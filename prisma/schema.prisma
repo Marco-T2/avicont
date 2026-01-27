@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Tenant {
+  id            String        @id @default(uuid())
+  name          String
+  slug          String        @unique
+  plan          Plan          @default(FREE)
+  status        TenantStatus  @default(ACTIVE)
+  memberships   Membership[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+  featureFlags  FeatureFlag[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model User {
+  id               String          @id @default(uuid())
+  email            String          @unique
+  hashedPassword   String
+  displayName      String?
+  isEmailVerified  Boolean         @default(false)
+  memberships      Membership[]
+  auditLogs        AuditLog[]
+  refreshTokens    RefreshToken[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  role      Role     @default(MEMBER)
+  tenantId  String
+  userId    String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  tenantId  String
+  userId    String?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String
+  tenantId  String?
+  userId    String
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  revokedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model FeatureFlag {
+  id           String   @id @default(uuid())
+  key          String
+  name         String
+  description  String?
+  enabled      Boolean  @default(false)
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  metadata     Json?    // For percentage rollouts, A/B tests, etc.
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([key, tenantId])
+  @@index([tenantId])
+  @@index([key])
+}
