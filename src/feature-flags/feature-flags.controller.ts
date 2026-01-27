@@ -1,11 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiSecurity,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';

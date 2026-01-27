@@ -48,7 +48,7 @@ export class PaddleAdapter implements BillingPort {
   /**
    * Customer Management
    */
-  async createCustomer(tenantId: string, info: CustomerInfo): Promise<string> {
+  async createCustomer(tenantId: string, _info: CustomerInfo): Promise<string> {
     // Paddle creates customers implicitly during checkout
     // You can use their Customers API for explicit creation
     // https://developer.paddle.com/api-reference/customers/create-customer
@@ -57,44 +57,44 @@ export class PaddleAdapter implements BillingPort {
     throw new NotImplementedException('Paddle createCustomer not implemented');
   }
 
-  async updateCustomer(customerId: string, info: Partial<CustomerInfo>): Promise<void> {
+  async updateCustomer(_customerId: string, _info: Partial<CustomerInfo>): Promise<void> {
     throw new NotImplementedException('Paddle updateCustomer not implemented');
   }
 
-  async deleteCustomer(customerId: string): Promise<void> {
+  async deleteCustomer(_customerId: string): Promise<void> {
     throw new NotImplementedException('Paddle deleteCustomer not implemented');
   }
 
-  async getCustomer(customerId: string): Promise<CustomerInfo | null> {
+  async getCustomer(_customerId: string): Promise<CustomerInfo | null> {
     throw new NotImplementedException('Paddle getCustomer not implemented');
   }
 
   /**
    * Subscription Management
    */
-  async createSubscription(customerId: string, planId: string): Promise<Subscription> {
+  async createSubscription(_customerId: string, _planId: string): Promise<Subscription> {
     // Paddle subscriptions are created through checkout
     throw new NotImplementedException('Paddle createSubscription not implemented');
   }
 
-  async getSubscription(subscriptionId: string): Promise<Subscription | null> {
+  async getSubscription(_subscriptionId: string): Promise<Subscription | null> {
     throw new NotImplementedException('Paddle getSubscription not implemented');
   }
 
-  async getSubscriptionByCustomer(customerId: string): Promise<Subscription | null> {
+  async getSubscriptionByCustomer(_customerId: string): Promise<Subscription | null> {
     throw new NotImplementedException('Paddle getSubscriptionByCustomer not implemented');
   }
 
-  async cancelSubscription(subscriptionId: string, immediately = false): Promise<void> {
+  async cancelSubscription(_subscriptionId: string, _immediately = false): Promise<void> {
     // https://developer.paddle.com/api-reference/subscriptions/cancel-subscription
     throw new NotImplementedException('Paddle cancelSubscription not implemented');
   }
 
-  async resumeSubscription(subscriptionId: string): Promise<void> {
+  async resumeSubscription(_subscriptionId: string): Promise<void> {
     throw new NotImplementedException('Paddle resumeSubscription not implemented');
   }
 
-  async updateSubscription(subscriptionId: string, planId: string): Promise<Subscription> {
+  async updateSubscription(_subscriptionId: string, _planId: string): Promise<Subscription> {
     // https://developer.paddle.com/api-reference/subscriptions/update-subscription
     throw new NotImplementedException('Paddle updateSubscription not implemented');
   }
@@ -103,10 +103,10 @@ export class PaddleAdapter implements BillingPort {
    * Checkout & Portal Sessions
    */
   async createCheckoutSession(
-    customerId: string,
-    planId: string,
-    successUrl: string,
-    cancelUrl: string,
+    _customerId: string,
+    _planId: string,
+    _successUrl: string,
+    _cancelUrl: string,
   ): Promise<CheckoutSession> {
     // Paddle uses client-side checkout with Paddle.js
     // Server-side: create a transaction
@@ -115,7 +115,7 @@ export class PaddleAdapter implements BillingPort {
     throw new NotImplementedException('Paddle createCheckoutSession not implemented');
   }
 
-  async createPortalSession(customerId: string, returnUrl: string): Promise<PortalSession> {
+  async createPortalSession(_customerId: string, _returnUrl: string): Promise<PortalSession> {
     // Paddle has a customer portal, but it's handled differently
     // You typically redirect to a Paddle-hosted URL
 
@@ -125,7 +125,7 @@ export class PaddleAdapter implements BillingPort {
   /**
    * Webhook Handling
    */
-  constructWebhookEvent(payload: string | Buffer, signature: string): WebhookEvent {
+  constructWebhookEvent(_payload: string | Buffer, _signature: string): WebhookEvent {
     // Paddle webhook verification
     // https://developer.paddle.com/webhooks/signature-verification
 
@@ -136,7 +136,7 @@ export class PaddleAdapter implements BillingPort {
    * Plan & Price Information
    */
   async getPlanPrice(
-    planId: string,
+    _planId: string,
   ): Promise<{ amount: number; currency: string; interval: string } | null> {
     // https://developer.paddle.com/api-reference/prices/get-price
     throw new NotImplementedException('Paddle getPlanPrice not implemented');

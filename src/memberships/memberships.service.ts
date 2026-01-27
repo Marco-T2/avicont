@@ -78,7 +78,7 @@ export class MembershipsService {
     });
   }
 
-  async remove(membershipId: string, actorUserId: string) {
+  async remove(membershipId: string, _actorUserId: string) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new ForbiddenException('Tenant context required');

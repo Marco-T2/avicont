@@ -64,7 +64,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
-  // eslint-disable-next-line no-console
   console.info(`API listening on http://localhost:${port}`);
   console.info(`Swagger docs at http://localhost:${port}/docs`);
 }

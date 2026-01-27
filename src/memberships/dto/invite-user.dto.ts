@@ -14,7 +14,11 @@ export class InviteUserDto {
   @IsEmail()
   email!: string;
 
-  @ApiPropertyOptional({ enum: ['OWNER', 'ADMIN', 'MEMBER'], default: 'MEMBER', description: 'Role to assign' })
+  @ApiPropertyOptional({
+    enum: ['OWNER', 'ADMIN', 'MEMBER'],
+    default: 'MEMBER',
+    description: 'Role to assign',
+  })
   @IsOptional()
   @IsEnum(Role)
   role?: RoleType;

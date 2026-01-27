@@ -35,7 +35,10 @@ export class ConsoleAdapter implements NotificationPort {
     if (options.html) {
       this.logger.log('HTML BODY:');
       // Strip HTML tags for console display
-      const textContent = options.html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const textContent = options.html
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       this.logger.log(textContent.substring(0, 500) + (textContent.length > 500 ? '...' : ''));
     }
 

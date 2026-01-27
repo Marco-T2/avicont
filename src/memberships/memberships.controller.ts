@@ -1,11 +1,5 @@
 import { Controller, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiSecurity,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { MembershipsService } from './memberships.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';

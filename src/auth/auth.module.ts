@@ -17,8 +17,8 @@ import { TenantContextService } from '../common/tenant-context/tenant-context.se
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_ACCESS_SECRET'),
-        signOptions: { expiresIn: config.get<string>('JWT_ACCESS_EXPIRES_IN', '15m') },
+        secret: config.get<string>('JWT_ACCESS_SECRET') || 'fallback-secret-change-in-production',
+        signOptions: { expiresIn: '15m' },
       }),
     }),
     UsersModule,

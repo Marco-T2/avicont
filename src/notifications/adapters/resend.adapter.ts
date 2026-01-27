@@ -74,7 +74,7 @@ export class ResendAdapter implements NotificationPort {
     this.logger.warn(`Resend does not have built-in templates. Using templateId as subject.`);
 
     // Simple template replacement - in production, use a proper template engine
-    let html = `<h1>${templateId}</h1><pre>${JSON.stringify(data, null, 2)}</pre>`;
+    const html = `<h1>${templateId}</h1><pre>${JSON.stringify(data, null, 2)}</pre>`;
 
     return this.sendEmail({
       to,

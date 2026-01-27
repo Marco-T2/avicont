@@ -1,11 +1,5 @@
 import { Controller, Post, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiSecurity,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';

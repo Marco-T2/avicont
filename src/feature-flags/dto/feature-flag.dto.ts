@@ -2,7 +2,11 @@ import { IsString, IsBoolean, IsOptional, IsObject, MaxLength, Matches } from 'c
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateFeatureFlagDto {
-  @ApiProperty({ example: 'new_dashboard', pattern: '^[a-z][a-z0-9_]*$', description: 'Unique flag key' })
+  @ApiProperty({
+    example: 'new_dashboard',
+    pattern: '^[a-z][a-z0-9_]*$',
+    description: 'Unique flag key',
+  })
   @IsString()
   @MaxLength(100)
   @Matches(/^[a-z][a-z0-9_]*$/, {

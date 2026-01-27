@@ -88,7 +88,9 @@ export interface BillingPort {
   /**
    * Plan & Price Information
    */
-  getPlanPrice(planId: string): Promise<{ amount: number; currency: string; interval: string } | null>;
+  getPlanPrice(
+    planId: string,
+  ): Promise<{ amount: number; currency: string; interval: string } | null>;
 }
 
 /**
