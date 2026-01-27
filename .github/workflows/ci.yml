@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saas
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+      redis:
+        image: redis:6
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy env
+        run: cp .env.example .env
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run Prisma migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+          REDIS_HOST: localhost
+        run: npm run test -- --runInBand
+
+      - name: E2E Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+          REDIS_HOST: localhost
+        run: npm run test:e2e -- --runInBand

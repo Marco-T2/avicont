@@ -2,11 +2,13 @@
 
 > Production-ready NestJS backend for building SaaS applications with organizations, users, roles, strict tenant isolation, and billing-ready architecture. Think "Laravel Jetstream for NestJS".
 
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)
-![NestJS](https://img.shields.io/badge/NestJS-10-red)
-![Prisma](https://img.shields.io/badge/Prisma-5-teal)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![CI](https://github.com/YOUR_USERNAME/Multi-Tenant-SaaS-Starter-NestJS/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/Multi-Tenant-SaaS-Starter-NestJS/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-10-red?logo=nestjs)](https://nestjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)](https://www.postgresql.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ## ✨ Features
 
@@ -14,12 +16,21 @@
 - **🔐 Authentication** — JWT with access/refresh token rotation
 - **👥 Organizations** — Create tenants, invite users, switch contexts
 - **🛡️ RBAC** — Role-based permissions (Owner, Admin, Member)
-- **� Feature Flags** — Per-tenant feature toggles with global defaults
+- **🚩 Feature Flags** — Per-tenant feature toggles with global defaults
 - **📊 Audit Logs** — Track all actions per tenant
-- **💳 Billing-ready** — Interfaces for Stripe, Paddle, etc.
+- **💳 Billing-ready** — Ports/Adapters pattern for Stripe, Paddle, etc.
+- **📧 Notifications** — Email via SMTP, Resend, or console (dev)
 - **⚡ Rate Limiting** — Per-tenant throttling
 - **🔴 Redis** — Caching layer with tenant isolation
+- **📖 Swagger** — Interactive API documentation at `/docs`
 - **🧪 Test Helpers** — Factory functions for E2E testing
+
+## 📚 Documentation
+
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## 🏗️ Architecture
 
@@ -41,20 +52,19 @@
                               ▼
                     ┌──────────────────┐
                     │  Tenant Context  │
-                    │  (AsyncLocalStorage)
+                    │ (AsyncLocalStorage)│
                     └──────────────────┘
                               │
-                              ▼
-                    ┌──────────────────┐
-                    │ Prisma Middleware│
-                    │ (Auto tenant_id) │
-                    └──────────────────┘
-                              │
-                              ▼
-                    ┌──────────────────┐
-                    │   PostgreSQL     │
-                    │  (Row-level)     │
-                    └──────────────────┘
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        ┌──────────┐   ┌──────────┐   ┌──────────┐
+        │  Billing │   │  Cache   │   │  Notify  │
+        │  (Port)  │   │ (Redis)  │   │  (Port)  │
+        └──────────┘   └──────────┘   └──────────┘
+              │                             │
+     ┌────────┴────────┐           ┌───────┴───────┐
+     ▼        ▼        ▼           ▼       ▼       ▼
+  Stripe   Paddle    Mock       SMTP   Resend  Console
 ```
 
 ### Tenant Resolution
@@ -71,13 +81,13 @@ Every request knows which tenant it belongs to via:
 
 - Node.js 18+
 - PostgreSQL 14+
-- pnpm/npm/yarn
+- Redis 6+ (optional, for caching)
 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/yourusername/multi-tenant-saas-starter-nestjs.git
-cd multi-tenant-saas-starter-nestjs
+git clone https://github.com/YOUR_USERNAME/Multi-Tenant-SaaS-Starter-NestJS.git
+cd Multi-Tenant-SaaS-Starter-NestJS
 npm install
 ```
 
@@ -91,8 +101,8 @@ cp .env.example .env
 ### 3. Setup Database
 
 ```bash
-npm run prisma:migrate
-npm run seed
+npx prisma migrate dev
+npx prisma db seed
 ```
 
 ### 4. Start Development Server
@@ -101,7 +111,14 @@ npm run seed
 npm run start:dev
 ```
 
-API available at `http://localhost:3000/api`
+- **API**: http://localhost:3000/api
+- **Swagger Docs**: http://localhost:3000/docs
+
+### 🐳 Docker (Alternative)
+
+```bash
+docker-compose up -d
+```
 
 ## 📁 Project Structure
 
@@ -117,11 +134,14 @@ src/
 │   ├── guards/              # Permissions guard
 │   └── decorators/          # @RequirePermissions()
 ├── feature-flags/           # Feature toggle system
-│   └── dto/                 # Feature flag DTOs
 ├── cache/                   # Redis caching layer
 ├── audit/                   # Audit logging
-├── billing/                 # Billing interfaces (Stripe-ready)
-│   └── interfaces/          # BillingProvider, QuotaChecker
+├── billing/                 # Payment integration
+│   ├── ports/               # BillingPort interface
+│   └── adapters/            # Stripe, Paddle, Mock
+├── notifications/           # Email notifications
+│   ├── ports/               # NotificationPort interface
+│   └── adapters/            # SMTP, Resend, Console
 ├── common/
 │   ├── guards/              # JwtAuthGuard, TenantGuard
 │   ├── interceptors/        # TenantContext, Audit
@@ -175,33 +195,22 @@ src/
 | GET    | `/api/billing/limits`        | Plan limits        |
 | GET    | `/api/billing/quota/:resource` | Check quota      |
 
-### Audit
-
-| Method | Endpoint       | Description       |
-|--------|---------------|-------------------|
-| GET    | `/api/audit`  | List audit logs   |
-
 ### Feature Flags
 
 | Method | Endpoint                                  | Description                    |
 |--------|------------------------------------------|--------------------------------|
 | GET    | `/api/feature-flags`                     | Get all flags for tenant       |
-| GET    | `/api/feature-flags/list`                | List flags (global + overrides)|
 | GET    | `/api/feature-flags/:key/check`          | Check if feature enabled       |
 | POST   | `/api/feature-flags/overrides`           | Create tenant override         |
-| PUT    | `/api/feature-flags/overrides/:key`      | Update tenant override         |
-| POST   | `/api/feature-flags/overrides/:key/toggle`| Toggle tenant override        |
 | DELETE | `/api/feature-flags/overrides/:key`      | Delete tenant override         |
 
-### Feature Flags Admin (Global)
+### Audit Logs
 
-| Method | Endpoint                                  | Description                    |
-|--------|------------------------------------------|--------------------------------|
-| GET    | `/api/admin/feature-flags`               | List all global flags          |
-| POST   | `/api/admin/feature-flags`               | Create global flag             |
-| PUT    | `/api/admin/feature-flags/:key`          | Update global flag             |
-| POST   | `/api/admin/feature-flags/:key/toggle`   | Toggle global flag             |
-| DELETE | `/api/admin/feature-flags/:key`          | Delete global flag             |
+| Method | Endpoint       | Description       |
+|--------|---------------|-------------------|
+| GET    | `/api/audit`  | List audit logs   |
+
+> 📖 **Full API documentation available at** `/docs` **(Swagger UI)**
 
 ## 🔒 Tenant Isolation
 
@@ -209,22 +218,8 @@ src/
 
 1. **TenantContextInterceptor** extracts `tenantId` from request
 2. Stores in **AsyncLocalStorage** for request lifecycle
-3. **Prisma middleware** automatically adds `tenantId` to queries
+3. **PrismaService** helpers add `tenantId` to queries
 4. **TenantGuard** blocks requests without tenant context
-
-```typescript
-// Automatic tenant scoping via Prisma middleware
-this.$use(async (params, next) => {
-  const tenantId = this.tenantContext.getTenantId();
-  if (isTenantAware && tenantId) {
-    params.args.where = {
-      ...params.args.where,
-      tenantId
-    };
-  }
-  return next(params);
-});
-```
 
 ### Protected Models
 
@@ -232,26 +227,15 @@ These tables are automatically scoped by `tenant_id`:
 - `Membership`
 - `AuditLog`
 - `RefreshToken`
+- `FeatureFlag` (overrides)
 
 ## 🛡️ RBAC Permissions
 
-### Roles
-
-| Role   | Description                    |
-|--------|--------------------------------|
-| OWNER  | Full access, billing, transfer |
-| ADMIN  | Manage users, read billing     |
-| MEMBER | Basic access                   |
-
-### Permissions
-
-```typescript
-const ROLE_PERMISSIONS = {
-  OWNER: ['users.invite', 'users.manage', 'billing.read', 'billing.manage', 'tenant.update', 'audit.read'],
-  ADMIN: ['users.invite', 'users.manage', 'billing.read', 'audit.read'],
-  MEMBER: []
-};
-```
+| Role   | Permissions |
+|--------|-------------|
+| OWNER  | `users.invite`, `users.manage`, `billing.read`, `billing.manage`, `tenant.update`, `audit.read`, `settings.read`, `settings.write` |
+| ADMIN  | `users.invite`, `users.manage`, `billing.read`, `audit.read`, `settings.read` |
+| MEMBER | (none) |
 
 ### Usage
 
@@ -267,183 +251,84 @@ export class MembershipsController {
 }
 ```
 
-## 💳 Billing Integration
+## 💳 Billing (Ports/Adapters)
 
-Ready-to-implement interfaces for payment providers:
+Swap payment providers without changing business logic:
 
-```typescript
-interface BillingProvider {
-  createCustomer(tenant: Tenant): Promise<{ customerId: string }>;
-  createCheckoutSession(tenantId: string, planId: string, ...): Promise<{ sessionUrl: string }>;
-  hasActiveSubscription(tenantId: string): Promise<boolean>;
-  // ... more methods
-}
+```bash
+# .env
+BILLING_PROVIDER=stripe  # stripe | paddle | mock
 ```
 
-### Plan Limits
+Implement the `BillingPort` interface for any provider.
 
-```typescript
-const DEFAULT_PLAN_LIMITS = {
-  FREE: { members: 3, projects: 5, apiCalls: 1000 },
-  PRO: { members: 25, projects: 100, apiCalls: 50000 }
-};
+## 📧 Notifications (Ports/Adapters)
+
+```bash
+# .env
+EMAIL_PROVIDER=console  # smtp | resend | console
 ```
+
+Pre-built email templates: invite, welcome, password reset, subscription confirmation.
 
 ## 🚩 Feature Flags
 
-### How It Works
-
-Feature flags support global defaults with per-tenant overrides:
-
-1. **Global flags** — Set by admins, apply to all tenants by default
-2. **Tenant overrides** — Individual tenants can override global settings
-3. **Caching** — Redis-backed with 60-second TTL for performance
-
-### Usage in Controllers
-
 ```typescript
-import { RequireFeature, FeatureFlagGuard } from './feature-flags';
+// Guard-based
+@RequireFeature('beta_dashboard')
+async getBetaDashboard() { ... }
 
-@Controller('projects')
-@UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
-export class ProjectsController {
-  @Get('export')
-  @RequireFeature('advanced_export')
-  async exportProjects() {
-    // Only accessible if 'advanced_export' flag is enabled
-  }
+// Programmatic
+if (await this.featureFlags.isEnabled('new_feature', tenantId)) {
+  // Feature enabled
 }
-```
-
-### Programmatic Check
-
-```typescript
-@Injectable()
-export class MyService {
-  constructor(private featureFlags: FeatureFlagsService) {}
-
-  async doSomething(tenantId: string) {
-    if (await this.featureFlags.isEnabled('beta_feature', tenantId)) {
-      // Feature is enabled for this tenant
-    }
-  }
-}
-```
-
-### Flag Resolution Order
-
-1. Check tenant-specific override
-2. Fall back to global flag
-3. Default to `false` if not found
-
-## 🔴 Redis Caching
-
-### Setup
-
-```bash
-# Add Redis config to .env
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-```
-
-### Usage
-
-```typescript
-import { CacheService } from './cache';
-
-@Injectable()
-export class MyService {
-  constructor(private cache: CacheService) {}
-
-  async getData(tenantId: string) {
-    // Tenant-isolated cache
-    const cached = await this.cache.getTenantCache<MyData>(tenantId, 'my-key');
-    if (cached) return cached;
-
-    const data = await this.fetchData();
-    await this.cache.setTenantCache(tenantId, 'my-key', data, 300); // 5 min TTL
-    return data;
-  }
-}
-```
-
-### Rate Limiting Helper
-
-```typescript
-const { allowed, remaining, resetIn } = await this.cache.checkRateLimit(
-  `api:${tenantId}:${endpoint}`,
-  100,  // limit
-  60    // window in seconds
-);
 ```
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-npm test
-
-# Run e2e tests
-npm run test:e2e
-
-# Watch mode
-npm run test:watch
-```
-
-### Test Factories
-
-```typescript
-import { createTestUserWithTenant, cleanupTestData } from './helpers/test-factory';
-
-describe('My Feature', () => {
-  beforeEach(async () => {
-    const { user, tenant, membership } = await createTestUserWithTenant({
-      email: 'test@example.com',
-      role: Role.OWNER
-    });
-  });
-
-  afterEach(() => cleanupTestData());
-});
+npm test          # Unit tests
+npm run test:e2e  # E2E tests
+npm run test:cov  # Coverage
 ```
 
 ## 🗺️ Roadmap
 
-### v1 (Current)
-- [x] JWT Authentication
+- [x] JWT Authentication with refresh tokens
 - [x] Multi-tenant architecture
 - [x] RBAC permissions
-- [x] Tenant isolation
 - [x] Audit logging
-- [x] Billing interfaces
-- [x] Feature flags (per-tenant)
+- [x] Feature flags
 - [x] Redis caching
-
-### v2 (Planned)
-- [ ] Stripe integration
-- [ ] Schema-per-tenant option
-- [ ] Webhook system
-- [ ] Admin panel
-- [ ] Email verification
-- [ ] Password reset
+- [x] Billing & Notification ports/adapters
+- [x] Swagger documentation
+- [ ] Stripe integration (full)
+- [ ] Email verification flow
+- [ ] Password reset flow
 - [ ] 2FA/MFA
+- [ ] Admin dashboard
+- [ ] Webhook system
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our contributing guidelines first.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) first.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## 🔐 Security
+
+Please report security vulnerabilities by following our [Security Policy](SECURITY.md).
+
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+[MIT](LICENSE) © 2026
 
 ---
 
 **Built with ❤️ for the NestJS community**
+
+⭐ Star this repo if you find it useful!
