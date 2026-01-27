@@ -15,7 +15,14 @@ describe('Auth (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.setGlobalPrefix('api');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidUnknownValues: true,
+      }),
+    );
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
@@ -26,7 +33,6 @@ describe('Auth (e2e)', () => {
   });
 
   beforeEach(async () => {
-    // Clean up test data
     await prisma.refreshToken.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.membership.deleteMany({});

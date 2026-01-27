@@ -22,12 +22,17 @@ export class TenantContextInterceptor implements NestInterceptor {
     const tenantId = headerTenantId || jwtTenant || subdomainTenant;
     req.tenantId = tenantId;
 
-    return from(
-      this.tenantContext.runWithContext(
-        { tenantId, userId: user?.sub, roles: user?.roles ?? [] },
-        () => next.handle(),
-      ) as Promise<Observable<any>>,
-    ).pipe(switchMap((obs) => obs));
+    const result = this.tenantContext.runWithContext(
+      { tenantId, userId: user?.sub, roles: user?.roles ?? [] },
+      () => next.handle(),
+    );
+
+    // If runWithContext returns a Promise<Observable>, unwrap it
+    if (result instanceof Promise) {
+      return from(result).pipe(switchMap((obs) => obs));
+    }
+    // If it returns an Observable directly, return it
+    return result;
   }
 
   private extractTenantFromHost(host: string): string | undefined {

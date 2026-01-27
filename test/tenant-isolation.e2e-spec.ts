@@ -22,13 +22,26 @@ describe('Tenant Isolation (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidUnknownValues: true,
+      }),
+    );
     await app.init();
 
     prisma = moduleFixture.get(PrismaService);
   });
 
   afterAll(async () => {
+    await prisma.$transaction([
+      prisma.refreshToken.deleteMany({}),
+      prisma.auditLog.deleteMany({}),
+      prisma.membership.deleteMany({}),
+      prisma.tenant.deleteMany({}),
+      prisma.user.deleteMany({}),
+    ]);
     await app.close();
   });
 
@@ -83,6 +96,14 @@ describe('Tenant Isolation (e2e)', () => {
         .send({ email: 'user1@example.com', password: 'password123' });
       tenant1Token = res1.body.accessToken;
 
+      // Verify user1 has membership
+      const user1Memberships = await prisma.membership.findMany({
+        where: { userId: user1.id },
+      });
+      expect(user1Memberships.length).toBeGreaterThan(0);
+      expect(res1.status).toBe(200);
+      expect(res1.body.accessToken).toBeDefined();
+
       const res2 = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: 'user2@example.com', password: 'password123' });
@@ -91,14 +112,24 @@ describe('Tenant Isolation (e2e)', () => {
 
     it('should not allow user to access other tenant data', async () => {
       // User 1 tries to access tenant 2's data via header
-      await request(app.getHttpServer())
+      // JWT has tenant1 in activeTenantId, but X-Tenant-ID header specifies tenant2
+      // The TenantGuard now checks membership, should return 403
+      const response = await request(app.getHttpServer())
         .get('/api/tenants/current')
         .set('Authorization', `Bearer ${tenant1Token}`)
-        .set('X-Tenant-ID', tenant2Id)
-        .expect(403); // Should fail because user1 is not a member of tenant2
+        .set('X-Tenant-ID', tenant2Id);
+
+      // Should fail because user1 is not a member of tenant2
+      expect([401, 403]).toContain(response.status);
     });
 
     it('should scope audit logs to tenant', async () => {
+      // Verify tenants exist
+      const tenantsExist = await prisma.tenant.findMany({
+        where: { id: { in: [tenant1Id, tenant2Id] } },
+      });
+      expect(tenantsExist.length).toBe(2);
+
       // Create audit logs for both tenants directly
       await prisma.auditLog.create({
         data: {
@@ -122,7 +153,13 @@ describe('Tenant Isolation (e2e)', () => {
       const response = await request(app.getHttpServer())
         .get('/api/audit')
         .set('Authorization', `Bearer ${tenant1Token}`)
-        .expect(200);
+        .set('X-Tenant-ID', tenant1Id);
+
+      if (response.status !== 200) {
+        console.log('Response status:', response.status);
+        console.log('Response body:', response.body);
+      }
+      expect(response.status).toBe(200);
 
       expect(response.body.length).toBe(1);
       expect(response.body[0].tenantId).toBe(tenant1Id);

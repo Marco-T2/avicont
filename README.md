@@ -79,7 +79,7 @@ Every request knows which tenant it belongs to via:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 24+
 - PostgreSQL 14+
 - Redis 6+ (optional, for caching)
 
