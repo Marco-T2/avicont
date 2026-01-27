@@ -1,0 +1,47 @@
+### Multi-Tenant SaaS API - Tenants
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+@tenantId = {{$dotenv %TENANT_ID}}
+
+### Create a new tenant
+# @name createTenant
+POST {{baseUrl}}/tenants
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "New Organization"
+}
+
+### Get current tenant
+GET {{baseUrl}}/tenants/current
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Update current tenant
+PATCH {{baseUrl}}/tenants/current
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+{
+  "name": "Updated Organization Name"
+}
+
+### Get tenant members
+GET {{baseUrl}}/tenants/current/members
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Get tenant by ID
+GET {{baseUrl}}/tenants/{{tenantId}}
+Authorization: Bearer {{accessToken}}
+
+### Get tenant by slug
+GET {{baseUrl}}/tenants/slug/my-organization
+Authorization: Bearer {{accessToken}}

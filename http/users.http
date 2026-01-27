@@ -1,0 +1,21 @@
+### Multi-Tenant SaaS API - Users
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+
+### Get my profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+
+### Update my profile
+PATCH {{baseUrl}}/users/me
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "displayName": "Updated Name"
+}

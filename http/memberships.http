@@ -1,0 +1,42 @@
+### Multi-Tenant SaaS API - Memberships
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+@tenantId = {{$dotenv %TENANT_ID}}
+@membershipId = replace-with-membership-id
+
+### Invite a user to the tenant
+# @name invite
+POST {{baseUrl}}/memberships/invite
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+{
+  "email": "newmember@example.com",
+  "role": "MEMBER"
+}
+
+### Update member role
+PATCH {{baseUrl}}/memberships/{{membershipId}}
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+{
+  "role": "ADMIN"
+}
+
+### Remove a member
+DELETE {{baseUrl}}/memberships/{{membershipId}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Leave the tenant (as current user)
+DELETE {{baseUrl}}/memberships/leave
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}

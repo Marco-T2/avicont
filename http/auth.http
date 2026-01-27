@@ -1,0 +1,58 @@
+### Multi-Tenant SaaS API - Authentication
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Register a new user
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "password123",
+  "displayName": "Test User"
+}
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+###
+@accessToken = {{login.response.body.accessToken}}
+@refreshToken = {{login.response.body.refreshToken}}
+@tenantId = {{login.response.body.tenantId}}
+
+### Refresh tokens
+# @name refresh
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Logout
+POST {{baseUrl}}/auth/logout
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Switch tenant
+# @name switchTenant
+POST {{baseUrl}}/auth/switch-tenant
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "tenantId": "{{tenantId}}"
+}

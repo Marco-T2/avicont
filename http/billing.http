@@ -1,0 +1,34 @@
+### Multi-Tenant SaaS API - Billing
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+@tenantId = {{$dotenv %TENANT_ID}}
+
+### Get billing overview
+GET {{baseUrl}}/billing
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Get plan limits
+GET {{baseUrl}}/billing/limits
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Check quota for a specific resource
+GET {{baseUrl}}/billing/quota/seats
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Check API calls quota
+GET {{baseUrl}}/billing/quota/api_calls
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Check storage quota
+GET {{baseUrl}}/billing/quota/storage_gb
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}

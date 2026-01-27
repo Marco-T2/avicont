@@ -1,0 +1,34 @@
+### Multi-Tenant SaaS API - Audit Logs
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+@tenantId = {{$dotenv %TENANT_ID}}
+
+### List audit logs (paginated)
+GET {{baseUrl}}/audit?skip=0&take=20
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### List audit logs - page 2
+GET {{baseUrl}}/audit?skip=20&take=20
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Get audit logs for a specific entity
+GET {{baseUrl}}/audit/entity?entity=Membership&entityId=replace-with-entity-id
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Get audit logs for a user entity
+GET {{baseUrl}}/audit/entity?entity=User&entityId=replace-with-user-id
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Get audit logs for a tenant entity
+GET {{baseUrl}}/audit/entity?entity=Tenant&entityId={{tenantId}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}

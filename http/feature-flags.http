@@ -1,0 +1,61 @@
+### Multi-Tenant SaaS API - Feature Flags
+### VS Code REST Client / JetBrains HTTP Client compatible
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get tokens first by running auth.http login
+@accessToken = {{$dotenv %ACCESS_TOKEN}}
+@tenantId = {{$dotenv %TENANT_ID}}
+
+### Get all feature flags for current tenant
+GET {{baseUrl}}/feature-flags
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### List flags with details (requires settings.read permission)
+GET {{baseUrl}}/feature-flags/list
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Check if a specific feature is enabled
+GET {{baseUrl}}/feature-flags/new_dashboard/check
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Create a tenant-specific override
+POST {{baseUrl}}/feature-flags/overrides
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+{
+  "key": "beta_features",
+  "name": "Beta Features",
+  "description": "Enable beta features for this tenant",
+  "enabled": true,
+  "metadata": {
+    "rollout_percentage": 100
+  }
+}
+
+### Update a tenant-specific override
+PUT {{baseUrl}}/feature-flags/overrides/beta_features
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+{
+  "enabled": false,
+  "name": "Beta Features (Disabled)"
+}
+
+### Toggle a feature flag
+POST {{baseUrl}}/feature-flags/overrides/beta_features/toggle
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
+
+### Delete a tenant override (falls back to global)
+DELETE {{baseUrl}}/feature-flags/overrides/beta_features
+Authorization: Bearer {{accessToken}}
+X-Tenant-ID: {{tenantId}}
