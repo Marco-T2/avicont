@@ -13,10 +13,14 @@ import { CacheModule } from './cache/cache.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { HealthModule } from './health/health.module';
 import { LoggerModule } from './logger/logger.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { TracingModule } from './tracing/tracing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaService } from './common/prisma.service';
 import { TenantContextService } from './common/tenant-context/tenant-context.service';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
+import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
+import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.interceptor';
 
 @Module({
   imports: [
@@ -33,6 +37,8 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
     }),
     CacheModule,
     LoggerModule,
+    MetricsModule,
+    TracingModule,
     HealthModule,
     NotificationsModule,
     AuthModule,
@@ -49,6 +55,8 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
     PrismaService,
     TenantContextService,
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

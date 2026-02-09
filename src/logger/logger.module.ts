@@ -4,9 +4,11 @@ import { LoggerService } from './logger.service';
 import { LOGGER_PORT, LogLevel } from './ports/logger.port';
 import { ConsoleLoggerAdapter } from './adapters/console.adapter';
 import { PinoAdapter } from './adapters/pino.adapter';
+import { PinoLokiAdapter } from './adapters/pino-loki.adapter';
 import { WinstonAdapter } from './adapters/winston.adapter';
+import { LokiAdapter } from './adapters/loki.adapter';
 
-export type LogProvider = 'console' | 'pino' | 'winston';
+export type LogProvider = 'console' | 'pino' | 'pino-loki' | 'winston' | 'loki';
 
 @Global()
 @Module({
@@ -33,6 +35,17 @@ export type LogProvider = 'console' | 'pino' | 'winston';
               );
               return new ConsoleLoggerAdapter(level);
             }
+          case 'pino-loki':
+            try {
+              require.resolve('pino');
+              require.resolve('pino-loki');
+              return new PinoLokiAdapter(config);
+            } catch {
+              logger.warn(
+                'Pino or pino-loki not installed, falling back to console. Run: npm install pino pino-pretty pino-loki',
+              );
+              return new ConsoleLoggerAdapter(level);
+            }
           case 'winston':
             try {
               require.resolve('winston');
@@ -40,6 +53,17 @@ export type LogProvider = 'console' | 'pino' | 'winston';
             } catch {
               logger.warn(
                 'Winston not installed, falling back to console. Run: npm install winston',
+              );
+              return new ConsoleLoggerAdapter(level);
+            }
+          case 'loki':
+            try {
+              require.resolve('winston');
+              require.resolve('winston-loki');
+              return new LokiAdapter(config);
+            } catch {
+              logger.warn(
+                'Winston or winston-loki not installed, falling back to console. Run: npm install winston winston-loki',
               );
               return new ConsoleLoggerAdapter(level);
             }
