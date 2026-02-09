@@ -8,6 +8,7 @@ import {
 } from '@nestjs/terminus';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../common/prisma.service';
+import { LoggerService } from 'src/logger/logger.service';
 
 @ApiTags('Health')
 @Controller('health')
@@ -18,12 +19,14 @@ export class HealthController {
     private disk: DiskHealthIndicator,
     private prisma: PrismaHealthIndicator,
     private prismaService: PrismaService,
+    private readonly logger: LoggerService,
   ) {}
 
   @Get()
   @HealthCheck()
   @ApiOperation({ summary: 'Check application health' })
   check() {
+    this.logger.info('Performing health check');
     return this.health.check([
       () => this.prisma.pingCheck('database', this.prismaService),
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024), // 150MB
