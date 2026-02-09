@@ -11,6 +11,7 @@ import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
 import { CacheModule } from './cache/cache.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaService } from './common/prisma.service';
 import { TenantContextService } from './common/tenant-context/tenant-context.service';
@@ -30,6 +31,7 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
       ],
     }),
     CacheModule,
+    HealthModule,
     NotificationsModule,
     AuthModule,
     TenantsModule,
