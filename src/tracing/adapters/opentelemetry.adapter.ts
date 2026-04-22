@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   TracingPort,
@@ -9,70 +9,23 @@ import {
   SpanStatusCode,
 } from '../ports/tracing.port';
 import * as api from '@opentelemetry/api';
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
-import { NestInstrumentation } from '@opentelemetry/instrumentation-nestjs-core';
 
 /**
- * OpenTelemetry Tracing Adapter for Tempo
- * Provides distributed tracing capabilities with automatic instrumentation.
+ * OpenTelemetry Tracing Adapter.
+ * The SDK is initialized in src/tracing/otel-bootstrap.ts BEFORE NestJS loads,
+ * so instrumentations can patch http/express/nestjs at import time.
+ * This adapter only exposes the already-initialized tracer to the app.
  */
 @Injectable()
-export class OpenTelemetryAdapter implements TracingPort, OnModuleDestroy {
+export class OpenTelemetryAdapter implements TracingPort {
   private readonly logger = new Logger(OpenTelemetryAdapter.name);
   private readonly tracer: api.Tracer;
-  private sdk: NodeSDK | null = null;
   private readonly serviceName: string;
 
   constructor(private readonly config: ConfigService) {
     this.serviceName = config.get<string>('OTEL_SERVICE_NAME', 'saas-api');
-    const enabled = config.get<string>('TRACING_ENABLED', 'true') === 'true';
-
-    if (enabled) {
-      this.initializeSDK();
-    }
-
     this.tracer = api.trace.getTracer(this.serviceName);
-  }
-
-  private initializeSDK() {
-    const endpoint = this.config.get<string>('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://tempo:4318');
-
-    const exporter = new OTLPTraceExporter({
-      url: `${endpoint}/v1/traces`,
-    });
-
-    const resource = resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: this.serviceName,
-      [ATTR_SERVICE_VERSION]: this.config.get<string>('APP_VERSION', '1.0.0'),
-      'deployment.environment': this.config.get<string>('NODE_ENV', 'development'),
-    });
-
-    this.sdk = new NodeSDK({
-      resource,
-      traceExporter: exporter,
-      instrumentations: [
-        new HttpInstrumentation({
-          ignoreIncomingRequestHook: (req) => {
-            // Ignore health checks and metrics endpoints
-            return Boolean(
-              req.url?.includes('/health') ||
-              req.url?.includes('/metrics') ||
-              req.url?.includes('/favicon'),
-            );
-          },
-        }),
-        new ExpressInstrumentation(),
-        new NestInstrumentation(),
-      ],
-    });
-
-    this.sdk.start();
-    this.logger.log(`OpenTelemetry tracing initialized, exporting to: ${endpoint}`);
+    this.logger.log(`Tracing adapter ready (service: ${this.serviceName})`);
   }
 
   private mapSpanKind(kind?: SpanKind): api.SpanKind {
@@ -182,13 +135,7 @@ export class OpenTelemetryAdapter implements TracingPort, OnModuleDestroy {
   }
 
   async shutdown(): Promise<void> {
-    if (this.sdk) {
-      await this.sdk.shutdown();
-      this.logger.log('OpenTelemetry SDK shutdown');
-    }
-  }
-
-  async onModuleDestroy() {
-    await this.shutdown();
+    // No-op: SDK lifecycle is owned by src/tracing/otel-bootstrap.ts
+    // which registers SIGTERM/SIGINT handlers for graceful flush.
   }
 }

@@ -1,3 +1,7 @@
+// IMPORTANT: must be the first import so OpenTelemetry instrumentations
+// patch http/express/nestjs BEFORE they are loaded below.
+import './tracing/otel-bootstrap';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
