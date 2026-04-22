@@ -17,35 +17,35 @@ export class FeatureFlagsService {
    * Check if a feature is enabled for a tenant
    * First checks tenant-specific flags, then falls back to global flags
    */
-  async isEnabled(key: string, tenantId?: string): Promise<boolean> {
+  async isEnabled(key: string, organizationId?: string): Promise<boolean> {
     // Check cache first
     const cacheKey = `feature:${key}`;
-    if (tenantId) {
-      const cachedTenant = await this.cache.getTenantCache<boolean>(tenantId, cacheKey);
+    if (organizationId) {
+      const cachedTenant = await this.cache.getTenantCache<boolean>(organizationId, cacheKey);
       if (cachedTenant !== null) return cachedTenant;
     }
 
     // Check tenant-specific flag first
-    if (tenantId) {
+    if (organizationId) {
       const tenantFlag = await this.prisma.featureFlag.findUnique({
-        where: { key_tenantId: { key, tenantId } },
+        where: { key_organizationId: { key, organizationId } },
       });
 
       if (tenantFlag) {
-        await this.cache.setTenantCache(tenantId, cacheKey, tenantFlag.enabled, this.CACHE_TTL);
+        await this.cache.setTenantCache(organizationId, cacheKey, tenantFlag.enabled, this.CACHE_TTL);
         return tenantFlag.enabled;
       }
     }
 
     // Fallback to global flag
     const globalFlag = await this.prisma.featureFlag.findFirst({
-      where: { key, tenantId: null },
+      where: { key, organizationId: null },
     });
 
     const enabled = globalFlag?.enabled ?? false;
 
-    if (tenantId) {
-      await this.cache.setTenantCache(tenantId, cacheKey, enabled, this.CACHE_TTL);
+    if (organizationId) {
+      await this.cache.setTenantCache(organizationId, cacheKey, enabled, this.CACHE_TTL);
     }
 
     return enabled;
@@ -54,19 +54,19 @@ export class FeatureFlagsService {
   /**
    * Get all flags for a tenant (includes global flags with tenant overrides)
    */
-  async getAllForTenant(tenantId: string): Promise<Record<string, boolean>> {
+  async getAllForTenant(organizationId: string): Promise<Record<string, boolean>> {
     const cacheKey = 'feature:all';
-    const cached = await this.cache.getTenantCache<Record<string, boolean>>(tenantId, cacheKey);
+    const cached = await this.cache.getTenantCache<Record<string, boolean>>(organizationId, cacheKey);
     if (cached) return cached;
 
     // Get all global flags
     const globalFlags = await this.prisma.featureFlag.findMany({
-      where: { tenantId: null },
+      where: { organizationId: null },
     });
 
     // Get tenant-specific flags
     const tenantFlags = await this.prisma.featureFlag.findMany({
-      where: { tenantId },
+      where: { organizationId },
     });
 
     // Merge: tenant flags override global flags
@@ -80,7 +80,7 @@ export class FeatureFlagsService {
       result[flag.key] = flag.enabled;
     }
 
-    await this.cache.setTenantCache(tenantId, cacheKey, result, this.CACHE_TTL);
+    await this.cache.setTenantCache(organizationId, cacheKey, result, this.CACHE_TTL);
     return result;
   }
 
@@ -89,7 +89,7 @@ export class FeatureFlagsService {
    */
   async createGlobal(dto: CreateFeatureFlagDto) {
     const existing = await this.prisma.featureFlag.findFirst({
-      where: { key: dto.key, tenantId: null },
+      where: { key: dto.key, organizationId: null },
     });
 
     if (existing) {
@@ -103,7 +103,7 @@ export class FeatureFlagsService {
         description: dto.description,
         enabled: dto.enabled ?? false,
         metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        tenantId: null,
+        organizationId: null,
       },
     });
   }
@@ -111,9 +111,9 @@ export class FeatureFlagsService {
   /**
    * Create a tenant-specific override
    */
-  async createTenantOverride(tenantId: string, dto: CreateFeatureFlagDto) {
+  async createTenantOverride(organizationId: string, dto: CreateFeatureFlagDto) {
     const existing = await this.prisma.featureFlag.findUnique({
-      where: { key_tenantId: { key: dto.key, tenantId } },
+      where: { key_organizationId: { key: dto.key, organizationId } },
     });
 
     if (existing) {
@@ -127,13 +127,13 @@ export class FeatureFlagsService {
         description: dto.description,
         enabled: dto.enabled ?? false,
         metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        tenantId,
+        organizationId,
       },
     });
 
     // Invalidate cache
-    await this.cache.invalidateTenantCache(tenantId, `feature:${dto.key}`);
-    await this.cache.invalidateTenantCache(tenantId, 'feature:all');
+    await this.cache.invalidateTenantCache(organizationId, `feature:${dto.key}`);
+    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
 
     return flag;
   }
@@ -143,7 +143,7 @@ export class FeatureFlagsService {
    */
   async listGlobal() {
     return this.prisma.featureFlag.findMany({
-      where: { tenantId: null },
+      where: { organizationId: null },
       orderBy: { key: 'asc' },
     });
   }
@@ -151,14 +151,14 @@ export class FeatureFlagsService {
   /**
    * List all flags for a tenant (both tenant-specific and global)
    */
-  async listForTenant(tenantId: string) {
+  async listForTenant(organizationId: string) {
     const [globalFlags, tenantFlags] = await Promise.all([
       this.prisma.featureFlag.findMany({
-        where: { tenantId: null },
+        where: { organizationId: null },
         orderBy: { key: 'asc' },
       }),
       this.prisma.featureFlag.findMany({
-        where: { tenantId },
+        where: { organizationId },
         orderBy: { key: 'asc' },
       }),
     ]);
@@ -176,7 +176,7 @@ export class FeatureFlagsService {
    */
   async updateGlobal(key: string, dto: UpdateFeatureFlagDto) {
     const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, tenantId: null },
+      where: { key, organizationId: null },
     });
 
     if (!flag) {
@@ -197,9 +197,9 @@ export class FeatureFlagsService {
   /**
    * Update a tenant-specific flag
    */
-  async updateTenantOverride(tenantId: string, key: string, dto: UpdateFeatureFlagDto) {
+  async updateTenantOverride(organizationId: string, key: string, dto: UpdateFeatureFlagDto) {
     const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_tenantId: { key, tenantId } },
+      where: { key_organizationId: { key, organizationId } },
     });
 
     if (!flag) {
@@ -217,8 +217,8 @@ export class FeatureFlagsService {
     });
 
     // Invalidate cache
-    await this.cache.invalidateTenantCache(tenantId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(tenantId, 'feature:all');
+    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
+    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
 
     return updated;
   }
@@ -228,7 +228,7 @@ export class FeatureFlagsService {
    */
   async deleteGlobal(key: string) {
     const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, tenantId: null },
+      where: { key, organizationId: null },
     });
 
     if (!flag) {
@@ -243,9 +243,9 @@ export class FeatureFlagsService {
   /**
    * Delete a tenant-specific override
    */
-  async deleteTenantOverride(tenantId: string, key: string) {
+  async deleteTenantOverride(organizationId: string, key: string) {
     const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_tenantId: { key, tenantId } },
+      where: { key_organizationId: { key, organizationId } },
     });
 
     if (!flag) {
@@ -257,8 +257,8 @@ export class FeatureFlagsService {
     });
 
     // Invalidate cache
-    await this.cache.invalidateTenantCache(tenantId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(tenantId, 'feature:all');
+    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
+    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
   }
 
   /**
@@ -266,7 +266,7 @@ export class FeatureFlagsService {
    */
   async toggleGlobal(key: string): Promise<boolean> {
     const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, tenantId: null },
+      where: { key, organizationId: null },
     });
 
     if (!flag) {
@@ -284,9 +284,9 @@ export class FeatureFlagsService {
   /**
    * Toggle a tenant-specific flag
    */
-  async toggleTenantOverride(tenantId: string, key: string): Promise<boolean> {
+  async toggleTenantOverride(organizationId: string, key: string): Promise<boolean> {
     const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_tenantId: { key, tenantId } },
+      where: { key_organizationId: { key, organizationId } },
     });
 
     if (!flag) {
@@ -299,8 +299,8 @@ export class FeatureFlagsService {
     });
 
     // Invalidate cache
-    await this.cache.invalidateTenantCache(tenantId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(tenantId, 'feature:all');
+    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
+    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
 
     return updated.enabled;
   }

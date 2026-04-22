@@ -1,16 +1,19 @@
-import { IsEnum } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import type { SystemRole } from '@prisma/client';
 
-const Role = {
-  OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER',
-} as const;
+const SYSTEM_ROLES = ['OWNER', 'ADMIN'] as const satisfies readonly SystemRole[];
 
-type RoleType = (typeof Role)[keyof typeof Role];
-
+// Exactamente uno de systemRole o customRoleId debe estar presente.
+// Pasar systemRole=null + customRoleId=X cambia a rol custom, y viceversa.
 export class UpdateMembershipDto {
-  @ApiProperty({ enum: ['OWNER', 'ADMIN', 'MEMBER'], description: 'New role' })
-  @IsEnum(Role)
-  role!: RoleType;
+  @ApiPropertyOptional({ enum: SYSTEM_ROLES, nullable: true })
+  @IsOptional()
+  @IsIn(SYSTEM_ROLES)
+  systemRole?: SystemRole | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  customRoleId?: string | null;
 }

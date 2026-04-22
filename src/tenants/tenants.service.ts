@@ -1,13 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { SystemRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
-
-const Role = {
-  OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER',
-} as const;
 
 @Injectable()
 export class TenantsService {
@@ -15,17 +10,17 @@ export class TenantsService {
 
   async create(dto: CreateTenantDto, ownerId: string) {
     const slug = this.generateSlug(dto.name);
-    const existing = await this.prisma.tenant.findUnique({ where: { slug } });
+    const existing = await this.prisma.organization.findUnique({ where: { slug } });
     if (existing) {
       throw new BadRequestException('Tenant slug already exists');
     }
 
-    return this.prisma.tenant.create({
+    return this.prisma.organization.create({
       data: {
         name: dto.name,
         slug,
         memberships: {
-          create: { userId: ownerId, role: Role.OWNER },
+          create: { userId: ownerId, systemRole: SystemRole.OWNER },
         },
       },
       include: { memberships: true },
@@ -33,7 +28,7 @@ export class TenantsService {
   }
 
   async findById(id: string) {
-    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    const tenant = await this.prisma.organization.findUnique({ where: { id } });
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
@@ -41,7 +36,7 @@ export class TenantsService {
   }
 
   async findBySlug(slug: string) {
-    const tenant = await this.prisma.tenant.findUnique({ where: { slug } });
+    const tenant = await this.prisma.organization.findUnique({ where: { slug } });
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
@@ -49,7 +44,7 @@ export class TenantsService {
   }
 
   async update(id: string, dto: UpdateTenantDto) {
-    return this.prisma.tenant.update({
+    return this.prisma.organization.update({
       where: { id },
       data: dto,
     });
@@ -57,11 +52,12 @@ export class TenantsService {
 
   async getMembers(tenantId: string) {
     return this.prisma.membership.findMany({
-      where: { tenantId },
+      where: { organizationId: tenantId },
       include: {
         user: {
           select: { id: true, email: true, displayName: true },
         },
+        customRole: { select: { id: true, slug: true, name: true } },
       },
     });
   }

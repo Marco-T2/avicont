@@ -33,7 +33,7 @@ export class AuditService {
         action: entry.action,
         entity: entry.entity,
         entityId: entry.entityId,
-        tenantId,
+        organizationId: tenantId,
         userId,
         metadata: entry.metadata ?? {},
       },
@@ -42,7 +42,7 @@ export class AuditService {
 
   async findByTenant(tenantId: string, options?: { skip?: number; take?: number }) {
     return this.prisma.auditLog.findMany({
-      where: { tenantId },
+      where: { organizationId: tenantId },
       orderBy: { createdAt: 'desc' },
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
@@ -54,7 +54,7 @@ export class AuditService {
 
   async findByEntity(tenantId: string, entity: string, entityId: string) {
     return this.prisma.auditLog.findMany({
-      where: { tenantId, entity, entityId },
+      where: { organizationId: tenantId, entity, entityId },
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, email: true, displayName: true } },

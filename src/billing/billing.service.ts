@@ -11,7 +11,7 @@ export class BillingService {
   ) {}
 
   async getTenantPlan(tenantId: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.prisma.organization.findUnique({
       where: { id: tenantId },
       select: { id: true, plan: true, status: true },
     });
@@ -48,7 +48,7 @@ export class BillingService {
     // Example implementation - customize per resource type
     switch (resource) {
       case 'members':
-        return this.prisma.membership.count({ where: { tenantId } });
+        return this.prisma.membership.count({ where: { organizationId: tenantId } });
       default:
         return 0;
     }
@@ -56,7 +56,7 @@ export class BillingService {
 
   async upgradePlan(tenantId: string, plan: 'FREE' | 'PRO') {
     // In production, this would integrate with BillingProvider
-    return this.prisma.tenant.update({
+    return this.prisma.organization.update({
       where: { id: tenantId },
       data: { plan },
     });
@@ -65,7 +65,9 @@ export class BillingService {
   async getBillingOverview(tenantId: string) {
     const tenant = await this.getTenantPlan(tenantId);
     const limits = await this.getPlanLimits(tenantId);
-    const memberCount = await this.prisma.membership.count({ where: { tenantId } });
+    const memberCount = await this.prisma.membership.count({
+      where: { organizationId: tenantId },
+    });
 
     return {
       plan: tenant?.plan,

@@ -7,105 +7,291 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =====================================================================
+// IDENTIDAD Y MULTI-TENANCY
+// =====================================================================
+//
+// Modelo flat: cada Organization es una isla. Un User puede pertenecer a
+// múltiples Organizations vía Membership con distinto rol en cada una.
+// Ver CLAUDE.md §5 (Seguridad y permisos) y §10.1 (Arquitectura).
+//
+// Roles: SystemRole (OWNER/ADMIN) hardcoded; el resto son CustomRole por
+// organización con permisos como strings (Nivel B: modulo.recurso.action).
+// Ver CLAUDE.md §10.4.
+
 enum Plan {
   FREE
   PRO
 }
 
-enum TenantStatus {
+enum OrganizationStatus {
   ACTIVE
   SUSPENDED
+  ARCHIVED
 }
 
-enum Role {
+enum SystemRole {
   OWNER
   ADMIN
-  MEMBER
 }
 
-model Tenant {
-  id            String        @id @default(uuid())
-  name          String
-  slug          String        @unique
-  plan          Plan          @default(FREE)
-  status        TenantStatus  @default(ACTIVE)
-  memberships   Membership[]
-  auditLogs     AuditLog[]
-  refreshTokens RefreshToken[]
-  featureFlags  FeatureFlag[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 model User {
-  id               String          @id @default(uuid())
-  email            String          @unique
-  hashedPassword   String
-  displayName      String?
-  isEmailVerified  Boolean         @default(false)
-  memberships      Membership[]
-  auditLogs        AuditLog[]
-  refreshTokens    RefreshToken[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id              String    @id @default(uuid())
+  email           String    @unique
+  hashedPassword  String
+  displayName     String?
+  isEmailVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships             Membership[]
+  refreshTokens           RefreshToken[]
+  auditLogs               AuditLog[]
+  invitationsSent         Invitation[]         @relation("InvitedBy")
+  invitationsAccepted     Invitation[]         @relation("AcceptedBy")
+  customRolesCreated      CustomRole[]         @relation("CustomRoleCreator")
+  impersonationsAsAdmin   ImpersonationLog[]   @relation("ImpersonationAdmin")
+  impersonationsAsTarget  ImpersonationLog[]   @relation("ImpersonationTarget")
 }
 
-model Membership {
-  id        String   @id @default(uuid())
-  role      Role     @default(MEMBER)
-  tenantId  String
-  userId    String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+model Organization {
+  id     String             @id @default(uuid())
+  slug   String             @unique
+  name   String
+  status OrganizationStatus @default(ACTIVE)
+
+  // Plan de suscripción (lógica de cuotas en BillingService).
+  plan Plan @default(FREE)
+
+  // Feature flags de módulos. Si está deshabilitado, los endpoints del
+  // módulo retornan 404/403 incluso para OWNER. Ver CLAUDE.md §10.4 y §8.3.
+  contabilidadEnabled Boolean @default(true)
+  granjaEnabled       Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tenantId, userId])
-  @@index([tenantId])
+  memberships       Membership[]
+  customRoles       CustomRole[]
+  invitations       Invitation[]
+  refreshTokens     RefreshToken[]
+  auditLogs         AuditLog[]
+  featureFlags      FeatureFlag[]
+  impersonationLogs ImpersonationLog[]
+
+  @@map("organizations")
 }
 
-model AuditLog {
-  id        String   @id @default(uuid())
-  action    String
-  entity    String
-  entityId  String
-  metadata  Json?
-  tenantId  String
-  userId    String?
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+model Membership {
+  id             String @id @default(uuid())
+  organizationId String
+  userId         String
 
-  @@index([tenantId])
+  // Exactamente UNO de los dos debe estar seteado, nunca ambos ni ninguno.
+  // OWNER/ADMIN son systemRole (hardcoded, no editable).
+  // Cualquier otro rol es customRoleId (FK a CustomRole de la org).
+  // Ver CLAUDE.md §10.4 y §8.3.
+  systemRole   SystemRole?
+  customRoleId String?
+
+  deactivatedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customRole   CustomRole?  @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, deactivatedAt])
+  @@index([customRoleId])
+  @@map("memberships")
 }
+
+model CustomRole {
+  id             String @id @default(uuid())
+  organizationId String
+  slug           String // ej: "contador", "granjero", "cobrador-aux"
+  name           String // ej: "Contador", "Granjero"
+  description    String?
+
+  // Permisos como strings con formato {modulo}.{recurso}.{accion}.
+  // Nivel B (CRUD + acciones específicas como .post, .void). Ver CLAUDE.md §2.5 y §10.2.
+  // Wildcards permitidos: "contabilidad.*", "*.read".
+  permissions String[]
+
+  // Templates "Contador" y "Granjero" se precargan al crear la org.
+  // El admin puede editarlos (isEditable=true) pero no eliminarlos si isSystemDefault=true.
+  isSystemDefault Boolean @default(false)
+  isEditable      Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("CustomRoleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  memberships  Membership[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, isSystemDefault])
+  @@map("custom_roles")
+}
+
+model Invitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  email          String
+  invitedById    String
+
+  // El rol que se asignará al aceptar. Mismo patrón que Membership.
+  systemRole   SystemRole?
+  customRoleId String?
+
+  // Hash SHA-256 del token enviado al usuario por email. El token claro
+  // se entrega una vez en la respuesta del POST /invitations y nunca más.
+  tokenHash String           @unique
+  status    InvitationStatus @default(PENDING)
+  expiresAt DateTime
+
+  createdAt        DateTime  @default(now())
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitedBy", fields: [invitedById], references: [id])
+  acceptedBy   User?        @relation("AcceptedBy", fields: [acceptedByUserId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([email])
+  @@map("invitations")
+}
+
+// =====================================================================
+// AUTH: Refresh tokens con detección de reuso
+// =====================================================================
+//
+// Familia de tokens: cada login crea una nueva familia. Cada rotación
+// emite un token nuevo dentro de la misma familia y marca el viejo como
+// replacedBy. Si llega un refresh ya rotado, se revoca toda la familia.
+// Ver CLAUDE.md §5.3.
 
 model RefreshToken {
-  id        String   @id @default(uuid())
-  tokenHash String
-  tenantId  String?
-  userId    String
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-  revokedAt DateTime?
-  expiresAt DateTime
+  id             String  @id @default(uuid())
+  tokenHash      String  @unique
+  userId         String
+  organizationId String?
+
+  // familyId agrupa todos los tokens de una sesión (login → rotaciones).
+  // Si se detecta reuso, se revoca toda la familia de un solo UPDATE.
+  familyId     String
+  replacedById String?
+
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  revokedReason String?
+
   createdAt DateTime @default(now())
 
-  @@index([userId])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
 }
 
-model FeatureFlag {
-  id           String   @id @default(uuid())
-  key          String
-  name         String
-  description  String?
-  enabled      Boolean  @default(false)
-  tenantId     String?
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
-  metadata     Json?    // For percentage rollouts, A/B tests, etc.
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// =====================================================================
+// AUDITORÍA Y SEGURIDAD
+// =====================================================================
 
-  @@unique([key, tenantId])
-  @@index([tenantId])
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  entity         String
+  entityId       String
+  metadata       Json?
+  organizationId String
+  userId         String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entity, entityId])
+  @@map("audit_logs")
+}
+
+// Impersonation: cuando un OWNER/ADMIN entra al tenant de otro user.
+// Toda acción durante impersonation se registra DOBLE: (a) en auditoría
+// del dominio (userId = impersonado), (b) en ImpersonationAction (admin real).
+// Ver CLAUDE.md §5.6 y §8.3 (Anti-27).
+
+model ImpersonationLog {
+  id             String    @id @default(uuid())
+  adminUserId    String
+  targetUserId   String
+  organizationId String?
+  reason         String
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+
+  admin        User          @relation("ImpersonationAdmin",  fields: [adminUserId],  references: [id])
+  target       User          @relation("ImpersonationTarget", fields: [targetUserId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  actions ImpersonationAction[]
+
+  @@index([adminUserId, startedAt])
+  @@index([targetUserId, startedAt])
+  @@map("impersonation_logs")
+}
+
+model ImpersonationAction {
+  id                 String   @id @default(uuid())
+  impersonationLogId String
+  action             String   // ej: "POST /api/asientos"
+  resource           String?  // ej: "asiento:abc123"
+  metadata           Json?
+  timestamp          DateTime @default(now())
+
+  impersonationLog ImpersonationLog @relation(fields: [impersonationLogId], references: [id], onDelete: Cascade)
+
+  @@index([impersonationLogId, timestamp])
+  @@map("impersonation_actions")
+}
+
+// =====================================================================
+// FEATURE FLAGS (genéricos, distintos de los module flags de Organization)
+// =====================================================================
+//
+// Para flags arbitrarios runtime (A/B tests, rollouts graduales, etc.).
+// NO confundir con los flags de módulo (contabilidadEnabled, granjaEnabled)
+// que viven directamente en Organization.
+
+model FeatureFlag {
+  id             String   @id @default(uuid())
+  key            String
+  name           String
+  description    String?
+  enabled        Boolean  @default(false)
+  organizationId String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([key, organizationId])
+  @@index([organizationId])
   @@index([key])
+  @@map("feature_flags")
 }

@@ -1,15 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { SystemRole } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
 import * as bcrypt from 'bcrypt';
-
-const Role = {
-  OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER',
-} as const;
 
 describe('Tenant Isolation (e2e)', () => {
   let app: INestApplication;
@@ -38,8 +33,13 @@ describe('Tenant Isolation (e2e)', () => {
     await prisma.$transaction([
       prisma.refreshToken.deleteMany({}),
       prisma.auditLog.deleteMany({}),
+      prisma.impersonationAction.deleteMany({}),
+      prisma.impersonationLog.deleteMany({}),
+      prisma.invitation.deleteMany({}),
       prisma.membership.deleteMany({}),
-      prisma.tenant.deleteMany({}),
+      prisma.customRole.deleteMany({}),
+      prisma.featureFlag.deleteMany({}),
+      prisma.organization.deleteMany({}),
       prisma.user.deleteMany({}),
     ]);
     await app.close();
@@ -48,8 +48,13 @@ describe('Tenant Isolation (e2e)', () => {
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany({});
     await prisma.auditLog.deleteMany({});
+    await prisma.impersonationAction.deleteMany({});
+    await prisma.impersonationLog.deleteMany({});
+    await prisma.invitation.deleteMany({});
     await prisma.membership.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await prisma.customRole.deleteMany({});
+    await prisma.featureFlag.deleteMany({});
+    await prisma.organization.deleteMany({});
     await prisma.user.deleteMany({});
   });
 
@@ -67,11 +72,11 @@ describe('Tenant Isolation (e2e)', () => {
         data: { email: 'user1@example.com', hashedPassword },
       });
 
-      const tenant1 = await prisma.tenant.create({
+      const tenant1 = await prisma.organization.create({
         data: {
           name: 'Tenant One',
           slug: 'tenant-one',
-          memberships: { create: { userId: user1.id, role: Role.OWNER } },
+          memberships: { create: { userId: user1.id, systemRole: SystemRole.OWNER } },
         },
       });
       tenant1Id = tenant1.id;
@@ -81,11 +86,11 @@ describe('Tenant Isolation (e2e)', () => {
         data: { email: 'user2@example.com', hashedPassword },
       });
 
-      const tenant2 = await prisma.tenant.create({
+      const tenant2 = await prisma.organization.create({
         data: {
           name: 'Tenant Two',
           slug: 'tenant-two',
-          memberships: { create: { userId: user2.id, role: Role.OWNER } },
+          memberships: { create: { userId: user2.id, systemRole: SystemRole.OWNER } },
         },
       });
       tenant2Id = tenant2.id;
@@ -111,32 +116,26 @@ describe('Tenant Isolation (e2e)', () => {
     });
 
     it('should not allow user to access other tenant data', async () => {
-      // User 1 tries to access tenant 2's data via header
-      // JWT has tenant1 in activeTenantId, but X-Tenant-ID header specifies tenant2
-      // The TenantGuard now checks membership, should return 403
       const response = await request(app.getHttpServer())
         .get('/api/tenants/current')
         .set('Authorization', `Bearer ${tenant1Token}`)
         .set('X-Tenant-ID', tenant2Id);
 
-      // Should fail because user1 is not a member of tenant2
       expect([401, 403]).toContain(response.status);
     });
 
     it('should scope audit logs to tenant', async () => {
-      // Verify tenants exist
-      const tenantsExist = await prisma.tenant.findMany({
+      const tenantsExist = await prisma.organization.findMany({
         where: { id: { in: [tenant1Id, tenant2Id] } },
       });
       expect(tenantsExist.length).toBe(2);
 
-      // Create audit logs for both tenants directly
       await prisma.auditLog.create({
         data: {
           action: 'test.action',
           entity: 'test',
           entityId: '1',
-          tenantId: tenant1Id,
+          organizationId: tenant1Id,
         },
       });
 
@@ -145,11 +144,10 @@ describe('Tenant Isolation (e2e)', () => {
           action: 'test.action',
           entity: 'test',
           entityId: '2',
-          tenantId: tenant2Id,
+          organizationId: tenant2Id,
         },
       });
 
-      // Verify each tenant only sees their own audit logs
       const response = await request(app.getHttpServer())
         .get('/api/audit')
         .set('Authorization', `Bearer ${tenant1Token}`)
@@ -162,7 +160,8 @@ describe('Tenant Isolation (e2e)', () => {
       expect(response.status).toBe(200);
 
       expect(response.body.length).toBe(1);
-      expect(response.body[0].tenantId).toBe(tenant1Id);
+      // El endpoint devuelve el campo organizationId del AuditLog.
+      expect(response.body[0].organizationId).toBe(tenant1Id);
     });
   });
 });

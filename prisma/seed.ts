@@ -1,44 +1,132 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, SystemRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-const Role = {
-  OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER'
-} as const;
-
 const prisma = new PrismaClient();
+
+// Permisos de los templates que se precargan al crear una Organization.
+// Ver CLAUDE.md §10.4 (roles templates) y §2.5 (convención de strings).
+// Formato: {modulo}.{recurso}.{accion}.
+
+const CONTADOR_PERMISSIONS = [
+  'contabilidad.dashboard.read',
+  'contabilidad.plan-cuentas.read',
+  'contabilidad.plan-cuentas.create',
+  'contabilidad.plan-cuentas.update',
+  'contabilidad.plan-cuentas.delete',
+  'contabilidad.asientos.read',
+  'contabilidad.asientos.create',
+  'contabilidad.asientos.update',
+  'contabilidad.asientos.delete',
+  'contabilidad.asientos.post',
+  'contabilidad.asientos.void',
+  'contabilidad.libro-diario.read',
+  'contabilidad.libro-mayor.read',
+  'contabilidad.ventas.read',
+  'contabilidad.ventas.create',
+  'contabilidad.ventas.update',
+  'contabilidad.ventas.delete',
+  'contabilidad.compras.read',
+  'contabilidad.compras.create',
+  'contabilidad.compras.update',
+  'contabilidad.compras.delete',
+  'contabilidad.periodos.read',
+  'contabilidad.periodos.create',
+  'contabilidad.cierre-mensual.read',
+  'contabilidad.cierre-mensual.create',
+  'contabilidad.eeff.read',
+  'contabilidad.configuracion.read',
+  'contabilidad.configuracion.update',
+];
+
+const GRANJERO_PERMISSIONS = [
+  'granja.dashboard.read',
+  'granja.lotes.read',
+  'granja.lotes.create',
+  'granja.lotes.update',
+  'granja.lotes.delete',
+  'granja.tipos-registro.read',
+  'granja.tipos-registro.create',
+  'granja.tipos-registro.update',
+  'granja.tipos-registro.delete',
+  'granja.movimientos.read',
+  'granja.movimientos.create',
+  'granja.movimientos.update',
+  'granja.movimientos.delete',
+  'granja.chat.interact',
+];
 
 async function main() {
   const password = await bcrypt.hash('password', 10);
 
-  const user = await prisma.user.upsert({
-    where: { email: 'founder@yoursaas.com' },
+  const founder = await prisma.user.upsert({
+    where: { email: 'founder@avicont.bo' },
     update: {},
     create: {
-      email: 'founder@yoursaas.com',
+      email: 'founder@avicont.bo',
       hashedPassword: password,
+      displayName: 'Founder',
       isEmailVerified: true,
-      displayName: 'Founder'
-    }
+      isActive: true,
+    },
   });
 
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: 'acme' },
+  const asociacion = await prisma.organization.upsert({
+    where: { slug: 'asociacion-piloto' },
     update: {},
     create: {
-      name: 'Acme Inc',
-      slug: 'acme'
-    }
+      slug: 'asociacion-piloto',
+      name: 'Asociación Piloto',
+      contabilidadEnabled: true,
+      granjaEnabled: false,
+    },
+  });
+
+  // Templates precargados (editables) para cada organización nueva.
+  await prisma.customRole.upsert({
+    where: { organizationId_slug: { organizationId: asociacion.id, slug: 'contador' } },
+    update: {},
+    create: {
+      organizationId: asociacion.id,
+      slug: 'contador',
+      name: 'Contador',
+      description: 'Acceso completo al módulo de contabilidad',
+      permissions: CONTADOR_PERMISSIONS,
+      isSystemDefault: true,
+      isEditable: true,
+      createdById: founder.id,
+    },
+  });
+
+  await prisma.customRole.upsert({
+    where: { organizationId_slug: { organizationId: asociacion.id, slug: 'granjero' } },
+    update: {},
+    create: {
+      organizationId: asociacion.id,
+      slug: 'granjero',
+      name: 'Granjero',
+      description: 'Acceso completo al módulo de granja',
+      permissions: GRANJERO_PERMISSIONS,
+      isSystemDefault: true,
+      isEditable: true,
+      createdById: founder.id,
+    },
   });
 
   await prisma.membership.upsert({
-    where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
-    update: { role: Role.OWNER },
-    create: { tenantId: tenant.id, userId: user.id, role: Role.OWNER }
+    where: { organizationId_userId: { organizationId: asociacion.id, userId: founder.id } },
+    update: { systemRole: SystemRole.OWNER, customRoleId: null },
+    create: {
+      organizationId: asociacion.id,
+      userId: founder.id,
+      systemRole: SystemRole.OWNER,
+    },
   });
 
-  console.info('Seed complete:', { tenant: tenant.slug, user: user.email });
+  console.info('Seed complete:', {
+    user: founder.email,
+    organization: asociacion.slug,
+    templates: ['contador', 'granjero'],
+  });
 }
 
 main()

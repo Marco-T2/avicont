@@ -28,7 +28,10 @@ export class UsersService {
       where: { id: userId },
       include: {
         memberships: {
-          include: { tenant: true },
+          include: {
+            organization: true,
+            customRole: { select: { slug: true, name: true } },
+          },
         },
       },
     });
@@ -39,14 +42,14 @@ export class UsersService {
       email: user.email,
       displayName: user.displayName,
       isEmailVerified: user.isEmailVerified,
-      tenants: user.memberships.map(
-        (m: { tenant: { id: string; name: string; slug: string }; role: string }) => ({
-          id: m.tenant.id,
-          name: m.tenant.name,
-          slug: m.tenant.slug,
-          role: m.role,
-        }),
-      ),
+      tenants: user.memberships.map((m) => ({
+        id: m.organization.id,
+        name: m.organization.name,
+        slug: m.organization.slug,
+        // Rol efectivo: systemRole si lo tiene (OWNER/ADMIN),
+        // si no el slug del CustomRole asignado.
+        role: m.systemRole ?? m.customRole?.slug ?? null,
+      })),
     };
   }
 }

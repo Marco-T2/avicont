@@ -21,8 +21,8 @@ export class TenantGuard implements CanActivate {
     if (user?.sub) {
       const membership = await this.prisma.membership.findUnique({
         where: {
-          tenantId_userId: {
-            tenantId,
+          organizationId_userId: {
+            organizationId: tenantId,
             userId: user.sub,
           },
         },
