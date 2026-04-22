@@ -6,11 +6,11 @@ import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
 import { BILLING_PORT } from './ports/billing.port';
-import { StripeAdapter } from './adapters/stripe.adapter';
-import { PaddleAdapter } from './adapters/paddle.adapter';
 import { MockBillingAdapter } from './adapters/mock.adapter';
 
-export type BillingProvider = 'stripe' | 'paddle' | 'mock';
+// Adapters de pago externos (Stripe, Paddle) están preservados en branch
+// archive/billing-starter. Si se reintroducen, agregar provider + case aquí.
+export type BillingProvider = 'mock';
 
 @Module({
   imports: [RbacModule, ConfigModule],
@@ -27,15 +27,7 @@ export type BillingProvider = 'stripe' | 'paddle' | 'mock';
 
         logger.log(`Initializing billing adapter: ${provider}`);
 
-        switch (provider) {
-          case 'stripe':
-            return new StripeAdapter(config);
-          case 'paddle':
-            return new PaddleAdapter(config);
-          case 'mock':
-          default:
-            return new MockBillingAdapter();
-        }
+        return new MockBillingAdapter();
       },
       inject: [ConfigService],
     },
