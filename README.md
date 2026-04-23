@@ -9,7 +9,7 @@ Este repositorio es un **monorepo**: contiene todas las piezas del sistema en un
 ```
 avicont/
 ├── backend/          # API NestJS + Prisma + PostgreSQL
-├── frontend/         # Vite + React (pendiente — arranca tras estabilizar backend)
+├── frontend/         # Vite + React + TypeScript (shell + auth listos)
 ├── docs/             # Diseños de dominio transversales
 ├── observability/    # Configs de Grafana, Loki, Prometheus, Tempo
 ├── docker-compose.yml
@@ -40,7 +40,14 @@ npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts   # siembra el catálog
 npm run start:dev
 ```
 
-El backend queda en `http://localhost:3000`, con Swagger en `/api/docs` y health en `/api/health`.
+El backend queda en `http://localhost:3000`, con Swagger en `/docs` y health en `/api/health`.
+
+```bash
+# 3. En otra terminal: arrancar el frontend
+cd frontend
+npm install
+npm run dev             # http://localhost:5173 (proxy /api → backend)
+```
 
 Para el stack completo con observabilidad (Grafana, Loki, Prometheus, Tempo, dbgate):
 
@@ -52,8 +59,9 @@ Puertos expuestos (ver `CLAUDE.md §11.1` para la tabla completa):
 
 | Servicio   | URL                          |
 | ---------- | ---------------------------- |
+| Frontend   | http://localhost:5173        |
 | Backend    | http://localhost:3000        |
-| Swagger    | http://localhost:3000/api/docs |
+| Swagger    | http://localhost:3000/docs |
 | Grafana    | http://localhost:3001 (admin/admin) |
 | dbgate     | http://localhost:3100        |
 | Prometheus | http://localhost:9090        |
@@ -69,9 +77,11 @@ Puertos expuestos (ver `CLAUDE.md §11.1` para la tabla completa):
 
 - ✅ Fase 0 — Identidad (auth, RBAC, invitaciones, impersonación, feature flags)
 - ✅ Fase 1.0 — Plan de cuentas + configuración contable (151 tests verdes)
+- ✅ Auth hardening — access token en memoria + refresh token en httpOnly cookie
+- ✅ Frontend shell — Vite + React + shadcn/ui + login + dashboard con dark mode
 - 🔲 Fase 1.1 — Asientos contables con partida doble
+- 🔲 Frontend — plan de cuentas viewer + configuración contable UI
 - 🔲 Fase 1.2+ — Periodos fiscales, libros, estados financieros
-- 🔲 Frontend — slice vertical pendiente
 
 ## Licencia
 
