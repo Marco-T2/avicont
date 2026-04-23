@@ -23,7 +23,11 @@ export class TenantContextInterceptor implements NestInterceptor {
     req.tenantId = tenantId;
 
     const result = this.tenantContext.runWithContext(
-      { tenantId, userId: user?.sub, roles: user?.roles ?? [] },
+      {
+        ...(tenantId !== undefined ? { tenantId } : {}),
+        ...(user?.sub !== undefined ? { userId: user.sub } : {}),
+        roles: user?.roles ?? [],
+      },
       () => next.handle(),
     );
 

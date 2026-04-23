@@ -268,17 +268,15 @@ async function procesarRespuestaSIN(raw: unknown): Promise<RespuestaSIN> {
 }
 ```
 
-### 2.5.1 Flags estrictos pendientes de re-habilitar (Fase 0)
+### 2.5.1 Flags estrictos activos
 
-Estos flags están **desactivados temporalmente** hasta el cierre de Fase 0. El código heredado del starter no los respeta (Prisma genera tipos incompatibles con `exactOptionalPropertyTypes`, y el acceso a arrays sin chequeo es omnipresente).
-
-**El código NUEVO se escribe como si estuvieran activos:**
+`tsconfig.json` tiene activos los siguientes flags además de `strict: true`:
 
 - `noUncheckedIndexedAccess`: chequear `array[i]` antes de usarlo (devuelve `T | undefined`).
 - `exactOptionalPropertyTypes`: distinguir `prop?: string` de `prop: string | undefined`.
+  Para campos opcionales (DTOs, payloads de Prisma) usar **spread condicional** en
+  vez de pasar `undefined`: `...(value !== undefined ? { field: value } : {})`.
 - `noImplicitOverride`: usar keyword `override` al sobreescribir métodos.
-
-**Al cierre de Fase 0** (tarea 0.11): re-habilitar en `tsconfig.json` y arreglar errores remanentes.
 
 ### 2.6 Imports
 
@@ -1687,7 +1685,6 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 |------|--------|----------------------------|
 | Migrar a Vitest | Diferido | Cuando haya >500 tests y la velocidad de Jest moleste |
 | Mutation testing (Stryker) | Diferido | Fase 1+, una vez estabilizado el core |
-| Re-habilitar `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride` | Diferido | Cierre de Fase 0.11 |
 | Feature flags para trunk-based | Diferido | Si el equipo crece a >3 devs |
 | Integración SIN (facturación electrónica) | Fuera de scope | Si un cliente lo pide como upsell de pago |
 

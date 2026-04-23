@@ -42,7 +42,7 @@ export class AuthService {
       data: {
         email: dto.email.toLowerCase().trim(),
         hashedPassword,
-        displayName: dto.displayName,
+        ...(dto.displayName !== undefined ? { displayName: dto.displayName } : {}),
       },
     });
     return { id: user.id, email: user.email };
@@ -76,7 +76,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
-      activeTenantId,
+      ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
     };
 
@@ -114,7 +114,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: stored.userId,
       email: stored.user.email,
-      activeTenantId,
+      ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
     };
 
@@ -200,7 +200,7 @@ export class AuthService {
       data: {
         tokenHash: hash,
         userId,
-        organizationId: tenantId,
+        ...(tenantId !== undefined ? { organizationId: tenantId } : {}),
         familyId: family,
         expiresAt,
       },
@@ -215,7 +215,7 @@ export class AuthService {
 
   private parseDuration(duration: string): number {
     const match = duration.match(/^(\d+)([smhd])$/);
-    if (!match) return 30 * 24 * 60 * 60 * 1000;
+    if (!match || !match[1] || !match[2]) return 30 * 24 * 60 * 60 * 1000;
     const value = parseInt(match[1], 10);
     switch (match[2]) {
       case 's':

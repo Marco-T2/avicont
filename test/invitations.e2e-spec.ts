@@ -91,7 +91,7 @@ describe('Invitations (e2e)', () => {
       .send({ email: 'nuevo@inv.bo', password: 'micl4v3.' });
     expect(loginRes.status).toBe(200);
     const payload = JSON.parse(
-      Buffer.from(loginRes.body.accessToken.split('.')[1], 'base64').toString(),
+      Buffer.from(loginRes.body.accessToken.split('.')[1] ?? '', 'base64').toString(),
     );
     expect(payload.roles).toEqual(['contador']);
     expect(payload.activeTenantId).toBe(orgId);

@@ -44,12 +44,12 @@ export async function createTestUserWithTenant(
   } = {},
 ) {
   const user = await createTestUser({
-    email: options.email,
-    password: options.password,
+    ...(options.email !== undefined ? { email: options.email } : {}),
+    ...(options.password !== undefined ? { password: options.password } : {}),
   });
 
   const tenant = await createTestTenant({
-    name: options.tenantName,
+    ...(options.tenantName !== undefined ? { name: options.tenantName } : {}),
   });
 
   const membership = await createTestMembership(user.id, tenant.id, options.role ?? SystemRole.OWNER);

@@ -87,7 +87,7 @@ describe('Impersonation (e2e)', () => {
     expect(startRes.status).toBe(201);
     const impToken = startRes.body.impersonationToken as string;
     const impId = startRes.body.impersonationId as string;
-    const payload = JSON.parse(Buffer.from(impToken.split('.')[1], 'base64').toString());
+    const payload = JSON.parse(Buffer.from(impToken.split('.')[1] ?? '', 'base64').toString());
     expect(payload.sub).toBe(targetUserId);
     expect(payload.impersonatedBy).toBeTruthy();
     expect(payload.impersonationId).toBe(impId);
@@ -127,7 +127,7 @@ describe('Impersonation (e2e)', () => {
 
   it('debe rechazar impersonar a sí mismo', async () => {
     const ownerId = JSON.parse(
-      Buffer.from(ownerToken.split('.')[1], 'base64').toString(),
+      Buffer.from(ownerToken.split('.')[1] ?? '', 'base64').toString(),
     ).sub;
     const res = await request(app.getHttpServer())
       .post('/api/admin/impersonate')

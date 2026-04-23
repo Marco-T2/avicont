@@ -34,14 +34,20 @@ export class BillingService {
     }
 
     const limit = limits[resource];
+    if (limit === undefined) {
+      return { allowed: true, current: 0, limit: Infinity };
+    }
     const current = await this.getCurrentUsage(tenantId, resource);
 
-    return {
-      allowed: current < limit,
-      current,
-      limit,
-      message: current >= limit ? `${resource} limit reached for your plan` : undefined,
-    };
+    const exceeds = current >= limit;
+    return exceeds
+      ? {
+          allowed: false,
+          current,
+          limit,
+          message: `${resource} limit reached for your plan`,
+        }
+      : { allowed: true, current, limit };
   }
 
   async getCurrentUsage(tenantId: string, resource: string): Promise<number> {

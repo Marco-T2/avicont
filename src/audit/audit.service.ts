@@ -34,7 +34,7 @@ export class AuditService {
         entity: entry.entity,
         entityId: entry.entityId,
         organizationId: tenantId,
-        userId,
+        ...(userId ? { userId } : {}),
         metadata: entry.metadata ?? {},
       },
     });

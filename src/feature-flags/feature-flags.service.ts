@@ -100,7 +100,7 @@ export class FeatureFlagsService {
       data: {
         key: dto.key,
         name: dto.name,
-        description: dto.description,
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
         enabled: dto.enabled ?? false,
         metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         organizationId: null,
@@ -124,7 +124,7 @@ export class FeatureFlagsService {
       data: {
         key: dto.key,
         name: dto.name,
-        description: dto.description,
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
         enabled: dto.enabled ?? false,
         metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
         organizationId,
@@ -186,10 +186,10 @@ export class FeatureFlagsService {
     return this.prisma.featureFlag.update({
       where: { id: flag.id },
       data: {
-        name: dto.name,
-        description: dto.description,
-        enabled: dto.enabled,
-        metadata: dto.metadata ? (dto.metadata as Prisma.InputJsonValue) : undefined,
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+        ...(dto.metadata ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
       },
     });
   }
@@ -209,10 +209,10 @@ export class FeatureFlagsService {
     const updated = await this.prisma.featureFlag.update({
       where: { id: flag.id },
       data: {
-        name: dto.name,
-        description: dto.description,
-        enabled: dto.enabled,
-        metadata: dto.metadata ? (dto.metadata as Prisma.InputJsonValue) : undefined,
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+        ...(dto.metadata ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
       },
     });
 

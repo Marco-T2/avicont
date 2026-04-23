@@ -18,8 +18,8 @@ export class AuditInterceptor implements NestInterceptor {
           action: entity,
           entity: 'http-request',
           entityId: request.id ?? request.url,
-          tenantId,
-          userId: user?.sub,
+          ...(tenantId !== undefined ? { tenantId } : {}),
+          ...(user?.sub !== undefined ? { userId: user.sub } : {}),
           metadata: { status: request.res?.statusCode, response: responseBody },
         });
       }),

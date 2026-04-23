@@ -34,8 +34,8 @@ export class AuditController {
     @Query('take') take?: string,
   ) {
     return this.auditService.findByTenant(tenantId, {
-      skip: skip ? parseInt(skip, 10) : undefined,
-      take: take ? parseInt(take, 10) : undefined,
+      ...(skip ? { skip: parseInt(skip, 10) } : {}),
+      ...(take ? { take: parseInt(take, 10) } : {}),
     });
   }
 

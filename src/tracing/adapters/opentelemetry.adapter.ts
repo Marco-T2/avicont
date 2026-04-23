@@ -60,7 +60,11 @@ export class OpenTelemetryAdapter implements TracingPort {
       setAttributes: (attrs) => otelSpan.setAttributes(attrs),
       addEvent: (name, attrs) => otelSpan.addEvent(name, attrs),
       recordException: (error) => otelSpan.recordException(error),
-      setStatus: (code, message) => otelSpan.setStatus({ code: this.mapStatusCode(code), message }),
+      setStatus: (code, message) =>
+        otelSpan.setStatus({
+          code: this.mapStatusCode(code),
+          ...(message !== undefined ? { message } : {}),
+        }),
       end: () => otelSpan.end(),
       getContext: () => {
         const ctx = otelSpan.spanContext();
@@ -77,17 +81,17 @@ export class OpenTelemetryAdapter implements TracingPort {
   startSpan(name: string, options?: SpanOptions): Span {
     const otelSpan = this.tracer.startSpan(name, {
       kind: this.mapSpanKind(options?.kind),
-      attributes: options?.attributes,
+      ...(options?.attributes ? { attributes: options.attributes } : {}),
     });
     return this.wrapSpan(otelSpan);
   }
 
   startActiveSpan<T>(name: string, fn: (span: Span) => T, options?: SpanOptions): T {
-    return this.tracer.startActiveSpan(
+    return this.tracer.startActiveSpan<(span: api.Span) => T>(
       name,
       {
         kind: this.mapSpanKind(options?.kind),
-        attributes: options?.attributes,
+        ...(options?.attributes ? { attributes: options.attributes } : {}),
       },
       (otelSpan) => {
         const wrappedSpan = this.wrapSpan(otelSpan);

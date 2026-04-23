@@ -7,10 +7,13 @@ export class RedisService implements OnModuleDestroy {
   private readonly client: Redis;
 
   constructor(private readonly config: ConfigService) {
+    const password = this.config.get<string>('REDIS_PASSWORD');
     this.client = new Redis({
       host: this.config.get<string>('REDIS_HOST', 'localhost'),
       port: this.config.get<number>('REDIS_PORT', 6379),
-      password: this.config.get<string>('REDIS_PASSWORD') || undefined,
+      // Solo pasar password si está seteado: con exactOptionalPropertyTypes
+      // no podemos asignar `string | undefined` a una prop opcional.
+      ...(password ? { password } : {}),
       db: this.config.get<number>('REDIS_DB', 0),
       keyPrefix: 'saas:',
     });
