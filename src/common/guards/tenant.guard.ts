@@ -11,13 +11,21 @@ export class TenantGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
-    const tenantId = req.tenantId || this.tenantContext.getTenantId();
+    // Los guards corren ANTES de los interceptors, así que NO podemos depender
+    // de req.tenantId (lo setea TenantContextInterceptor) ni de
+    // tenantContext.getTenantId() (AsyncLocalStorage). Leemos directo del
+    // header X-Tenant-ID o del JWT.activeTenantId.
+    const headerTenantId = req.headers['x-tenant-id'] as string | undefined;
+    const user = req.user as { sub?: string; activeTenantId?: string } | undefined;
+    const tenantId = headerTenantId || user?.activeTenantId;
     if (!tenantId) {
       throw new ForbiddenException('Tenant context is required');
     }
 
-    // Verify user is a member of this tenant
-    const user = req.user as { sub?: string };
+    // Setear req.tenantId acá facilita el resto del pipeline (controllers leen
+    // de req.tenantId vía @CurrentTenant; interceptor lo confirma después).
+    req.tenantId = tenantId;
+
     if (user?.sub) {
       const membership = await this.prisma.membership.findUnique({
         where: {
@@ -28,7 +36,7 @@ export class TenantGuard implements CanActivate {
         },
       });
 
-      if (!membership) {
+      if (!membership || membership.deactivatedAt) {
         throw new ForbiddenException('You are not a member of this tenant');
       }
     }

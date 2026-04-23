@@ -24,6 +24,7 @@ import { TenantContextService } from './common/tenant-context/tenant-context.ser
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
 import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.interceptor';
+import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
 
 @Module({
   imports: [
@@ -64,6 +65,9 @@ import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.inter
     { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // ModuleEnabledGuard se aplica global: solo activa cuando un endpoint
+    // tiene @RequireModule(...). Otros endpoints pasan transparentemente.
+    { provide: APP_GUARD, useClass: ModuleEnabledGuard },
   ],
 })
 export class AppModule {}

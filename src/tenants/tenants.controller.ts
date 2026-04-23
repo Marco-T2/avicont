@@ -3,10 +3,13 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateFeaturesDto } from './dto/update-features.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 
 @ApiTags('Tenants')
 @ApiBearerAuth('JWT-auth')
@@ -48,6 +51,24 @@ export class TenantsController {
   @ApiResponse({ status: 200, description: 'List of members' })
   async getMembers(@CurrentTenant() tenantId: string) {
     return this.tenantsService.getMembers(tenantId);
+  }
+
+  @Get('current/features')
+  @UseGuards(TenantGuard, PermissionsGuard)
+  @RequirePermissions('organizacion.feature-flags.read')
+  @ApiSecurity('X-Tenant-ID')
+  @ApiOperation({ summary: 'Get feature flags (modules enabled) of current tenant' })
+  async getFeatures(@CurrentTenant() tenantId: string) {
+    return this.tenantsService.getFeatures(tenantId);
+  }
+
+  @Patch('current/features')
+  @UseGuards(TenantGuard, PermissionsGuard)
+  @RequirePermissions('organizacion.feature-flags.update')
+  @ApiSecurity('X-Tenant-ID')
+  @ApiOperation({ summary: 'Toggle feature flags (modules) of current tenant' })
+  async updateFeatures(@CurrentTenant() tenantId: string, @Body() dto: UpdateFeaturesDto) {
+    return this.tenantsService.updateFeatures(tenantId, dto);
   }
 
   @Get(':id')
