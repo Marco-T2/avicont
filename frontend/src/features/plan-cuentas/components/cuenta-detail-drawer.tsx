@@ -51,7 +51,13 @@ export function CuentaDetailDrawer({
         open={cuentaId !== null}
         onOpenChange={(open) => !open && onClose()}
       >
-        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent
+          side="right"
+          // max-w-xl (576px) + overflow-x-hidden: los 4 botones del footer
+          // (Cerrar, Cambiar PUCT, Editar, Desactivar) no entran en 512px,
+          // y max-w-xl les da margen sin invadir mobile.
+          className="w-full sm:max-w-xl overflow-y-auto overflow-x-hidden"
+        >
           <SheetHeader>
             <SheetTitle>Detalle de cuenta</SheetTitle>
             <SheetDescription>
@@ -69,11 +75,16 @@ export function CuentaDetailDrawer({
             {cuenta !== null ? <DetailBody cuenta={cuenta} /> : null}
           </div>
 
-          <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:gap-2">
-            <Button variant="outline" onClick={onClose}>
+          {/* Footer con layout responsive:
+              - mobile: todo apilado vertical, Cerrar al final (col-reverse)
+              - desktop: "Cerrar" a la izquierda, acciones a la derecha con
+                flex-wrap para que si los 4 botones no entran, bajen de línea
+                en vez de disparar scroll horizontal */}
+          <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <Button variant="outline" onClick={onClose} className="sm:shrink-0">
               Cerrar
             </Button>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
               {cuenta !== null ? (
                 <Button
                   variant="outline"

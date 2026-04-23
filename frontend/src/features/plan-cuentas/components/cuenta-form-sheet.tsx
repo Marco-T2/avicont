@@ -64,7 +64,10 @@ export function CuentaFormSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-2xl overflow-y-auto"
+        // max-w-3xl (768px) + overflow-x-hidden: los forms con selects largos
+        // (cuenta padre muestra "codigo + nombre completo") no tienen espacio
+        // en 672px. 768px es más cómodo sin invadir mobile.
+        className="w-full sm:max-w-3xl overflow-y-auto overflow-x-hidden"
       >
         <SheetHeader>
           <SheetTitle>

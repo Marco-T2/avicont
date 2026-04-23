@@ -160,7 +160,8 @@ export function CuentaForm({
       className="space-y-5"
       noValidate
     >
-      <Row>
+      {/* Row 1-de-3: código + nombre (el nombre ocupa 2 cols para tener espacio). */}
+      <div className="grid gap-4 sm:grid-cols-3">
         <Field
           label="Código interno"
           required
@@ -186,7 +187,7 @@ export function CuentaForm({
           label="Nombre"
           required
           error={errors.nombre?.message}
-          className="md:col-span-2"
+          className="sm:col-span-2"
         >
           <Input
             {...register('nombre')}
@@ -194,7 +195,7 @@ export function CuentaForm({
             aria-invalid={errors.nombre !== undefined}
           />
         </Field>
-      </Row>
+      </div>
 
       <Field label="Descripción" error={errors.descripcion?.message}>
         <Textarea
@@ -303,15 +304,20 @@ export function CuentaForm({
             }
             disabled={structuralDisabled}
           >
-            <SelectTrigger>
+            {/* min-w-0 permite que el trigger se achique y el texto truncado
+                no desborde. max-w del content evita que el dropdown crezca
+                más allá del viewport en mobile. */}
+            <SelectTrigger className="min-w-0 [&>span]:truncate">
               <SelectValue placeholder="— sin padre (raíz) —" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)]">
               <SelectItem value="__none__">— sin padre (raíz) —</SelectItem>
               {agrupadores.map((ag) => (
                 <SelectItem key={ag.id} value={ag.id}>
-                  <span className="font-mono text-xs mr-2">{ag.codigoInterno}</span>
-                  {ag.nombre}
+                  <span className="font-mono text-xs mr-2 text-muted-foreground">
+                    {ag.codigoInterno}
+                  </span>
+                  <span>{ag.nombre}</span>
                 </SelectItem>
               ))}
             </SelectContent>
