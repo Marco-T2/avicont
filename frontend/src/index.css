@@ -46,6 +46,23 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Colores semánticos del dominio contable (estándar internacional:
+     activos azul, pasivos rojo, patrimonio púrpura, ingreso verde, egreso
+     naranja). Se exponen como tokens de Tailwind — clases disponibles:
+     text-clase-activo-fg, bg-clase-activo-bg, border-clase-activo-fg/30, etc.
+     Ver :root y .dark abajo para los valores oklch con luminosidad ajustada
+     a cada modo (contraste WCAG AA). */
+  --color-clase-activo-fg: var(--clase-activo-fg);
+  --color-clase-activo-bg: var(--clase-activo-bg);
+  --color-clase-pasivo-fg: var(--clase-pasivo-fg);
+  --color-clase-pasivo-bg: var(--clase-pasivo-bg);
+  --color-clase-patrimonio-fg: var(--clase-patrimonio-fg);
+  --color-clase-patrimonio-bg: var(--clase-patrimonio-bg);
+  --color-clase-ingreso-fg: var(--clase-ingreso-fg);
+  --color-clase-ingreso-bg: var(--clase-ingreso-bg);
+  --color-clase-egreso-fg: var(--clase-egreso-fg);
+  --color-clase-egreso-bg: var(--clase-egreso-bg);
 }
 
 :root {
@@ -84,6 +101,22 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Colores por clase contable — light mode: luminosidad 0.45 para el
+     foreground (contraste WCAG AA sobre fondo claro), 12% de alpha para
+     el background (tinte sutil sin dominar). Usados por ClaseBadge y
+     cualquier futuro componente que coloree por clase (ej. indicadores
+     en tablas de asientos, gráficos EEFF). */
+  --clase-activo-fg: oklch(0.45 0.18 250);
+  --clase-activo-bg: oklch(0.55 0.15 250 / 0.12);
+  --clase-pasivo-fg: oklch(0.5 0.2 25);
+  --clase-pasivo-bg: oklch(0.55 0.18 25 / 0.12);
+  --clase-patrimonio-fg: oklch(0.45 0.18 300);
+  --clase-patrimonio-bg: oklch(0.55 0.15 300 / 0.12);
+  --clase-ingreso-fg: oklch(0.45 0.15 145);
+  --clase-ingreso-bg: oklch(0.55 0.15 145 / 0.12);
+  --clase-egreso-fg: oklch(0.5 0.17 40);
+  --clase-egreso-bg: oklch(0.55 0.15 40 / 0.15);
 }
 
 .dark {
@@ -118,6 +151,20 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Colores por clase contable — dark mode: luminosidad ~0.78 para el
+     foreground (contraste WCAG AA sobre fondo oscuro), alpha 18% para el
+     background (más visible en dark, donde el tinte sutil se pierde). */
+  --clase-activo-fg: oklch(0.78 0.15 250);
+  --clase-activo-bg: oklch(0.65 0.15 250 / 0.18);
+  --clase-pasivo-fg: oklch(0.78 0.16 25);
+  --clase-pasivo-bg: oklch(0.65 0.16 25 / 0.2);
+  --clase-patrimonio-fg: oklch(0.78 0.15 300);
+  --clase-patrimonio-bg: oklch(0.65 0.15 300 / 0.18);
+  --clase-ingreso-fg: oklch(0.78 0.15 145);
+  --clase-ingreso-bg: oklch(0.65 0.15 145 / 0.18);
+  --clase-egreso-fg: oklch(0.78 0.16 40);
+  --clase-egreso-bg: oklch(0.65 0.15 40 / 0.2);
 }
 
 /* Dashboard shell: scroll único en la región main, no en el body. */

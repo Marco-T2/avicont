@@ -64,8 +64,20 @@ src/features/cuentas/
 │   └── cuenta-detail-page.tsx
 ├── schemas/                Zod schemas (form validation)
 │   └── cuenta-form-schema.ts
+├── lib/                    Utilidades PURAS del feature (funciones, cálculos,
+│   │                       helpers). Sin React, sin I/O, sin side effects.
+│   └── sugerir-codigo-hijo.ts
 └── types.ts                Tipos locales a la feature (no compartidos)
 ```
+
+**Regla para `lib/` dentro de un feature:**
+- Funciones **puras** (determinísticas, sin efectos).
+- **Sin** dependencias de React (si necesita `useState`, va a `hooks/`).
+- **Sin** I/O: si hace `fetch`, va a `api/`.
+- Tests unitarios al lado (`sugerir-codigo-hijo.test.ts`). Es el lugar más
+  barato de testear del feature — funciones puras sin setup.
+- Ejemplo canónico: `sugerirCodigoHijo(padre, hijas): string` — recibe
+  data, devuelve data, sin tocar nada más.
 
 **Otras carpetas de la raíz de `src/`:**
 
@@ -308,14 +320,27 @@ Los estándar de Tailwind, sin personalizar:
 - `index.html` debe tener `<meta name="viewport" content="width=device-width, initial-scale=1.0">`.
 - **No** usar `maximum-scale=1.0` ni `user-scalable=no`: bloquea el zoom de accesibilidad del usuario. Los inputs con `font-size ≥ 16 px` ya evitan el auto-zoom molesto.
 
-### Checklist antes de mergear una feature
+### Checklist pre-commit de cambios de UI
 
-- [ ] Testeado en los 3 viewports (375 / 768 / 1440)
-- [ ] Navegación accesible en `< md` (drawer funciona)
-- [ ] Inputs no disparan auto-zoom en iOS
-- [ ] Tap targets ≥ 44 px en interacciones críticas
-- [ ] Tablas con estrategia explícita (scroll-x o card stack)
-- [ ] Modales no atrapan al usuario en mobile (fullscreen o sheet)
+Este checklist es **obligatorio** antes de commitear cualquier cambio que toque
+componentes, layouts o estilos. Su ausencia es la causa #1 de regresiones
+visuales en mobile o dark mode. Copiarlo al cuerpo del commit o del PR:
+
+- [ ] Renderizado correcto en **375 px** (iPhone SE, viewport mobile)
+- [ ] Renderizado correcto en **768 px** (iPad, breakpoint `md:`)
+- [ ] Renderizado correcto en **1440 px** (laptop, breakpoint `xl:` target)
+- [ ] Tap targets ≥ **44×44 px** en todos los botones/items interactivos de mobile
+- [ ] **Modo oscuro** verificado — ningún color literal (ver §6, Anti-F-10).
+      Usar variables del tema (`text-foreground`, `bg-primary`, `bg-clase-activo-bg`, …).
+- [ ] Navegación accesible en `< md` (drawer/hamburger funciona)
+- [ ] Inputs no disparan auto-zoom en iOS (text-base en mobile)
+- [ ] Tablas con estrategia explícita (scroll-x + sticky first col, o card stack)
+- [ ] Modales no atrapan al usuario en mobile (fullscreen o sheet, no centered)
+- [ ] Si el feature tiene formularios: submit deshabilitado con `isPending`
+      (Anti-F-07 crítico para sistemas transaccionales)
+
+> El agente que abre un PR sin este checklist debe pedir al caller humano que
+> lo complete antes de mergear. No es opcional cuando hay cambios visuales.
 
 ## 8. API client y handlers por feature
 

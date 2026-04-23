@@ -15,13 +15,18 @@ describe('ClaseBadge', () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  it('aplica color semántico distinto por cada clase', () => {
+  it('aplica variables del tema distintas por cada clase', () => {
     const { container: a } = render(<ClaseBadge clase="ACTIVO" />);
     const { container: p } = render(<ClaseBadge clase="PASIVO" />);
     const activoClasses = a.firstElementChild?.className ?? '';
     const pasivoClasses = p.firstElementChild?.className ?? '';
-    expect(activoClasses).toContain('blue');
-    expect(pasivoClasses).toContain('red');
+    // Tras la migración a variables del tema (src/index.css), cada clase usa
+    // clase-{activo,pasivo,...}-{fg,bg}. Validamos que existen las tokens
+    // correctas y que dos clases distintas no comparten className.
+    expect(activoClasses).toContain('clase-activo-fg');
+    expect(activoClasses).toContain('clase-activo-bg');
+    expect(pasivoClasses).toContain('clase-pasivo-fg');
+    expect(pasivoClasses).toContain('clase-pasivo-bg');
     expect(activoClasses).not.toBe(pasivoClasses);
   });
 });
