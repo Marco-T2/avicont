@@ -1,7 +1,12 @@
-import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { SystemRole } from '@prisma/client';
+import { ConflictError } from '../common/errors';
 import { PrismaService } from '../common/prisma.service';
 import { RedisService } from '../cache/redis.service';
+import {
+  GESTIONES_READER_PORT,
+  GestionesReaderPort,
+} from '../periodos-fiscales/ports/gestiones-reader.port';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
@@ -13,6 +18,8 @@ export class TenantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Inject(GESTIONES_READER_PORT)
+    private readonly gestionesReader: GestionesReaderPort,
   ) {}
 
   async create(dto: CreateTenantDto, ownerId: string) {
@@ -51,6 +58,17 @@ export class TenantsService {
   }
 
   async update(id: string, dto: UpdateTenantDto) {
+    if (dto.tipoEmpresaPrincipal !== undefined) {
+      const tieneGestion = await this.gestionesReader.existeAlgunaGestion(id);
+      if (tieneGestion) {
+        // Ver docs/disenos/gestiones-periodos-fiscales-v3.md §2.1
+        throw new ConflictError(
+          'TENANT_EMPRESA_INMUTABLE',
+          'El tipo de empresa no se puede cambiar porque ya existe una gestión fiscal. Elimine o cierre las gestiones primero.',
+          { tenantId: id },
+        );
+      }
+    }
     return this.prisma.organization.update({
       where: { id },
       data: dto,

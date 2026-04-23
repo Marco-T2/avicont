@@ -167,6 +167,8 @@ model Organization {
   impersonationLogs   ImpersonationLog[]
   cuentas             Cuenta[]
   configuracionContable OrgConfiguracionContable?
+  gestionesFiscales   GestionFiscal[]
+  periodosFiscales    PeriodoFiscal[]
 
   @@map("organizations")
 }
@@ -552,4 +554,90 @@ model FeatureFlag {
   @@index([organizationId])
   @@index([key])
   @@map("feature_flags")
+}
+
+// ============================================================
+// Gestiones y períodos fiscales (Fase 1.2)
+// Ver docs/disenos/gestiones-periodos-fiscales-v3.md
+// ============================================================
+
+// Gestión fiscal = ejercicio anual. Contenedor de los 12 períodos mensuales.
+// El mesInicio se deriva de Organization.tipoEmpresaPrincipal (Ley 843 art. 46)
+// y es inmutable una vez creada la gestión.
+model GestionFiscal {
+  id              String              @id @default(uuid())
+  organizationId  String
+  year            Int                  // año fiscal (no necesariamente calendario)
+  mesInicio       Int                  // derivado de tipoEmpresaPrincipal al crear
+  status          GestionFiscalStatus @default(ABIERTA)
+  closedAt        DateTime?
+  closedByUserId  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodos        PeriodoFiscal[]
+
+  @@unique([organizationId, year])
+  @@index([organizationId, status])
+  @@map("gestiones_fiscales")
+}
+
+enum GestionFiscalStatus {
+  ABIERTA
+  CERRADA
+}
+
+// Período fiscal = mes calendario real dentro de una gestión.
+// Unidad operativa donde viven los comprobantes.
+// year/month son el calendario REAL (ej. gestión INDUSTRIAL 2026 tiene
+// períodos desde year=2026/month=4 hasta year=2027/month=3).
+model PeriodoFiscal {
+  id               String              @id @default(uuid())
+  organizationId   String
+  gestionId        String
+  year             Int
+  month            Int                  // 1-12 (mes calendario)
+  ordenEnGestion   Int                  // 1-12 (posición en la gestión)
+  status           PeriodoFiscalStatus @default(ABIERTO)
+  esDefinitivo     Boolean             @default(false)
+
+  closedAt         DateTime?
+  closedByUserId   String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  gestion          GestionFiscal            @relation(fields: [gestionId], references: [id], onDelete: Cascade)
+  reopenings       PeriodoFiscalReopening[]
+
+  @@unique([organizationId, year, month])
+  @@unique([gestionId, ordenEnGestion])
+  @@index([organizationId, status])
+  @@index([gestionId])
+  @@map("periodos_fiscales")
+}
+
+enum PeriodoFiscalStatus {
+  ABIERTO
+  CERRADO
+}
+
+// Auditoría de reaperturas. Cada fila = una ventana de reapertura; reclosedAt
+// se setea cuando se vuelve a cerrar el período.
+model PeriodoFiscalReopening {
+  id                 String   @id @default(uuid())
+  periodoId          String
+  reopenedAt         DateTime @default(now())
+  reopenedByUserId   String
+  motivo             String   // mínimo 20 caracteres, validado en el servicio
+  reclosedAt         DateTime?
+  reclosedByUserId   String?
+
+  periodo            PeriodoFiscal @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+
+  @@index([periodoId])
+  @@map("periodo_fiscal_reopenings")
 }

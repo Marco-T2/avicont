@@ -71,6 +71,10 @@ export async function cleanupTestData() {
   // CatalogoPuct NO se borra — es catálogo compartido read-only entre tests.
   await prisma.orgConfiguracionContable.deleteMany({});
   await prisma.cuenta.deleteMany({});
+  // Gestiones + períodos fiscales (Fase 1.2). Orden importa por las FKs.
+  await prisma.periodoFiscalReopening.deleteMany({});
+  await prisma.periodoFiscal.deleteMany({});
+  await prisma.gestionFiscal.deleteMany({});
   await prisma.organization.deleteMany({});
   await prisma.user.deleteMany({});
 }

@@ -14,6 +14,8 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { ImpersonationModule } from './impersonation/impersonation.module';
 import { CuentasModule } from './cuentas/cuentas.module';
 import { ConfiguracionContableModule } from './configuracion-contable/configuracion-contable.module';
+import { PeriodosFiscalesModule } from './periodos-fiscales/periodos-fiscales.module';
+import { ClockModule } from './common/clock';
 import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
 import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
@@ -65,6 +67,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     FeatureFlagsModule,
     CuentasModule,
     ConfiguracionContableModule,
+    ClockModule,
+    PeriodosFiscalesModule,
   ],
   controllers: [],
   providers: [

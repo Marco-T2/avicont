@@ -145,10 +145,21 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
   },
   {
     modulo: 'contabilidad',
+    submodulo: 'gestiones',
+    acciones: {
+      read: 'Consultar gestiones fiscales',
+      create: 'Crear gestión fiscal (genera los 12 períodos)',
+      cerrar: 'Cerrar gestión fiscal anual',
+    },
+  },
+  {
+    modulo: 'contabilidad',
     submodulo: 'periodos',
     acciones: {
       read: 'Consultar períodos fiscales',
-      create: 'Abrir nuevo período fiscal',
+      cerrar: 'Cerrar período fiscal mensual',
+      reabrir: 'Reabrir período fiscal cerrado (con motivo auditado)',
+      'marcar-definitivo': 'Marcar período como definitivo (irreversible)',
     },
   },
   {
