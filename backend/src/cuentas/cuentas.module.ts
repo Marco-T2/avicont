@@ -8,10 +8,12 @@ import { RbacModule } from '../rbac/rbac.module';
 import { CuentaReaderAdapter } from './adapters/cuenta-reader.adapter';
 import { PrismaCatalogoPuctReader } from './adapters/prisma-catalogo-puct-reader';
 import { PrismaCuentaRepository } from './adapters/prisma-cuenta.repository';
+import { PrismaCuentasReaderAdapter } from './adapters/prisma-cuentas-reader.adapter';
 import { StubMovimientosReader } from './adapters/stub-movimientos-reader';
 import { CuentasController } from './cuentas.controller';
 import { CuentasService } from './cuentas.service';
 import { CATALOGO_PUCT_READER_PORT } from './ports/catalogo-puct-reader.port';
+import { CUENTAS_READER_PORT } from './ports/cuentas-reader.port';
 import { CUENTA_REPOSITORY_PORT } from './ports/cuenta.repository.port';
 import {
   MOVIMIENTOS_READER_PORT,
@@ -42,7 +44,10 @@ function movimientosReaderFactory(): MovimientosReaderPort {
     { provide: CATALOGO_PUCT_READER_PORT, useClass: PrismaCatalogoPuctReader },
     { provide: MOVIMIENTOS_READER_PORT, useFactory: movimientosReaderFactory },
     { provide: CUENTA_READER_PORT, useClass: CuentaReaderAdapter },
+    // Port de lectura batch para el validador de comprobantes (Fase 1.3+).
+    PrismaCuentasReaderAdapter,
+    { provide: CUENTAS_READER_PORT, useExisting: PrismaCuentasReaderAdapter },
   ],
-  exports: [CuentasService, CUENTA_READER_PORT],
+  exports: [CuentasService, CUENTA_READER_PORT, CUENTAS_READER_PORT],
 })
 export class CuentasModule {}
