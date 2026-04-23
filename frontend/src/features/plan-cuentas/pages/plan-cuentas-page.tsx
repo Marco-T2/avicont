@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { type ClaseCuenta } from '@/types/api';
 
 import { CuentaDetailDrawer } from '../components/cuenta-detail-drawer';
+import { CuentaFormSheet } from '../components/cuenta-form-sheet';
 import { CuentaListFilters } from '../components/cuenta-list-filters';
 import { CuentaListTable } from '../components/cuenta-list-table';
 import { CuentaTreeView } from '../components/cuenta-tree-view';
@@ -37,6 +38,7 @@ export function PlanCuentasPage(): React.JSX.Element {
   const [page, setPage] = useState(1);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Reset de página cuando cambia un filtro — si estaba en p. 3 con 8 hits,
   // tras buscar queda en la 1.
@@ -51,11 +53,17 @@ export function PlanCuentasPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Plan de cuentas</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Catálogo contable del tenant — jerárquico según PUCT.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Plan de cuentas</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Catálogo contable del tenant — jerárquico según PUCT.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)} className="self-start">
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva cuenta
+        </Button>
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(parseView(v))}>
@@ -85,6 +93,12 @@ export function PlanCuentasPage(): React.JSX.Element {
       <CuentaDetailDrawer
         cuentaId={selectedId}
         onClose={() => setSelectedId(null)}
+      />
+
+      <CuentaFormSheet
+        mode="create"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
       />
     </div>
   );

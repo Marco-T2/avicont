@@ -1,3 +1,6 @@
+import { Link2, Pencil, Power } from 'lucide-react';
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -14,54 +17,121 @@ import type { Cuenta } from '@/types/api';
 import { useCuentaDetail } from '../hooks/use-cuenta-detail';
 
 import { ClaseBadge } from './clase-badge';
+import { CuentaFormSheet } from './cuenta-form-sheet';
+import { DeactivateCuentaDialog } from './deactivate-cuenta-dialog';
+import { MapearPuctDialog } from './mapear-puct-dialog';
 
 interface CuentaDetailDrawerProps {
   cuentaId: string | null;
   onClose: () => void;
 }
 
-// Drawer lateral con los detalles de una Cuenta. Se abre cuando `cuentaId`
-// es distinto de null; al cerrarse, el caller setea cuentaId=null.
-// El footer está preparado para los botones Editar/Desactivar del slice
-// CRUD — hoy solo "Cerrar".
+// Drawer lateral con los detalles de una Cuenta + acciones CRUD del slice
+// Plan de cuentas: Editar (otro Sheet con CuentaForm), Mapear PUCT (Dialog
+// con input) y Desactivar (AlertDialog de confirmación).
+// Las cuentas esRequeridaSistema ocultan el botón Desactivar — el backend
+// las protege con el error CUENTA_REQUERIDA_SISTEMA_INMUTABLE, pero la UI
+// lo previene explícitamente para no invitar el intento.
 export function CuentaDetailDrawer({
   cuentaId,
   onClose,
 }: CuentaDetailDrawerProps): React.JSX.Element {
   const { data, isLoading, isError } = useCuentaDetail(cuentaId);
+  const [editOpen, setEditOpen] = useState(false);
+  const [mapearOpen, setMapearOpen] = useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+
+  const cuenta = data ?? null;
+  const puedeDesactivar =
+    cuenta !== null && cuenta.activa && !cuenta.esRequeridaSistema;
 
   return (
-    <Sheet open={cuentaId !== null} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Detalle de cuenta</SheetTitle>
-          <SheetDescription>
-            Información completa según el PUCT y la configuración del tenant.
-          </SheetDescription>
-        </SheetHeader>
+    <>
+      <Sheet
+        open={cuentaId !== null}
+        onOpenChange={(open) => !open && onClose()}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detalle de cuenta</SheetTitle>
+            <SheetDescription>
+              Información completa según el PUCT y la configuración del tenant.
+            </SheetDescription>
+          </SheetHeader>
 
-        <div className="px-4 py-2 space-y-4">
-          {isLoading ? <DetailSkeleton /> : null}
-          {isError ? (
-            <p className="text-sm text-destructive">
-              No se pudo cargar el detalle de la cuenta.
-            </p>
-          ) : null}
-          {data !== undefined ? <DetailBody cuenta={data} /> : null}
-        </div>
+          <div className="px-4 py-2 space-y-4">
+            {isLoading ? <DetailSkeleton /> : null}
+            {isError ? (
+              <p className="text-sm text-destructive">
+                No se pudo cargar el detalle de la cuenta.
+              </p>
+            ) : null}
+            {cuenta !== null ? <DetailBody cuenta={cuenta} /> : null}
+          </div>
 
-        <SheetFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cerrar
-          </Button>
-          {/* TODO(slice CRUD):
-              <Button>Editar</Button>
-              <Button variant="destructive">Desactivar</Button>
-              <Button variant="outline">Mapear PUCT</Button>
-          */}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cerrar
+            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {cuenta !== null ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setMapearOpen(true)}
+                  disabled={cuenta.esRequeridaSistema}
+                  title={
+                    cuenta.esRequeridaSistema
+                      ? 'Las cuentas del sistema no permiten cambio de mapeo'
+                      : undefined
+                  }
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  {cuenta.codigoPuct !== null ? 'Cambiar PUCT' : 'Mapear PUCT'}
+                </Button>
+              ) : null}
+              {cuenta !== null && cuenta.activa ? (
+                <Button onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              ) : null}
+              {puedeDesactivar ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => setDeactivateOpen(true)}
+                >
+                  <Power className="h-4 w-4 mr-2" />
+                  Desactivar
+                </Button>
+              ) : null}
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Sub-drawers/dialogs — se montan fuera del Sheet principal para no
+          encadenar overlays de Radix. Comparten el mismo `cuenta` del query. */}
+      {cuenta !== null ? (
+        <>
+          <CuentaFormSheet
+            mode="edit"
+            initialData={cuenta}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+          />
+          <MapearPuctDialog
+            cuenta={cuenta}
+            open={mapearOpen}
+            onOpenChange={setMapearOpen}
+          />
+          <DeactivateCuentaDialog
+            cuenta={cuenta}
+            open={deactivateOpen}
+            onOpenChange={setDeactivateOpen}
+          />
+        </>
+      ) : null}
+    </>
   );
 }
 

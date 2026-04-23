@@ -7,6 +7,7 @@ import {
 import { SystemRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
+import { RbacService } from '../rbac/rbac.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 
@@ -15,6 +16,7 @@ export class MembershipsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly rbac: RbacService,
   ) {}
 
   async invite(dto: InviteUserDto) {
@@ -43,7 +45,7 @@ export class MembershipsService {
       await this.assertCustomRoleBelongsToTenant(dto.customRoleId, tenantId);
     }
 
-    return this.prisma.membership.create({
+    const created = await this.prisma.membership.create({
       data: {
         organizationId: tenantId,
         userId: user.id,
@@ -55,6 +57,10 @@ export class MembershipsService {
         customRole: { select: { id: true, slug: true, name: true } },
       },
     });
+    // Invalidar el cache RBAC del nuevo miembro: su primera consulta
+    // post-invite debe resolver permisos frescos desde BD, no un EMPTY cacheado.
+    await this.rbac.invalidateUser(user.id, tenantId);
+    return created;
   }
 
   async updateRole(membershipId: string, dto: UpdateMembershipDto, actorUserId: string) {
@@ -86,13 +92,16 @@ export class MembershipsService {
       await this.assertCustomRoleBelongsToTenant(dto.customRoleId, tenantId);
     }
 
-    return this.prisma.membership.update({
+    const updated = await this.prisma.membership.update({
       where: { id: membershipId },
       data: {
         systemRole: dto.systemRole ?? null,
         customRoleId: dto.customRoleId ?? null,
       },
     });
+    // Cambio de rol → permisos cambian → invalidar cache RBAC del miembro.
+    await this.rbac.invalidateUser(membership.userId, tenantId);
+    return updated;
   }
 
   async remove(membershipId: string, _actorUserId: string) {
@@ -112,7 +121,10 @@ export class MembershipsService {
       await this.assertNotLastOwner(tenantId);
     }
 
-    return this.prisma.membership.delete({ where: { id: membershipId } });
+    const deleted = await this.prisma.membership.delete({ where: { id: membershipId } });
+    // Ex-miembro → quitar cualquier cache de permisos que haya quedado.
+    await this.rbac.invalidateUser(membership.userId, tenantId);
+    return deleted;
   }
 
   async leave(tenantId: string, userId: string) {
@@ -127,9 +139,11 @@ export class MembershipsService {
       await this.assertNotLastOwner(tenantId);
     }
 
-    return this.prisma.membership.delete({
+    const deleted = await this.prisma.membership.delete({
       where: { organizationId_userId: { organizationId: tenantId, userId } },
     });
+    await this.rbac.invalidateUser(userId, tenantId);
+    return deleted;
   }
 
   // ---------- helpers privados ----------
