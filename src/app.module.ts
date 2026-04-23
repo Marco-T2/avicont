@@ -7,6 +7,8 @@ import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { RbacModule } from './rbac/rbac.module';
+import { CustomRolesModule } from './custom-roles/custom-roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
 import { CacheModule } from './cache/cache.module';
@@ -46,6 +48,8 @@ import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.inter
     UsersModule,
     MembershipsModule,
     RbacModule,
+    CustomRolesModule,
+    PermissionsModule,
     AuditModule,
     BillingModule,
     FeatureFlagsModule,

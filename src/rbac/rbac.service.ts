@@ -1,65 +1,85 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  PERMISSIONS_RESOLVER_PORT,
+  PermissionsResolverPort,
+  ResolvedPermissions,
+} from './ports/permissions-resolver.port';
+import {
+  PERMISSIONS_CACHE_PORT,
+  PermissionsCachePort,
+} from './ports/permissions-cache.port';
+import {
+  hasAllPermissions,
+  hasAnyPermission,
+  matchesPermission,
+} from './domain/permission-matcher';
 
-const Role = {
-  OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
-  MEMBER: 'MEMBER',
-} as const;
-
-type RoleType = (typeof Role)[keyof typeof Role];
-
-export type Permission =
-  | 'users.invite'
-  | 'users.manage'
-  | 'billing.read'
-  | 'billing.manage'
-  | 'tenant.update'
-  | 'audit.read'
-  | 'settings.read'
-  | 'settings.write';
-
-const ROLE_PERMISSIONS: Record<RoleType, Permission[]> = {
-  [Role.OWNER]: [
-    'users.invite',
-    'users.manage',
-    'billing.read',
-    'billing.manage',
-    'tenant.update',
-    'audit.read',
-    'settings.read',
-    'settings.write',
-  ],
-  [Role.ADMIN]: ['users.invite', 'users.manage', 'billing.read', 'audit.read', 'settings.read'],
-  [Role.MEMBER]: [],
-};
+// Cuando el cache está vacío y el resolver dice "no es miembro", devolvemos
+// este objeto para fail-safe: cero permisos. NO se cachea para no dejar
+// "stuck" un usuario que aún se está terminando de aprovisionar.
+const EMPTY: ResolvedPermissions = { esOwner: false, esAdmin: false, wildcards: [] };
 
 @Injectable()
 export class RbacService {
-  getPermissionsForRole(role: RoleType): Permission[] {
-    return ROLE_PERMISSIONS[role] ?? [];
+  private readonly logger = new Logger(RbacService.name);
+
+  constructor(
+    @Inject(PERMISSIONS_RESOLVER_PORT)
+    private readonly resolver: PermissionsResolverPort,
+    @Inject(PERMISSIONS_CACHE_PORT)
+    private readonly cache: PermissionsCachePort,
+  ) {}
+
+  async getPermissions(userId: string, organizationId: string): Promise<ResolvedPermissions> {
+    const cached = await this.cache.get(userId, organizationId);
+    if (cached) return cached;
+
+    const fresh = await this.resolver.resolve(userId, organizationId);
+    if (!fresh) return EMPTY;
+
+    await this.cache.set(userId, organizationId, fresh);
+    return fresh;
   }
 
-  getPermissionsForRoles(roles: RoleType[]): Permission[] {
-    const permissions = new Set<Permission>();
-    for (const role of roles) {
-      for (const perm of this.getPermissionsForRole(role)) {
-        permissions.add(perm);
-      }
-    }
-    return Array.from(permissions);
+  async hasPermission(
+    userId: string,
+    organizationId: string,
+    required: string,
+  ): Promise<boolean> {
+    const perms = await this.getPermissions(userId, organizationId);
+    if (perms.esOwner || perms.esAdmin) return true;
+    return perms.wildcards.some((g) => matchesPermission(g, required));
   }
 
-  hasPermission(roles: RoleType[], permission: Permission): boolean {
-    return this.getPermissionsForRoles(roles).includes(permission);
+  async hasAllPermissions(
+    userId: string,
+    organizationId: string,
+    required: string[],
+  ): Promise<boolean> {
+    const perms = await this.getPermissions(userId, organizationId);
+    if (perms.esOwner || perms.esAdmin) return true;
+    return hasAllPermissions(perms.wildcards, required);
   }
 
-  hasAnyPermission(roles: RoleType[], permissions: Permission[]): boolean {
-    const userPermissions = this.getPermissionsForRoles(roles);
-    return permissions.some((p) => userPermissions.includes(p));
+  async hasAnyPermission(
+    userId: string,
+    organizationId: string,
+    required: string[],
+  ): Promise<boolean> {
+    const perms = await this.getPermissions(userId, organizationId);
+    if (perms.esOwner || perms.esAdmin) return true;
+    return hasAnyPermission(perms.wildcards, required);
   }
 
-  hasAllPermissions(roles: RoleType[], permissions: Permission[]): boolean {
-    const userPermissions = this.getPermissionsForRoles(roles);
-    return permissions.every((p) => userPermissions.includes(p));
+  // Invalidaciones expuestas para que servicios de dominio las llamen
+  // post-commit. Ver §10.4 de CLAUDE.md y decisión 3 de Fase 0.6.
+  invalidateUser(userId: string, organizationId: string) {
+    return this.cache.invalidateUser(userId, organizationId);
+  }
+  invalidateUsersByCustomRole(customRoleId: string) {
+    return this.cache.invalidateUsersByCustomRole(customRoleId);
+  }
+  invalidateOrganization(organizationId: string) {
+    return this.cache.invalidateOrganization(organizationId);
   }
 }
