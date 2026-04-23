@@ -36,6 +36,8 @@ import {
   SUBCLASES_POR_CLASE,
 } from '../schemas/cuenta-form-schema';
 
+import { CuentaParentPicker } from './cuenta-parent-picker';
+
 interface CuentaFormProps {
   mode: 'create' | 'edit';
   initialData?: Cuenta;
@@ -145,6 +147,19 @@ export function CuentaForm({
       setValue('subClaseCuenta', undefined, { shouldValidate: false });
     }
   }, [mode, claseCuenta, subClasesValidas, form, setValue]);
+
+  // Al cambiar claseCuenta, reset de parentId si el padre seleccionado ya no
+  // pertenece a la nueva clase. Regla implícita del PUCT: el árbol no cruza
+  // clases. El backend no lo valida explícito, el frontend previene el bug.
+  useEffect(() => {
+    if (mode === 'edit') return;
+    const currentParentId = form.getValues('parentId');
+    if (currentParentId === undefined) return;
+    const parent = agrupadores.find((a) => a.id === currentParentId);
+    if (parent !== undefined && parent.claseCuenta !== claseCuenta) {
+      setValue('parentId', undefined, { shouldValidate: false });
+    }
+  }, [mode, claseCuenta, agrupadores, form, setValue]);
 
   // Derivar nivel del código interno para hint visual.
   const nivelDerivado =
@@ -296,31 +311,16 @@ export function CuentaForm({
       <Field
         label="Cuenta padre"
         error={errors.parentId?.message}
-        hint="Agrupador del mismo tenant. Dejar vacío para una raíz (nivel 1)."
+        hint={`Agrupador del mismo tenant y clase ${LABELS_CLASE[claseCuenta]}. Dejar vacío para una raíz (nivel 1).`}
         disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
       >
-        <Select
-          value={watch('parentId') ?? '__none__'}
-          onValueChange={(v) =>
-            setValue('parentId', v === '__none__' ? undefined : v)
-          }
+        <CuentaParentPicker
+          agrupadores={agrupadores}
+          value={watch('parentId')}
+          onChange={(v) => setValue('parentId', v, { shouldValidate: true })}
+          filterByClase={claseCuenta}
           disabled={structuralDisabled}
-        >
-          <SelectTrigger className="min-w-0 [&>span]:truncate">
-            <SelectValue placeholder="— sin padre (raíz) —" />
-          </SelectTrigger>
-          <SelectContent className="max-w-[calc(100vw-2rem)]">
-            <SelectItem value="__none__">— sin padre (raíz) —</SelectItem>
-            {agrupadores.map((ag) => (
-              <SelectItem key={ag.id} value={ag.id}>
-                <span className="font-mono text-xs mr-2 text-muted-foreground">
-                  {ag.codigoInterno}
-                </span>
-                <span>{ag.nombre}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
 
       <div className="grid gap-3 md:grid-cols-2">
