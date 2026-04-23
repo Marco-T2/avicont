@@ -8,7 +8,7 @@ import {
 } from '@nestjs/terminus';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../common/prisma.service';
-import { LoggerService } from 'src/logger/logger.service';
+import { LoggerService } from '../logger/logger.service';
 
 @ApiTags('Health')
 @Controller('health')
