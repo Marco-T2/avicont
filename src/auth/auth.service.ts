@@ -13,6 +13,9 @@ export interface JwtPayload {
   email: string;
   activeTenantId?: string;
   roles?: string[];
+  // Presentes solo en tokens de impersonation (ver ImpersonationService).
+  impersonatedBy?: string;
+  impersonationId?: string;
 }
 
 export interface TokenPair {

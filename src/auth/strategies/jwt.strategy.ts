@@ -21,6 +21,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       activeTenantId: payload.activeTenantId,
       roles: payload.roles,
+      // Propagar claims de impersonation al req.user para que guards/interceptors
+      // puedan diferenciar sesiones impersonadas.
+      impersonatedBy: payload.impersonatedBy,
+      impersonationId: payload.impersonationId,
     };
   }
 }

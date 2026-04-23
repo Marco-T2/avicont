@@ -10,6 +10,8 @@ import { RbacModule } from './rbac/rbac.module';
 import { CustomRolesModule } from './custom-roles/custom-roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { InvitationsModule } from './invitations/invitations.module';
+import { ImpersonationModule } from './impersonation/impersonation.module';
+import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
 import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
 import { CacheModule } from './cache/cache.module';
@@ -53,6 +55,7 @@ import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
     CustomRolesModule,
     PermissionsModule,
     InvitationsModule,
+    ImpersonationModule,
     AuditModule,
     BillingModule,
     FeatureFlagsModule,
@@ -64,6 +67,7 @@ import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
     { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ImpersonationAuditInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // ModuleEnabledGuard se aplica global: solo activa cuando un endpoint
     // tiene @RequireModule(...). Otros endpoints pasan transparentemente.
