@@ -1,7 +1,14 @@
-import { Link2, Pencil, Power } from 'lucide-react';
+import { Link2, MoreHorizontal, Pencil, Power } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -75,47 +82,56 @@ export function CuentaDetailDrawer({
             {cuenta !== null ? <DetailBody cuenta={cuenta} /> : null}
           </div>
 
-          {/* Footer con layout responsive:
-              - mobile: todo apilado vertical, Cerrar al final (col-reverse)
-              - desktop: "Cerrar" a la izquierda, acciones a la derecha con
-                flex-wrap para que si los 4 botones no entran, bajen de línea
-                en vez de disparar scroll horizontal */}
-          <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <Button variant="outline" onClick={onClose} className="sm:shrink-0">
+          {/* Footer: patrón estándar de admin apps — primary CTA "Editar" +
+              "Más acciones" en dropdown. Así entran limpio incluso en 576px.
+              Cerrar queda a la izquierda separado del grupo de acciones. */}
+          <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="outline" onClick={onClose}>
               Cerrar
             </Button>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              {cuenta !== null ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setMapearOpen(true)}
-                  disabled={cuenta.esRequeridaSistema}
-                  title={
-                    cuenta.esRequeridaSistema
-                      ? 'Las cuentas del sistema no permiten cambio de mapeo'
-                      : undefined
-                  }
-                >
-                  <Link2 className="h-4 w-4 mr-2" />
-                  {cuenta.codigoPuct !== null ? 'Cambiar PUCT' : 'Mapear PUCT'}
-                </Button>
-              ) : null}
-              {cuenta !== null && cuenta.activa ? (
-                <Button onClick={() => setEditOpen(true)}>
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              ) : null}
-              {puedeDesactivar ? (
-                <Button
-                  variant="destructive"
-                  onClick={() => setDeactivateOpen(true)}
-                >
-                  <Power className="h-4 w-4 mr-2" />
-                  Desactivar
-                </Button>
-              ) : null}
-            </div>
+            {cuenta !== null ? (
+              <div className="flex gap-2 sm:justify-end">
+                {cuenta.activa ? (
+                  <Button onClick={() => setEditOpen(true)} className="flex-1 sm:flex-none">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                ) : null}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      aria-label="Más acciones"
+                      className="sm:flex-none"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="ml-2 sm:hidden">Más</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => setMapearOpen(true)}
+                      disabled={cuenta.esRequeridaSistema}
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      {cuenta.codigoPuct !== null ? 'Cambiar PUCT' : 'Mapear PUCT'}
+                    </DropdownMenuItem>
+                    {puedeDesactivar ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setDeactivateOpen(true)}
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                        >
+                          <Power className="h-4 w-4 mr-2" />
+                          Desactivar
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : null}
           </SheetFooter>
         </SheetContent>
       </Sheet>

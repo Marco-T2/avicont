@@ -261,69 +261,67 @@ export function CuentaForm({
         </Field>
       </Row>
 
-      <Row>
-        <Field
-          label="Naturaleza"
-          required
-          error={errors.naturaleza?.message}
-          hint={
-            mode === 'create'
-              ? 'Se ajusta automáticamente según clase + "es contraria".'
-              : undefined
-          }
-          disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
+      {/* Naturaleza y Cuenta padre van FULL-WIDTH (no en grid) para evitar
+          superposición con los hints/errores y dar aire al Select de
+          Cuenta padre que muestra código + nombre completo del agrupador. */}
+      <Field
+        label="Naturaleza"
+        required
+        error={errors.naturaleza?.message}
+        hint={
+          mode === 'create'
+            ? 'Se ajusta automáticamente según clase + "es contraria".'
+            : undefined
+        }
+        disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
+      >
+        <Select
+          value={watch('naturaleza')}
+          onValueChange={(v) => setValue('naturaleza', v as NaturalezaCuenta)}
+          disabled={structuralDisabled}
         >
-          <Select
-            value={watch('naturaleza')}
-            onValueChange={(v) => setValue('naturaleza', v as NaturalezaCuenta)}
-            disabled={structuralDisabled}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.keys(LABELS_NATURALEZA) as NaturalezaCuenta[]).map((n) => (
-                <SelectItem key={n} value={n}>
-                  {LABELS_NATURALEZA[n]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+          <SelectTrigger className="max-w-md">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(LABELS_NATURALEZA) as NaturalezaCuenta[]).map((n) => (
+              <SelectItem key={n} value={n}>
+                {LABELS_NATURALEZA[n]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
-        <Field
-          label="Cuenta padre"
-          error={errors.parentId?.message}
-          hint="Agrupador del mismo tenant. Dejar vacío para una raíz (nivel 1)."
-          disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
+      <Field
+        label="Cuenta padre"
+        error={errors.parentId?.message}
+        hint="Agrupador del mismo tenant. Dejar vacío para una raíz (nivel 1)."
+        disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
+      >
+        <Select
+          value={watch('parentId') ?? '__none__'}
+          onValueChange={(v) =>
+            setValue('parentId', v === '__none__' ? undefined : v)
+          }
+          disabled={structuralDisabled}
         >
-          <Select
-            value={watch('parentId') ?? '__none__'}
-            onValueChange={(v) =>
-              setValue('parentId', v === '__none__' ? undefined : v)
-            }
-            disabled={structuralDisabled}
-          >
-            {/* min-w-0 permite que el trigger se achique y el texto truncado
-                no desborde. max-w del content evita que el dropdown crezca
-                más allá del viewport en mobile. */}
-            <SelectTrigger className="min-w-0 [&>span]:truncate">
-              <SelectValue placeholder="— sin padre (raíz) —" />
-            </SelectTrigger>
-            <SelectContent className="max-w-[calc(100vw-2rem)]">
-              <SelectItem value="__none__">— sin padre (raíz) —</SelectItem>
-              {agrupadores.map((ag) => (
-                <SelectItem key={ag.id} value={ag.id}>
-                  <span className="font-mono text-xs mr-2 text-muted-foreground">
-                    {ag.codigoInterno}
-                  </span>
-                  <span>{ag.nombre}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </Row>
+          <SelectTrigger className="min-w-0 [&>span]:truncate">
+            <SelectValue placeholder="— sin padre (raíz) —" />
+          </SelectTrigger>
+          <SelectContent className="max-w-[calc(100vw-2rem)]">
+            <SelectItem value="__none__">— sin padre (raíz) —</SelectItem>
+            {agrupadores.map((ag) => (
+              <SelectItem key={ag.id} value={ag.id}>
+                <span className="font-mono text-xs mr-2 text-muted-foreground">
+                  {ag.codigoInterno}
+                </span>
+                <span>{ag.nombre}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
       <div className="grid gap-3 md:grid-cols-2">
         <CheckRow
