@@ -41,6 +41,13 @@ import { CuentaParentPicker } from './cuenta-parent-picker';
 interface CuentaFormProps {
   mode: 'create' | 'edit';
   initialData?: Cuenta;
+  /** Solo aplica en mode=create: mergea sobre los defaults. Usado cuando se
+   *  crea una cuenta hija desde el árbol (hereda clase/subclase/naturaleza
+   *  del padre + codigoInterno sugerido). */
+  prefill?: Partial<CuentaFormValues>;
+  /** Si se provee, muestra "Creando sub-cuenta de: {codigo} {nombre}" al
+   *  tope del form — ancla visual del contexto jerárquico. */
+  breadcrumbParent?: Pick<Cuenta, 'codigoInterno' | 'nombre'>;
   onSubmit: (values: CuentaFormValues) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -97,6 +104,8 @@ function flattenAgrupadores(nodes: CuentaTreeNode[]): CuentaTreeNode[] {
 export function CuentaForm({
   mode,
   initialData,
+  prefill,
+  breadcrumbParent,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -109,7 +118,13 @@ export function CuentaForm({
     defaultValues:
       mode === 'edit' && initialData !== undefined
         ? mapCuentaToFormValues(initialData)
-        : DEFAULT_CREATE_VALUES,
+        : {
+            ...DEFAULT_CREATE_VALUES,
+            // En create, el prefill (opcional) se aplica sobre los defaults.
+            // Usado cuando se crea una hija desde el árbol: trae clase/
+            // subclase/naturaleza/parentId/codigoInterno del padre.
+            ...(prefill ?? {}),
+          },
   });
 
   const {
@@ -175,6 +190,16 @@ export function CuentaForm({
       className="space-y-5"
       noValidate
     >
+      {breadcrumbParent !== undefined ? (
+        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          Creando sub-cuenta de:{' '}
+          <span className="font-mono text-foreground">
+            {breadcrumbParent.codigoInterno}
+          </span>{' '}
+          <span className="text-foreground">{breadcrumbParent.nombre}</span>
+        </div>
+      ) : null}
+
       {/* Row 1-de-3: código + nombre (el nombre ocupa 2 cols para tener espacio). */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field

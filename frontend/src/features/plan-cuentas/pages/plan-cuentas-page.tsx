@@ -15,6 +15,9 @@ import { CuentaListTable } from '../components/cuenta-list-table';
 import { CuentaTreeView } from '../components/cuenta-tree-view';
 import { useCuentas } from '../hooks/use-cuentas';
 import { useCuentaTree } from '../hooks/use-cuenta-tree';
+import { sugerirCodigoHijo } from '../lib/sugerir-codigo-hijo';
+import type { CuentaFormValues } from '../schemas/cuenta-form-schema';
+import type { CuentaTreeNode } from '@/types/api';
 
 const PAGE_SIZE = 25;
 
@@ -39,6 +42,9 @@ export function PlanCuentasPage(): React.JSX.Element {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // Cuando el user clickea "+" en un nodo del árbol, guardamos ese nodo y
+  // abrimos el Sheet con prefill. Al cerrar el Sheet, reseteamos.
+  const [createChildOf, setCreateChildOf] = useState<CuentaTreeNode | null>(null);
 
   // Reset de página cuando cambia un filtro — si estaba en p. 3 con 8 hits,
   // tras buscar queda en la 1.
@@ -86,7 +92,10 @@ export function PlanCuentasPage(): React.JSX.Element {
         </TabsContent>
 
         <TabsContent value="arbol" className="space-y-4 mt-4">
-          <ArbolTab onSelect={(id) => setSelectedId(id)} />
+          <ArbolTab
+            onSelect={(id) => setSelectedId(id)}
+            onCreateChild={(parent) => setCreateChildOf(parent)}
+          />
         </TabsContent>
       </Tabs>
 
@@ -95,13 +104,50 @@ export function PlanCuentasPage(): React.JSX.Element {
         onClose={() => setSelectedId(null)}
       />
 
+      {/* Sheet "Nueva cuenta" global — sin prefill, el user escribe todo. */}
       <CuentaFormSheet
         mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
       />
+
+      {/* Sheet "Crear sub-cuenta" — activado desde el botón "+" del árbol.
+          Monta prefill con clase/subclase/naturaleza/parentId del padre +
+          codigoInterno sugerido (max+1 de hermanos). */}
+      {createChildOf !== null ? (
+        <CuentaFormSheet
+          mode="create"
+          open={createChildOf !== null}
+          onOpenChange={(open) => {
+            if (!open) setCreateChildOf(null);
+          }}
+          prefill={buildPrefillForChild(createChildOf)}
+          breadcrumbParent={createChildOf}
+        />
+      ) : null}
     </div>
   );
+}
+
+// Construye los valores del form pre-rellenados cuando se crea una hija
+// desde el botón "+" del árbol. La clase/subclase/naturaleza se heredan
+// del padre; el codigoInterno se sugiere (max+1 de las hijas existentes).
+// Ver CLAUDE.md §4 para la regla implícita del PUCT (el árbol no cruza
+// clases, por eso heredar claseCuenta del padre es siempre correcto).
+function buildPrefillForChild(parent: CuentaTreeNode): Partial<CuentaFormValues> {
+  return {
+    codigoInterno: sugerirCodigoHijo(parent, parent.hijas),
+    claseCuenta: parent.claseCuenta,
+    naturaleza: parent.naturaleza,
+    // esDetalle: true — el caso común del "+" es crear una cuenta hoja.
+    // Si el user quiere crear otro agrupador, destilda el checkbox antes
+    // de submit.
+    esDetalle: true,
+    parentId: parent.id,
+    ...(parent.subClaseCuenta !== null
+      ? { subClaseCuenta: parent.subClaseCuenta }
+      : {}),
+  };
 }
 
 // ------------------------------------------------------------
@@ -186,8 +232,10 @@ function ListaTab(props: ListaTabProps): React.JSX.Element {
 
 function ArbolTab({
   onSelect,
+  onCreateChild,
 }: {
   onSelect: (id: string) => void;
+  onCreateChild: (parent: CuentaTreeNode) => void;
 }): React.JSX.Element {
   const { data, isLoading, isError } = useCuentaTree();
 
@@ -207,6 +255,7 @@ function ArbolTab({
     <CuentaTreeView
       nodes={data ?? []}
       onSelect={(node) => onSelect(node.id)}
+      onCreateChild={onCreateChild}
     />
   );
 }

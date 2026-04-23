@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { CuentaTreeNode } from '@/types/api';
 
@@ -10,6 +11,9 @@ import { ClaseBadge } from './clase-badge';
 interface CuentaTreeViewProps {
   nodes: CuentaTreeNode[];
   onSelect: (node: CuentaTreeNode) => void;
+  /** Opcional: callback al hacer click en el "+" de un agrupador activo.
+   *  Si se provee, los agrupadores activos renderizan el botón "+". */
+  onCreateChild?: (parent: CuentaTreeNode) => void;
 }
 
 // Árbol expandible del plan de cuentas. Todos los nodos inician expandidos
@@ -18,6 +22,7 @@ interface CuentaTreeViewProps {
 export function CuentaTreeView({
   nodes,
   onSelect,
+  onCreateChild,
 }: CuentaTreeViewProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -50,6 +55,7 @@ export function CuentaTreeView({
           collapsed={collapsed}
           onToggle={toggle}
           onSelect={onSelect}
+          onCreateChild={onCreateChild}
         />
       ))}
     </div>
@@ -62,6 +68,7 @@ interface TreeRowProps {
   collapsed: Set<string>;
   onToggle: (id: string) => void;
   onSelect: (node: CuentaTreeNode) => void;
+  onCreateChild?: (parent: CuentaTreeNode) => void;
 }
 
 function TreeRow({
@@ -70,15 +77,22 @@ function TreeRow({
   collapsed,
   onToggle,
   onSelect,
+  onCreateChild,
 }: TreeRowProps): React.JSX.Element {
   const hasChildren = node.hijas.length > 0;
   const isCollapsed = collapsed.has(node.id);
+  // Solo agrupadores activos pueden recibir hijas. Los detalle (hojas) y
+  // las inactivas no muestran el botón "+".
+  const canCreateChild =
+    onCreateChild !== undefined && !node.esDetalle && node.activa;
 
   return (
     <div>
       <div
+        // group/row: habilita el hover-visible del botón "+" en desktop
+        // (opacity 0 → 100 al hacer hover sobre la fila). Mobile siempre visible.
         className={cn(
-          'flex items-center gap-2 px-2 py-2 hover:bg-muted/50 cursor-pointer',
+          'group/row flex items-center gap-2 px-2 py-2 hover:bg-muted/50 cursor-pointer',
           !node.activa && 'opacity-60',
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -109,11 +123,35 @@ function TreeRow({
           {node.codigoInterno}
         </span>
         <span
-          className={cn('flex-1 truncate text-sm', node.esDetalle ? 'font-normal' : 'font-medium')}
+          className={cn(
+            'flex-1 truncate text-sm',
+            node.esDetalle ? 'font-normal' : 'font-medium',
+          )}
         >
           {node.nombre}
         </span>
         <ClaseBadge clase={node.claseCuenta} className="shrink-0" />
+        {canCreateChild ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Crear sub-cuenta bajo ${node.codigoInterno} ${node.nombre}`}
+                // Tap target ≥44px en mobile (CLAUDE.md §7). En desktop
+                // h-8 con hover-visible. Mobile: siempre visible, h-10.
+                className="h-10 w-10 shrink-0 md:h-8 md:w-8 md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100 md:transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateChild(node);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Crear sub-cuenta</TooltipContent>
+          </Tooltip>
+        ) : null}
       </div>
 
       {hasChildren && !isCollapsed ? (
@@ -126,6 +164,7 @@ function TreeRow({
               collapsed={collapsed}
               onToggle={onToggle}
               onSelect={onSelect}
+              onCreateChild={onCreateChild}
             />
           ))}
         </div>

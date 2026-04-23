@@ -19,6 +19,10 @@ interface CuentaFormSheetProps {
   mode: 'create' | 'edit';
   // initialData es obligatorio en mode=edit.
   initialData?: Cuenta;
+  /** Solo en mode=create: valores sugeridos (ej. desde "Agregar hija" del árbol). */
+  prefill?: Partial<CuentaFormValues>;
+  /** Contexto del padre cuando se crea una hija — renderiza breadcrumb. */
+  breadcrumbParent?: Pick<Cuenta, 'codigoInterno' | 'nombre'>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -28,6 +32,8 @@ interface CuentaFormSheetProps {
 export function CuentaFormSheet({
   mode,
   initialData,
+  prefill,
+  breadcrumbParent,
   open,
   onOpenChange,
 }: CuentaFormSheetProps): React.JSX.Element {
@@ -84,6 +90,8 @@ export function CuentaFormSheet({
           <CuentaForm
             mode={mode}
             {...(initialData !== undefined ? { initialData } : {})}
+            {...(prefill !== undefined ? { prefill } : {})}
+            {...(breadcrumbParent !== undefined ? { breadcrumbParent } : {})}
             onSubmit={handleSubmit}
             onCancel={() => onOpenChange(false)}
             isSubmitting={isSubmitting}
