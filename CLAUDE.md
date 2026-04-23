@@ -1730,4 +1730,109 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 
 ---
 
+## 11. Entorno local y comandos operativos
+
+Sección runbook: **qué comando correr para cada tarea común** en el entorno local. Aplica tanto a devs humanos como a Claude Code (ver nota sobre `DATABASE_URL` más abajo).
+
+### 11.1 Stack de servicios (Docker Compose)
+
+8 servicios definidos en `docker-compose.yml`:
+
+| Servicio | Puerto host | Rol |
+|----------|-------------|-----|
+| `app` | 3000 | Backend NestJS (`/api/health`, `/api/docs` Swagger) |
+| `postgres` | 5432 | BD principal (db `saas`, user `postgres/postgres`) |
+| `redis` | 6379 | Cache + blocklist de JWT revocados |
+| `dbgate` | 3100 | UI web para explorar Postgres y Redis |
+| `grafana` | 3001 | Dashboards de logs/métricas/traces (login `admin/admin`) |
+| `loki` | 3101 | Agregador de logs (datasource de Grafana) |
+| `prometheus` | 9090 | Scrape de `/api/metrics` |
+| `tempo` | 3200 / OTLP 4317-4318 | Traces OpenTelemetry |
+
+**Levantar todo el stack**:
+```bash
+docker compose up -d
+```
+
+**Levantar solo BD y Redis** (suficiente para dev y tests E2E sin observabilidad):
+```bash
+docker compose up -d postgres redis
+```
+
+**Ver estado y puertos**:
+```bash
+docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
+```
+
+**Bajar todo** (mantiene volúmenes con datos):
+```bash
+docker compose down
+```
+
+**Bajar y limpiar datos** (⚠️ destructivo, pedir confirmación):
+```bash
+docker compose down -v
+```
+
+### 11.2 Prisma: migraciones y seeds
+
+`DATABASE_URL` vive en `.env` (gitignored). Los scripts npm (`prisma:migrate`, `seed`) lo leen de ahí automáticamente.
+
+**Cuando Claude Code corre los comandos**, NO tiene acceso al `.env` por restricciones de permisos del entorno sandboxed. Debe pasarlo **inline** en la invocación:
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate dev --name <nombre>
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate deploy
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate status
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma generate
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts
+```
+
+Para el caller humano, los scripts npm funcionan sin exportar variables porque leen del `.env`:
+```bash
+npm run prisma:migrate          # equivale a: prisma migrate dev
+npm run prisma:generate         # genera el cliente Prisma
+npm run prisma:studio           # UI web de Prisma en localhost:5555
+```
+
+### 11.3 Tests
+
+**Unitarios + integración**:
+```bash
+npx jest src/                    # todos los .spec.ts del código
+npm test                         # equivalente
+```
+
+**E2E (requieren Postgres arriba + CatalogoPuct sembrado)**:
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
+JWT_ACCESS_SECRET="test-secret" \
+JWT_REFRESH_SECRET="test-refresh" \
+npx jest test/ --runInBand --forceExit
+```
+
+`--runInBand` es necesario para que los tests E2E de distintos módulos no pisen el mismo Postgres en paralelo. `--forceExit` porque PrismaClient deja handles que Jest no detecta (patrón consistente con el resto de los E2E del proyecto).
+
+`ensurePuctSeeded()` en `test/helpers/test-factory.ts` se llama en `beforeAll` de cada suite que necesite el catálogo — idempotente, solo siembra si `CatalogoPuct` está vacío.
+
+### 11.4 Lint y typecheck
+
+```bash
+npx tsc --noEmit -p tsconfig.json    # typecheck
+npm run lint                         # eslint src/
+npx eslint <path> --fix              # auto-fix
+npm run format                       # prettier sobre src/ y test/
+```
+
+### 11.5 Checklist antes de arrancar a codear desde cero
+
+1. `docker compose up -d postgres redis` (mínimo viable)
+2. Si es la primera vez: `DATABASE_URL=... npx prisma migrate deploy` + `DATABASE_URL=... npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts`
+3. `npm run start:dev` para el backend en watch mode
+4. Abrir http://localhost:3000/api/docs para el Swagger
+
+Para agregar observabilidad al dev: `docker compose up -d` (todo el stack), entrar a Grafana http://localhost:3001.
+
+---
+
 **Fin del documento.** Para dudas que no resuelve este archivo: preguntar antes de decidir. Este documento se versiona en git — cualquier cambio se discute en PR.
