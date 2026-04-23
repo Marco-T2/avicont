@@ -5,11 +5,11 @@ import { toast } from 'sonner';
 import { MobileSidebar } from '@/components/mobile-sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { OrgSwitcher } from '@/features/tenants/components/org-switcher';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
 
 export function Topbar(): React.JSX.Element {
-  const user = useAuthStore((s) => s.user);
   const clear = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
 
@@ -30,13 +30,11 @@ export function Topbar(): React.JSX.Element {
       <div className="flex min-w-0 items-center gap-2">
         {/* Hamburger solo en mobile; abre el drawer con la nav completa. */}
         <MobileSidebar />
-        {/* truncate + title para emails largos — evita que desborde en 375px. */}
-        <span
-          className="truncate text-sm font-medium max-w-[180px] sm:max-w-xs md:max-w-md"
-          title={user?.email ?? 'Sin sesión'}
-        >
-          {user?.email ?? 'Sin sesión'}
-        </span>
+        {/* OrgSwitcher reemplaza al span del email: muestra la org activa
+            con iniciales + rol, dropdown para cambiar. El email del user
+            sigue accesible decodificando el JWT en auth-store (ver futuro
+            "User menu" cuando agreguemos /settings/profile). */}
+        <OrgSwitcher />
       </div>
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />

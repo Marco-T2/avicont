@@ -7,6 +7,9 @@ export interface AuthUser {
   email: string;
   activeTenantId?: string;
   roles: string[];
+  /** Si está presente, la sesión actual es una impersonación iniciada por este admin. */
+  impersonatedBy?: string;
+  impersonationId?: string;
 }
 
 interface AuthState {
@@ -40,6 +43,12 @@ export const useAuthStore = create<AuthState>((set) => ({
             ? { activeTenantId: payload.activeTenantId }
             : {}),
           roles: payload.roles ?? [],
+          ...(payload.impersonatedBy !== undefined
+            ? { impersonatedBy: payload.impersonatedBy }
+            : {}),
+          ...(payload.impersonationId !== undefined
+            ? { impersonationId: payload.impersonationId }
+            : {}),
         }
       : null;
     set({ accessToken: token, user });

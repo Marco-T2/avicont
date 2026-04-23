@@ -134,3 +134,243 @@ export interface ListarCuentasParams {
   page?: number;
   pageSize?: number;
 }
+
+// ============================================================
+// Identidad / multi-tenant
+// ============================================================
+
+// Espejo de GET /api/users/me (backend/src/users/users.service.ts#getProfile).
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string | null;
+  isEmailVerified: boolean;
+  tenants: UserTenant[];
+}
+
+export interface UserTenant {
+  id: string;
+  name: string;
+  slug: string;
+  /** Rol efectivo: SystemRole ("OWNER" / "ADMIN") o slug del CustomRole. */
+  role: string | null;
+}
+
+// POST /api/auth/switch-tenant request + response.
+export interface SwitchTenantRequest {
+  tenantId: string;
+}
+// El response tiene la misma shape que LoginResponse (refresh en cookie).
+export type SwitchTenantResponse = LoginResponse;
+
+// ============================================================
+// Memberships (miembros del tenant activo)
+// ============================================================
+
+export type SystemRole = 'OWNER' | 'ADMIN';
+
+export interface MembershipUser {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+
+export interface MembershipCustomRole {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+// Espejo de getMembers (backend/src/tenants/tenants.service.ts).
+export interface Membership {
+  id: string;
+  organizationId: string;
+  userId: string;
+  systemRole: SystemRole | null;
+  customRoleId: string | null;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: MembershipUser;
+  customRole: MembershipCustomRole | null;
+}
+
+// POST /api/memberships/invite (requiere que el user YA exista).
+export interface InviteExistingUserRequest {
+  email: string;
+  systemRole?: SystemRole;
+  customRoleId?: string;
+}
+
+// PATCH /api/memberships/:id — cambio de rol del miembro.
+export interface UpdateMembershipRequest {
+  systemRole?: SystemRole;
+  customRoleId?: string;
+}
+
+// ============================================================
+// Invitations (flujo email — admin + pública)
+// ============================================================
+
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+
+export interface Invitation {
+  id: string;
+  organizationId: string;
+  email: string;
+  invitedById: string;
+  systemRole: SystemRole | null;
+  customRoleId: string | null;
+  status: InvitationStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  acceptedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// POST /api/invitations — body del admin para invitar por email.
+export interface CreateInvitationRequest {
+  email: string;
+  systemRole?: SystemRole;
+  customRoleId?: string;
+  expiresInDays?: number;
+}
+
+// Response del POST incluye la invitation creada + el token plano (para
+// que el admin lo copie al email manualmente si el mailer falla).
+export interface CreateInvitationResponse {
+  invitation: Invitation;
+  token: string;
+}
+
+// GET /api/invitations/preview?token=... — shape del backend
+// (backend/src/invitations/invitations.service.ts#previewByToken).
+export interface InvitationPreview {
+  email: string;
+  expiresAt: string;
+  organization: { id: string; slug: string; name: string };
+  invitedBy: { email: string; displayName: string | null };
+}
+
+// POST /api/invitations/accept-and-register — registro + aceptación en una.
+export interface AcceptAndRegisterRequest {
+  token: string;
+  password: string;
+  displayName?: string;
+}
+
+export interface AcceptAndRegisterResponse {
+  invitation: Invitation;
+  userId: string;
+}
+
+// ============================================================
+// Custom Roles (RBAC per-tenant)
+// ============================================================
+
+export interface CustomRole {
+  id: string;
+  organizationId: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  isSystemDefault: boolean;
+  isEditable: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdById: string | null;
+}
+
+export interface CustomRoleMember {
+  membershipId: string;
+  deactivatedAt: string | null;
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+  };
+}
+
+export interface CreateCustomRoleRequest {
+  slug: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+export interface UpdateCustomRoleRequest {
+  name?: string;
+  description?: string;
+  permissions?: string[];
+}
+
+// Catálogo de permisos del backend.
+export interface PermisoCatalogado {
+  key: string;
+  modulo: string;
+  submodulo: string;
+  accion: string;
+  descripcion: string;
+}
+
+export interface CatalogoAgrupado {
+  modulo: string;
+  submodulos: {
+    submodulo: string;
+    permisos: PermisoCatalogado[];
+  }[];
+}
+
+// ============================================================
+// Impersonation
+// ============================================================
+
+export interface StartImpersonationRequest {
+  targetUserId: string;
+  reason: string;
+}
+
+export interface StartImpersonationResponse {
+  impersonationToken: string;
+  expiresAt: string;
+  impersonationId: string;
+}
+
+// ============================================================
+// Feature flags
+// ============================================================
+
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  organizationId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// GET /api/feature-flags/list response.
+export interface FeatureFlagListResponse {
+  global: FeatureFlag[];
+  overrides: FeatureFlag[];
+}
+
+export interface CreateFeatureFlagOverrideRequest {
+  key: string;
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateFeatureFlagOverrideRequest {
+  name?: string;
+  description?: string;
+  enabled?: boolean;
+  metadata?: Record<string, unknown>;
+}
