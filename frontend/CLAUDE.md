@@ -234,13 +234,90 @@ import { cn } from '@/lib/utils';
 )}>
 ```
 
-### Responsive
+## 7. Responsive y mobile
 
-- **Mobile-first**: clases base sin prefijo son para mobile; breakpoints Tailwind para upgrades (`md:`, `lg:`, `xl:`).
-- Shell tiene sidebar solo desde `md:` (oculto en mobile hasta que agreguemos drawer).
-- Evitar breakpoints propios — usar los de Tailwind.
+### Postura del proyecto: **mobile-usable**
 
-## 7. API client y handlers por feature
+- **Desktop es la experiencia óptima** para trabajo contable pesado (asientos con muchas líneas, estados financieros, libro mayor). El contador vive en la laptop.
+- **Mobile funciona para consulta y operaciones rápidas**: dashboard, aprobaciones, cambiar tenant, chat de granja, notificaciones. Siempre usable, no siempre ideal.
+- **Excepción — `features/granja/**` es mobile-first estricto**: el usuario opera en el gallinero con el celular. Ahí la feel tiene que ser igual de buena que en desktop.
+
+### Breakpoints
+
+Los estándar de Tailwind, sin personalizar:
+
+| Prefijo | Ancho | Device referencia |
+|---------|-------|-------------------|
+| (ninguno) | < 640 px | Mobile portrait (iPhone SE 375 px) |
+| `sm:` | ≥ 640 px | Mobile landscape / phablet |
+| `md:` | ≥ 768 px | Tablet portrait (iPad 768 px) |
+| `lg:` | ≥ 1024 px | Tablet landscape / laptop chica |
+| `xl:` | ≥ 1280 px | Laptop estándar (1440 px target) |
+| `2xl:` | ≥ 1536 px | Desktop grande |
+
+**Viewports de testing obligatorios** antes de merge: **375 px** (iPhone SE) + **768 px** (iPad) + **1440 px** (laptop).
+
+### Reglas duras
+
+#### Mobile-first siempre
+- Clases sin prefijo = mobile. `md:` y arriba son **upgrades**, no overrides.
+- ✅ `className="flex-col md:flex-row gap-2 md:gap-4"`
+- ❌ `className="flex-row md:flex-col"` (empieza desktop, baja a mobile — al revés)
+
+#### Tap targets mínimos 44×44 px (Apple HIG)
+- Todo `<Button>`, `<a>`, item de lista tocable, icono clickeable.
+- Button de shadcn size `default` (h-9 = 36 px) **no cumple**; para elementos críticos en mobile usar `size="lg"` (h-10 = 40 px) o agregar `py-3 px-4` al wrap.
+- Los icon-only buttons (`size="icon"` = h-9 w-9) requieren `h-10 w-10` o mayor en contextos mobile.
+
+#### Inputs con `font-size ≥ 16 px` en mobile
+- iOS Safari **hace auto-zoom** al focusear inputs con font < 16 px. Es visualmente destructivo.
+- shadcn Input default es `text-sm` (14 px). **Forzar `text-base` (16 px) en mobile**:
+  ```tsx
+  <Input className="text-base md:text-sm" />
+  ```
+- O mejor: ajustar la base del componente `ui/input.tsx` para que arranque `text-base` y suba a `text-sm` en `md:`.
+
+#### Sidebar: fixed en desktop, drawer en mobile
+- `md:flex` para el sidebar fijo. En `< md`, oculto.
+- **Botón hamburger visible solo en mobile** (`md:hidden`) en el topbar, abre un `Sheet` (shadcn) con los mismos items.
+- **Los items del nav viven en un solo lugar** (constante compartida), ambos modos los consumen.
+
+#### Modales: centrados en desktop, fullscreen en mobile
+- `Dialog` de shadcn default es centrado con `max-w-lg`.
+- En mobile, formulario de crear asiento con 10 campos dentro de un modal chico es inmanejable.
+- Patrón: `className="sm:max-w-lg max-w-none h-full sm:h-auto"` o usar `Sheet` desde bottom/fullscreen.
+
+#### Tablas con muchas columnas
+- El dominio contable tiene tablas de 8-15 columnas (libro mayor, plan de cuentas con codigoInterno + codigoPuct + nombre + clase + subclase + estado + …).
+- Dos patrones aceptados según el caso:
+  - **Scroll horizontal**: `<div className="overflow-x-auto"><table className="min-w-[900px]">...</table></div>`. Con sticky de primera columna (`sticky left-0 bg-background`) si el contexto lo necesita.
+  - **Card stack en mobile**: en `< md` la tabla se transforma en lista de cards apiladas. Mejor lectura, peor para comparar filas.
+- Decisión por tabla, no global. Documentarla en el componente.
+
+#### Formularios en mobile
+- Labels **siempre arriba** del input (nunca inline en `< md`).
+- Submit button **full-width** en mobile (`w-full md:w-auto`).
+- Si el form tiene ≥ 6 campos, considerar wizard multi-step en mobile aunque en desktop sea single-page.
+
+#### Toast (`sonner`)
+- Desktop: `position="top-right"` (default ya configurado).
+- Mobile: el toast top-right queda cortado. Usar `top-center` o `bottom-right`.
+- Patrón: detectar ancho y setear position responsive, o aceptar `top-center` como unificado.
+
+#### Viewport meta y meta tags
+- `index.html` debe tener `<meta name="viewport" content="width=device-width, initial-scale=1.0">`.
+- **No** usar `maximum-scale=1.0` ni `user-scalable=no`: bloquea el zoom de accesibilidad del usuario. Los inputs con `font-size ≥ 16 px` ya evitan el auto-zoom molesto.
+
+### Checklist antes de mergear una feature
+
+- [ ] Testeado en los 3 viewports (375 / 768 / 1440)
+- [ ] Navegación accesible en `< md` (drawer funciona)
+- [ ] Inputs no disparan auto-zoom en iOS
+- [ ] Tap targets ≥ 44 px en interacciones críticas
+- [ ] Tablas con estrategia explícita (scroll-x o card stack)
+- [ ] Modales no atrapan al usuario en mobile (fullscreen o sheet)
+
+## 8. API client y handlers por feature
 
 ### Cliente único
 
@@ -335,7 +412,7 @@ export function mensajeDeError(err: unknown): string {
 
 Mostrar el `message` del backend directamente **está permitido** porque ya viene en español, pero para errores con acción clara (ej. `CUENTA_CONFIGURADA_COMO_CONCEPTO` con lista de conceptos) el frontend compone un mensaje más útil con `details`.
 
-## 8. Testing
+## 9. Testing
 
 ### Stack
 
@@ -368,7 +445,7 @@ features/cuentas/
 
 Hoy no usamos MSW porque los tests cubren validación de forms y stores. Cuando tengamos queries con orquestación (invalidations, optimistic updates), migrar a **MSW** (Mock Service Worker) — anotado como deuda.
 
-## 9. Accesibilidad mínima
+## 10. Accesibilidad mínima
 
 - `<label htmlFor="id">` asociado a `<input id="id">` — siempre.
 - Botones con solo ícono: `aria-label="Cerrar sesión"` obligatorio.
@@ -376,7 +453,7 @@ Hoy no usamos MSW porque los tests cubren validación de forms y stores. Cuando 
 - No quitar `outline-ring` de focus — shadcn lo maneja bien; forzar un estado de focus propio solo si es mejor, no porque molesta.
 - **Contraste**: las variables del tema (oklch) ya cumplen WCAG AA para pares `foreground`/`background`. Si agregás colores propios, verificar.
 
-## 10. Git
+## 11. Git
 
 - **Conventional commits** siguiendo la regla de `../CLAUDE.md §9.1`.
 - **Scope** para cambios solo frontend: `<modulo>-ui` o `frontend` si es transversal.
@@ -386,7 +463,7 @@ Hoy no usamos MSW porque los tests cubren validación de forms y stores. Cuando 
 - Cuando un cambio toca backend + frontend en el mismo slice vertical: scope del módulo de dominio, sin sufijo:
   - `feat(invitations): backend flow + frontend accept page`
 
-## 11. Antipatrones del frontend
+## 12. Antipatrones del frontend
 
 Cada antipatrón: **Qué** (una línea), **Por qué duele** (con foco en un sistema contable), **Regla**.
 
@@ -448,7 +525,7 @@ Cada antipatrón: **Qué** (una línea), **Por qué duele** (con foco en un sist
 ### Anti-F-12: Llamar a `api/*.ts` directamente desde un componente
 - **Qué**: `import { getCuentas } from '@/features/cuentas/api/get-cuentas'` en `cuentas-page.tsx`.
 - **Por qué duele**: pierde cache, pierde dedup, pierde invalidations. Dos componentes montados piden la misma data dos veces.
-- **Regla**: componentes importan **solo** del hook (`use-cuentas`). El hook es la fachada de la feature. Ver §7.
+- **Regla**: componentes importan **solo** del hook (`use-cuentas`). El hook es la fachada de la feature. Ver §8.
 
 ---
 

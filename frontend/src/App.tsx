@@ -21,7 +21,9 @@ function App(): React.JSX.Element {
       <BootstrapGate>
         <RouterProvider router={router} />
       </BootstrapGate>
-      <Toaster richColors position="top-right" />
+      {/* top-center unificado — en mobile (375px) el top-right se corta;
+          top-center queda legible en ambos viewports sin media queries. */}
+      <Toaster richColors position="top-center" />
     </QueryClientProvider>
   );
 }

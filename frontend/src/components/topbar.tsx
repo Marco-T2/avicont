@@ -2,6 +2,7 @@ import { LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { MobileSidebar } from '@/components/mobile-sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
@@ -25,17 +26,30 @@ export function Topbar(): React.JSX.Element {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4 lg:px-6">
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-3 md:px-4 lg:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        {/* Hamburger solo en mobile; abre el drawer con la nav completa. */}
+        <MobileSidebar />
+        {/* truncate + title para emails largos — evita que desborde en 375px. */}
+        <span
+          className="truncate text-sm font-medium max-w-[180px] sm:max-w-xs md:max-w-md"
+          title={user?.email ?? 'Sin sesión'}
+        >
           {user?.email ?? 'Sin sesión'}
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          Cerrar sesión
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          aria-label="Cerrar sesión"
+          // Icon-only en mobile (tap target h-10 w-10); full label en sm+
+          className="h-10 w-10 sm:h-9 sm:w-auto sm:px-3"
+        >
+          <LogOut className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Cerrar sesión</span>
         </Button>
       </div>
     </header>
