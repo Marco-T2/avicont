@@ -42,6 +42,76 @@ enum InvitationStatus {
   REVOKED
 }
 
+// =====================================================================
+// DOMINIO CONTABLE — enums compartidos
+// =====================================================================
+
+// Tipos de empresa según clasificación SIN (Bolivia). El PUCT mapea cada
+// cuenta a uno o más de estos tipos. Una organización tiene UN principal
+// (para reportes al SIN) y N activos (para seed del plan de cuentas).
+enum TipoEmpresa {
+  COMERCIAL
+  SERVICIOS
+  TRANSPORTE
+  INDUSTRIAL
+  PETROLERA
+  CONSTRUCCION
+  AGROPECUARIA
+  MINERA
+}
+
+// Moneda funcional. BOB es la moneda funcional obligatoria en Bolivia
+// (Código de Comercio Art. 37, Ley 843). USD se usa para registrar
+// operaciones internacionales con tri-valor (monto + tipoCambio + montoBob).
+enum Moneda {
+  BOB
+  USD
+}
+
+// Clase contable de la cuenta (5 valores estándar PUCT).
+enum ClaseCuenta {
+  ACTIVO
+  PASIVO
+  PATRIMONIO
+  INGRESO
+  EGRESO
+}
+
+// Naturaleza determina cómo afecta el saldo:
+// DEUDORA: aumenta con DEBE, disminuye con HABER (Activos, Egresos)
+// ACREEDORA: aumenta con HABER, disminuye con DEBE (Pasivos, Patrimonio, Ingresos)
+// Excepción: cuentas contrarias (esContraria=true) tienen naturaleza opuesta
+// a su clase (ej: Depreciación Acumulada vive en ACTIVO pero es ACREEDORA).
+enum NaturalezaCuenta {
+  DEUDORA
+  ACREEDORA
+}
+
+// Sub-clasificación NIIF/PCGA, requerida para Estados Financieros.
+// El Balance General separa Corriente/No Corriente.
+// El Estado de Resultados separa Operativo/No Operativo.
+// Nullable solo en cuentas raíz (nivel 1) que son agrupadores.
+enum SubClaseCuenta {
+  // Activo
+  ACTIVO_CORRIENTE
+  ACTIVO_NO_CORRIENTE
+  // Pasivo
+  PASIVO_CORRIENTE
+  PASIVO_NO_CORRIENTE
+  // Patrimonio
+  PATRIMONIO_CAPITAL
+  PATRIMONIO_RESULTADOS
+  // Ingreso
+  INGRESO_OPERATIVO
+  INGRESO_NO_OPERATIVO
+  // Egreso
+  EGRESO_OPERATIVO         // Costos directos (5.1 PUCT: Costo de Ventas)
+  EGRESO_ADMINISTRATIVO    // 5.2 Gastos de Administración
+  EGRESO_COMERCIALIZACION  // 5.3 Gastos de Comercialización (publicidad, fletes de venta, comisiones)
+  EGRESO_FINANCIERO        // 5.4 Gastos Financieros (intereses, comisiones bancarias)
+  EGRESO_NO_OPERATIVO      // 5.5 Otros + 5.6 Ajustes y Diferencias de Cambio
+}
+
 model User {
   id              String    @id @default(uuid())
   email           String    @unique
@@ -76,16 +146,27 @@ model Organization {
   contabilidadEnabled Boolean @default(true)
   granjaEnabled       Boolean @default(false)
 
+  // Tipo de empresa principal (para reportes al SIN). INMUTABLE después
+  // del primer asiento POSTED — un cambio de giro es proceso tributario
+  // formal, no del sistema.
+  tipoEmpresaPrincipal TipoEmpresa @default(COMERCIAL)
+
+  // Tipos de empresa activos (para seed del plan de cuentas y sugerencias
+  // del PUCT). Editable. Invariante: tipoEmpresaPrincipal ∈ tiposEmpresaActivos.
+  tiposEmpresaActivos TipoEmpresa[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships       Membership[]
-  customRoles       CustomRole[]
-  invitations       Invitation[]
-  refreshTokens     RefreshToken[]
-  auditLogs         AuditLog[]
-  featureFlags      FeatureFlag[]
-  impersonationLogs ImpersonationLog[]
+  memberships         Membership[]
+  customRoles         CustomRole[]
+  invitations         Invitation[]
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+  featureFlags        FeatureFlag[]
+  impersonationLogs   ImpersonationLog[]
+  cuentas             Cuenta[]
+  configuracionContable OrgConfiguracionContable?
 
   @@map("organizations")
 }
@@ -267,6 +348,183 @@ model ImpersonationAction {
 
   @@index([impersonationLogId, timestamp])
   @@map("impersonation_actions")
+}
+
+// =====================================================================
+// DOMINIO CONTABLE — Catálogo PUCT (compartido) y Plan de Cuentas (per-tenant)
+// =====================================================================
+//
+// CatalogoPuct es la fuente de verdad oficial del SIN (RND-101800000004).
+// Compartido entre todos los tenants — read-only desde la app.
+// Seed desde prisma/seeds/prod/puct/source/puct.xlsx (538 registros).
+//
+// Cuenta es el plan de cuentas DEL TENANT. Cada cuenta puede mapear a un
+// codigoPuct para consolidación al SIN. Múltiples cuentas internas pueden
+// mapear al mismo PUCT (consolidación). Ver CLAUDE.md §4.1 y §10.3.
+
+model CatalogoPuct {
+  // codigo es PK simple (no composite). Cuando el SIN actualice y haya
+  // que mantener histórico, agregar HistoricoCatalogoPuct con snapshots.
+  // El snapshot vive en Cuenta.nombrePuctSnapshot + versionPuctMapeado.
+  codigo        String        @id // ej "1.1.1.001"
+  nivel         Int           // 1..4 — nivel 5 (auxiliar) son plantillas y se ignoran al seed
+  nombre        String
+  claseCuenta   ClaseCuenta
+  padre         String?       // codigo del padre, null en nivel 1
+  activo        Boolean       @default(true) // false = deprecado por SIN
+  tiposEmpresa  TipoEmpresa[] // qué tipos de empresa lo utilizan (1 a 8)
+  versionPuct   String        // versión interna ej "2018-03"
+  actualizadoEn DateTime      @updatedAt
+
+  padreCuenta CatalogoPuct?  @relation("PuctJerarquia", fields: [padre], references: [codigo])
+  hijas       CatalogoPuct[] @relation("PuctJerarquia")
+
+  @@index([nivel])
+  @@index([padre])
+  @@index([claseCuenta])
+  @@index([tiposEmpresa], type: Gin)
+  @@map("catalogo_puct")
+}
+
+model Cuenta {
+  id             String @id @default(uuid())
+  organizationId String
+
+  // ----- Códigos -----
+  // codigoInterno: hasta 8 niveles separados por punto, único por org.
+  // Permite granularidad mayor que el PUCT (ej: 1.1.1.001.001 con sucursal).
+  codigoInterno String
+
+  // codigoPuct: opcional, debe mapearse a nivel 4 del CatalogoPuct (regla SIN).
+  // NO es único por tenant: múltiples cuentas internas pueden consolidar al mismo.
+  codigoPuct           String?
+  // Snapshot del nombre PUCT al momento del mapeo (trazabilidad histórica).
+  nombrePuctSnapshot   String?
+  // Versión del catálogo PUCT al momento del mapeo (ej "2018-03").
+  versionPuctMapeado   String?
+
+  // ----- Identidad -----
+  nombre      String
+  descripcion String?
+
+  // ----- Clasificación contable -----
+  claseCuenta    ClaseCuenta
+  // Sub-clasificación NIIF/PCGA, requerida para EEFF.
+  // Nullable solo en cuentas raíz (nivel 1) que son agrupadores puros.
+  subClaseCuenta SubClaseCuenta?
+  naturaleza     NaturalezaCuenta
+
+  // ----- Jerarquía -----
+  parentId String?
+  // nivel persistido (1..8). Validar nivel = parent.nivel + 1 al insert/update.
+  nivel    Int
+  esDetalle Boolean @default(false)
+
+  // ----- Reglas de uso -----
+  // Si true, los asientos contra esta cuenta requieren contactoId.
+  requiereContacto Boolean @default(false)
+  // Cuenta contraria: vive en una clase pero su naturaleza es opuesta.
+  // Ej: Depreciación Acumulada vive en ACTIVO pero es ACREEDORA.
+  // En reportes, las contrarias se RESTAN del total de su grupo.
+  esContraria      Boolean @default(false)
+  // Soft-disable; no se elimina si tiene movimientos.
+  activa           Boolean @default(true)
+
+  // ----- Multi-moneda -----
+  // Moneda funcional informativa (ej "Caja USD" → USD).
+  monedaFuncional    Moneda  @default(BOB)
+  // Si false, restringe asientos a esta moneda únicamente.
+  // Ej: "Caja Moneda Nacional" → false. CxC general → true.
+  permiteMultiMoneda Boolean @default(true)
+
+  // ----- Origen -----
+  // true = creada por el seed inicial al provisionar la org.
+  esSystemSeed       Boolean @default(false)
+  // true = el sistema la requiere para operar (IVA, Dif Cambio, Resultado Ejercicio).
+  // No se puede eliminar/desactivar; solo re-mapear vía OrgConfiguracionContable.
+  esRequeridaSistema Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       Cuenta?      @relation("CuentaJerarquia", fields: [parentId], references: [id])
+  hijas        Cuenta[]     @relation("CuentaJerarquia")
+
+  // Configuración contable (FKs onDelete: Restrict en OrgConfiguracionContable).
+  configIvaCredito              OrgConfiguracionContable[] @relation("ConfigIvaCredito")
+  configIvaDebito               OrgConfiguracionContable[] @relation("ConfigIvaDebito")
+  configIvaCreditoImportaciones OrgConfiguracionContable[] @relation("ConfigIvaCreditoImp")
+  configItPorPagar              OrgConfiguracionContable[] @relation("ConfigIt")
+  configIuePorPagar             OrgConfiguracionContable[] @relation("ConfigIue")
+  configRcIvaRetenido           OrgConfiguracionContable[] @relation("ConfigRcIva")
+  configDifCambioGanancia       OrgConfiguracionContable[] @relation("ConfigDifCambioGan")
+  configDifCambioPerdida        OrgConfiguracionContable[] @relation("ConfigDifCambioPer")
+  configResultadoEjercicio      OrgConfiguracionContable[] @relation("ConfigResultadoEj")
+  configResultadosAcumulados    OrgConfiguracionContable[] @relation("ConfigResultadosAcum")
+  configCajaChicaDefault        OrgConfiguracionContable[] @relation("ConfigCajaChica")
+  configAjustePorInflacion      OrgConfiguracionContable[] @relation("ConfigAjusteInflacion")
+
+  @@unique([organizationId, codigoInterno])
+  @@index([organizationId, codigoPuct])
+  @@index([organizationId, claseCuenta])
+  @@index([organizationId, subClaseCuenta])
+  @@index([parentId])
+  @@map("cuentas")
+}
+
+// Mapeo de "conceptos contables" a cuentas específicas del tenant.
+// Una sola fila por organización. Los asientos automáticos (IVA, dif. cambio,
+// cierre) usan estas FKs para encontrar la cuenta correspondiente.
+// FKs onDelete: Restrict — la cuenta no se puede borrar si está mapeada;
+// el servicio valida que no se desactive sin re-mapear primero (Anti-35).
+// Ver CLAUDE.md §10.3.
+model OrgConfiguracionContable {
+  organizationId String @id
+
+  // ---- IVA (Ley 843, alícuota 13%) ----
+  ivaCreditoId              String? // IVA Crédito Fiscal (compras nacionales)
+  ivaDebitoId               String? // IVA Débito Fiscal (ventas)
+  ivaCreditoImportacionesId String? // IVA Crédito Fiscal por importaciones (separado para control)
+
+  // ---- Otros impuestos ----
+  itPorPagarId    String? // Impuesto a las Transacciones (3% sobre ventas)
+  iuePorPagarId   String? // Impuesto a las Utilidades de las Empresas (25%)
+  rcIvaRetenidoId String? // Régimen Complementario al IVA retenido a empleados
+
+  // ---- Diferencia de cambio (Norma Contable N° 6: SEPARADAS) ----
+  // Ganancia: cuenta de INGRESO. Pérdida: cuenta de EGRESO.
+  // Una sola cuenta no puede ser INGRESO y EGRESO simultáneamente.
+  difCambioGananciaId String?
+  difCambioPerdidaId  String?
+
+  // ---- Cierre de gestión ----
+  resultadoEjercicioId   String? // Resultado del Ejercicio (PATRIMONIO_RESULTADOS)
+  resultadosAcumuladosId String? // Resultados Acumulados (PATRIMONIO_RESULTADOS)
+
+  // ---- Otros ----
+  cajaChicaDefaultId   String? // Cuenta default para movimientos de caja chica sin especificar
+  ajustePorInflacionId String? // AITB — Ajuste Integral por Inflación (poco usado hoy, algunos sectores)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  ivaCredito              Cuenta? @relation("ConfigIvaCredito",         fields: [ivaCreditoId],              references: [id], onDelete: Restrict)
+  ivaDebito               Cuenta? @relation("ConfigIvaDebito",          fields: [ivaDebitoId],               references: [id], onDelete: Restrict)
+  ivaCreditoImportaciones Cuenta? @relation("ConfigIvaCreditoImp",      fields: [ivaCreditoImportacionesId], references: [id], onDelete: Restrict)
+  itPorPagar              Cuenta? @relation("ConfigIt",                 fields: [itPorPagarId],              references: [id], onDelete: Restrict)
+  iuePorPagar             Cuenta? @relation("ConfigIue",                fields: [iuePorPagarId],             references: [id], onDelete: Restrict)
+  rcIvaRetenido           Cuenta? @relation("ConfigRcIva",              fields: [rcIvaRetenidoId],           references: [id], onDelete: Restrict)
+  difCambioGanancia       Cuenta? @relation("ConfigDifCambioGan",       fields: [difCambioGananciaId],       references: [id], onDelete: Restrict)
+  difCambioPerdida        Cuenta? @relation("ConfigDifCambioPer",       fields: [difCambioPerdidaId],        references: [id], onDelete: Restrict)
+  resultadoEjercicio      Cuenta? @relation("ConfigResultadoEj",        fields: [resultadoEjercicioId],      references: [id], onDelete: Restrict)
+  resultadosAcumulados    Cuenta? @relation("ConfigResultadosAcum",     fields: [resultadosAcumuladosId],    references: [id], onDelete: Restrict)
+  cajaChicaDefault        Cuenta? @relation("ConfigCajaChica",          fields: [cajaChicaDefaultId],        references: [id], onDelete: Restrict)
+  ajustePorInflacion      Cuenta? @relation("ConfigAjusteInflacion",    fields: [ajustePorInflacionId],      references: [id], onDelete: Restrict)
+
+  @@map("org_configuracion_contable")
 }
 
 // =====================================================================

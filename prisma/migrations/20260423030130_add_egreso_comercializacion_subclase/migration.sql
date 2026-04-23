@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SubClaseCuenta" ADD VALUE 'EGRESO_COMERCIALIZACION';
