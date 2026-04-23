@@ -10,8 +10,23 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
+
+  // CORS con credentials — la cookie refreshToken (httpOnly, SameSite=Strict)
+  // necesita `credentials: true` y un origin explícito (no wildcard).
+  // En dev, el frontend corre en :5173 (Vite). En prod se usa FRONTEND_URL.
+  const configService = app.get(ConfigService);
+  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
+  app.enableCors({
+    origin: frontendUrl,
+    credentials: true,
+  });
+
+  // cookie-parser se registra dentro de AppModule.configure() para que
+  // también se aplique en los tests E2E (Test.createTestingModule no ejecuta
+  // el main.ts). Dejamos esto aquí como referencia — si hiciera falta
+  // configuración por env, pasaría el secret via ConfigService.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -65,7 +80,6 @@ async function bootstrap() {
     },
   });
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
   console.info(`API listening on http://localhost:${port}`);

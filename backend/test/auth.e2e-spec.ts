@@ -100,7 +100,18 @@ describe('Auth (e2e)', () => {
         .expect(200);
 
       expect(response.body).toHaveProperty('accessToken');
-      expect(response.body).toHaveProperty('refreshToken');
+      // refreshToken ya NO viene en el body — ahora se emite como cookie
+      // httpOnly, SameSite=Strict, Path=/api/auth (ver auth.controller).
+      expect(response.body).not.toHaveProperty('refreshToken');
+      const setCookie = response.headers['set-cookie'];
+      const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
+      const refreshCookie = cookies.find(
+        (c): c is string => typeof c === 'string' && c.startsWith('refreshToken='),
+      );
+      expect(refreshCookie).toBeDefined();
+      expect(refreshCookie).toContain('HttpOnly');
+      expect(refreshCookie).toContain('SameSite=Strict');
+      expect(refreshCookie).toContain('Path=/api/auth');
     });
 
     it('should reject invalid password', async () => {
@@ -119,7 +130,23 @@ describe('Auth (e2e)', () => {
   });
 
   describe('POST /api/auth/refresh', () => {
-    let refreshToken: string;
+    // Helper: extrae el header `Cookie` para mandarlo en el próximo request.
+    // supertest guarda el Set-Cookie completo, pero el request outgoing solo
+    // necesita `name=value` (sin flags).
+    function extractCookieHeader(setCookieHeader: string | string[] | undefined): string {
+      const cookies = Array.isArray(setCookieHeader)
+        ? setCookieHeader
+        : setCookieHeader !== undefined
+          ? [setCookieHeader]
+          : [];
+      const refresh = cookies.find(
+        (c): c is string => typeof c === 'string' && c.startsWith('refreshToken='),
+      );
+      if (refresh === undefined) throw new Error('No refreshToken cookie in response');
+      return refresh.split(';')[0] ?? '';
+    }
+
+    let refreshCookieHeader: string;
 
     beforeEach(async () => {
       const hashedPassword = await bcrypt.hash('password123', 10);
@@ -130,34 +157,41 @@ describe('Auth (e2e)', () => {
         },
       });
 
-      const response = await request(app.getHttpServer())
+      const loginRes = await request(app.getHttpServer())
         .post('/api/auth/login')
         .send({ email: 'refresh@example.com', password: 'password123' });
 
-      refreshToken = response.body.refreshToken;
+      refreshCookieHeader = extractCookieHeader(loginRes.headers['set-cookie']);
     });
 
     it('should refresh tokens', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/auth/refresh')
-        .send({ refreshToken })
+        .set('Cookie', refreshCookieHeader)
         .expect(200);
 
       expect(response.body).toHaveProperty('accessToken');
-      expect(response.body).toHaveProperty('refreshToken');
-      expect(response.body.refreshToken).not.toBe(refreshToken);
+      // El nuevo refresh viene como cookie rotada, NO en el body.
+      expect(response.body).not.toHaveProperty('refreshToken');
+      const newCookie = extractCookieHeader(response.headers['set-cookie']);
+      expect(newCookie).not.toBe(refreshCookieHeader);
     });
 
     it('should reject used refresh token (rotation)', async () => {
       await request(app.getHttpServer())
         .post('/api/auth/refresh')
-        .send({ refreshToken })
+        .set('Cookie', refreshCookieHeader)
         .expect(200);
 
+      // El mismo cookie ya fue rotado; reutilizarlo debe fallar.
       await request(app.getHttpServer())
         .post('/api/auth/refresh')
-        .send({ refreshToken })
+        .set('Cookie', refreshCookieHeader)
         .expect(401);
+    });
+
+    it('should reject missing refresh cookie', async () => {
+      await request(app.getHttpServer()).post('/api/auth/refresh').expect(401);
     });
   });
 });

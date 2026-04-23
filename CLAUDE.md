@@ -900,6 +900,7 @@ Ninguna capa confía en que la anterior hizo su trabajo.
 
 - Nunca commitear secrets al repo. `.env` en `.gitignore`, `.env.example` con placeholders.
 - Secrets obligatorios: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`, `REDIS_PASSWORD` (si aplica).
+- Var de entorno obligatoria para CORS: `FRONTEND_URL` (ej. `http://localhost:5173` en dev). CORS se abre con `credentials: true` **solo** a ese origin — necesario para que la cookie `refreshToken` viaje entre frontend y backend.
 - Rotación de secrets documentada en `docs/security/secret-rotation.md` (pendiente).
 
 ---
@@ -1759,6 +1760,10 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Mutation testing (Stryker) | Diferido | Fase 1+, una vez estabilizado el core |
 | Feature flags para trunk-based | Diferido | Si el equipo crece a >3 devs |
 | Integración SIN (facturación electrónica) | Fuera de scope | Si un cliente lo pide como upsell de pago |
+| Cookie `refreshToken` `SameSite=Strict` → `Lax` | Deuda | Cuando se integre OAuth/SSO externo — Strict bloquea el callback del provider |
+| Logout multi-tab vía `BroadcastChannel('auth')` en frontend | Deuda | Fase 1.1+ — hoy logout en una tab no purga las otras |
+| `openapi-typescript` para tipos compartidos frontend↔backend | Deuda | Cuando haya 4-5 features consumiendo la API con DTOs duplicados a mano |
+| Migración de `accessToken` en memoria a un worker/SW con rotación background | Diferido | Si el proyecto escala a múltiples frontends/apps móviles |
 
 ---
 

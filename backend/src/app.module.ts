@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
@@ -78,4 +79,12 @@ import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
     { provide: APP_GUARD, useClass: ModuleEnabledGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // Registrar cookie-parser como middleware del módulo — así se aplica en
+  // cualquier INestApplication creada desde AppModule (producción via main.ts
+  // y tests E2E vía Test.createTestingModule). Evita duplicar `app.use()`
+  // entre main.ts y cada spec.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(cookieParser()).forRoutes('*');
+  }
+}
