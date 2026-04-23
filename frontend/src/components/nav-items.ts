@@ -12,6 +12,6 @@ export interface NavItem {
 // acá y ambos modos lo reflejan automáticamente.
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Panel', icon: Home },
-  { to: '/plan-cuentas', label: 'Plan de cuentas', icon: BookOpen, disabled: true },
+  { to: '/plan-cuentas', label: 'Plan de cuentas', icon: BookOpen },
   { to: '/configuracion', label: 'Configuración contable', icon: Settings, disabled: true },
 ];

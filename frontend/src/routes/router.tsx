@@ -4,6 +4,7 @@ import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
 import { LoginPage } from '@/features/auth/login-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
+import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 
 import { ProtectedRoute } from './protected-route';
 
@@ -17,7 +18,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <DashboardShell />,
-        children: [{ path: '/', element: <DashboardPage /> }],
+        children: [
+          { path: '/', element: <DashboardPage /> },
+          { path: '/plan-cuentas', element: <PlanCuentasPage /> },
+        ],
       },
     ],
   },
