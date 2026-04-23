@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import {
-  ComprobantesLockPort,
-  ResumenPeriodo,
-} from '../ports/comprobantes-lock.port';
+import { ComprobantesLockPort, ResumenPeriodo } from '../ports/comprobantes-lock.port';
 
 /**
  * Stub de Fase 1.2: no hay módulo `comprobantes` todavía, así que este

@@ -18,19 +18,13 @@ export abstract class ComprobantesLockPort {
    * Transiciona todos los comprobantes `CONTABILIZADO` del período a
    * `BLOQUEADO`. Devuelve la cantidad afectada.
    */
-  abstract bloquearPorPeriodo(
-    tx: Prisma.TransactionClient,
-    periodoId: string,
-  ): Promise<number>;
+  abstract bloquearPorPeriodo(tx: Prisma.TransactionClient, periodoId: string): Promise<number>;
 
   /**
    * Transiciona todos los comprobantes `BLOQUEADO` del período a
    * `CONTABILIZADO`. Devuelve la cantidad afectada.
    */
-  abstract desbloquearPorPeriodo(
-    tx: Prisma.TransactionClient,
-    periodoId: string,
-  ): Promise<number>;
+  abstract desbloquearPorPeriodo(tx: Prisma.TransactionClient, periodoId: string): Promise<number>;
 
   /**
    * Cuenta comprobantes en estado `BORRADOR` del período. Se usa para
