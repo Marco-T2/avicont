@@ -4,7 +4,10 @@ import { IsOptional, IsUUID, ValidateIf } from 'class-validator';
 // DTO de actualización. Cualquier campo puede ser UUID (mapear) o null (desmapear).
 // Para aceptar ambos con class-validator usamos ValidateIf cuando el valor no sea null.
 const uuidOrNull = () => [
-  ApiPropertyOptional({ nullable: true, format: 'uuid' }),
+  // type: String explícito evita que Swagger intente inferir del tipo TS.
+  // Con `string | null` como type, schema-object-factory interpreta la clase
+  // como self-referenciada y lanza "circular dependency" al bootstrap.
+  ApiPropertyOptional({ type: String, nullable: true, format: 'uuid' }),
   IsOptional(),
   ValidateIf((_o, v) => v !== null),
   IsUUID(),

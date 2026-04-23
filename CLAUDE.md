@@ -322,8 +322,36 @@ function procesarPago(pago: Pago) {
 
 ### 3.1 Estructura general del proyecto
 
+El repositorio es un **monorepo** con carpetas separadas para backend y frontend.
+La documentación transversal y la configuración de infraestructura viven en la raíz;
+cada stack es autocontenido en su carpeta.
+
 ```
-src/
+avicont/                     Raíz del monorepo
+├── backend/                 API NestJS (este es el foco de esta constitución)
+│   ├── src/                 Ver árbol abajo
+│   ├── prisma/              Schema, migrations, seeds
+│   ├── test/                E2E tests (fixtures compartidas entre suites)
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── Dockerfile
+│   └── ...
+│
+├── frontend/                Vite + React (se agrega cuando arranque el slice UI)
+│
+├── docs/                    Diseños de dominio transversales
+│   └── disenos/
+│
+├── observability/           Configs de Grafana, Loki, Prometheus, Tempo
+├── docker-compose.yml       Stack local (app + postgres + redis + obs)
+├── CLAUDE.md                Esta constitución (aplica al repo entero)
+└── README.md                Overview del monorepo
+```
+
+Estructura interna del backend (`backend/src/`):
+
+```
+backend/src/
 ├── common/                  Código compartido transversalmente
 │   ├── domain/              Value objects globales (Money, Nit, Ufv, Porcentaje)
 │   ├── errors/              Excepciones de dominio reutilizables
@@ -356,6 +384,10 @@ src/
 ├── app.module.ts
 └── main.ts
 ```
+
+> Los paths en el resto de este documento (`src/...`, `prisma/...`, `test/...`)
+> son relativos a `backend/`. Los comandos operativos del §11 se corren
+> desde `backend/` salvo que se indique lo contrario.
 
 ### 3.2 Estructura interna de un módulo (hexagonal ESTRICTO)
 
@@ -1776,11 +1808,14 @@ docker compose down -v
 
 ### 11.2 Prisma: migraciones y seeds
 
-`DATABASE_URL` vive en `.env` (gitignored). Los scripts npm (`prisma:migrate`, `seed`) lo leen de ahí automáticamente.
+> Todos los comandos Prisma se corren **desde `backend/`** (o con `-p backend/` en el caso de npm scripts). La raíz del repo es el monorepo; cada carpeta de stack es un proyecto Node independiente.
 
-**Cuando Claude Code corre los comandos**, NO tiene acceso al `.env` por restricciones de permisos del entorno sandboxed. Debe pasarlo **inline** en la invocación:
+`DATABASE_URL` vive en `backend/.env` (gitignored). Los scripts npm (`prisma:migrate`, `seed`) lo leen de ahí automáticamente.
+
+**Cuando Claude Code corre los comandos**, NO tiene acceso al `.env` por restricciones de permisos del entorno sandboxed. Debe pasarlo **inline** en la invocación, y correr desde `backend/`:
 
 ```bash
+cd backend
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate dev --name <nombre>
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate deploy
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate status
@@ -1790,6 +1825,7 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx ts-node pr
 
 Para el caller humano, los scripts npm funcionan sin exportar variables porque leen del `.env`:
 ```bash
+cd backend
 npm run prisma:migrate          # equivale a: prisma migrate dev
 npm run prisma:generate         # genera el cliente Prisma
 npm run prisma:studio           # UI web de Prisma en localhost:5555
@@ -1797,14 +1833,18 @@ npm run prisma:studio           # UI web de Prisma en localhost:5555
 
 ### 11.3 Tests
 
+Correr **desde `backend/`**:
+
 **Unitarios + integración**:
 ```bash
+cd backend
 npx jest src/                    # todos los .spec.ts del código
 npm test                         # equivalente
 ```
 
 **E2E (requieren Postgres arriba + CatalogoPuct sembrado)**:
 ```bash
+cd backend
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
 JWT_ACCESS_SECRET="test-secret" \
 JWT_REFRESH_SECRET="test-refresh" \
@@ -1817,7 +1857,10 @@ npx jest test/ --runInBand --forceExit
 
 ### 11.4 Lint y typecheck
 
+Correr **desde `backend/`**:
+
 ```bash
+cd backend
 npx tsc --noEmit -p tsconfig.json    # typecheck
 npm run lint                         # eslint src/
 npx eslint <path> --fix              # auto-fix
@@ -1826,12 +1869,14 @@ npm run format                       # prettier sobre src/ y test/
 
 ### 11.5 Checklist antes de arrancar a codear desde cero
 
-1. `docker compose up -d postgres redis` (mínimo viable)
-2. Si es la primera vez: `DATABASE_URL=... npx prisma migrate deploy` + `DATABASE_URL=... npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts`
-3. `npm run start:dev` para el backend en watch mode
+1. Desde la raíz del repo: `docker compose up -d postgres redis` (mínimo viable)
+2. Si es la primera vez, desde `backend/`:
+   `DATABASE_URL=... npx prisma migrate deploy` +
+   `DATABASE_URL=... npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts`
+3. Desde `backend/`: `npm run start:dev` para el backend en watch mode
 4. Abrir http://localhost:3000/api/docs para el Swagger
 
-Para agregar observabilidad al dev: `docker compose up -d` (todo el stack), entrar a Grafana http://localhost:3001.
+Para agregar observabilidad al dev, desde la raíz: `docker compose up -d` (todo el stack), entrar a Grafana http://localhost:3001.
 
 ---
 
