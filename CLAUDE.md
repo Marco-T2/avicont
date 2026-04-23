@@ -932,9 +932,27 @@ Formato: `{MODULO}_{SUBDOMINIO}_{CONDICION}` en `SCREAMING_SNAKE_CASE`.
 ASIENTO_PARTIDA_DOBLE_VIOLATED
 ASIENTO_PERIODO_CERRADO
 ASIENTO_TRANSICION_INVALIDA
-CUENTA_NO_DETALLE
 CUENTA_NOT_FOUND
-CUENTA_TIENE_MOVIMIENTOS
+CUENTA_NO_DETALLE
+CUENTA_CON_MOVIMIENTOS
+CUENTA_CODIGO_INTERNO_INVALIDO
+CUENTA_CODIGO_INTERNO_DUPLICADO
+CUENTA_NIVEL_MAXIMO_EXCEDIDO
+CUENTA_PADRE_INVALIDA
+CUENTA_PADRE_INACTIVA
+CUENTA_PADRE_ES_DETALLE
+CUENTA_SUBCLASE_INCONSISTENTE
+CUENTA_CONTRARIA_NATURALEZA_INVALIDA
+CUENTA_CODIGO_PUCT_INVALIDO
+CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE
+CUENTA_CONFIGURADA_COMO_CONCEPTO
+CUENTA_REQUERIDA_SISTEMA_INMUTABLE
+CONFIG_CONCEPTO_INVALIDO
+CONFIG_CUENTA_NO_ENCONTRADA
+CONFIG_CUENTA_INACTIVA
+CONFIG_CUENTA_NO_DETALLE
+CONFIG_CUENTA_CLASE_INCORRECTA
+CONFIG_DIF_CAMBIO_MISMA_CUENTA
 PERIODO_FISCAL_CERRADO
 PERIODO_ANTERIOR_ABIERTO
 AUTH_INVALID_CREDENTIALS
@@ -1092,24 +1110,30 @@ describe('AsientoService (integration)', () => {
 
 ### 7.3 Ubicación de archivos
 
-**Al lado del código.** Cohesión + refactors baratos.
+**Unitarios e integración: al lado del código.** Cohesión + refactors baratos.
+**E2E: en `test/` en la raíz del proyecto.** Por convención del starter — comparten fixtures, helpers y bootstrap entre suites E2E de distintos módulos.
 
 ```
-modules/asientos/
+src/modules/asientos/
 ├── asiento.service.ts
-├── asiento.service.spec.ts              ← unitario
-├── asiento.service.integration.spec.ts  ← contra Postgres
+├── asiento.service.spec.ts              ← unitario (al lado)
+├── asiento.service.integration.spec.ts  ← integración contra Postgres (al lado)
 ├── asiento.controller.ts
 └── asiento.controller.spec.ts
+
+test/
+├── helpers/test-factory.ts              ← fixtures compartidas entre E2E
+├── asientos.e2e-spec.ts                 ← E2E end-to-end
+└── cuentas.e2e-spec.ts
 ```
 
 **Sufijos:**
 
-| Sufijo | Tipo | Cuándo |
-|--------|------|--------|
-| `.spec.ts` | Unitario puro (sin BD, sin red, sin filesystem) | Value objects, cálculos, validadores |
-| `.integration.spec.ts` | Integración contra Postgres real | Repositorios, servicios con BD |
-| `.e2e-spec.ts` | E2E end-to-end vía HTTP | Flujos completos con auth |
+| Sufijo | Tipo | Cuándo | Ubicación |
+|--------|------|--------|-----------|
+| `.spec.ts` | Unitario puro (sin BD, sin red, sin filesystem) | Value objects, cálculos, validadores | al lado del código |
+| `.integration.spec.ts` | Integración contra Postgres real | Repositorios, servicios con BD | al lado del código |
+| `.e2e-spec.ts` | E2E end-to-end vía HTTP con JWT real | Flujos completos con auth | `test/` |
 
 ### 7.4 Framework: Jest (mantener starter)
 
@@ -1469,6 +1493,22 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 - **Enforcement**: coverage de integración ≥ 60% del total + revisión en PR.
 
 ---
+
+### 8.6 Plan de cuentas y configuración contable
+
+#### Anti-41: Desactivar cuenta configurada como concepto contable
+
+- **Qué**: permitir `DELETE /cuentas/:id` (o setear `activa=false`) en una cuenta que está mapeada en `OrgConfiguracionContable` como concepto (ej. cuenta de IVA Crédito Fiscal, Resultado del Ejercicio, Diferencia de Cambio).
+- **Por qué duele**: los asientos automáticos que dependen del concepto (cálculo IVA de venta, cierre de gestión, diferencia de cambio) empiezan a fallar silenciosamente o con 500 en el próximo uso. El admin desactivó la cuenta sin saber que estaba "enchufada" a procesos internos.
+- **Regla**: `CuentasService.desactivar` consulta `OrgConfiguracionContable` y rechaza con `CUENTA_CONFIGURADA_COMO_CONCEPTO` devolviendo en `details.conceptos` la lista de campos que apuntan a la cuenta (ej. `['ivaCreditoId', 'resultadoEjercicioId']`). El usuario debe remapear primero vía `PATCH /api/configuracion-contable`.
+- **Enforcement**: validación en el service + FK `onDelete: Restrict` en cada relación de `OrgConfiguracionContable` (defense in depth) + test unitario `cuentas.service.spec.ts#desactivar › rechaza con lista de conceptos`.
+
+#### Anti-42: Proponer códigos del PUCT/SIN sin validar contra catálogo real
+
+- **Qué**: asumir un código PUCT (por ejemplo "5.3.1.001 INTERESES PAGADOS") basado en memoria, convención o suposición sin verificar contra el xlsx/catálogo oficial (`prisma/seeds/prod/puct/source/puct.xlsx`).
+- **Por qué duele**: cicatriz — durante el seed inicial de la plantilla COMERCIAL (Fase 1.0.6), >50% de los códigos propuestos a primera vista no existían o tenían otro nombre en el PUCT real (ej. 5.3.1.001 es SUELDOS Y SALARIOS, no INTERESES PAGADOS). De haber pasado a producción, el LCV y los EEFF habrían sido inconsistentes con el catálogo que revisa el SIN.
+- **Regla**: todo código PUCT se verifica en `CatalogoPuct` (o se greppea en el xlsx oficial) antes de usarlo en código o seeds. Nunca pasar `codigoPuct` sin que haya atravesado `CatalogoPuctReaderPort.findByCodigo` + `validarNivelPuct(4)`.
+- **Enforcement**: en runtime — lookup obligatorio en `CuentasService.resolverPuctSnapshot` antes de persistir; en seed — test de coherencia `prisma/seeds/prod/planes-cuentas/__tests__/puct-a-concepto.spec.ts` (toda cuenta `esRequeridaSistema: true` debe estar en `MAPEO_PUCT_A_CONCEPTO` y vice-versa); en ingesta del catálogo — `catalogo-puct.seed.ts` upsertea directo desde el xlsx oficial.
 
 ---
 

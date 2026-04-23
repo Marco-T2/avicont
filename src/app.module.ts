@@ -11,6 +11,8 @@ import { CustomRolesModule } from './custom-roles/custom-roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { ImpersonationModule } from './impersonation/impersonation.module';
+import { CuentasModule } from './cuentas/cuentas.module';
+import { ConfiguracionContableModule } from './configuracion-contable/configuracion-contable.module';
 import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
 import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
@@ -59,6 +61,8 @@ import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
     AuditModule,
     BillingModule,
     FeatureFlagsModule,
+    CuentasModule,
+    ConfiguracionContableModule,
   ],
   controllers: [],
   providers: [
