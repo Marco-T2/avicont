@@ -169,6 +169,7 @@ model Organization {
   configuracionContable OrgConfiguracionContable?
   gestionesFiscales   GestionFiscal[]
   periodosFiscales    PeriodoFiscal[]
+  comprobantes        Comprobante[]
 
   @@map("organizations")
 }
@@ -467,6 +468,9 @@ model Cuenta {
   configCajaChicaDefault        OrgConfiguracionContable[] @relation("ConfigCajaChica")
   configAjustePorInflacion      OrgConfiguracionContable[] @relation("ConfigAjusteInflacion")
 
+  // Líneas de comprobante que referencian esta cuenta (no se borra con movimientos)
+  lineasComprobante LineaComprobante[]
+
   @@unique([organizationId, codigoInterno])
   @@index([organizationId, codigoPuct])
   @@index([organizationId, claseCuenta])
@@ -612,6 +616,7 @@ model PeriodoFiscal {
   organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   gestion          GestionFiscal            @relation(fields: [gestionId], references: [id], onDelete: Cascade)
   reopenings       PeriodoFiscalReopening[]
+  comprobantes     Comprobante[]
 
   @@unique([organizationId, year, month])
   @@unique([gestionId, ordenEnGestion])
@@ -636,8 +641,191 @@ model PeriodoFiscalReopening {
   reclosedAt         DateTime?
   reclosedByUserId   String?
 
-  periodo            PeriodoFiscal @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  periodo                PeriodoFiscal          @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  auditoriasComprobante  ComprobanteAuditoria[]
 
   @@index([periodoId])
   @@map("periodo_fiscal_reopenings")
+}
+
+// ============================================================
+// Comprobantes y asientos (Fase 1.3)
+// Ver docs/disenos/comprobantes-asientos.md
+// ============================================================
+
+// Tipo de comprobante: determina el prefijo de numeración (A, D, I, E, J, T, C)
+// y la semántica operativa. Enum hardcoded, no configurable per-tenant.
+enum TipoComprobante {
+  APERTURA   // A — saldos iniciales de la gestión
+  DIARIO     // D — asiento general, uso más común
+  INGRESO    // I — entradas de dinero (cobros, ventas)
+  EGRESO     // E — salidas de dinero (pagos, compras)
+  AJUSTE     // J — ajustes, reversiones, reclasificaciones
+  TRASPASO   // T — movimientos entre cuentas internas
+  CIERRE     // C — cierre de cuentas de resultado (Fase 1.5)
+}
+
+// Estado del comprobante.
+// Transiciones válidas: BORRADOR → CONTABILIZADO → {BLOQUEADO | ANULADO}.
+// BLOQUEADO vuelve a CONTABILIZADO únicamente vía reapertura del período.
+// ANULADO es terminal; la anulación crea un comprobante AJUSTE de reversión.
+enum EstadoComprobante {
+  BORRADOR
+  CONTABILIZADO
+  BLOQUEADO
+  ANULADO
+}
+
+// Acción registrada en ComprobanteAuditoria.
+enum AccionAuditoriaComprobante {
+  CREADO
+  EDITADO
+  CONTABILIZADO
+  ANULADO
+  CREADO_POR_REVERSION
+  EDIT_EN_REAPERTURA
+}
+
+// Comprobante = cabecera del asiento contable (Ley 843 art. 46, Código
+// Tributario art. 47). Contiene fecha, tipo, número, estado, glosa, moneda
+// principal y totales cache en BOB. El detalle vive en LineaComprobante.
+model Comprobante {
+  id              String            @id @default(uuid())
+  organizationId  String
+  tipo            TipoComprobante
+  // NULL en BORRADOR. Asignado al CONTABILIZAR con formato {prefijo}{YY}{MM}-{correlativo:6}.
+  numero          String?
+  estado          EstadoComprobante @default(BORRADOR)
+
+  // FechaContable: calendario puro (CLAUDE.md §4.6 core). Inmutable post-CONTABILIZADO.
+  fechaContable   DateTime          @db.Date
+  // Resuelto al create desde fechaContable. Inmutable post-CONTABILIZADO.
+  periodoFiscalId String
+
+  glosa           String
+  monedaPrincipal Moneda            @default(BOB)
+
+  // Totales cache en BOB, calculados al contabilizar. Validan partida doble.
+  totalDebitoBob  Decimal           @default(0) @db.Decimal(18, 2)
+  totalCreditoBob Decimal           @default(0) @db.Decimal(18, 2)
+
+  // Origen de auto-entries (Fase 1.5+). En 1.3 siempre NULL. Campo presente
+  // para evitar migración futura sobre tabla grande. UNIQUE ignora NULL.
+  origenTipo      String?           // "VENTA" | "COMPRA" | "PAGO" | NULL
+  origenId        String?           // id del documento origen
+
+  // Anulación / reversión — una sola FK (1:1). La reversión tiene anulaAId
+  // apuntando al original; el original accede a su reversión vía la back-ref
+  // implícita (`reversion`) gracias a @unique([anulaAId]).
+  // Metadatos de la anulación viven en el original.
+  anulaAId         String?          // solo en la reversión; NULL en el original
+  anuladoEn        DateTime?        // timestamptz UTC, solo en el original
+  anuladoPorUserId String?          // solo en el original
+  motivoAnulacion  String?          // solo en el original
+
+  createdAt       DateTime  @default(now())
+  createdByUserId String
+  updatedAt       DateTime  @updatedAt
+
+  organization   Organization           @relation(fields: [organizationId], references: [id],  onDelete: Cascade)
+  periodoFiscal  PeriodoFiscal          @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
+  lineas         LineaComprobante[]
+  auditorias     ComprobanteAuditoria[]
+  // Lado con FK: este comprobante es una reversión y apunta al original.
+  anulaA         Comprobante?           @relation("ComprobanteReversion", fields: [anulaAId], references: [id])
+  // Back-ref 1:1 (gracias a @unique([anulaAId])): si este comprobante está
+  // ANULADO, su reversión es el único Comprobante cuyo anulaAId = this.id.
+  reversion      Comprobante?           @relation("ComprobanteReversion")
+
+  // Unicidad del número por (tenant, tipo). numero es NULL en BORRADOR y
+  // Postgres permite múltiples NULL en un UNIQUE, así que no colisiona.
+  @@unique([organizationId, tipo, numero])
+
+  // Unicidad de auto-entries (CLAUDE.md §4.9 core, Anti-17). NULLs ignorados
+  // en 1.3 → no colisiona. Campo presente para no migrar en Fase 1.5.
+  @@unique([organizationId, origenTipo, origenId])
+
+  // Reversión 1:1 — una anulación genera exactamente una reversión.
+  @@unique([anulaAId])
+
+  @@index([organizationId, periodoFiscalId, estado])
+  @@index([organizationId, fechaContable])
+  @@index([organizationId, tipo, fechaContable])
+  @@map("comprobantes")
+}
+
+// Líneas del comprobante = tabla de detalle donde viven los asientos (cuenta +
+// monto + DEBE/HABER + moneda + tipoCambio). Multi-moneda estructural desde
+// día 1 (CLAUDE.md §4.5 core): todos los campos de moneda siempre persisten,
+// aunque sea BOB con tipoCambio=1.
+model LineaComprobante {
+  id              String   @id @default(uuid())
+  organizationId  String   // denormalizado para queries cross-cuenta sin JOIN
+  comprobanteId   String
+  orden           Int      // 1..N dentro del comprobante; inmutable post-create
+
+  cuentaId        String
+  // Requerido si cuenta.requiereContacto = true. En 1.3 es string libre sin FK;
+  // Fase 1.4 agrega FK a tabla Contacto con onDelete: Restrict.
+  contactoId      String?
+
+  // Multi-moneda estructural. BOB → moneda=BOB, tipoCambio=1, debitoBob=debito.
+  moneda          Moneda
+  debito          Decimal  @default(0) @db.Decimal(18, 2)
+  credito         Decimal  @default(0) @db.Decimal(18, 2)
+  tipoCambio      Decimal  @default(1) @db.Decimal(14, 8)
+  debitoBob       Decimal  @default(0) @db.Decimal(18, 2)
+  creditoBob      Decimal  @default(0) @db.Decimal(18, 2)
+
+  glosaLinea      String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  comprobante     Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  cuenta          Cuenta      @relation(fields: [cuentaId],      references: [id], onDelete: Restrict)
+
+  @@unique([comprobanteId, orden])
+  @@index([organizationId, cuentaId])
+  @@index([organizationId, comprobanteId])
+  @@map("lineas_comprobante")
+}
+
+// Contador atómico de numeración por (tenant, tipo, year, month). Se usa con
+// upsert `INSERT ... ON CONFLICT DO UPDATE ... RETURNING ultimo_numero`
+// para garantizar atomicidad bajo concurrencia (CLAUDE.md §4.9 core,
+// Anti-24: PROHIBIDO `SELECT MAX(numero) + 1`).
+model SecuenciaComprobante {
+  organizationId String
+  tipo           TipoComprobante
+  year           Int
+  month          Int              // 1-12
+  ultimoNumero   Int              @default(0)
+
+  updatedAt      DateTime         @updatedAt
+
+  @@id([organizationId, tipo, year, month])
+  @@map("secuencias_comprobante")
+}
+
+// Auditoría de comprobantes. Tabla separada del AuditLog genérico porque
+// volumen y queries de negocio son específicas (drill-down por comprobante,
+// filtros por reapertura). Diff es resumen (counts + totales), no snapshot.
+model ComprobanteAuditoria {
+  id                   String                     @id @default(uuid())
+  organizationId       String
+  comprobanteId        String
+  userId               String
+  accion               AccionAuditoriaComprobante
+  diff                 Json                       // {antes, despues, campos: []}
+  fueDuranteReapertura Boolean                    @default(false)
+  reaperturaId         String?                    // FK a PeriodoFiscalReopening
+  timestamp            DateTime                   @default(now())  // timestamptz UTC
+
+  comprobante  Comprobante             @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  reapertura   PeriodoFiscalReopening? @relation(fields: [reaperturaId],  references: [id], onDelete: SetNull)
+
+  @@index([organizationId, comprobanteId, timestamp])
+  @@index([organizationId, userId, timestamp])
+  @@map("comprobantes_auditoria")
 }
