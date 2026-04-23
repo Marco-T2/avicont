@@ -138,9 +138,9 @@ function TreeRow({
                 variant="ghost"
                 size="icon"
                 aria-label={`Crear sub-cuenta bajo ${node.codigoInterno} ${node.nombre}`}
-                // Tap target ≥44px en mobile (CLAUDE.md §7). En desktop
-                // h-8 con hover-visible. Mobile: siempre visible, h-10.
-                className="h-10 w-10 shrink-0 md:h-8 md:w-8 md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100 md:transition-opacity"
+                // Tap target h-11/w-11 (44px) en mobile — Apple HIG (CLAUDE.md §7).
+                // Desktop h-8 con hover-visible para no ensuciar árboles densos.
+                className="h-11 w-11 shrink-0 md:h-8 md:w-8 md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100 md:transition-opacity"
                 onClick={(e) => {
                   e.stopPropagation();
                   onCreateChild(node);

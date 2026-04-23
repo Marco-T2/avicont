@@ -45,8 +45,9 @@ export function Topbar(): React.JSX.Element {
           size="sm"
           onClick={handleLogout}
           aria-label="Cerrar sesión"
-          // Icon-only en mobile (tap target h-10 w-10); full label en sm+
-          className="h-10 w-10 sm:h-9 sm:w-auto sm:px-3"
+          // Icon-only en mobile con tap target h-11 w-11 (44px, Apple HIG §7);
+          // full label desde sm+ con height estándar shadcn.
+          className="h-11 w-11 sm:h-9 sm:w-auto sm:px-3"
         >
           <LogOut className="h-4 w-4 sm:mr-2" />
           <span className="hidden sm:inline">Cerrar sesión</span>

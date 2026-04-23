@@ -24,7 +24,7 @@ export function MobileSidebar(): React.JSX.Element {
           variant="ghost"
           size="icon"
           aria-label="Abrir menú de navegación"
-          className="md:hidden h-10 w-10"
+          className="md:hidden h-11 w-11"
         >
           <Menu className="h-5 w-5" />
         </Button>
