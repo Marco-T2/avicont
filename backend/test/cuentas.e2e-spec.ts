@@ -112,7 +112,7 @@ describe('Cuentas (e2e)', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_PADRE_INVALIDA');
+    expect(res.body.error.code).toBe('CUENTA_PADRE_INVALIDA');
   });
 
   // ---------------------------------------------------------------
@@ -129,7 +129,7 @@ describe('Cuentas (e2e)', () => {
       codigoPuct: '9.9.9.999',
     });
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_CODIGO_PUCT_INVALIDO');
+    expect(res.body.error.code).toBe('CUENTA_CODIGO_PUCT_INVALIDO');
   });
 
   // ---------------------------------------------------------------
@@ -147,7 +147,7 @@ describe('Cuentas (e2e)', () => {
       codigoPuct: '1.1.1',
     });
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE');
+    expect(res.body.error.code).toBe('CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE');
   });
 
   // ---------------------------------------------------------------
@@ -176,7 +176,7 @@ describe('Cuentas (e2e)', () => {
       parentId: raiz.body.id,
     });
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_SUBCLASE_INCONSISTENTE');
+    expect(res.body.error.code).toBe('CUENTA_SUBCLASE_INCONSISTENTE');
   });
 
   // ---------------------------------------------------------------
@@ -204,9 +204,9 @@ describe('Cuentas (e2e)', () => {
       parentId: raiz.body.id,
     });
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_CODIGO_INTERNO_INVALIDO');
-    expect(res.body.details.nivelDerivado).toBe(4);
-    expect(res.body.details.nivelEsperado).toBe(2);
+    expect(res.body.error.code).toBe('CUENTA_CODIGO_INTERNO_INVALIDO');
+    expect(res.body.error.details.nivelDerivado).toBe(4);
+    expect(res.body.error.details.nivelEsperado).toBe(2);
   });
 
   // ---------------------------------------------------------------
@@ -225,7 +225,7 @@ describe('Cuentas (e2e)', () => {
       esContraria: true,
     });
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CUENTA_CONTRARIA_NATURALEZA_INVALIDA');
+    expect(res.body.error.code).toBe('CUENTA_CONTRARIA_NATURALEZA_INVALIDA');
   });
 
   // ---------------------------------------------------------------

@@ -86,7 +86,7 @@ describe('CustomRoles (e2e)', () => {
         .set('X-Tenant-ID', orgId)
         .send({ slug: 'bad', name: 'Bad', permissions: ['foo.bar.bazz'] });
       expect(res.status).toBe(400);
-      expect(res.body.message).toMatch(/desconocido/i);
+      expect(res.body.error.message).toMatch(/desconocido/i);
     });
 
     it('debe rechazar wildcards inválidos como *.read', async () => {

@@ -1,7 +1,7 @@
 import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AuthModule } from './auth/auth.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -30,6 +30,7 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
 import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
 import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.interceptor';
 import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
   imports: [
@@ -77,6 +78,10 @@ import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
     // ModuleEnabledGuard se aplica global: solo activa cuando un endpoint
     // tiene @RequireModule(...). Otros endpoints pasan transparentemente.
     { provide: APP_GUARD, useClass: ModuleEnabledGuard },
+    // GlobalExceptionFilter mapea DomainError + HttpException + errores Prisma
+    // al formato estándar { error: { code, message, details?, traceId?, timestamp } }.
+    // Ver CLAUDE.md §6.4 y §6.5.
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })
 export class AppModule implements NestModule {

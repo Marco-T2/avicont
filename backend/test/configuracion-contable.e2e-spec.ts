@@ -98,9 +98,9 @@ describe('ConfiguracionContable (e2e)', () => {
       .send({ ivaDebitoId: cuentaActivo.id });
 
     expect(res.status).toBe(400);
-    expect(res.body.code).toBe('CONFIG_CUENTA_CLASE_INCORRECTA');
-    expect(res.body.details.claseEsperada).toBe('PASIVO');
-    expect(res.body.details.claseRecibida).toBe('ACTIVO');
+    expect(res.body.error.code).toBe('CONFIG_CUENTA_CLASE_INCORRECTA');
+    expect(res.body.error.details.claseEsperada).toBe('PASIVO');
+    expect(res.body.error.details.claseRecibida).toBe('ACTIVO');
   });
 
   // ---------------------------------------------------------------
@@ -154,8 +154,8 @@ describe('ConfiguracionContable (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .set('x-tenant-id', tenantId);
     expect(delFail.status).toBe(409);
-    expect(delFail.body.code).toBe('CUENTA_CONFIGURADA_COMO_CONCEPTO');
-    expect(delFail.body.details.conceptos).toContain('ivaCreditoId');
+    expect(delFail.body.error.code).toBe('CUENTA_CONFIGURADA_COMO_CONCEPTO');
+    expect(delFail.body.error.details.conceptos).toContain('ivaCreditoId');
 
     // 3. Remapear ivaCreditoId a la alternativa.
     const remap = await request(app.getHttpServer())
@@ -200,6 +200,6 @@ describe('ConfiguracionContable (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .set('x-tenant-id', tenantId);
     expect(invalido.status).toBe(400);
-    expect(invalido.body.code).toBe('CONFIG_CONCEPTO_INVALIDO');
+    expect(invalido.body.error.code).toBe('CONFIG_CONCEPTO_INVALIDO');
   });
 });

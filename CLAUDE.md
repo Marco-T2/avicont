@@ -1764,6 +1764,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Logout multi-tab vía `BroadcastChannel('auth')` en frontend | Deuda | Fase 1.1+ — hoy logout en una tab no purga las otras |
 | `openapi-typescript` para tipos compartidos frontend↔backend | Deuda | Cuando haya 4-5 features consumiendo la API con DTOs duplicados a mano |
 | Migración de `accessToken` en memoria a un worker/SW con rotación background | Diferido | Si el proyecto escala a múltiples frontends/apps móviles |
+| Refactor de los ~80 `throw new *Exception(...)` viejos a `DomainError` (§6.2) | Deuda técnica | **Regla de oro**: al tocar un módulo para agregar features, migrar primero sus errores a la nueva jerarquía. El `GlobalExceptionFilter` ya mapea los `HttpException` viejos al formato estándar (§6.4), así que el refactor no es bloqueante — pero no agregues throws nuevos con `*Exception` de NestJS en código nuevo |
 
 ---
 
