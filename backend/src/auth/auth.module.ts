@@ -5,7 +5,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { LocalStrategy } from './strategies/local.strategy';
 import { UsersModule } from '../users/users.module';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
@@ -24,7 +23,7 @@ import { TenantContextService } from '../common/tenant-context/tenant-context.se
     UsersModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, TenantContextService],
+  providers: [AuthService, JwtStrategy, PrismaService, TenantContextService],
   exports: [AuthService],
 })
 export class AuthModule {}
