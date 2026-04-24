@@ -57,7 +57,7 @@ import {
   type LineaParaValidar,
   validarComprobanteParaContabilizar,
 } from './domain/comprobante-validator';
-import { formatearNumero } from './domain/numeracion';
+import { NumeroComprobante } from './domain/numero-comprobante';
 import {
   COMPROBANTE_REPOSITORY_PORT,
   ComprobanteConLineas,
@@ -351,12 +351,12 @@ export class ComprobantesService {
         fechaContable.month,
         tx,
       );
-      const numero = formatearNumero(
+      const numero = NumeroComprobante.of(
         actual.tipo,
         fechaContable.year,
         fechaContable.month,
         correlativo,
-      );
+      ).toString();
 
       // 5) Totales cache en BOB.
       const totales = calcularTotalesBob(lineasParaValidar);
@@ -456,12 +456,12 @@ export class ComprobantesService {
         hoy.month,
         tx,
       );
-      const numeroReversion = formatearNumero(
+      const numeroReversion = NumeroComprobante.of(
         TipoComprobante.AJUSTE,
         hoy.year,
         hoy.month,
         correlativo,
-      );
+      ).toString();
 
       // Líneas invertidas: lo que era DEBE pasa a HABER y viceversa. Misma
       // moneda, mismo tipoCambio, mismo contactoId, mismos montos — el único
