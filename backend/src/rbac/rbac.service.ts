@@ -1,18 +1,19 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  PERMISSIONS_RESOLVER_PORT,
-  PermissionsResolverPort,
-  ResolvedPermissions,
-} from './ports/permissions-resolver.port';
+  hasAllPermissions,
+  hasAnyPermission,
+  matchesPermission,
+} from './domain/permission-matcher';
+import { PermissionsCacheInvalidationPort } from './ports/permissions-cache-invalidation.port';
 import {
   PERMISSIONS_CACHE_PORT,
   PermissionsCachePort,
 } from './ports/permissions-cache.port';
 import {
-  hasAllPermissions,
-  hasAnyPermission,
-  matchesPermission,
-} from './domain/permission-matcher';
+  PERMISSIONS_RESOLVER_PORT,
+  PermissionsResolverPort,
+  ResolvedPermissions,
+} from './ports/permissions-resolver.port';
 
 // Cuando el cache está vacío y el resolver dice "no es miembro", devolvemos
 // este objeto para fail-safe: cero permisos. NO se cachea para no dejar
@@ -20,7 +21,7 @@ import {
 const EMPTY: ResolvedPermissions = { esOwner: false, esAdmin: false, wildcards: [] };
 
 @Injectable()
-export class RbacService {
+export class RbacService implements PermissionsCacheInvalidationPort {
   private readonly logger = new Logger(RbacService.name);
 
   constructor(
@@ -73,13 +74,19 @@ export class RbacService {
 
   // Invalidaciones expuestas para que servicios de dominio las llamen
   // post-commit. Ver §10.4 de CLAUDE.md y decisión 3 de Fase 0.6.
-  invalidateUser(userId: string, organizationId: string) {
+  //
+  // Los dos primeros métodos cumplen `PermissionsCacheInvalidationPort`
+  // — callers externos deberían inyectar ese port, no `RbacService`
+  // directo. `invalidateOrganization` sigue acá porque sólo se usa
+  // internamente; si algún día un caller externo lo necesita, se
+  // amplía el port.
+  invalidateUser(userId: string, organizationId: string): Promise<void> {
     return this.cache.invalidateUser(userId, organizationId);
   }
-  invalidateUsersByCustomRole(customRoleId: string) {
+  invalidateUsersByCustomRole(customRoleId: string): Promise<void> {
     return this.cache.invalidateUsersByCustomRole(customRoleId);
   }
-  invalidateOrganization(organizationId: string) {
+  invalidateOrganization(organizationId: string): Promise<void> {
     return this.cache.invalidateOrganization(organizationId);
   }
 }
