@@ -259,18 +259,20 @@ Introducir **oportunísticamente** cuando se tocan esos archivos:
 
 Hexagonizar siguiendo el patrón de `contactos`. Orden y prioridad:
 
-#### 3.2.a memberships — ⏳ EN CURSO 2026-04-24
+#### 3.2.a memberships — ✅ CERRADA 2026-04-24
 
-Reader port cross-módulo ya cerrado en §2.1 Sesión B. Full refactor
-arrancó en `778ca67`:
+Full refactor entregado en 4 commits atómicos sobre `main`
+(`778ca67..`). Reader port cross-módulo ya venía de §2.1 Sesión B.
 - ✅ Domain: VOs (`MembershipId`, `MembershipRole`) + 9 domain errors
   con codes `MEMBERSHIP_*` estables.
 - ✅ Port interno `MEMBERSHIP_REPOSITORY_PORT` + adapter Prisma +
   integration spec (19 tests).
 - ✅ `MembershipsService` consume el port, domain errors reemplazan
   `HttpException` crudos. Unit spec con ports mockeados (22 tests).
-- ⏳ Pendiente commit 4: drop `MembershipsService` del `exports` del
-  módulo (nadie cross-módulo lo consume).
+- ✅ `MembershipsService` fuera del `exports` del módulo y del barrel
+  `index.ts` — no es API pública; sólo el controller interno lo usa.
+
+624/624 unit + integration + 87/87 e2e verdes al cierre.
 
 **Deuda bidireccional abierta** (las dos viven en TODOs dentro de
 `memberships.service.ts`):
@@ -278,9 +280,9 @@ arrancó en `778ca67`:
 - Ver §3.2.b custom-roles: necesita
   `CUSTOM_ROLES_READER_PORT.belongsToTenant`.
 
-Hasta que ambas se cierren, `MembershipsService` inyecta
-`PrismaService` para los dos lookups. Al cerrar las dos extensiones,
-dropear esa inyección.
+Hasta que ambas se cierren, `MembershipsService` sigue inyectando
+`PrismaService` sólo para esos dos lookups. Al cerrar las dos
+extensiones, dropear la inyección.
 
 #### 3.2.b custom-roles
 

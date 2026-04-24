@@ -21,6 +21,6 @@ import { RbacModule } from '../rbac/rbac.module';
     PrismaMembershipRepository,
     { provide: MEMBERSHIP_REPOSITORY_PORT, useExisting: PrismaMembershipRepository },
   ],
-  exports: [MembershipsService, MEMBERSHIPS_READER_PORT],
+  exports: [MEMBERSHIPS_READER_PORT],
 })
 export class MembershipsModule {}
