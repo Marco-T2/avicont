@@ -45,6 +45,7 @@ describe('AuthService (unit)', () => {
     memberships = {
       findActivasByUserId: jest.fn().mockResolvedValue([]),
       findActivaByUserAndTenant: jest.fn(),
+      findActivasConOrganizacionByUserId: jest.fn().mockResolvedValue([]),
     };
     usersReader = { findByEmail: jest.fn() };
     usersWriter = { create: jest.fn() };

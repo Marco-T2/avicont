@@ -1,11 +1,16 @@
 // Port cross-módulo DEFINIDO por memberships (dueño del dominio Membership,
-// CLAUDE.md §3.7) para lecturas orientadas a AUTENTICACIÓN. Superficie mínima
-// (regla #5 del doc de deudas): hoy sólo auth lo consume, y sólo necesita
-// resolver el rol efectivo por tenant para armar el claim `roles` del JWT.
+// CLAUDE.md §3.7) para lecturas de memberships ACTIVAS. Superficie mínima
+// (regla #5 del doc de deudas): cada método expone sólo los campos que un
+// consumer concreto necesita.
 //
-// No expone `permissions` ni el objeto `Organization` completo — esos siguen
-// dentro del módulo memberships o se agregan cuando un consumer real los
-// requiera.
+// Consumers:
+// - auth: `findActivasByUserId` (login / refreshTokens para claim `roles`)
+//   y `findActivaByUserAndTenant` (switchTenant).
+// - users: `findActivasConOrganizacionByUserId` (getProfile, incluye datos
+//   públicos de la organización).
+//
+// No expone `permissions` ni el objeto `Organization` completo — los métodos
+// devuelven DTOs proyectados al shape exacto del consumer.
 
 export const MEMBERSHIPS_READER_PORT = Symbol('MEMBERSHIPS_READER_PORT');
 
@@ -17,6 +22,14 @@ export interface MembershipActivaParaAuth {
 
 export interface MembershipActivaDeTenantParaAuth extends MembershipActivaParaAuth {
   userEmail: string;
+}
+
+export interface MembershipActivaConOrganizacion {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  systemRole: string | null;
+  customRoleSlug: string | null;
 }
 
 export abstract class MembershipsReaderPort {
@@ -36,4 +49,12 @@ export abstract class MembershipsReaderPort {
     userId: string,
     tenantId: string,
   ): Promise<MembershipActivaDeTenantParaAuth | null>;
+
+  /**
+   * Memberships activas del usuario con datos públicos de la organización
+   * (id, name, slug) para renderizar el perfil. Usado por `users.getProfile`.
+   */
+  abstract findActivasConOrganizacionByUserId(
+    userId: string,
+  ): Promise<MembershipActivaConOrganizacion[]>;
 }

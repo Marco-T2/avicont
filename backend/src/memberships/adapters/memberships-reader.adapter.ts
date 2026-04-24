@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 
 import type {
+  MembershipActivaConOrganizacion,
   MembershipActivaDeTenantParaAuth,
   MembershipActivaParaAuth,
   MembershipsReaderPort,
@@ -49,5 +50,25 @@ export class MembershipsReaderAdapter implements MembershipsReaderPort {
       customRoleSlug: row.customRole?.slug ?? null,
       userEmail: row.user.email,
     };
+  }
+
+  async findActivasConOrganizacionByUserId(
+    userId: string,
+  ): Promise<MembershipActivaConOrganizacion[]> {
+    const rows = await this.prisma.membership.findMany({
+      where: { userId, deactivatedAt: null },
+      select: {
+        systemRole: true,
+        customRole: { select: { slug: true } },
+        organization: { select: { id: true, name: true, slug: true } },
+      },
+    });
+    return rows.map((r) => ({
+      organizationId: r.organization.id,
+      organizationName: r.organization.name,
+      organizationSlug: r.organization.slug,
+      systemRole: r.systemRole,
+      customRoleSlug: r.customRole?.slug ?? null,
+    }));
   }
 }
