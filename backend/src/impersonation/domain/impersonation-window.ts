@@ -49,7 +49,7 @@ export class ImpersonationWindow {
     return this.minutes;
   }
 
-  toExpiresIn(): string {
+  toExpiresIn(): `${number}m` {
     return `${this.minutes}m`;
   }
 
