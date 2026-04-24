@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CustomRole } from '@prisma/client';
 
 import { permisoExisteEnCatalogo } from '@/common/permisos/catalogo';
@@ -15,6 +8,15 @@ import {
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
 
+import {
+  CustomRoleConMiembrosActivosError,
+  CustomRoleDelSistemaError,
+  CustomRoleNoEditableError,
+  CustomRoleNoEncontradoError,
+  CustomRoleSlugDuplicadoError,
+  PermisoDesconocidoError,
+  PermisoInvalidoError,
+} from './domain/custom-role-errors';
 import { CloneCustomRoleDto } from './dto/clone-custom-role.dto';
 import { CreateCustomRoleDto } from './dto/create-custom-role.dto';
 import { UpdateCustomRoleDto } from './dto/update-custom-role.dto';
@@ -39,7 +41,7 @@ export class CustomRolesService {
   async findById(organizationId: string, id: string): Promise<CustomRole> {
     const role = await this.repo.findById(id);
     if (!role || role.organizationId !== organizationId) {
-      throw new NotFoundException('Rol no encontrado');
+      throw new CustomRoleNoEncontradoError(id);
     }
     return role;
   }
@@ -58,7 +60,7 @@ export class CustomRolesService {
 
     const dup = await this.repo.findBySlug(organizationId, dto.slug);
     if (dup) {
-      throw new ConflictException(`Ya existe un rol con slug "${dto.slug}"`);
+      throw new CustomRoleSlugDuplicadoError(dto.slug, organizationId);
     }
 
     return this.repo.create({
@@ -83,7 +85,7 @@ export class CustomRolesService {
 
     const dup = await this.repo.findBySlug(organizationId, dto.slug);
     if (dup) {
-      throw new ConflictException(`Ya existe un rol con slug "${dto.slug}"`);
+      throw new CustomRoleSlugDuplicadoError(dto.slug, organizationId);
     }
 
     return this.repo.create({
@@ -105,7 +107,7 @@ export class CustomRolesService {
   ): Promise<CustomRole> {
     const role = await this.findById(organizationId, id);
     if (!role.isEditable) {
-      throw new ForbiddenException('Este rol está marcado como no editable');
+      throw new CustomRoleNoEditableError(id);
     }
     if (dto.permissions) {
       this.validatePermissions(dto.permissions);
@@ -130,13 +132,11 @@ export class CustomRolesService {
   async delete(organizationId: string, id: string): Promise<void> {
     const role = await this.findById(organizationId, id);
     if (role.isSystemDefault) {
-      throw new ForbiddenException('No se pueden eliminar roles del sistema');
+      throw new CustomRoleDelSistemaError(id);
     }
     const count = await this.repo.countActiveMembers(id);
     if (count > 0) {
-      throw new ConflictException(
-        `No se puede eliminar: ${count} miembro(s) activo(s) tienen este rol`,
-      );
+      throw new CustomRoleConMiembrosActivosError(id, count);
     }
     // Invalidamos cache ANTES del delete por si quedan memberships con FK SetNull.
     await this.rbac.invalidateUsersByCustomRole(id);
@@ -155,11 +155,11 @@ export class CustomRolesService {
       try {
         assertValidPermissionPattern(p);
       } catch (e) {
-        throw new BadRequestException((e as Error).message);
+        throw new PermisoInvalidoError(p, (e as Error).message);
       }
       const tieneWildcard = p === '*' || p.includes('*');
       if (!tieneWildcard && !permisoExisteEnCatalogo(p)) {
-        throw new BadRequestException(`Permiso desconocido: "${p}"`);
+        throw new PermisoDesconocidoError(p);
       }
     }
   }
