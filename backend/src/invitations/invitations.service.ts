@@ -13,14 +13,22 @@ import { ConfigService } from '@nestjs/config';
 import { Invitation, InvitationStatus, SystemRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { PrismaService } from '../common/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { RbacService } from '../rbac/rbac.service';
+
+import { PrismaService } from '@/common/prisma.service';
+import {
+  INVITATION_EMAILS_PORT,
+  InvitationEmailsPort,
+} from '@/notifications/ports/invitation-emails.port';
+import {
+  PERMISSIONS_CACHE_INVALIDATION_PORT,
+  PermissionsCacheInvalidationPort,
+} from '@/rbac/ports/permissions-cache-invalidation.port';
+
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 import {
   INVITATION_REPOSITORY_PORT,
   InvitationRepositoryPort,
 } from './ports/invitation.repository.port';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
 
 const TOKEN_BYTES = 32;
 const DEFAULT_EXPIRY_DAYS = 7;
@@ -33,8 +41,10 @@ export class InvitationsService {
     @Inject(INVITATION_REPOSITORY_PORT)
     private readonly repo: InvitationRepositoryPort,
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService,
-    private readonly rbac: RbacService,
+    @Inject(INVITATION_EMAILS_PORT)
+    private readonly invitationEmails: InvitationEmailsPort,
+    @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
+    private readonly rbac: PermissionsCacheInvalidationPort,
     private readonly config: ConfigService,
   ) {}
 
@@ -110,7 +120,7 @@ export class InvitationsService {
     const baseUrl = this.config.get<string>('APP_BASE_URL', 'http://localhost:3000');
     const inviteUrl = `${baseUrl}/invitations/accept?token=${token}`;
     try {
-      await this.notifications.sendInviteEmail(email, {
+      await this.invitationEmails.sendInviteEmail(email, {
         inviterName: inviter.displayName ?? inviter.email,
         tenantName: organization.name,
         inviteUrl,
