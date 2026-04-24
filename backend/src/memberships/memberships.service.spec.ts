@@ -5,12 +5,15 @@ import {
   CUSTOM_ROLES_READER_PORT,
   type CustomRolesReaderPort,
 } from '@/custom-roles/ports/custom-roles-reader.port';
-import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   type PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
+import {
+  USERS_READER_PORT,
+  type UsersReaderPort,
+} from '@/users/ports/users-reader.port';
 
 import {
   AsignacionRolInvalidaError,
@@ -44,15 +47,14 @@ describe('MembershipsService (unit)', () => {
   type RepoMock = jest.Mocked<MembershipRepositoryPort>;
   type RbacMock = jest.Mocked<PermissionsCacheInvalidationPort>;
   type CustomRolesMock = jest.Mocked<CustomRolesReaderPort>;
+  type UsersReaderMock = jest.Mocked<UsersReaderPort>;
 
   let service: MembershipsService;
   let repo: RepoMock;
   let tenantContext: { getTenantId: jest.Mock };
   let rbac: RbacMock;
   let customRoles: CustomRolesMock;
-  let prisma: {
-    user: { findUnique: jest.Mock };
-  };
+  let users: UsersReaderMock;
 
   beforeEach(async () => {
     repo = {
@@ -72,16 +74,17 @@ describe('MembershipsService (unit)', () => {
     customRoles = {
       belongsToTenant: jest.fn(),
     } as unknown as CustomRolesMock;
-    prisma = {
-      user: { findUnique: jest.fn() },
-    };
+    users = {
+      findByEmail: jest.fn(),
+      findMinimalByEmail: jest.fn(),
+    } as unknown as UsersReaderMock;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MembershipsService,
         { provide: MEMBERSHIP_REPOSITORY_PORT, useValue: repo },
         { provide: CUSTOM_ROLES_READER_PORT, useValue: customRoles },
-        { provide: PrismaService, useValue: prisma },
+        { provide: USERS_READER_PORT, useValue: users },
         { provide: TenantContextService, useValue: tenantContext },
         { provide: PERMISSIONS_CACHE_INVALIDATION_PORT, useValue: rbac },
       ],
@@ -96,8 +99,9 @@ describe('MembershipsService (unit)', () => {
 
   describe('invite', () => {
     it('crea membership con systemRole e invalida el cache RBAC del nuevo miembro', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      users.findMinimalByEmail.mockResolvedValue({
         id: USER_ID,
+        displayName: null,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
@@ -120,8 +124,9 @@ describe('MembershipsService (unit)', () => {
     });
 
     it('crea membership con customRoleId si pertenece al tenant', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      users.findMinimalByEmail.mockResolvedValue({
         id: USER_ID,
+        displayName: null,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
@@ -151,15 +156,16 @@ describe('MembershipsService (unit)', () => {
     });
 
     it('lanza UsuarioNoRegistradoParaInviteError si el user no existe', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      users.findMinimalByEmail.mockResolvedValue(null);
       await expect(
         service.invite({ email: 'new@user.com', systemRole: SystemRole.ADMIN }),
       ).rejects.toBeInstanceOf(UsuarioNoRegistradoParaInviteError);
     });
 
     it('lanza UsuarioYaEsMiembroError si el user ya es miembro', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      users.findMinimalByEmail.mockResolvedValue({
         id: USER_ID,
+        displayName: null,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue({
@@ -173,8 +179,9 @@ describe('MembershipsService (unit)', () => {
     it('lanza CustomRoleInvalidoParaTenantError si belongsToTenant retorna false', async () => {
       // El adapter retorna false tanto para "no existe" como para "otro tenant"
       // (ver doc del reader port). El service no distingue los dos casos.
-      prisma.user.findUnique.mockResolvedValue({
+      users.findMinimalByEmail.mockResolvedValue({
         id: USER_ID,
+        displayName: null,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
@@ -201,8 +208,9 @@ describe('MembershipsService (unit)', () => {
     });
 
     it('normaliza el email (lowercase + trim) antes del lookup', async () => {
-      prisma.user.findUnique.mockResolvedValue({
+      users.findMinimalByEmail.mockResolvedValue({
         id: USER_ID,
+        displayName: null,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
@@ -215,9 +223,7 @@ describe('MembershipsService (unit)', () => {
         systemRole: SystemRole.ADMIN,
       });
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: 'a@b.com' },
-      });
+      expect(users.findMinimalByEmail).toHaveBeenCalledWith('a@b.com');
     });
   });
 

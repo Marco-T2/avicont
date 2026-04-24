@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
   CUSTOM_ROLES_READER_PORT,
@@ -10,6 +9,10 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
+import {
+  USERS_READER_PORT,
+  UsersReaderPort,
+} from '@/users/ports/users-reader.port';
 
 import {
   AutoDegradacionOwnerError,
@@ -35,12 +38,8 @@ export class MembershipsService {
     private readonly repo: MembershipRepositoryPort,
     @Inject(CUSTOM_ROLES_READER_PORT)
     private readonly customRoles: CustomRolesReaderPort,
-    // TODO(deudas §2.1 remanente): la inyección de PrismaService se va
-    // cuando USERS_READER_PORT gane `findMinimalByEmail`. Mientras tanto,
-    // el único uso de `prisma` en este service es el lookup de User por
-    // email en `invite()`. Cuando esa extensión aterrice, dropear la
-    // inyección y este comentario.
-    private readonly prisma: PrismaService,
+    @Inject(USERS_READER_PORT)
+    private readonly users: UsersReaderPort,
     private readonly tenantContext: TenantContextService,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
     private readonly rbac: PermissionsCacheInvalidationPort,
@@ -51,11 +50,7 @@ export class MembershipsService {
     const role = MembershipRole.parse(dto);
     const email = dto.email.toLowerCase().trim();
 
-    // TODO(deudas §2.1 remanente): reemplazar por
-    // USERS_READER_PORT.findMinimalByEmail(email). La extensión del reader
-    // cae fuera del scope de §3.2 memberships — cuando se agregue el método
-    // al port de users, dropeamos la inyección de PrismaService.
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.users.findMinimalByEmail(email);
     if (!user) {
       throw new UsuarioNoRegistradoParaInviteError(email);
     }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { MembershipsController } from './memberships.controller';
 import { MembershipsReaderAdapter } from './adapters/memberships-reader.adapter';
@@ -9,9 +9,14 @@ import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
 import { CustomRolesModule } from '../custom-roles/custom-roles.module';
+import { UsersModule } from '../users/users.module';
 
+// forwardRef porque UsersModule ya importa MembershipsModule (para
+// consumir MEMBERSHIPS_READER_PORT en getProfile); cerrar el ciclo
+// con forwardRef en ambas direcciones es el patrón establecido
+// (cf. comprobantes ↔ periodos-fiscales en §1.1).
 @Module({
-  imports: [RbacModule, CustomRolesModule],
+  imports: [RbacModule, CustomRolesModule, forwardRef(() => UsersModule)],
   controllers: [MembershipsController],
   providers: [
     MembershipsService,

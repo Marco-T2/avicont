@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { MembershipsModule } from '../memberships/memberships.module';
@@ -11,8 +11,11 @@ import { USER_REPOSITORY_PORT } from './ports/user.repository.port';
 import { USERS_READER_PORT } from './ports/users-reader.port';
 import { USERS_WRITER_PORT } from './ports/users-writer.port';
 
+// forwardRef: MembershipsModule ahora importa UsersModule (para
+// consumir USERS_READER_PORT.findMinimalByEmail en invite). El ciclo
+// se cierra con forwardRef en ambas direcciones.
 @Module({
-  imports: [MembershipsModule],
+  imports: [forwardRef(() => MembershipsModule)],
   controllers: [UsersController],
   providers: [
     UsersService,

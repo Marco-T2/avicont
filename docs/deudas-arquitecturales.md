@@ -26,7 +26,7 @@
 | impersonation | 0 | B | `domain/` vacío |
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
-| memberships | 0 | A− | §3.2.a cerrada 2026-04-24; fuga a custom-roles cerrada 2026-04-24 (§3.2.b); queda 1 fuga a users documentada en TODO (§2.1 remanente) |
+| memberships | 0 | A | §3.2.a cerrada 2026-04-24; ambas fugas bidireccionales cerradas (§3.2.b custom-roles + §2.1 remanente users) 2026-04-24; sin deuda viva |
 | custom-roles | 0 | A− | domain + CUSTOM_ROLES_READER_PORT + domain errors 2026-04-24 (§3.2.b); invitations también migrado al port en el mismo batch |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
@@ -158,27 +158,20 @@ Verde al cierre: 529/529 unit+integration + 20/20 e2e auth+users+
 tenant-isolation+impersonation. Typecheck limpio.
 
 **Deuda remanente** (fuera de scope de §2.1):
-- **§3.2 memberships full refactor**: ⏳ EN CURSO 2026-04-24 — port
-  interno + `MembershipRepository` + domain errors entregados en
-  commits `778ca67..` sobre `main`. Reader port ya estaba desde
-  Sesión B. Queda el cleanup del export concreto (commit 4 del batch)
-  y las fugas cross-módulo listadas abajo.
+- ✅ **§3.2 memberships full refactor**: CERRADA 2026-04-24 —
+  `778ca67..32135c1`. Ver §3.2.a para el detalle.
 - **`TenantContextService` provider en `auth.module.ts` sin consumers**:
   cosmético, borrar en la próxima pasada sobre auth.
 - **`users.service.ts` sigue con `prisma.user.findUnique(include: memberships)`
   en `getProfile`**: Sesión A lo dejó explícito. Migrar a
   `MEMBERSHIPS_READER_PORT.findActivasByUserId` más `USER_REPOSITORY_PORT.findById`
   ahora sí es posible — queda como follow-up rápido.
-- **Extender `USERS_READER_PORT` con `findMinimalByEmail(email)`**
-  — deuda bidireccional con §3.2 memberships. `memberships.service.ts`
-  consulta `prisma.user.findUnique({ where: { email } })` en el flujo
-  `invite`; el shape `UsuarioParaAuth` existente expone
-  `hashedPassword` y no aplica acá. Shape esperado para el nuevo
-  método: `{ id: string; email: string; displayName: string | null } | null`.
-  El TODO vive en `memberships.service.ts:invite` y referencia
-  explícitamente esta sección. Al cerrarla, dropear la inyección de
-  `PrismaService` del `MembershipsService` (coordinación con §3.2
-  custom-roles).
+- ✅ **Extender `USERS_READER_PORT` con `findMinimalByEmail(email)`**
+  — CERRADA 2026-04-24 (`15a7a48..`). Método nuevo en el port con
+  shape `UsuarioMinimo = { id, email, displayName: string | null }`.
+  `memberships.invite` lo consume y dropea la inyección de
+  `PrismaService` del service. Ciclo `memberships ↔ users` resuelto
+  con `forwardRef` en ambas direcciones (patrón §1.1 comprobantes).
 
 #### Follow-up descubiertos durante Sesión A
 
@@ -274,16 +267,15 @@ Full refactor entregado en 4 commits atómicos sobre `main`
 
 624/624 unit + integration + 87/87 e2e verdes al cierre.
 
-**Deudas bidireccionales abiertas** (TODO dentro de
-`memberships.service.ts`):
-- ✅ ~~`CUSTOM_ROLES_READER_PORT.belongsToTenant`~~ — cerrada
-  2026-04-24 junto con §3.2.b (ver abajo). `MembershipsService`
-  consume el port desde commit `...`.
-- ⏳ Ver §2.1 remanente: necesita `USERS_READER_PORT.findMinimalByEmail`.
+**Deudas bidireccionales** (cerradas 2026-04-24):
+- ✅ ~~`CUSTOM_ROLES_READER_PORT.belongsToTenant`~~ — §3.2.b.
+  `MembershipsService` e `InvitationsService` consumen el port.
+- ✅ ~~`USERS_READER_PORT.findMinimalByEmail`~~ — §2.1 remanente.
+  `MembershipsService` consume el port y dropea `PrismaService`.
+  Ciclo `memberships ↔ users` resuelto con `forwardRef`.
 
-`MembershipsService` sigue inyectando `PrismaService` únicamente para
-el `prisma.user.findUnique` del flujo `invite`. Al cerrar §2.1
-remanente, dropear la inyección.
+`MembershipsService` ya no inyecta `PrismaService`. Sin deudas
+bidireccionales abiertas.
 
 #### 3.2.b custom-roles — ✅ CERRADA 2026-04-24
 
@@ -415,11 +407,10 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.2 +
-§3.2.a + §3.2.b cerradas; queda 1 sola fuga documentada — §2.1
-remanente, USERS_READER_PORT.findMinimalByEmail consumido desde
-memberships.invite — y §3.3 super-admin como deuda de diseño
-separada).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.1
+remanente + §2.2 + §3.2.a + §3.2.b cerradas; CERO fugas cross-módulo
+documentadas activas. Deuda viva: §3.2.c tenants, §3.2.d impersonation,
+§3.3 super-admin).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
