@@ -1,26 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { User } from '@prisma/client';
+
 import { PrismaService } from '../common/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import {
+  USER_REPOSITORY_PORT,
+  type UserRepositoryPort,
+} from './ports/user.repository.port';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(USER_REPOSITORY_PORT)
+    private readonly repo: UserRepositoryPort,
+    // `getProfile` compone datos de Membership y Organization (otros módulos).
+    // Mientras esos módulos no expongan sus propios ports de lectura, el service
+    // hace el join vía Prisma directo. TODO: extraer a un MembershipsReaderPort
+    // cuando se hexagonice memberships (§3.2 del doc de deudas).
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
+  findByEmail(email: string): Promise<User | null> {
+    return this.repo.findByEmail(email);
   }
 
-  async findById(id: string) {
-    return this.prisma.user.findUnique({ where: { id } });
+  findById(id: string): Promise<User | null> {
+    return this.repo.findById(id);
   }
 
-  async update(id: string, dto: UpdateUserDto) {
-    return this.prisma.user.update({
-      where: { id },
-      data: dto,
-    });
+  update(id: string, dto: UpdateUserDto): Promise<User> {
+    return this.repo.update(id, dto);
   }
 
   async getProfile(userId: string) {
