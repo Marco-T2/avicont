@@ -95,6 +95,19 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
     },
   },
 
+  // ---------- Sistema (operaciones cross-tenant) ----------
+  // Estos permisos son CROSS-TENANT pero hoy el modelo RBAC es
+  // tenant-scoped: cualquier OWNER/ADMIN los matchea vía el wildcard '*'
+  // del resolver. Refinar cuando se formalice super-admin global —
+  // ver docs/deudas-arquitecturales.md §3.3 (deuda abierta).
+  {
+    modulo: 'sistema',
+    submodulo: 'feature-flags',
+    acciones: {
+      admin: 'Administrar catálogo global de feature flags (cross-tenant)',
+    },
+  },
+
   // ---------- Contabilidad ----------
   {
     modulo: 'contabilidad',

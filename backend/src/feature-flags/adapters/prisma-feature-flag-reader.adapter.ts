@@ -119,11 +119,7 @@ export class PrismaFeatureFlagReaderAdapter extends FeatureFlagReaderPort {
     }
   }
 
-  private async safeSet(
-    organizationId: string,
-    cacheKey: string,
-    value: unknown,
-  ): Promise<void> {
+  private async safeSet(organizationId: string, cacheKey: string, value: unknown): Promise<void> {
     try {
       await this.cache.setTenantCache(organizationId, cacheKey, value, CACHE_TTL_SECONDS);
     } catch (err) {

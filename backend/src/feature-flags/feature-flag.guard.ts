@@ -1,18 +1,31 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { FeatureFlagsService } from './feature-flags.service';
+
 import { FEATURE_FLAG_KEY } from './feature-flag.decorator';
+import {
+  FEATURE_FLAG_READER_PORT,
+  type FeatureFlagReaderPort,
+} from './ports/feature-flag-reader.port';
 
 /**
- * Guard that checks if a feature flag is enabled for the current tenant
- * Usage: @UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
- *        @RequireFeature('my_feature')
+ * Guard que verifica si una feature flag está habilitada para el tenant actual.
+ * Uso: @UseGuards(JwtAuthGuard, TenantGuard, FeatureFlagGuard)
+ *      @RequireFeature('my_feature')
+ *
+ * Depende sólo del puerto de lectura — el guard no conoce Prisma ni cache.
  */
 @Injectable()
 export class FeatureFlagGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly featureFlagsService: FeatureFlagsService,
+    @Inject(FEATURE_FLAG_READER_PORT)
+    private readonly reader: FeatureFlagReaderPort,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,7 +41,7 @@ export class FeatureFlagGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const tenantId = request.tenantId;
 
-    const isEnabled = await this.featureFlagsService.isEnabled(requiredFeature, tenantId);
+    const isEnabled = await this.reader.isEnabled(requiredFeature, tenantId);
 
     if (!isEnabled) {
       throw new ForbiddenException(

@@ -1,12 +1,18 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Inject, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+
+import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
-import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
-import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
-import { FeatureFlagsService } from './feature-flags.service';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+
 import { CreateFeatureFlagDto, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
+import { FeatureFlagsService } from './feature-flags.service';
+import {
+  FEATURE_FLAG_READER_PORT,
+  type FeatureFlagReaderPort,
+} from './ports/feature-flag-reader.port';
 
 @ApiTags('Feature Flags')
 @ApiBearerAuth('JWT-auth')
@@ -14,13 +20,17 @@ import { CreateFeatureFlagDto, UpdateFeatureFlagDto } from './dto/feature-flag.d
 @Controller('feature-flags')
 @UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
 export class FeatureFlagsController {
-  constructor(private readonly featureFlagsService: FeatureFlagsService) {}
+  constructor(
+    private readonly featureFlagsService: FeatureFlagsService,
+    @Inject(FEATURE_FLAG_READER_PORT)
+    private readonly reader: FeatureFlagReaderPort,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all feature flags for current tenant' })
   @ApiResponse({ status: 200, description: 'Map of feature flag states' })
   async getAllFlags(@CurrentTenant() tenantId: string) {
-    return this.featureFlagsService.getAllForTenant(tenantId);
+    return this.reader.getAllForTenant(tenantId);
   }
 
   @Get('list')
@@ -35,7 +45,7 @@ export class FeatureFlagsController {
   @ApiOperation({ summary: 'Check if a specific feature is enabled' })
   @ApiResponse({ status: 200, description: 'Feature enabled status' })
   async checkFlag(@CurrentTenant() tenantId: string, @Param('key') key: string) {
-    const enabled = await this.featureFlagsService.isEnabled(key, tenantId);
+    const enabled = await this.reader.isEnabled(key, tenantId);
     return { key, enabled };
   }
 

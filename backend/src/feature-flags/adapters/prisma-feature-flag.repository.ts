@@ -21,10 +21,7 @@ export class PrismaFeatureFlagRepository extends FeatureFlagRepositoryPort {
     });
   }
 
-  async findTenantOverride(
-    organizationId: string,
-    key: string,
-  ): Promise<FeatureFlag | null> {
+  async findTenantOverride(organizationId: string, key: string): Promise<FeatureFlag | null> {
     return this.prisma.featureFlag.findUnique({
       where: { key_organizationId: { key, organizationId } },
     });

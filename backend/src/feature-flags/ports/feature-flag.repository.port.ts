@@ -43,10 +43,7 @@ export interface ActualizarFeatureFlagData {
 export abstract class FeatureFlagRepositoryPort {
   abstract findGlobal(key: string): Promise<FeatureFlag | null>;
 
-  abstract findTenantOverride(
-    organizationId: string,
-    key: string,
-  ): Promise<FeatureFlag | null>;
+  abstract findTenantOverride(organizationId: string, key: string): Promise<FeatureFlag | null>;
 
   abstract listGlobal(): Promise<FeatureFlag[]>;
 

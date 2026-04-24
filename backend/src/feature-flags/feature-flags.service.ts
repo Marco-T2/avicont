@@ -1,307 +1,165 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../common/prisma.service';
-import { CacheService } from '../cache/cache.service';
-import { CreateFeatureFlagDto, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import {
+  FeatureFlagDuplicadaError,
+  FeatureFlagNoEncontradaError,
+} from './domain/feature-flag-errors';
+import { FeatureFlagKey } from './domain/feature-flag-key';
+import { CreateFeatureFlagDto, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
+import {
+  FEATURE_FLAG_READER_PORT,
+  type FeatureFlagReaderPort,
+} from './ports/feature-flag-reader.port';
+import {
+  FEATURE_FLAG_REPOSITORY_PORT,
+  type FeatureFlagRepositoryPort,
+} from './ports/feature-flag.repository.port';
+
+/**
+ * Flujos administrativos del catálogo de feature flags (global + overrides
+ * por tenant). Las lecturas (`isEnabled`, `getAllForTenant`) NO viven acá:
+ * están en `FEATURE_FLAG_READER_PORT`, que es además el dueño del cache.
+ *
+ * Patrón de invalidación: cada mutación con alcance tenant commitea a DB
+ * via `repo` y recién después llama `reader.invalidate(...)`. Si la
+ * invalidación falla (Redis caído) el reader lo absorbe — el negocio no
+ * se rompe, el cache expira por TTL.
+ */
 @Injectable()
 export class FeatureFlagsService {
-  private readonly CACHE_TTL = 60; // 1 minute cache for feature flags
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly cache: CacheService,
+    @Inject(FEATURE_FLAG_REPOSITORY_PORT)
+    private readonly repo: FeatureFlagRepositoryPort,
+    @Inject(FEATURE_FLAG_READER_PORT)
+    private readonly reader: FeatureFlagReaderPort,
   ) {}
 
-  /**
-   * Check if a feature is enabled for a tenant
-   * First checks tenant-specific flags, then falls back to global flags
-   */
-  async isEnabled(key: string, organizationId?: string): Promise<boolean> {
-    // Check cache first
-    const cacheKey = `feature:${key}`;
-    if (organizationId) {
-      const cachedTenant = await this.cache.getTenantCache<boolean>(organizationId, cacheKey);
-      if (cachedTenant !== null) return cachedTenant;
-    }
+  // ============================================================
+  // Catálogo global
+  // ============================================================
 
-    // Check tenant-specific flag first
-    if (organizationId) {
-      const tenantFlag = await this.prisma.featureFlag.findUnique({
-        where: { key_organizationId: { key, organizationId } },
-      });
-
-      if (tenantFlag) {
-        await this.cache.setTenantCache(organizationId, cacheKey, tenantFlag.enabled, this.CACHE_TTL);
-        return tenantFlag.enabled;
-      }
-    }
-
-    // Fallback to global flag
-    const globalFlag = await this.prisma.featureFlag.findFirst({
-      where: { key, organizationId: null },
-    });
-
-    const enabled = globalFlag?.enabled ?? false;
-
-    if (organizationId) {
-      await this.cache.setTenantCache(organizationId, cacheKey, enabled, this.CACHE_TTL);
-    }
-
-    return enabled;
-  }
-
-  /**
-   * Get all flags for a tenant (includes global flags with tenant overrides)
-   */
-  async getAllForTenant(organizationId: string): Promise<Record<string, boolean>> {
-    const cacheKey = 'feature:all';
-    const cached = await this.cache.getTenantCache<Record<string, boolean>>(organizationId, cacheKey);
-    if (cached) return cached;
-
-    // Get all global flags
-    const globalFlags = await this.prisma.featureFlag.findMany({
-      where: { organizationId: null },
-    });
-
-    // Get tenant-specific flags
-    const tenantFlags = await this.prisma.featureFlag.findMany({
-      where: { organizationId },
-    });
-
-    // Merge: tenant flags override global flags
-    const result: Record<string, boolean> = {};
-
-    for (const flag of globalFlags) {
-      result[flag.key] = flag.enabled;
-    }
-
-    for (const flag of tenantFlags) {
-      result[flag.key] = flag.enabled;
-    }
-
-    await this.cache.setTenantCache(organizationId, cacheKey, result, this.CACHE_TTL);
-    return result;
-  }
-
-  /**
-   * Create a global feature flag (admin only)
-   */
   async createGlobal(dto: CreateFeatureFlagDto) {
-    const existing = await this.prisma.featureFlag.findFirst({
-      where: { key: dto.key, organizationId: null },
-    });
-
+    const key = FeatureFlagKey.of(dto.key).toString();
+    const existing = await this.repo.findGlobal(key);
     if (existing) {
-      throw new ConflictException(`Global feature flag '${dto.key}' already exists`);
+      throw new FeatureFlagDuplicadaError(key, null);
     }
-
-    return this.prisma.featureFlag.create({
-      data: {
-        key: dto.key,
-        name: dto.name,
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        enabled: dto.enabled ?? false,
-        metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        organizationId: null,
-      },
+    return this.repo.create({
+      key,
+      name: dto.name,
+      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      enabled: dto.enabled ?? false,
+      metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+      organizationId: null,
     });
   }
 
-  /**
-   * Create a tenant-specific override
-   */
-  async createTenantOverride(organizationId: string, dto: CreateFeatureFlagDto) {
-    const existing = await this.prisma.featureFlag.findUnique({
-      where: { key_organizationId: { key: dto.key, organizationId } },
-    });
+  async listGlobal() {
+    return this.repo.listGlobal();
+  }
 
-    if (existing) {
-      throw new ConflictException(`Feature flag '${dto.key}' already exists for this tenant`);
+  async updateGlobal(rawKey: string, dto: UpdateFeatureFlagDto) {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findGlobal(key);
+    if (!flag) {
+      throw new FeatureFlagNoEncontradaError(key, null);
     }
-
-    const flag = await this.prisma.featureFlag.create({
-      data: {
-        key: dto.key,
-        name: dto.name,
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        enabled: dto.enabled ?? false,
-        metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-        organizationId,
-      },
+    return this.repo.update(flag.id, {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+      ...(dto.metadata !== undefined ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
     });
+  }
 
-    // Invalidate cache
-    await this.cache.invalidateTenantCache(organizationId, `feature:${dto.key}`);
-    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
+  async deleteGlobal(rawKey: string): Promise<void> {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findGlobal(key);
+    if (!flag) {
+      throw new FeatureFlagNoEncontradaError(key, null);
+    }
+    await this.repo.delete(flag.id);
+  }
 
+  async toggleGlobal(rawKey: string): Promise<boolean> {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findGlobal(key);
+    if (!flag) {
+      throw new FeatureFlagNoEncontradaError(key, null);
+    }
+    const updated = await this.repo.update(flag.id, { enabled: !flag.enabled });
+    return updated.enabled;
+  }
+
+  // ============================================================
+  // Overrides por tenant
+  // ============================================================
+
+  async createTenantOverride(organizationId: string, dto: CreateFeatureFlagDto) {
+    const key = FeatureFlagKey.of(dto.key).toString();
+    const existing = await this.repo.findTenantOverride(organizationId, key);
+    if (existing) {
+      throw new FeatureFlagDuplicadaError(key, organizationId);
+    }
+    const flag = await this.repo.create({
+      key,
+      name: dto.name,
+      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      enabled: dto.enabled ?? false,
+      metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+      organizationId,
+    });
+    await this.reader.invalidate(organizationId, key);
     return flag;
   }
 
-  /**
-   * List all global flags
-   */
-  async listGlobal() {
-    return this.prisma.featureFlag.findMany({
-      where: { organizationId: null },
-      orderBy: { key: 'asc' },
-    });
-  }
-
-  /**
-   * List all flags for a tenant (both tenant-specific and global)
-   */
   async listForTenant(organizationId: string) {
     const [globalFlags, tenantFlags] = await Promise.all([
-      this.prisma.featureFlag.findMany({
-        where: { organizationId: null },
-        orderBy: { key: 'asc' },
-      }),
-      this.prisma.featureFlag.findMany({
-        where: { organizationId },
-        orderBy: { key: 'asc' },
-      }),
+      this.repo.listGlobal(),
+      this.repo.listTenantOverrides(organizationId),
     ]);
-
-    const tenantFlagKeys = new Set(tenantFlags.map((f: { key: string }) => f.key));
-
+    const tenantKeys = new Set(tenantFlags.map((f) => f.key));
     return {
-      global: globalFlags.filter((f: { key: string }) => !tenantFlagKeys.has(f.key)),
+      global: globalFlags.filter((f) => !tenantKeys.has(f.key)),
       overrides: tenantFlags,
     };
   }
 
-  /**
-   * Update a global feature flag
-   */
-  async updateGlobal(key: string, dto: UpdateFeatureFlagDto) {
-    const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, organizationId: null },
-    });
-
+  async updateTenantOverride(organizationId: string, rawKey: string, dto: UpdateFeatureFlagDto) {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findTenantOverride(organizationId, key);
     if (!flag) {
-      throw new NotFoundException(`Global feature flag '${key}' not found`);
+      throw new FeatureFlagNoEncontradaError(key, organizationId);
     }
-
-    return this.prisma.featureFlag.update({
-      where: { id: flag.id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
-        ...(dto.metadata ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
-      },
+    const updated = await this.repo.update(flag.id, {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+      ...(dto.metadata !== undefined ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
     });
-  }
-
-  /**
-   * Update a tenant-specific flag
-   */
-  async updateTenantOverride(organizationId: string, key: string, dto: UpdateFeatureFlagDto) {
-    const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_organizationId: { key, organizationId } },
-    });
-
-    if (!flag) {
-      throw new NotFoundException(`Feature flag '${key}' not found for this tenant`);
-    }
-
-    const updated = await this.prisma.featureFlag.update({
-      where: { id: flag.id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
-        ...(dto.metadata ? { metadata: dto.metadata as Prisma.InputJsonValue } : {}),
-      },
-    });
-
-    // Invalidate cache
-    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
-
+    await this.reader.invalidate(organizationId, key);
     return updated;
   }
 
-  /**
-   * Delete a global feature flag
-   */
-  async deleteGlobal(key: string) {
-    const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, organizationId: null },
-    });
-
+  async deleteTenantOverride(organizationId: string, rawKey: string): Promise<void> {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findTenantOverride(organizationId, key);
     if (!flag) {
-      throw new NotFoundException(`Global feature flag '${key}' not found`);
+      throw new FeatureFlagNoEncontradaError(key, organizationId);
     }
-
-    await this.prisma.featureFlag.delete({
-      where: { id: flag.id },
-    });
+    await this.repo.delete(flag.id);
+    await this.reader.invalidate(organizationId, key);
   }
 
-  /**
-   * Delete a tenant-specific override
-   */
-  async deleteTenantOverride(organizationId: string, key: string) {
-    const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_organizationId: { key, organizationId } },
-    });
-
+  async toggleTenantOverride(organizationId: string, rawKey: string): Promise<boolean> {
+    const key = FeatureFlagKey.of(rawKey).toString();
+    const flag = await this.repo.findTenantOverride(organizationId, key);
     if (!flag) {
-      throw new NotFoundException(`Feature flag '${key}' not found for this tenant`);
+      throw new FeatureFlagNoEncontradaError(key, organizationId);
     }
-
-    await this.prisma.featureFlag.delete({
-      where: { id: flag.id },
-    });
-
-    // Invalidate cache
-    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
-  }
-
-  /**
-   * Toggle a global feature flag
-   */
-  async toggleGlobal(key: string): Promise<boolean> {
-    const flag = await this.prisma.featureFlag.findFirst({
-      where: { key, organizationId: null },
-    });
-
-    if (!flag) {
-      throw new NotFoundException(`Global feature flag '${key}' not found`);
-    }
-
-    const updated = await this.prisma.featureFlag.update({
-      where: { id: flag.id },
-      data: { enabled: !flag.enabled },
-    });
-
-    return updated.enabled;
-  }
-
-  /**
-   * Toggle a tenant-specific flag
-   */
-  async toggleTenantOverride(organizationId: string, key: string): Promise<boolean> {
-    const flag = await this.prisma.featureFlag.findUnique({
-      where: { key_organizationId: { key, organizationId } },
-    });
-
-    if (!flag) {
-      throw new NotFoundException(`Feature flag '${key}' not found for this tenant`);
-    }
-
-    const updated = await this.prisma.featureFlag.update({
-      where: { id: flag.id },
-      data: { enabled: !flag.enabled },
-    });
-
-    // Invalidate cache
-    await this.cache.invalidateTenantCache(organizationId, `feature:${key}`);
-    await this.cache.invalidateTenantCache(organizationId, 'feature:all');
-
+    const updated = await this.repo.update(flag.id, { enabled: !flag.enabled });
+    await this.reader.invalidate(organizationId, key);
     return updated.enabled;
   }
 }
