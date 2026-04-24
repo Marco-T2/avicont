@@ -28,6 +28,7 @@ import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
   ComprobanteEstadoInvalidoError,
   ComprobanteNoEncontradoError,
+  ContactoRequeridoError,
   CuentaInactivaError,
   CuentaNoDetalleError,
   CuentaNoEncontradaError,
@@ -39,7 +40,13 @@ import {
   PeriodoNoAbiertoError,
   TipoCambioInvalidoError,
 } from './domain/comprobante-errors';
-import { TOLERANCIA_BOB } from './domain/comprobante-validator';
+import {
+  calcularTotalesBob,
+  type LineaParaValidar,
+  TOLERANCIA_BOB,
+  validarComprobanteParaContabilizar,
+} from './domain/comprobante-validator';
+import { formatearNumero } from './domain/numeracion';
 import {
   COMPROBANTE_REPOSITORY_PORT,
   ComprobanteConLineas,
@@ -47,6 +54,10 @@ import {
   LineaPersistData,
   ListarFiltros,
 } from './ports/comprobante.repository.port';
+import {
+  SECUENCIA_COMPROBANTE_PORT,
+  SecuenciaComprobantePort,
+} from './ports/secuencia-comprobante.port';
 
 interface DatosResueltos {
   tipo: TipoComprobante;
@@ -68,6 +79,8 @@ export class ComprobantesService {
     private readonly cuentas: CuentasReaderPort,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Inject(SECUENCIA_COMPROBANTE_PORT)
+    private readonly secuencia: SecuenciaComprobantePort,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -206,6 +219,137 @@ export class ComprobantesService {
     // Si otra request anuló o contabilizó entre el read y el delete, deleteMany
     // devuelve 0. Reportamos 404 para que el cliente re-lea el estado actual.
     if (deleted !== 1) throw new ComprobanteNoEncontradoError(id);
+  }
+
+  // ============================================================
+  // Escritura — CONTABILIZAR (BORRADOR → CONTABILIZADO)
+  // ============================================================
+
+  /**
+   * Transiciona un comprobante de BORRADOR a CONTABILIZADO asignando número
+   * atómico, validando partida doble y bloqueando la operación si el período
+   * se cerró, si alguna cuenta fue desactivada, o si falta contacto en una
+   * cuenta que lo requiere.
+   *
+   * Todo ocurre en una sola TX de Prisma:
+   *   1) Lock lógico: findById dentro de la TX (las validaciones posteriores
+   *      asumen el estado leído; si otra TX concurrente modifica el
+   *      comprobante, el update final choca con el where).
+   *   2) Re-validación cross-módulo (período + cuentas) porque el estado
+   *      puede haber cambiado entre crearBorrador y contabilizar.
+   *   3) Invariantes estructurales completos (partida doble ±Bs 0.01,
+   *      min 2 líneas, XOR, coherencia BOB, glosa, fecha no futura).
+   *   4) Numeración atómica vía `SecuenciaComprobante` upsert RETURNING.
+   *   5) Update de estado + número + totales cache.
+   *   6) Auditoría CONTABILIZADO con { numero, totales }.
+   */
+  async contabilizar(
+    tenantId: string,
+    userId: string,
+    id: string,
+  ): Promise<ComprobanteResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const actual = await this.repo.findById(tenantId, id, tx);
+      if (!actual) throw new ComprobanteNoEncontradoError(id);
+      if (actual.estado !== EstadoComprobante.BORRADOR) {
+        throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'contabilizar');
+      }
+
+      const fechaContable = FechaContable.fromDbDate(actual.fechaContable);
+
+      // 1) Período fiscal de la fecha sigue ABIERTO.
+      const periodo = await this.periodos.obtenerPorFecha(tenantId, fechaContable, tx);
+      if (!periodo) throw new GestionNoAbiertaError(fechaContable.toIso());
+      if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+        throw new PeriodoNoAbiertoError(periodo.id, periodo.status);
+      }
+
+      // 2) Cuentas: activas, esDetalle, y contacto presente si requerido.
+      const cuentaIds = actual.lineas.map((l) => l.cuentaId);
+      const cuentasMap = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
+      for (const linea of actual.lineas) {
+        const cuenta = cuentasMap.get(linea.cuentaId);
+        if (!cuenta) throw new CuentaNoEncontradaError(linea.cuentaId);
+        if (!cuenta.activa) {
+          throw new CuentaInactivaError(linea.orden, cuenta.id, cuenta.codigoInterno);
+        }
+        if (!cuenta.esDetalle) {
+          throw new CuentaNoDetalleError(linea.orden, cuenta.id, cuenta.codigoInterno);
+        }
+        if (cuenta.requiereContacto && !linea.contactoId) {
+          throw new ContactoRequeridoError(linea.orden, cuenta.id, cuenta.codigoInterno);
+        }
+      }
+
+      // 3) Invariantes estructurales completos (partida doble, mínimo líneas,
+      //    monto > 0, XOR, coherencia BOB, tipoCambio consistente, glosa,
+      //    fecha no futura).
+      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
+      const lineasParaValidar: LineaParaValidar[] = actual.lineas.map((l) => ({
+        orden: l.orden,
+        moneda: l.moneda,
+        debito: l.debito,
+        credito: l.credito,
+        tipoCambio: l.tipoCambio,
+        debitoBob: l.debitoBob,
+        creditoBob: l.creditoBob,
+      }));
+      validarComprobanteParaContabilizar({
+        glosa: actual.glosa,
+        fechaContable,
+        hoy,
+        lineas: lineasParaValidar,
+      });
+
+      // 4) Correlativo atómico en la misma TX (si esta TX falla más abajo,
+      //    el correlativo se revierte y no queda "consumido").
+      const correlativo = await this.secuencia.siguienteCorrelativo(
+        tenantId,
+        actual.tipo,
+        fechaContable.year,
+        fechaContable.month,
+        tx,
+      );
+      const numero = formatearNumero(
+        actual.tipo,
+        fechaContable.year,
+        fechaContable.month,
+        correlativo,
+      );
+
+      // 5) Totales cache en BOB.
+      const totales = calcularTotalesBob(lineasParaValidar);
+
+      // 6) Update + auditoría.
+      const persisted = await this.repo.contabilizar(
+        tenantId,
+        id,
+        {
+          numero,
+          totalDebitoBob: totales.debito,
+          totalCreditoBob: totales.credito,
+        },
+        tx,
+      );
+      await this.repo.registrarAuditoria(
+        tenantId,
+        {
+          comprobanteId: id,
+          userId,
+          accion: AccionAuditoriaComprobante.CONTABILIZADO,
+          diff: {
+            numero,
+            totales: {
+              debito: totales.debito.toFixed(2),
+              credito: totales.credito.toFixed(2),
+            },
+          },
+        },
+        tx,
+      );
+
+      return toComprobanteResponse(persisted);
+    });
   }
 
   // ============================================================

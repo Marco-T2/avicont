@@ -16,6 +16,7 @@ import type {
   ComprobanteConLineas,
   ComprobanteRepositoryPort,
 } from './ports/comprobante.repository.port';
+import type { SecuenciaComprobantePort } from './ports/secuencia-comprobante.port';
 
 // ============================================================
 // Fixtures y mocks
@@ -32,16 +33,22 @@ type MockRepo = { [K in keyof ComprobanteRepositoryPort]: jest.Mock };
 type MockPeriodos = { [K in keyof PeriodosReaderPort]: jest.Mock };
 type MockCuentas = { [K in keyof CuentasReaderPort]: jest.Mock };
 type MockClock = { [K in keyof ClockPort]: jest.Mock };
+type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
 
 function makeRepoMock(): MockRepo {
   return {
     crearBorrador: jest.fn(),
     findById: jest.fn(),
     reemplazarBorrador: jest.fn(),
+    contabilizar: jest.fn(),
     eliminarBorrador: jest.fn(),
     listar: jest.fn(),
     registrarAuditoria: jest.fn(),
   };
+}
+
+function makeSecuenciaMock(): MockSecuencia {
+  return { siguienteCorrelativo: jest.fn() };
 }
 
 function makePeriodosMock(): MockPeriodos {
@@ -147,11 +154,13 @@ function buildService(overrides?: {
   periodos?: Partial<MockPeriodos>;
   cuentas?: Partial<MockCuentas>;
   clock?: Partial<MockClock>;
+  secuencia?: Partial<MockSecuencia>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
   const cuentas = { ...makeCuentasMock(), ...(overrides?.cuentas ?? {}) };
   const clock = { ...makeClockMock(), ...(overrides?.clock ?? {}) };
+  const secuencia = { ...makeSecuenciaMock(), ...(overrides?.secuencia ?? {}) };
   const prisma = makePrismaMock();
 
   const service = new ComprobantesService(
@@ -159,9 +168,10 @@ function buildService(overrides?: {
     periodos as unknown as PeriodosReaderPort,
     cuentas as unknown as CuentasReaderPort,
     clock as unknown as ClockPort,
+    secuencia as unknown as SecuenciaComprobantePort,
     prisma,
   );
-  return { service, repo, periodos, cuentas, clock, prisma };
+  return { service, repo, periodos, cuentas, clock, secuencia, prisma };
 }
 
 function makeCuentasMap(): Map<string, CuentaParaLinea> {
@@ -554,6 +564,223 @@ describe('ComprobantesService', () => {
         service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', { glosa: 'x' }),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
       expect(repo.reemplazarBorrador).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contabilizar', () => {
+    function borradorBalanceadoFactory(): ComprobanteConLineas {
+      return comprobanteFactory({
+        id: 'comp-b',
+        estado: EstadoComprobante.BORRADOR,
+        lineas: [
+          {
+            id: 'l-1',
+            organizationId: TENANT_ID,
+            comprobanteId: 'comp-b',
+            orden: 1,
+            cuentaId: CUENTA_CAJA_ID,
+            contactoId: null,
+            moneda: Moneda.BOB,
+            debito: new Prisma.Decimal('1000'),
+            credito: new Prisma.Decimal(0),
+            tipoCambio: new Prisma.Decimal(1),
+            debitoBob: new Prisma.Decimal('1000'),
+            creditoBob: new Prisma.Decimal(0),
+            glosaLinea: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: 'l-2',
+            organizationId: TENANT_ID,
+            comprobanteId: 'comp-b',
+            orden: 2,
+            cuentaId: CUENTA_VENTAS_ID,
+            contactoId: null,
+            moneda: Moneda.BOB,
+            debito: new Prisma.Decimal(0),
+            credito: new Prisma.Decimal('1000'),
+            tipoCambio: new Prisma.Decimal(1),
+            debitoBob: new Prisma.Decimal(0),
+            creditoBob: new Prisma.Decimal('1000'),
+            glosaLinea: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      });
+    }
+
+    function setupHappyPath() {
+      const ctx = buildService();
+      ctx.repo.findById.mockResolvedValue(borradorBalanceadoFactory());
+      ctx.periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      ctx.cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      ctx.secuencia.siguienteCorrelativo.mockResolvedValue(42);
+      ctx.repo.contabilizar.mockImplementation(async (_t, _id, data) =>
+        comprobanteFactory({
+          id: 'comp-b',
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: data.numero,
+          totalDebitoBob: data.totalDebitoBob,
+          totalCreditoBob: data.totalCreditoBob,
+        }),
+      );
+      return ctx;
+    }
+
+    it('contabiliza un BORRADOR balanceado asignando número atómico', async () => {
+      const { service, repo, secuencia } = setupHappyPath();
+
+      const r = await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(secuencia.siguienteCorrelativo).toHaveBeenCalledWith(
+        TENANT_ID,
+        TipoComprobante.DIARIO,
+        2026,
+        4,
+        expect.any(Object),
+      );
+      expect(repo.contabilizar).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-b',
+        expect.objectContaining({
+          numero: 'D2604-000042',
+          totalDebitoBob: expect.anything(),
+          totalCreditoBob: expect.anything(),
+        }),
+        expect.any(Object),
+      );
+      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ accion: 'CONTABILIZADO' }),
+        expect.any(Object),
+      );
+      expect(r.numero).toBe('D2604-000042');
+      expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
+    });
+
+    it('rechaza contabilizar un CONTABILIZADO', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        borradorBalanceadoFactory() &&
+          comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO }),
+      );
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-1')).rejects.toMatchObject({
+        code: 'COMPROBANTE_ESTADO_INVALIDO',
+      });
+    });
+
+    it('lanza 404 si el comprobante no existe', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-x')).rejects.toMatchObject({
+        code: 'COMPROBANTE_NO_ENCONTRADO',
+      });
+    });
+
+    it('rechaza si el período se cerró entre create y contabilizar', async () => {
+      const { service, repo, periodos, secuencia } = buildService();
+      repo.findById.mockResolvedValue(borradorBalanceadoFactory());
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_PERIODO_NO_ABIERTO',
+      });
+      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si una cuenta fue desactivada después del create', async () => {
+      const { service, repo, periodos, cuentas, secuencia } = buildService();
+      repo.findById.mockResolvedValue(borradorBalanceadoFactory());
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      const map = makeCuentasMap();
+      map.set(CUENTA_CAJA_ID, cuentaFactory({ id: CUENTA_CAJA_ID, activa: false }));
+      cuentas.obtenerBatch.mockResolvedValue(map);
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_CUENTA_INACTIVA',
+      });
+      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si una cuenta requiere contacto y la línea no lo trae', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      repo.findById.mockResolvedValue(borradorBalanceadoFactory());
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      const map = makeCuentasMap();
+      map.set(CUENTA_CAJA_ID, cuentaFactory({ id: CUENTA_CAJA_ID, requiereContacto: true }));
+      cuentas.obtenerBatch.mockResolvedValue(map);
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_CONTACTO_REQUERIDO',
+      });
+    });
+
+    it('rechaza partida doble desbalanceada (más allá de ±0.01)', async () => {
+      const { service, repo, periodos, cuentas, secuencia } = buildService();
+      const borrador = borradorBalanceadoFactory();
+      // Rompemos el balance: débito 1000, crédito 500.
+      borrador.lineas[1]!.credito = new Prisma.Decimal('500');
+      borrador.lineas[1]!.creditoBob = new Prisma.Decimal('500');
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_DESBALANCEADO',
+      });
+      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+    });
+
+    it('rechaza contabilizar con solo 1 línea', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      const borrador = borradorBalanceadoFactory();
+      borrador.lineas = [borrador.lineas[0]!];
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_SIN_LINEAS',
+      });
+    });
+
+    it('genera número con prefijo correcto según el tipo', async () => {
+      const { service, repo, periodos, cuentas, secuencia } = setupHappyPath();
+      const borrador = borradorBalanceadoFactory();
+      borrador.tipo = TipoComprobante.INGRESO;
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      secuencia.siguienteCorrelativo.mockResolvedValue(7);
+
+      const r = await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(r.numero).toBe('I2604-000007');
     });
   });
 

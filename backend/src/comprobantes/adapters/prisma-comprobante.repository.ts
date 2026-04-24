@@ -108,6 +108,29 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     });
   }
 
+  async contabilizar(
+    tenantId: string,
+    id: string,
+    data: {
+      numero: string;
+      totalDebitoBob: Prisma.Decimal;
+      totalCreditoBob: Prisma.Decimal;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas> {
+    const client = tx ?? this.prisma;
+    return client.comprobante.update({
+      where: { id, organizationId: tenantId },
+      data: {
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: data.numero,
+        totalDebitoBob: data.totalDebitoBob,
+        totalCreditoBob: data.totalCreditoBob,
+      },
+      include: LINEAS_INCLUDE,
+    });
+  }
+
   async eliminarBorrador(
     tenantId: string,
     id: string,

@@ -76,10 +76,19 @@ class JournalEntryService {  // dominio traducido al inglés — NO
 ### Lista de términos del dominio que SIEMPRE van en español
 
 **Entidades contables:**
-- `Asiento`, `AsientoLinea`, `Cuenta`, `PlanCuentas`
-- `Comprobante`, `LibroDiario`, `LibroMayor`
-- `PeriodoFiscal`, `CierreMensual`
+- `Comprobante`, `LineaComprobante`, `Cuenta`, `PlanCuentas`
+- `LibroDiario`, `LibroMayor`
+- `PeriodoFiscal`, `GestionFiscal`, `CierreMensual`
 - `BalanceGeneral`, `EstadoResultados`
+
+**Nota — Comprobante vs "asiento"**: internamente la entidad se llama
+`Comprobante` (cabecera) + `LineaComprobante` (detalle). "Asiento" es
+**sinónimo user-facing** que usa el contador boliviano — aparece en textos
+de UI, en el catálogo de permisos (`contabilidad.asientos.{read,create,post,...}`),
+en logs orientados al usuario y en el glosario. No es inconsistencia: es
+vocabulario de dominio. Regla: en código, schema y tests → `Comprobante`;
+en RBAC, UI y mensajes al usuario → "asiento". Ver
+`docs/disenos/comprobantes-asientos.md` §1.
 
 **Términos tributarios/legales bolivianos:**
 - `nit`, `razonSocial`, `representanteLegal`, `nroPatronal`
@@ -91,7 +100,7 @@ class JournalEntryService {  // dominio traducido al inglés — NO
 - `Lote`, `TipoRegistro`, `MovimientoInversion`, `MovimientoCantidad`
 
 **Enums de dominio:**
-- Nombre Y **valores** en español: `EstadoAsiento.BORRADOR | CONTABILIZADO | BLOQUEADO | ANULADO`.
+- Nombre Y **valores** en español: `EstadoComprobante.BORRADOR | CONTABILIZADO | BLOQUEADO | ANULADO`.
 - Razón: si un auditor o contador lee los logs o inspecciona la BD, debe entender sin traducir mentalmente.
 - **Excepción**: enums de conceptos técnicos no-dominio siguen en inglés: `LogLevel.ERROR`, `HttpMethod.POST`, `SpanKind.SERVER`.
 
@@ -931,9 +940,16 @@ Correr **desde `backend/`**:
 **Unitarios + integración**:
 ```bash
 cd backend
-npx jest src/                    # todos los .spec.ts del código
-npm test                         # equivalente
+npx jest src/                                                           # solo unit (.spec.ts sin DB)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
+  npx jest src/                                                         # unit + integración (.integration.spec.ts vs Postgres real)
+npm test                                                                # equivalente al primero
 ```
+
+**Convención de sufijos** (CLAUDE.md §7.3):
+- `*.spec.ts` — unit puro, sin DB ni NestJS. Corre con `npx jest src/` sin env.
+- `*.integration.spec.ts` — integración contra infra real (Postgres). Requiere `DATABASE_URL` en el ambiente. Vive al lado del adapter que testea.
+- `*.e2e-spec.ts` — E2E full stack a través de HTTP (Supertest + AppModule). Vive en `test/`.
 
 **E2E (requieren Postgres arriba + CatalogoPuct sembrado)**:
 ```bash

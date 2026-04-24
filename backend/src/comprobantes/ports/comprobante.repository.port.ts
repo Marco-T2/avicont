@@ -111,6 +111,23 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<ComprobanteConLineas>;
 
   /**
+   * Transiciona un comprobante de BORRADOR a CONTABILIZADO persistiendo el
+   * número asignado y los totales cache en BOB. El caller ya debe haber
+   * validado (1) estado actual BORRADOR, (2) partida doble, (3) período
+   * abierto, (4) numeración atómica.
+   */
+  abstract contabilizar(
+    tenantId: string,
+    id: string,
+    data: {
+      numero: string;
+      totalDebitoBob: Prisma.Decimal;
+      totalCreditoBob: Prisma.Decimal;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas>;
+
+  /**
    * Elimina físicamente un comprobante en BORRADOR. Devuelve la cantidad de
    * filas afectadas (0 o 1) para que el caller distinga "no existía" de
    * "borrado OK". Las líneas se eliminan en cascada por onDelete: Cascade.
