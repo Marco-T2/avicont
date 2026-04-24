@@ -5,7 +5,9 @@ import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
 import { CUSTOM_ROLE_REPOSITORY_PORT } from './ports/custom-role.repository.port';
+import { CUSTOM_ROLES_READER_PORT } from './ports/custom-roles-reader.port';
 import { PrismaCustomRoleRepository } from './adapters/prisma-custom-role.repository';
+import { PrismaCustomRolesReaderAdapter } from './adapters/prisma-custom-roles-reader.adapter';
 
 @Module({
   imports: [RbacModule],
@@ -18,7 +20,12 @@ import { PrismaCustomRoleRepository } from './adapters/prisma-custom-role.reposi
       provide: CUSTOM_ROLE_REPOSITORY_PORT,
       useClass: PrismaCustomRoleRepository,
     },
+    PrismaCustomRolesReaderAdapter,
+    {
+      provide: CUSTOM_ROLES_READER_PORT,
+      useExisting: PrismaCustomRolesReaderAdapter,
+    },
   ],
-  exports: [CustomRolesService],
+  exports: [CustomRolesService, CUSTOM_ROLES_READER_PORT],
 })
 export class CustomRolesModule {}
