@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../common/prisma.service';
+import {
+  MEMBERSHIPS_READER_PORT,
+  type MembershipsReaderPort,
+} from '../memberships/ports/memberships-reader.port';
+
 import { UpdateUserDto } from './dto/update-user.dto';
 import { toUserResponseDto, type UserResponseDto } from './dto/user-response.dto';
 import {
@@ -13,11 +17,8 @@ export class UsersService {
   constructor(
     @Inject(USER_REPOSITORY_PORT)
     private readonly repo: UserRepositoryPort,
-    // `getProfile` compone datos de Membership y Organization (otros módulos).
-    // Mientras esos módulos no expongan sus propios ports de lectura, el service
-    // hace el join vía Prisma directo. TODO: extraer a un MembershipsReaderPort
-    // cuando se hexagonice memberships (§3.2 del doc de deudas).
-    private readonly prisma: PrismaService,
+    @Inject(MEMBERSHIPS_READER_PORT)
+    private readonly memberships: MembershipsReaderPort,
   ) {}
 
   async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
@@ -26,31 +27,23 @@ export class UsersService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        memberships: {
-          include: {
-            organization: true,
-            customRole: { select: { slug: true, name: true } },
-          },
-        },
-      },
-    });
+    const user = await this.repo.findById(userId);
     if (!user) return null;
+
+    const memberships = await this.memberships.findActivasConOrganizacionByUserId(userId);
 
     return {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
       isEmailVerified: user.isEmailVerified,
-      tenants: user.memberships.map((m) => ({
-        id: m.organization.id,
-        name: m.organization.name,
-        slug: m.organization.slug,
+      tenants: memberships.map((m) => ({
+        id: m.organizationId,
+        name: m.organizationName,
+        slug: m.organizationSlug,
         // Rol efectivo: systemRole si lo tiene (OWNER/ADMIN),
         // si no el slug del CustomRole asignado.
-        role: m.systemRole ?? m.customRole?.slug ?? null,
+        role: m.systemRole ?? m.customRoleSlug,
       })),
     };
   }

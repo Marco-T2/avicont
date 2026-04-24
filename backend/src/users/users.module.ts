@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { MembershipsModule } from '../memberships/memberships.module';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { PrismaUserRepository } from './adapters/prisma-user.repository';
@@ -11,6 +12,7 @@ import { USERS_READER_PORT } from './ports/users-reader.port';
 import { USERS_WRITER_PORT } from './ports/users-writer.port';
 
 @Module({
+  imports: [MembershipsModule],
   controllers: [UsersController],
   providers: [
     UsersService,
