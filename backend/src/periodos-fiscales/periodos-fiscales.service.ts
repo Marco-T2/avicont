@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PeriodoFiscal, PeriodoFiscalStatus } from '@prisma/client';
 
-import { rangoCalendario } from '@/common/domain/rango-periodo-fiscal';
 import { PrismaService } from '@/common/prisma.service';
 import {
   COMPROBANTES_LOCK_PORT,
   ComprobantesLockPort,
   ResumenPeriodo,
 } from '@/comprobantes/ports/comprobantes-lock.port';
+
+import { RangoPeriodoFiscal } from './domain/rango-periodo-fiscal';
 
 import {
   MotivoReaperturaInvalidoError,
@@ -94,7 +95,7 @@ export class PeriodosFiscalesService {
     tenantId: string,
   ): Promise<ResumenPrecierre> {
     const periodo = await this.obtenerPorId(id, tenantId);
-    const rango = rangoCalendario(periodo.year, periodo.month);
+    const rango = RangoPeriodoFiscal.of(periodo.year, periodo.month);
 
     const resumen = await this.prisma.$transaction((tx) =>
       this.comprobantesLock.obtenerResumenEnPeriodo(tx, id),
@@ -109,8 +110,8 @@ export class PeriodosFiscalesService {
         year: periodo.year,
         month: periodo.month,
         ordenEnGestion: periodo.ordenEnGestion,
-        fechaInicio: rango.inicio,
-        fechaFin: rango.fin,
+        fechaInicio: rango.inicio(),
+        fechaFin: rango.fin(),
       },
       comprobantes: {
         contabilizados: resumen.contabilizados,
