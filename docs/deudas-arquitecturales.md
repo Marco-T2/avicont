@@ -21,6 +21,7 @@
 | cuentas | 1.0 | A− | — (1 import relativo) |
 | contactos | 1.4 | A− | — |
 | rbac | 0 | A− | — |
+| users | 0 | A− | — (2026-04-24: §2.1 Sesión A cerrada) |
 | periodos-fiscales | 1.2 | B+ | `domain/` minimalista, sin response DTOs |
 | impersonation | 0 | B | `domain/` vacío |
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
@@ -28,8 +29,7 @@
 | feature-flags | 0 | C | `domain/`, `ports/`, `adapters/` |
 | memberships | 0 | C | `domain/`, `ports/`, `adapters/` |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
-| users | 0 | D | `domain/`, `ports/`, `adapters/` |
-| auth | 0 | D | `domain/`, `ports/`, `adapters/` |
+| auth | 0 | C | `domain/`, `ports/`, `adapters/` propios (Sesión B §2.1 pendiente) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
 
 ---
@@ -87,19 +87,70 @@ Entregado en 5 commits atómicos sobre `main`:
 
 ## 2. Media prioridad — refactor cuando haya espacio
 
-### 2.1 Hexagonizar auth + users
+### 2.1 Hexagonizar auth + users — 🟡 PARCIAL (Sesión A cerrada 2026-04-24)
 
-Es el punto de entrada de toda la app. Desacoplar vale porque:
-- Cualquier cambio en `UsersService` rompe auth.
-- Tests unit de auth requieren BD real hoy.
-- Bloquea futuras integraciones SSO/OAuth sin romper backwards-compat.
+#### Sesión A — users side ✅ CERRADA 2026-04-24
 
-Plan:
-1. **users**: crear `domain/` (VO `Email`, `UserId`, `DisplayName`), `ports/user.repository.port.ts`, `adapters/prisma-user.repository.ts`. Exportar `USER_REPOSITORY_PORT` y `USERS_READER_PORT` (superficie mínima para auth: `findByEmail`, `findById`).
-2. **auth**: reescribir `auth.service.ts` inyectando `USERS_READER_PORT` en vez de `UsersService`. Crear también `domain/`, `ports/credentials.repository.port.ts` para refresh tokens.
-3. Migrar tests: mocks del port reemplazan Prisma-based setup.
+Entregado en 5 commits atómicos sobre `main` (ver `git log`):
 
-**Estimación**: 2 sesiones (refactor grande, area crítica, mucho test a migrar).
+- ✅ `feat(users): add domain VOs Email, UserId, DisplayName and errors`
+  — VOs + specs (36 tests) + jerarquía `UsuarioNoEncontradoError` /
+  `UsuarioEmailDuplicadoError` / `EmailInvalidoError` / `UserIdInvalidoError` /
+  `DisplayNameInvalidoError` subclases de `DomainError` con codes
+  `USER_*` estables (CLAUDE.md §6.3).
+- ✅ `feat(users): add USER_REPOSITORY_PORT with PrismaUserRepository adapter`
+  — port interno con superficie completa (`findByEmail`, `findById`,
+  `create`, `update`), binding vía `useExisting`.
+- ✅ `feat(users): expose minimal cross-module USERS_READER_PORT + USERS_WRITER_PORT`
+  — superficie ULTRA mínima (regla #5): reader sólo `findByEmail →
+  UsuarioParaAuth`; writer sólo `create → UsuarioCreadoParaAuth`.
+  Adapters dedicados con `select` restringido para no filtrar columnas
+  sensibles.
+- ✅ `refactor(users): consume USER_REPOSITORY_PORT in service` — service
+  delega al port; `getProfile` sigue con Prisma directo (compone
+  memberships/organizations — extracción atada a hexagonizar
+  memberships, §3.2).
+- ✅ `refactor(auth): consume USERS_READER_PORT + USERS_WRITER_PORT; drop UsersService`
+  — AuthService ya no inyecta `UsersService` concreto; depende sólo de
+  los dos Symbols. Blast radius cross-module de `AuthService` confirmado
+  cero (el Explore agent reportó un falso positivo en `impersonation`).
+
+Verde al cierre: 486/486 (unit + integration) + 10/10 auth E2E. Typecheck limpio.
+
+#### Sesión B — auth hexagonal propio 🔲 PENDIENTE
+
+Falta atacar lo que sí mueve a auth de grade C a A−:
+
+1. **auth/domain/**: VOs `RefreshTokenHash`, `TokenFamily`, `JwtClaims`; errors
+   (`CredencialesInvalidasError`, `TokenRotadoError`, etc.).
+2. **auth/ports/credentials.repository.port.ts**: abstrae `prisma.refreshToken.*`
+   del servicio. Superficie: `find`, `rotate`, `revokeFamily`, `create`.
+3. **auth/adapters/prisma-credentials.repository.ts**: implementación.
+4. Refactor de `AuthService.refreshTokens` / `logout` / `createRefreshToken`
+   a consumir el port → se elimina `PrismaService` del constructor.
+5. Sacar `prisma.membership.findMany` de `login` / `switchTenant` →
+   necesita `MEMBERSHIPS_READER_PORT` (blocked por §3.2 memberships
+   hexagonal).
+6. Migrar tests unit con mocks del port (hoy no existen tests unit de
+   auth; sólo el e2e sirve como safety net).
+
+**Estimación Sesión B**: ~2h sin memberships; +1h si memberships queda
+también en scope (recomendado hacer juntas para no dejar `prisma.membership`
+colgando dentro de auth).
+
+#### Follow-up descubiertos durante Sesión A
+
+- ⚠️ **Leak potencial de `hashedPassword`**: `PATCH /users/me` retorna el
+  `User` entero del Prisma (incluye `hashedPassword`). El refactor **no**
+  introdujo el bug — estaba antes. Atacar con `UserResponseDto` + mapper
+  en el controller, cuando se toque ese endpoint.
+- ⚠️ **`isActive` no validado en login**: `UsuarioParaAuth` expone
+  `isActive` pero `validateUser` no lo chequea — un user desactivado
+  podría loguear. Preexistente. Atacar en Sesión B junto con el refactor
+  de `AuthService`.
+- ⚠️ **`LocalStrategy` registrada pero sin uso**: ningún endpoint aplica
+  `@UseGuards(LocalAuthGuard)`. Dead code. Remover o conectar en
+  Sesión B.
 
 ### 2.2 Hexagonizar feature-flags
 
@@ -185,7 +236,8 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 cerradas; próximo: §2.1 o §2.2).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 Sesión A cerradas;
+próximo: §2.1 Sesión B — auth hexagonal propio — o §2.2 feature-flags).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
