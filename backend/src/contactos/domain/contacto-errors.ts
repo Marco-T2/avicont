@@ -38,11 +38,17 @@ export class ContactoDocumentoDuplicadoError extends ConflictError {
 }
 
 export class ContactoReferenciadoError extends ConflictError {
-  constructor(id: string, lineasCount: number) {
+  /**
+   * `lineasCount` es opcional porque hay dos caminos al error:
+   *   - Pre-check del service (count conocido) → se incluye.
+   *   - Race condition: el adapter captura P2003 tras el delete fallido y
+   *     no re-cuenta para ahorrar la query extra. `details` omite el count.
+   */
+  constructor(id: string, lineasCount?: number) {
     super(
       'CONTACTO_REFERENCIADO',
       'No se puede eliminar el contacto porque está referenciado por líneas de comprobante. Desactivalo en su lugar.',
-      { id, lineasCount },
+      lineasCount !== undefined ? { id, lineasCount } : { id },
     );
   }
 }

@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import type { Contacto, Prisma } from '@prisma/client';
+import type { Contacto } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
+import { ContactoReferenciadoError } from '../domain/contacto-errors';
 import {
   ContactoCreateData,
   ContactoListarFiltros,
@@ -150,10 +152,21 @@ export class PrismaContactosRepository extends ContactosRepositoryPort {
     tx?: Prisma.TransactionClient,
   ): Promise<number> {
     const client = tx ?? this.prisma;
-    const result = await client.contacto.deleteMany({
-      where: { id, organizationId: tenantId },
-    });
-    return result.count;
+    // Convertimos P2003 (FK Restrict violada) a ContactoReferenciadoError
+    // para cubrir la race condition donde una línea aparece entre el
+    // count previo del service y este delete. Sin count porque no lo
+    // recomputamos — el mensaje al usuario es el mismo.
+    try {
+      const result = await client.contacto.deleteMany({
+        where: { id, organizationId: tenantId },
+      });
+      return result.count;
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        throw new ContactoReferenciadoError(id);
+      }
+      throw err;
+    }
   }
 
   async countLineasReferenciadoras(
