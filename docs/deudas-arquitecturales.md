@@ -27,7 +27,7 @@
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | custom-roles | 0 | C+ | `domain/` |
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
-| memberships | 0 | C+ | reader port público (2026-04-24 §2.1 Sesión B); falta repo interno + writer port (§3.2) |
+| memberships | 0 | B+ | reader port público (§2.1 Sesión B); repo interno + domain + service hexagonalizados 2026-04-24 (§3.2.a); quedan 2 fugas documentadas en TODOs (users + custom-roles) |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
@@ -158,16 +158,27 @@ Verde al cierre: 529/529 unit+integration + 20/20 e2e auth+users+
 tenant-isolation+impersonation. Typecheck limpio.
 
 **Deuda remanente** (fuera de scope de §2.1):
-- **§3.2 memberships full refactor**: falta `MembershipRepository`
-  interno + writer port. El reader port mínimo es suficiente para
-  desbloquear auth; el refactor completo se evalúa cuando otro
-  consumer cross-módulo lo pida.
+- **§3.2 memberships full refactor**: ⏳ EN CURSO 2026-04-24 — port
+  interno + `MembershipRepository` + domain errors entregados en
+  commits `778ca67..` sobre `main`. Reader port ya estaba desde
+  Sesión B. Queda el cleanup del export concreto (commit 4 del batch)
+  y las fugas cross-módulo listadas abajo.
 - **`TenantContextService` provider en `auth.module.ts` sin consumers**:
   cosmético, borrar en la próxima pasada sobre auth.
 - **`users.service.ts` sigue con `prisma.user.findUnique(include: memberships)`
   en `getProfile`**: Sesión A lo dejó explícito. Migrar a
   `MEMBERSHIPS_READER_PORT.findActivasByUserId` más `USER_REPOSITORY_PORT.findById`
   ahora sí es posible — queda como follow-up rápido.
+- **Extender `USERS_READER_PORT` con `findMinimalByEmail(email)`**
+  — deuda bidireccional con §3.2 memberships. `memberships.service.ts`
+  consulta `prisma.user.findUnique({ where: { email } })` en el flujo
+  `invite`; el shape `UsuarioParaAuth` existente expone
+  `hashedPassword` y no aplica acá. Shape esperado para el nuevo
+  método: `{ id: string; email: string; displayName: string | null } | null`.
+  El TODO vive en `memberships.service.ts:invite` y referencia
+  explícitamente esta sección. Al cerrarla, dropear la inyección de
+  `PrismaService` del `MembershipsService` (coordinación con §3.2
+  custom-roles).
 
 #### Follow-up descubiertos durante Sesión A
 
@@ -246,8 +257,60 @@ Introducir **oportunísticamente** cuando se tocan esos archivos:
 
 ### 3.2 Módulos Fase 0 restantes
 
-- **tenants**, **custom-roles**, **impersonation**: hexagonizar siguiendo el patrón de contactos cuando se necesite tocarlos. Menos críticos porque tienen menos callers cross-module.
-- **memberships**: después del desacople de 1.2, revisar si vale un refactor completo.
+Hexagonizar siguiendo el patrón de `contactos`. Orden y prioridad:
+
+#### 3.2.a memberships — ⏳ EN CURSO 2026-04-24
+
+Reader port cross-módulo ya cerrado en §2.1 Sesión B. Full refactor
+arrancó en `778ca67`:
+- ✅ Domain: VOs (`MembershipId`, `MembershipRole`) + 9 domain errors
+  con codes `MEMBERSHIP_*` estables.
+- ✅ Port interno `MEMBERSHIP_REPOSITORY_PORT` + adapter Prisma +
+  integration spec (19 tests).
+- ✅ `MembershipsService` consume el port, domain errors reemplazan
+  `HttpException` crudos. Unit spec con ports mockeados (22 tests).
+- ⏳ Pendiente commit 4: drop `MembershipsService` del `exports` del
+  módulo (nadie cross-módulo lo consume).
+
+**Deuda bidireccional abierta** (las dos viven en TODOs dentro de
+`memberships.service.ts`):
+- Ver §2.1 remanente: necesita `USERS_READER_PORT.findMinimalByEmail`.
+- Ver §3.2.b custom-roles: necesita
+  `CUSTOM_ROLES_READER_PORT.belongsToTenant`.
+
+Hasta que ambas se cierren, `MembershipsService` inyecta
+`PrismaService` para los dos lookups. Al cerrar las dos extensiones,
+dropear esa inyección.
+
+#### 3.2.b custom-roles
+
+Hexagonizar como el patrón de contactos (C+ → A). Crear:
+- `domain/` — VOs para `slug`, patrón de permisos
+  (`assertValidPermissionPattern` hoy es helper suelto).
+- `CUSTOM_ROLE_REPOSITORY_PORT` interno + adapter Prisma.
+- **`CUSTOM_ROLES_READER_PORT` cross-módulo con superficie mínima**
+  — consumer pendiente: `memberships.service.ts`
+  (`assertCustomRoleBelongsToTenant`). Shape esperado:
+  ```
+  belongsToTenant(customRoleId: string, tenantId: string): Promise<boolean>
+  ```
+  Alcanza con un único método. Cuando se exponga, migrar el TODO
+  de `memberships.service.ts` y cerrar la fuga bidireccional.
+  `invitations.service.ts` tiene la misma fuga
+  (`assertCustomRoleBelongsToTenant`) — cubrirla también en este
+  pase si se toca invitations, o dejarla como deuda propia del
+  módulo.
+
+#### 3.2.c tenants
+
+D+ → A. Desde cero: `domain/`, `ports/`, `adapters/`. VO `TenantSlug`
+(§3.1). Probablemente el más grande del grupo. Menos crítico
+cross-module.
+
+#### 3.2.d impersonation
+
+B → A. `domain/` vacío; tiene el VO `ImpersonationWindow` listo para
+extraer (§3.1). Sin consumers cross-módulo reportados.
 
 ### 3.3 Modelo de super-admin global
 
@@ -333,8 +396,9 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 Sesiones A y B
-cerradas; próximo: §2.2 feature-flags o §3.2 memberships full refactor).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.2 cerradas;
+§3.2.a memberships en curso con deuda bidireccional a §2.1 remanente
+y §3.2.b custom-roles).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
