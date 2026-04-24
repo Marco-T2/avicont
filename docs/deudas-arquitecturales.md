@@ -36,19 +36,34 @@
 
 ## 1. Alta prioridad — atacar primero
 
-### 1.1 Deudas puntuales de Fase 1.x (chicas, verde por commit)
+### 1.1 Deudas puntuales de Fase 1.x — ✅ CERRADO 2026-04-24
 
-Todos verdes al cerrar cada item.
+Los 7 items se entregaron en 7 commits verdes sobre `main` (ver `git log`):
 
-- **cuentas/adapters/cuenta-reader.adapter.ts**: usa `../../configuracion-contable/ports/cuenta-reader.port` → migrar a `@/configuracion-contable/ports/cuenta-reader.port` (§3.6).
-- **periodos-fiscales.module.ts**: importa `PrismaComprobantesLockAdapter` concreto desde `@/comprobantes/adapters/...` (§3.3 violation). Solución: re-exportar el adapter o exportar un `ComprobantesLockPort` symbol desde `ComprobantesModule.exports` y que el binding viva ahí — NO en periodos.
-- **periodos-fiscales**: controllers retornan ORM entities directas. Crear `gestion-response.dto.ts` y `periodo-fiscal-response.dto.ts` + mappers `toGestionResponse` / `toPeriodoResponse` (patrón idéntico a `toComprobanteResponse`).
-- **cuentas/domain/**: solo tiene validators + errors. Crear VOs `CodigoInterno` (valida regex jerárquico 1..8 niveles) y `CodigoPuct` (valida nivel 4 del catálogo).
-- **periodos-fiscales/domain/**: sólo tiene errors. Extraer lógica de `rangoCalendario()` a un VO `RangoPeriodoFiscal`.
-- **comprobantes/domain/**: `Prisma.Decimal` usado directo en validator. Crear `common/domain/Money` VO y migrar. Encapsula partida doble + redondeo ±0.01 BOB en un solo lugar.
-- **comprobantes/domain/numeracion.ts**: `formatearNumero()` es función plana. Oportunidad: `NumeroComprobante` VO con invariantes del formato `{prefijo}{YY}{MM}-{correlativo:6}` y método `parse(string)` / `toString()`.
+- ✅ `cuentas`: imports `../../` → `@/` (3 adapters).
+- ✅ `comprobantes`: binding de `COMPROBANTES_LOCK_PORT` migrado a
+  `ComprobantesModule.exports`, ciclo resuelto con `forwardRef` en
+  ambas direcciones. `periodos-fiscales` ya no conoce el adapter concreto.
+- ✅ `periodos-fiscales`: `GestionResponseDto`,
+  `GestionConPeriodosResponseDto`, `PeriodoFiscalResponseDto` con
+  mappers; controllers ya no retornan ORM entities.
+- ✅ `cuentas/domain/`: VOs `CodigoInterno` (1..8 niveles) y `CodigoPuct`
+  (4 segmentos, nivel PUCT del catálogo).
+- ✅ `periodos-fiscales/domain/`: VO `RangoPeriodoFiscal.of(year, month)`
+  reemplaza las funciones `rangoCalendario`, `diasEnMes`, `esBisiesto`
+  que vivían en `common/domain/`.
+- ✅ `common/domain/`: VO `Money` envuelve `Prisma.Decimal` y centraliza
+  `TOLERANCIA_BOB`, `balanceadoEnBobCon`, `toBob`, aritmética decimal.
+  `comprobante-validator` y `comprobantes.service` migrados.
+- ✅ `comprobantes/domain/`: VO `NumeroComprobante` con `of()`, `parse()`,
+  `toString()`, `equals()`. `formatearNumero` eliminada; `numeracion.ts`
+  queda sólo con el mapa `PREFIJO_POR_TIPO`.
 
-**Estimación**: 1 sesión de ~2h.
+Al cierre: 547/547 tests verdes en la suite completa (unit + integration + E2E).
+
+### 1.2 Desacoplar `memberships → rbac` y `invitations → rbac/notifications`
+
+**Próximo paso recomendado**: §1.2 (desacople RBAC).
 
 ### 1.2 Desacoplar `memberships → rbac` y `invitations → rbac/notifications`
 
@@ -165,7 +180,7 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-23.
+**Última revisión**: 2026-04-24 (§1.1 cerrada; próximo: §1.2).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
