@@ -209,6 +209,26 @@ export class ContactoRequeridoError extends InvalidStateError {
   }
 }
 
+export class ContactoReferenciadoNoExisteError extends InvalidStateError {
+  constructor(orden: number, contactoId: string) {
+    super(
+      'COMPROBANTE_CONTACTO_NO_EXISTE',
+      `La línea ${orden}: el contacto referenciado no existe`,
+      { orden, contactoId },
+    );
+  }
+}
+
+export class ContactoInactivoError extends InvalidStateError {
+  constructor(orden: number, contactoId: string) {
+    super(
+      'COMPROBANTE_CONTACTO_INACTIVO',
+      `La línea ${orden}: el contacto está inactivo. Reactivalo o usá otro antes de contabilizar.`,
+      { orden, contactoId },
+    );
+  }
+}
+
 export class MonedaIncompatibleCuentaError extends InvalidStateError {
   constructor(
     orden: number,

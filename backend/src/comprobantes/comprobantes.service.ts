@@ -11,6 +11,10 @@ import {
 import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import { FechaContable } from '@/common/domain/fecha-contable';
 import { PrismaService } from '@/common/prisma.service';
+import {
+  CONTACTOS_READER_PORT,
+  ContactosReaderPort,
+} from '@/contactos/ports/contactos-reader.port';
 import { CUENTAS_READER_PORT, CuentasReaderPort } from '@/cuentas/ports/cuentas-reader.port';
 import {
   PERIODOS_READER_PORT,
@@ -31,6 +35,8 @@ import {
   ComprobanteEstadoInvalidoError,
   ComprobanteNoEncontradoError,
   ComprobanteYaAnuladoError,
+  ContactoInactivoError,
+  ContactoReferenciadoNoExisteError,
   ContactoRequeridoError,
   CuentaInactivaError,
   CuentaNoDetalleError,
@@ -82,6 +88,8 @@ export class ComprobantesService {
     private readonly periodos: PeriodosReaderPort,
     @Inject(CUENTAS_READER_PORT)
     private readonly cuentas: CuentasReaderPort,
+    @Inject(CONTACTOS_READER_PORT)
+    private readonly contactos: ContactosReaderPort,
     @Inject(CLOCK_PORT)
     private readonly clock: ClockPort,
     @Inject(SECUENCIA_COMPROBANTE_PORT)
@@ -281,6 +289,16 @@ export class ComprobantesService {
       // 2) Cuentas: activas, esDetalle, y contacto presente si requerido.
       const cuentaIds = actual.lineas.map((l) => l.cuentaId);
       const cuentasMap = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
+
+      // 2.5) Contactos: existencia + activo. Lectura dentro de la misma TX
+      // para aislarse contra una desactivación concurrente. El contacto
+      // pudo haberse desactivado (pero no borrado, FK Restrict lo bloquea)
+      // entre crear/editar el borrador y este contabilizar.
+      const contactoIds = actual.lineas
+        .map((l) => l.contactoId)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      const contactosMap = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
+
       for (const linea of actual.lineas) {
         const cuenta = cuentasMap.get(linea.cuentaId);
         if (!cuenta) throw new CuentaNoEncontradaError(linea.cuentaId);
@@ -292,6 +310,15 @@ export class ComprobantesService {
         }
         if (cuenta.requiereContacto && !linea.contactoId) {
           throw new ContactoRequeridoError(linea.orden, cuenta.id, cuenta.codigoInterno);
+        }
+        if (linea.contactoId) {
+          const contacto = contactosMap.get(linea.contactoId);
+          if (!contacto) {
+            throw new ContactoReferenciadoNoExisteError(linea.orden, linea.contactoId);
+          }
+          if (!contacto.activo) {
+            throw new ContactoInactivoError(linea.orden, linea.contactoId);
+          }
         }
       }
 
@@ -555,6 +582,15 @@ export class ComprobantesService {
     const cuentaIds = input.lineas.map((l) => l.cuentaId);
     const cuentas = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
 
+    // 2.5) Cargar batch de contactos referenciados. En BORRADOR validamos
+    // sólo EXISTENCIA — permitimos referenciar inactivos (el contacto
+    // puede haberse desactivado mientras se editaba). El check de activo
+    // corre al contabilizar (ver §8.2 de docs/disenos/contactos.md).
+    const contactoIds = input.lineas
+      .map((l) => l.contactoId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const contactos = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
+
     // 3) Validar cada línea.
     const lineas: LineaPersistData[] = input.lineas.map((linea, index) => {
       const orden = index + 1;
@@ -571,6 +607,10 @@ export class ComprobantesService {
           monedaLinea: linea.moneda,
           monedaFuncional: cuenta.monedaFuncional,
         });
+      }
+
+      if (linea.contactoId && !contactos.has(linea.contactoId)) {
+        throw new ContactoReferenciadoNoExisteError(orden, linea.contactoId);
       }
 
       validarCoherenciaLineaBorrador(orden, linea);

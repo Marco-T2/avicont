@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
+import { ContactosModule } from '@/contactos/contactos.module';
 import { CuentasModule } from '@/cuentas/cuentas.module';
 import { PeriodosFiscalesModule } from '@/periodos-fiscales/periodos-fiscales.module';
 import { RbacModule } from '@/rbac/rbac.module';
@@ -20,7 +21,7 @@ import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
 // el módulo para consumo externo; el binding vive en quien lo consume
 // (PeriodosFiscalesModule) para que el singleton ande sin DI cruzada.
 @Module({
-  imports: [RbacModule, CuentasModule, PeriodosFiscalesModule],
+  imports: [RbacModule, CuentasModule, PeriodosFiscalesModule, ContactosModule],
   controllers: [ComprobantesController],
   providers: [
     PrismaService,

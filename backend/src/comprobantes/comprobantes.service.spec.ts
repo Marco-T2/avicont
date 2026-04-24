@@ -8,6 +8,10 @@ import {
 
 import type { ClockPort } from '@/common/clock/clock.port';
 import type { PrismaService } from '@/common/prisma.service';
+import type {
+  ContactoParaLinea,
+  ContactosReaderPort,
+} from '@/contactos/ports/contactos-reader.port';
 import type { CuentaParaLinea, CuentasReaderPort } from '@/cuentas/ports/cuentas-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
@@ -32,6 +36,7 @@ const CUENTA_IVA_ID = 'cuenta-iva';
 type MockRepo = { [K in keyof ComprobanteRepositoryPort]: jest.Mock };
 type MockPeriodos = { [K in keyof PeriodosReaderPort]: jest.Mock };
 type MockCuentas = { [K in keyof CuentasReaderPort]: jest.Mock };
+type MockContactos = { [K in keyof ContactosReaderPort]: jest.Mock };
 type MockClock = { [K in keyof ClockPort]: jest.Mock };
 type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
 
@@ -60,6 +65,14 @@ function makePeriodosMock(): MockPeriodos {
 
 function makeCuentasMock(): MockCuentas {
   return { obtenerBatch: jest.fn() };
+}
+
+// Default: Map vacío. Los tests sin contactoId ni siquiera consultan; los
+// tests que usan contactoId deben sobrescribir con .mockResolvedValue(...).
+function makeContactosMock(): MockContactos {
+  const fn = jest.fn();
+  fn.mockResolvedValue(new Map());
+  return { obtenerBatch: fn };
 }
 
 function makeClockMock(hoyIso = '2026-04-22'): MockClock {
@@ -156,12 +169,14 @@ function buildService(overrides?: {
   repo?: Partial<MockRepo>;
   periodos?: Partial<MockPeriodos>;
   cuentas?: Partial<MockCuentas>;
+  contactos?: Partial<MockContactos>;
   clock?: Partial<MockClock>;
   secuencia?: Partial<MockSecuencia>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
   const cuentas = { ...makeCuentasMock(), ...(overrides?.cuentas ?? {}) };
+  const contactos = { ...makeContactosMock(), ...(overrides?.contactos ?? {}) };
   const clock = { ...makeClockMock(), ...(overrides?.clock ?? {}) };
   const secuencia = { ...makeSecuenciaMock(), ...(overrides?.secuencia ?? {}) };
   const prisma = makePrismaMock();
@@ -170,11 +185,12 @@ function buildService(overrides?: {
     repo as unknown as ComprobanteRepositoryPort,
     periodos as unknown as PeriodosReaderPort,
     cuentas as unknown as CuentasReaderPort,
+    contactos as unknown as ContactosReaderPort,
     clock as unknown as ClockPort,
     secuencia as unknown as SecuenciaComprobantePort,
     prisma,
   );
-  return { service, repo, periodos, cuentas, clock, secuencia, prisma };
+  return { service, repo, periodos, cuentas, contactos, clock, secuencia, prisma };
 }
 
 function makeCuentasMap(): Map<string, CuentaParaLinea> {
@@ -436,6 +452,49 @@ describe('ComprobantesService', () => {
 
       await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).resolves.toMatchObject({
         id: 'comp-x',
+      });
+    });
+
+    it('rechaza si una línea referencia un contactoId que no existe', async () => {
+      const { service, repo, periodos, cuentas, contactos } = buildService();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      // Contacto inexistente: Map vacío.
+      contactos.obtenerBatch.mockResolvedValue(new Map());
+
+      const dto = dtoCreateDiarioBOB();
+      const missingId = '11111111-1111-4111-a111-111111111111';
+      (dto.lineas[0] as Record<string, unknown>).contactoId = missingId;
+
+      await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).rejects.toMatchObject({
+        code: 'COMPROBANTE_CONTACTO_NO_EXISTE',
+        details: { orden: 1, contactoId: missingId },
+      });
+      expect(repo.crearBorrador).not.toHaveBeenCalled();
+    });
+
+    it('acepta una línea con contactoId existente (independiente de activo)', async () => {
+      const { service, repo, periodos, cuentas, contactos } = buildService();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      const contactoId = '11111111-1111-4111-a111-11111111aaaa';
+      // Contacto inactivo — se permite en BORRADOR; se bloquea al contabilizar.
+      contactos.obtenerBatch.mockResolvedValue(
+        new Map([[contactoId, { id: contactoId, activo: false }]]),
+      );
+      repo.crearBorrador.mockResolvedValue(comprobanteFactory({ id: 'comp-ok' }));
+
+      const dto = dtoCreateDiarioBOB();
+      (dto.lineas[0] as Record<string, unknown>).contactoId = contactoId;
+
+      await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).resolves.toMatchObject({
+        id: 'comp-ok',
       });
     });
   });
@@ -784,6 +843,81 @@ describe('ComprobantesService', () => {
       const r = await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
 
       expect(r.numero).toBe('I2604-000007');
+    });
+
+    it('rechaza al contabilizar si un contacto referenciado fue desactivado entre medio', async () => {
+      const contactoId = '11111111-1111-4111-a111-11111111aaaa';
+      const borrador = borradorBalanceadoFactory();
+      borrador.lineas[0]!.contactoId = contactoId;
+
+      const { service, repo, periodos, cuentas, contactos } = buildService();
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      contactos.obtenerBatch.mockResolvedValue(
+        new Map([[contactoId, { id: contactoId, activo: false }]]),
+      );
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_CONTACTO_INACTIVO',
+        details: { orden: 1, contactoId },
+      });
+      expect(repo.contabilizar).not.toHaveBeenCalled();
+    });
+
+    it('rechaza al contabilizar si contactoId referenciado no existe (defense in depth)', async () => {
+      const contactoId = '11111111-1111-4111-a111-11111111bbbb';
+      const borrador = borradorBalanceadoFactory();
+      borrador.lineas[0]!.contactoId = contactoId;
+
+      const { service, repo, periodos, cuentas, contactos } = buildService();
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      contactos.obtenerBatch.mockResolvedValue(new Map());
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'COMPROBANTE_CONTACTO_NO_EXISTE',
+        details: { orden: 1, contactoId },
+      });
+      expect(repo.contabilizar).not.toHaveBeenCalled();
+    });
+
+    it('contabiliza OK si el contacto referenciado está activo', async () => {
+      const contactoId = '11111111-1111-4111-a111-11111111cccc';
+      const borrador = borradorBalanceadoFactory();
+      borrador.lineas[0]!.contactoId = contactoId;
+
+      const { service, repo, periodos, cuentas, contactos, secuencia } = buildService();
+      repo.findById.mockResolvedValue(borrador);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      contactos.obtenerBatch.mockResolvedValue(
+        new Map([[contactoId, { id: contactoId, activo: true }]]),
+      );
+      secuencia.siguienteCorrelativo.mockResolvedValue(99);
+      repo.contabilizar.mockImplementation(async (_t, _id, data) =>
+        comprobanteFactory({
+          id: 'comp-b',
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: data.numero,
+          totalDebitoBob: data.totalDebitoBob,
+          totalCreditoBob: data.totalCreditoBob,
+        }),
+      );
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).resolves.toMatchObject({
+        estado: EstadoComprobante.CONTABILIZADO,
+      });
     });
   });
 
