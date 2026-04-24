@@ -170,6 +170,7 @@ model Organization {
   gestionesFiscales   GestionFiscal[]
   periodosFiscales    PeriodoFiscal[]
   comprobantes        Comprobante[]
+  contactos           Contacto[]
 
   @@map("organizations")
 }
@@ -765,8 +766,8 @@ model LineaComprobante {
   orden           Int      // 1..N dentro del comprobante; inmutable post-create
 
   cuentaId        String
-  // Requerido si cuenta.requiereContacto = true. En 1.3 es string libre sin FK;
-  // Fase 1.4 agrega FK a tabla Contacto con onDelete: Restrict.
+  // Requerido si cuenta.requiereContacto = true. FK a Contacto con
+  // onDelete: Restrict (contacto referenciado nunca se elimina).
   contactoId      String?
 
   // Multi-moneda estructural. BOB → moneda=BOB, tipoCambio=1, debitoBob=debito.
@@ -784,10 +785,12 @@ model LineaComprobante {
 
   comprobante     Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
   cuenta          Cuenta      @relation(fields: [cuentaId],      references: [id], onDelete: Restrict)
+  contacto        Contacto?   @relation(fields: [contactoId],    references: [id], onDelete: Restrict)
 
   @@unique([comprobanteId, orden])
   @@index([organizationId, cuentaId])
   @@index([organizationId, comprobanteId])
+  @@index([organizationId, contactoId])
   @@map("lineas_comprobante")
 }
 
@@ -828,4 +831,49 @@ model ComprobanteAuditoria {
   @@index([organizationId, comprobanteId, timestamp])
   @@index([organizationId, userId, timestamp])
   @@map("comprobantes_auditoria")
+}
+
+// Contacto: persona natural o jurídica con quien la asociación tiene
+// vínculo contable (cliente y/o proveedor). Ver docs/disenos/contactos.md
+// (Fase 1.4 slice 1) para el diseño completo.
+//
+// Reglas que viven en migration raw SQL (Prisma no las declara):
+//   1. Unicidad parcial: (organizationId, documento) único cuando
+//      documento IS NOT NULL.
+//   2. CHECK ("esCliente" = true OR "esProveedor" = true) — al menos
+//      un flag activo (docs/disenos/contactos.md §5.3).
+//   3. Índices GIN trigram (pg_trgm) sobre razonSocial y nombreComercial
+//      para búsqueda ILIKE eficiente.
+model Contacto {
+  id              String   @id @default(uuid())
+  organizationId  String
+
+  razonSocial     String
+  nombreComercial String?
+  // Texto libre, acepta NIT, CI, CEX, pasaporte u otro. NO se valida
+  // formato en este slice — al implementar LCV (Fase 1.4 slice 4) se
+  // endurece donde IVA lo requiera.
+  documento       String?
+
+  esCliente       Boolean  @default(false)
+  esProveedor     Boolean  @default(false)
+
+  email           String?
+  telefono        String?
+  direccion       String?
+
+  activo          Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  createdByUserId String
+  updatedAt       DateTime @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lineasComprobante LineaComprobante[]
+
+  @@index([organizationId])
+  @@index([organizationId, activo])
+  @@index([organizationId, esCliente])
+  @@index([organizationId, esProveedor])
+  @@map("contactos")
 }
