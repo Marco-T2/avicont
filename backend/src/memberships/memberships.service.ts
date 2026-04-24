@@ -3,11 +3,17 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { SystemRole } from '@prisma/client';
-import { PrismaService } from '../common/prisma.service';
-import { TenantContextService } from '../common/tenant-context/tenant-context.service';
-import { RbacService } from '../rbac/rbac.service';
+
+import { PrismaService } from '@/common/prisma.service';
+import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
+import {
+  PERMISSIONS_CACHE_INVALIDATION_PORT,
+  PermissionsCacheInvalidationPort,
+} from '@/rbac/ports/permissions-cache-invalidation.port';
+
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 
@@ -16,7 +22,8 @@ export class MembershipsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
-    private readonly rbac: RbacService,
+    @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
+    private readonly rbac: PermissionsCacheInvalidationPort,
   ) {}
 
   async invite(dto: InviteUserDto) {
