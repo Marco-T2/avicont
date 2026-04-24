@@ -1,5 +1,4 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { User } from '@prisma/client';
 
 import { PrismaService } from '../common/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -20,14 +19,6 @@ export class UsersService {
     // cuando se hexagonice memberships (§3.2 del doc de deudas).
     private readonly prisma: PrismaService,
   ) {}
-
-  findByEmail(email: string): Promise<User | null> {
-    return this.repo.findByEmail(email);
-  }
-
-  findById(id: string): Promise<User | null> {
-    return this.repo.findById(id);
-  }
 
   async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
     const user = await this.repo.update(id, dto);
