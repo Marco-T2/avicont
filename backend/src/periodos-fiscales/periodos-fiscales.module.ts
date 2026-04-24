@@ -1,9 +1,8 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
-import { PrismaComprobantesLockAdapter } from '@/comprobantes/adapters/prisma-comprobantes-lock.adapter';
-import { COMPROBANTES_LOCK_PORT } from '@/comprobantes/ports/comprobantes-lock.port';
+import { ComprobantesModule } from '@/comprobantes/comprobantes.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
 import { PrismaGestionFiscalRepository } from './adapters/prisma-gestion-fiscal.repository';
@@ -22,8 +21,12 @@ import { PERIODOS_READER_PORT } from './ports/periodos-reader.port';
 // un único aggregate (gestión = raíz, período = entidad interna). Dos
 // controllers + dos services, pero un solo módulo NestJS y un solo binding
 // de repos.
+//
+// `COMPROBANTES_LOCK_PORT` se consume desde `ComprobantesModule` — el
+// binding vive allí (módulo dueño del dominio). `forwardRef` resuelve el
+// ciclo comprobantes↔periodos.
 @Module({
-  imports: [RbacModule],
+  imports: [RbacModule, forwardRef(() => ComprobantesModule)],
   controllers: [GestionesFiscalesController, PeriodosFiscalesController],
   providers: [
     PrismaService,
@@ -56,15 +59,6 @@ import { PERIODOS_READER_PORT } from './ports/periodos-reader.port';
     {
       provide: PERIODOS_READER_PORT,
       useExisting: PrismaPeriodosReaderAdapter,
-    },
-
-    // Fase 1.3: adapter real del lock de comprobantes. Reemplaza el
-    // NoopComprobantesLockAdapter de Fase 1.2 sin cambiar el contrato del
-    // port — los flujos de cierre/reapertura ya estaban escritos contra
-    // `ComprobantesLockPort` y siguen funcionando sin tocar.
-    {
-      provide: COMPROBANTES_LOCK_PORT,
-      useClass: PrismaComprobantesLockAdapter,
     },
   ],
   exports: [GESTIONES_READER_PORT, PERIODOS_READER_PORT],
