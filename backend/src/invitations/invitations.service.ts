@@ -16,6 +16,10 @@ import * as crypto from 'crypto';
 
 import { PrismaService } from '@/common/prisma.service';
 import {
+  CUSTOM_ROLES_READER_PORT,
+  CustomRolesReaderPort,
+} from '@/custom-roles/ports/custom-roles-reader.port';
+import {
   INVITATION_EMAILS_PORT,
   InvitationEmailsPort,
 } from '@/notifications/ports/invitation-emails.port';
@@ -45,6 +49,8 @@ export class InvitationsService {
     private readonly invitationEmails: InvitationEmailsPort,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
     private readonly rbac: PermissionsCacheInvalidationPort,
+    @Inject(CUSTOM_ROLES_READER_PORT)
+    private readonly customRoles: CustomRolesReaderPort,
     private readonly config: ConfigService,
   ) {}
 
@@ -59,12 +65,18 @@ export class InvitationsService {
     const email = dto.email.toLowerCase().trim();
 
     // Si el rol es customRoleId, validar que pertenezca a la org.
+    // El reader port retorna false tanto si el ID no existe como si
+    // pertenece a otro tenant (no se distinguen los casos, para no
+    // filtrar IDs cross-tenant).
     if (dto.customRoleId) {
-      const role = await this.prisma.customRole.findUnique({
-        where: { id: dto.customRoleId },
-      });
-      if (!role || role.organizationId !== organizationId) {
-        throw new BadRequestException('customRoleId inválido para esta organización');
+      const ok = await this.customRoles.belongsToTenant(
+        dto.customRoleId,
+        organizationId,
+      );
+      if (!ok) {
+        throw new BadRequestException(
+          'customRoleId inválido para esta organización',
+        );
       }
     }
 

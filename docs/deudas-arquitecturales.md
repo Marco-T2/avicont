@@ -27,7 +27,7 @@
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
 | memberships | 0 | A− | §3.2.a cerrada 2026-04-24; fuga a custom-roles cerrada 2026-04-24 (§3.2.b); queda 1 fuga a users documentada en TODO (§2.1 remanente) |
-| custom-roles | 0 | A− | domain + CUSTOM_ROLES_READER_PORT + domain errors 2026-04-24 (§3.2.b); repo port pre-existente. Invitations sigue con la misma fuga que cerró memberships — pendiente commit propio |
+| custom-roles | 0 | A− | domain + CUSTOM_ROLES_READER_PORT + domain errors 2026-04-24 (§3.2.b); invitations también migrado al port en el mismo batch |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
@@ -312,11 +312,10 @@ memberships (bidireccional). Repo port pre-existente (ya desde
   fuga bidireccional documentada en §3.2.a.
 
 **Deuda remanente** (fuera de scope de §3.2.b):
-- `invitations.service.ts:assertCustomRoleBelongsToTenant` tiene la
-  misma fuga (`prisma.customRole.findUnique`) — queda como deuda
-  propia de `invitations` para cerrar al hexagonalizarlo, o como
-  bonus si se toca invitations por otra razón. El port ya está
-  disponible.
+- ✅ ~~`invitations.service.ts:assertCustomRoleBelongsToTenant`~~
+  — cerrada en el mismo batch (bonus commit). InvitationsService
+  consume `CUSTOM_ROLES_READER_PORT.belongsToTenant`. Sin cambio
+  de contrato público, e2e verde.
 - `CustomRoleRepositoryPort` sigue siendo `interface` en lugar de
   `abstract class` — consistencia con el resto del proyecto.
   Cambio mecánico, sin impacto. Postponed.
@@ -417,9 +416,10 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 ---
 
 **Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.2 +
-§3.2.a + §3.2.b cerradas; queda 1 fuga documentada en §2.1 remanente
-— USERS_READER_PORT.findMinimalByEmail — y la misma fuga a
-custom-roles en invitations como deuda propia del módulo).
+§3.2.a + §3.2.b cerradas; queda 1 sola fuga documentada — §2.1
+remanente, USERS_READER_PORT.findMinimalByEmail consumido desde
+memberships.invite — y §3.3 super-admin como deuda de diseño
+separada).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
