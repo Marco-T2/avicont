@@ -27,9 +27,9 @@
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | custom-roles | 0 | C+ | `domain/` |
 | feature-flags | 0 | C | `domain/`, `ports/`, `adapters/` |
-| memberships | 0 | C | `domain/`, `ports/`, `adapters/` |
+| memberships | 0 | C+ | reader port público (2026-04-24 §2.1 Sesión B); falta repo interno + writer port (§3.2) |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
-| auth | 0 | C | `domain/`, `ports/`, `adapters/` propios (Sesión B §2.1 pendiente) |
+| auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
 
 ---
@@ -87,7 +87,7 @@ Entregado en 5 commits atómicos sobre `main`:
 
 ## 2. Media prioridad — refactor cuando haya espacio
 
-### 2.1 Hexagonizar auth + users — 🟡 PARCIAL (Sesión A cerrada 2026-04-24)
+### 2.1 Hexagonizar auth + users — ✅ CERRADA 2026-04-24 (A y B)
 
 #### Sesión A — users side ✅ CERRADA 2026-04-24
 
@@ -117,39 +117,67 @@ Entregado en 5 commits atómicos sobre `main` (ver `git log`):
 
 Verde al cierre: 486/486 (unit + integration) + 10/10 auth E2E. Typecheck limpio.
 
-#### Sesión B — auth hexagonal propio 🔲 PENDIENTE
+#### Sesión B — auth hexagonal propio ✅ CERRADA 2026-04-24
 
-Falta atacar lo que sí mueve a auth de grade C a A−:
+Entregado en 9 commits atómicos sobre `main` (warm-up de follow-ups +
+auth hexagonal + memberships reader port):
 
-1. **auth/domain/**: VOs `RefreshTokenHash`, `TokenFamily`, `JwtClaims`; errors
-   (`CredencialesInvalidasError`, `TokenRotadoError`, etc.).
-2. **auth/ports/credentials.repository.port.ts**: abstrae `prisma.refreshToken.*`
-   del servicio. Superficie: `find`, `rotate`, `revokeFamily`, `create`.
-3. **auth/adapters/prisma-credentials.repository.ts**: implementación.
-4. Refactor de `AuthService.refreshTokens` / `logout` / `createRefreshToken`
-   a consumir el port → se elimina `PrismaService` del constructor.
-5. Sacar `prisma.membership.findMany` de `login` / `switchTenant` →
-   necesita `MEMBERSHIPS_READER_PORT` (blocked por §3.2 memberships
-   hexagonal).
-6. Migrar tests unit con mocks del port (hoy no existen tests unit de
-   auth; sólo el e2e sirve como safety net).
+- ✅ `fix(auth): block login for deactivated users` — `validateUser`
+  rechaza users con `isActive=false` después del `bcrypt.compare`
+  (mismo mensaje genérico, mismo timing).
+- ✅ `chore(auth): remove unused LocalStrategy` — strategy + provider +
+  dep `passport-local` eliminados. Login va por JSON body contra
+  `AuthController`, no Passport.
+- ✅ `chore(users): remove dead findByEmail/findById from UsersService`
+  — métodos sin callers externos al módulo post-Sesión A; el port
+  interno `USER_REPOSITORY_PORT` los sigue exponiendo para `getProfile`.
+- ✅ `feat(auth): add domain VOs and errors` — VOs `RefreshTokenHash`
+  (SHA-256 hex), `TokenFamily` (UUID), `JwtClaims` (factory centralizado
+  del payload); jerarquía `CredencialesInvalidasError` /
+  `TokenInvalidoError` / `NoMiembroDeTenantError` + VO guards con codes
+  `AUTH_*` estables. 32 tests unit de dominio.
+- ✅ `feat(auth): add CREDENTIALS_REPOSITORY_PORT with Prisma adapter`
+  — interface + Symbol, adapter Prisma con `select` restringido;
+  `findActiveByHash` devuelve `userEmail` inline para evitar segundo
+  roundtrip.
+- ✅ `refactor(auth): consume CREDENTIALS_REPOSITORY_PORT in service`
+  — `refreshTokens` / `logout` / `createRefreshToken` delegan al port;
+  VOs reemplazan el manejo crudo de hashes y UUIDs; unit tests con
+  port mockeado.
+- ✅ `feat(memberships): expose MEMBERSHIPS_READER_PORT` — abstract
+  class + Symbol cross-módulo, adapter dedicado con `select` mínimo
+  (`organizationId`, `systemRole`, `customRole.slug`, `user.email`).
+  `Organization` y `customRole.permissions` dejan de cruzar la
+  frontera.
+- ✅ `refactor(auth): consume MEMBERSHIPS_READER_PORT; drop PrismaService`
+  — `login` / `refreshTokens` / `switchTenant` consumen el port;
+  `PrismaService` fuera del constructor de `AuthService`. 11 tests
+  unit nuevos cubriendo login / switchTenant / validateUser.
 
-**Estimación Sesión B**: ~2h sin memberships; +1h si memberships queda
-también en scope (recomendado hacer juntas para no dejar `prisma.membership`
-colgando dentro de auth).
+Verde al cierre: 529/529 unit+integration + 20/20 e2e auth+users+
+tenant-isolation+impersonation. Typecheck limpio.
+
+**Deuda remanente** (fuera de scope de §2.1):
+- **§3.2 memberships full refactor**: falta `MembershipRepository`
+  interno + writer port. El reader port mínimo es suficiente para
+  desbloquear auth; el refactor completo se evalúa cuando otro
+  consumer cross-módulo lo pida.
+- **`TenantContextService` provider en `auth.module.ts` sin consumers**:
+  cosmético, borrar en la próxima pasada sobre auth.
+- **`users.service.ts` sigue con `prisma.user.findUnique(include: memberships)`
+  en `getProfile`**: Sesión A lo dejó explícito. Migrar a
+  `MEMBERSHIPS_READER_PORT.findActivasByUserId` más `USER_REPOSITORY_PORT.findById`
+  ahora sí es posible — queda como follow-up rápido.
 
 #### Follow-up descubiertos durante Sesión A
 
 - ✅ **Leak de `hashedPassword`** — fijado 2026-04-24 en commit
   `d94631a` `fix(users): strip hashedPassword from PATCH /users/me response`.
   `UserResponseDto` + mapper allow-list + e2e de regresión.
-- ⚠️ **`isActive` no validado en login**: `UsuarioParaAuth` expone
-  `isActive` pero `validateUser` no lo chequea — un user desactivado
-  podría loguear. Preexistente. Atacar en Sesión B junto con el refactor
-  de `AuthService`.
-- ⚠️ **`LocalStrategy` registrada pero sin uso**: ningún endpoint aplica
-  `@UseGuards(LocalAuthGuard)`. Dead code. Remover o conectar en
-  Sesión B.
+- ✅ **`isActive` no validado en login** — fijado en §2.1 Sesión B
+  (commit `b7da3be`).
+- ✅ **`LocalStrategy` registrada pero sin uso** — removida en §2.1
+  Sesión B (commit `a0b2fa9`).
 
 ### 2.2 Hexagonizar feature-flags
 
@@ -235,8 +263,8 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 Sesión A cerradas;
-próximo: §2.1 Sesión B — auth hexagonal propio — o §2.2 feature-flags).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 Sesiones A y B
+cerradas; próximo: §2.2 feature-flags o §3.2 memberships full refactor).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
