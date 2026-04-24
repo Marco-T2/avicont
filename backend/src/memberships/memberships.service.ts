@@ -3,6 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
+  CUSTOM_ROLES_READER_PORT,
+  CustomRolesReaderPort,
+} from '@/custom-roles/ports/custom-roles-reader.port';
+import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
@@ -29,11 +33,13 @@ export class MembershipsService {
   constructor(
     @Inject(MEMBERSHIP_REPOSITORY_PORT)
     private readonly repo: MembershipRepositoryPort,
-    // TODO(deudas §2.1 remanente + §3.2 custom-roles): la inyección de
-    // PrismaService se va cuando (a) USERS_READER_PORT gane `findMinimalByEmail`
-    // y (b) custom-roles exponga CUSTOM_ROLES_READER_PORT.belongsToTenant.
-    // Ambos están documentados como deuda bidireccional en el doc — este
-    // service es el único consumer pendiente de esas extensiones.
+    @Inject(CUSTOM_ROLES_READER_PORT)
+    private readonly customRoles: CustomRolesReaderPort,
+    // TODO(deudas §2.1 remanente): la inyección de PrismaService se va
+    // cuando USERS_READER_PORT gane `findMinimalByEmail`. Mientras tanto,
+    // el único uso de `prisma` en este service es el lookup de User por
+    // email en `invite()`. Cuando esa extensión aterrice, dropear la
+    // inyección y este comentario.
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
@@ -153,19 +159,12 @@ export class MembershipsService {
     return tenantId;
   }
 
-  // TODO(deudas §3.2 custom-roles): reemplazar por
-  // CUSTOM_ROLES_READER_PORT.belongsToTenant(customRoleId, tenantId). Requiere
-  // exponer el port desde custom-roles como parte de su hexagonalización
-  // (§3.2). Hasta entonces, consultamos prisma directo — la fuga es consciente
-  // y la cubre la sesión §3.2 de custom-roles.
   private async assertCustomRoleBelongsToTenant(
     customRoleId: string,
     tenantId: string,
   ) {
-    const roleRow = await this.prisma.customRole.findUnique({
-      where: { id: customRoleId },
-    });
-    if (!roleRow || roleRow.organizationId !== tenantId) {
+    const ok = await this.customRoles.belongsToTenant(customRoleId, tenantId);
+    if (!ok) {
       throw new CustomRoleInvalidoParaTenantError(customRoleId, tenantId);
     }
   }

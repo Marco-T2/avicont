@@ -25,9 +25,9 @@
 | periodos-fiscales | 1.2 | B+ | `domain/` minimalista, sin response DTOs |
 | impersonation | 0 | B | `domain/` vacío |
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
-| custom-roles | 0 | C+ | `domain/` |
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
-| memberships | 0 | B+ | reader port público (§2.1 Sesión B); repo interno + domain + service hexagonalizados 2026-04-24 (§3.2.a); quedan 2 fugas documentadas en TODOs (users + custom-roles) |
+| memberships | 0 | A− | §3.2.a cerrada 2026-04-24; fuga a custom-roles cerrada 2026-04-24 (§3.2.b); queda 1 fuga a users documentada en TODO (§2.1 remanente) |
+| custom-roles | 0 | A− | domain + CUSTOM_ROLES_READER_PORT + domain errors 2026-04-24 (§3.2.b); repo port pre-existente. Invitations sigue con la misma fuga que cerró memberships — pendiente commit propio |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
@@ -274,34 +274,52 @@ Full refactor entregado en 4 commits atómicos sobre `main`
 
 624/624 unit + integration + 87/87 e2e verdes al cierre.
 
-**Deuda bidireccional abierta** (las dos viven en TODOs dentro de
+**Deudas bidireccionales abiertas** (TODO dentro de
 `memberships.service.ts`):
-- Ver §2.1 remanente: necesita `USERS_READER_PORT.findMinimalByEmail`.
-- Ver §3.2.b custom-roles: necesita
-  `CUSTOM_ROLES_READER_PORT.belongsToTenant`.
+- ✅ ~~`CUSTOM_ROLES_READER_PORT.belongsToTenant`~~ — cerrada
+  2026-04-24 junto con §3.2.b (ver abajo). `MembershipsService`
+  consume el port desde commit `...`.
+- ⏳ Ver §2.1 remanente: necesita `USERS_READER_PORT.findMinimalByEmail`.
 
-Hasta que ambas se cierren, `MembershipsService` sigue inyectando
-`PrismaService` sólo para esos dos lookups. Al cerrar las dos
-extensiones, dropear la inyección.
+`MembershipsService` sigue inyectando `PrismaService` únicamente para
+el `prisma.user.findUnique` del flujo `invite`. Al cerrar §2.1
+remanente, dropear la inyección.
 
-#### 3.2.b custom-roles
+#### 3.2.b custom-roles — ✅ CERRADA 2026-04-24
 
-Hexagonizar como el patrón de contactos (C+ → A). Crear:
-- `domain/` — VOs para `slug`, patrón de permisos
-  (`assertValidPermissionPattern` hoy es helper suelto).
-- `CUSTOM_ROLE_REPOSITORY_PORT` interno + adapter Prisma.
-- **`CUSTOM_ROLES_READER_PORT` cross-módulo con superficie mínima**
-  — consumer pendiente: `memberships.service.ts`
-  (`assertCustomRoleBelongsToTenant`). Shape esperado:
-  ```
-  belongsToTenant(customRoleId: string, tenantId: string): Promise<boolean>
-  ```
-  Alcanza con un único método. Cuando se exponga, migrar el TODO
-  de `memberships.service.ts` y cerrar la fuga bidireccional.
-  `invitations.service.ts` tiene la misma fuga
-  (`assertCustomRoleBelongsToTenant`) — cubrirla también en este
-  pase si se toca invitations, o dejarla como deuda propia del
-  módulo.
+Entregada en 3 commits sobre `main` + 1 para consumir desde
+memberships (bidireccional). Repo port pre-existente (ya desde
+§1.2), acá se agregó lo que faltaba:
+
+- ✅ `domain/` — VOs `CustomRoleId` (UUID), `CustomRoleSlug`
+  (kebab-case 2..50) + 9 domain errors con codes `CUSTOM_ROLE_*`
+  estables. 28 unit tests.
+- ✅ `CUSTOM_ROLES_READER_PORT` cross-módulo con superficie mínima:
+  un solo método `belongsToTenant(customRoleId, tenantId)`.
+  Adapter `PrismaCustomRolesReaderAdapter` + integration spec
+  (4 tests). La docstring deja explícito que el caller no
+  distingue "no existe" de "existe en otro tenant" — ambos
+  retornan `false` para no filtrar IDs cross-tenant.
+- ✅ `CustomRolesService` reemplaza los 7 HttpException por los
+  domain errors (`CustomRoleNoEncontradoError`,
+  `CustomRoleSlugDuplicadoError`, `CustomRoleConMiembrosActivosError`,
+  `CustomRoleNoEditableError`, `CustomRoleDelSistemaError`,
+  `PermisoInvalidoError`, `PermisoDesconocidoError`). Unit spec
+  con repo mockeado (22 tests). Contrato público intacto — el
+  e2e `custom-roles.e2e-spec.ts` pasa sin tocar.
+- ✅ `MembershipsService` consume `CUSTOM_ROLES_READER_PORT` —
+  dropea `prisma.customRole.findUnique` y cierra la primera
+  fuga bidireccional documentada en §3.2.a.
+
+**Deuda remanente** (fuera de scope de §3.2.b):
+- `invitations.service.ts:assertCustomRoleBelongsToTenant` tiene la
+  misma fuga (`prisma.customRole.findUnique`) — queda como deuda
+  propia de `invitations` para cerrar al hexagonalizarlo, o como
+  bonus si se toca invitations por otra razón. El port ya está
+  disponible.
+- `CustomRoleRepositoryPort` sigue siendo `interface` en lugar de
+  `abstract class` — consistencia con el resto del proyecto.
+  Cambio mecánico, sin impacto. Postponed.
 
 #### 3.2.c tenants
 
@@ -398,9 +416,10 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.2 cerradas;
-§3.2.a memberships en curso con deuda bidireccional a §2.1 remanente
-y §3.2.b custom-roles).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.2 +
+§3.2.a + §3.2.b cerradas; queda 1 fuga documentada en §2.1 remanente
+— USERS_READER_PORT.findMinimalByEmail — y la misma fuga a
+custom-roles en invitations como deuda propia del módulo).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.

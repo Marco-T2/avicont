@@ -8,9 +8,10 @@ import { MEMBERSHIP_REPOSITORY_PORT } from './ports/membership.repository.port';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
+import { CustomRolesModule } from '../custom-roles/custom-roles.module';
 
 @Module({
-  imports: [RbacModule],
+  imports: [RbacModule, CustomRolesModule],
   controllers: [MembershipsController],
   providers: [
     MembershipsService,

@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SystemRole } from '@prisma/client';
 
+import {
+  CUSTOM_ROLES_READER_PORT,
+  type CustomRolesReaderPort,
+} from '@/custom-roles/ports/custom-roles-reader.port';
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
@@ -32,7 +36,6 @@ import {
  */
 describe('MembershipsService (unit)', () => {
   const TENANT_ID = 'org-a';
-  const OTHER_TENANT_ID = 'org-b';
   const USER_ID = 'user-1';
   const ACTOR_USER_ID = 'user-actor';
   const CUSTOM_ROLE_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -40,14 +43,15 @@ describe('MembershipsService (unit)', () => {
 
   type RepoMock = jest.Mocked<MembershipRepositoryPort>;
   type RbacMock = jest.Mocked<PermissionsCacheInvalidationPort>;
+  type CustomRolesMock = jest.Mocked<CustomRolesReaderPort>;
 
   let service: MembershipsService;
   let repo: RepoMock;
   let tenantContext: { getTenantId: jest.Mock };
   let rbac: RbacMock;
+  let customRoles: CustomRolesMock;
   let prisma: {
     user: { findUnique: jest.Mock };
-    customRole: { findUnique: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -65,15 +69,18 @@ describe('MembershipsService (unit)', () => {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
       invalidateUsersByCustomRole: jest.fn().mockResolvedValue(undefined),
     } as unknown as RbacMock;
+    customRoles = {
+      belongsToTenant: jest.fn(),
+    } as unknown as CustomRolesMock;
     prisma = {
       user: { findUnique: jest.fn() },
-      customRole: { findUnique: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MembershipsService,
         { provide: MEMBERSHIP_REPOSITORY_PORT, useValue: repo },
+        { provide: CUSTOM_ROLES_READER_PORT, useValue: customRoles },
         { provide: PrismaService, useValue: prisma },
         { provide: TenantContextService, useValue: tenantContext },
         { provide: PERMISSIONS_CACHE_INVALIDATION_PORT, useValue: rbac },
@@ -118,16 +125,17 @@ describe('MembershipsService (unit)', () => {
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
-      prisma.customRole.findUnique.mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        organizationId: TENANT_ID,
-      });
+      customRoles.belongsToTenant.mockResolvedValue(true);
       repo.create.mockResolvedValue({
         id: 'm-new',
       } as Awaited<ReturnType<RepoMock['create']>>);
 
       await service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID });
 
+      expect(customRoles.belongsToTenant).toHaveBeenCalledWith(
+        CUSTOM_ROLE_ID,
+        TENANT_ID,
+      );
       expect(repo.create).toHaveBeenCalledWith(TENANT_ID, {
         userId: USER_ID,
         systemRole: null,
@@ -162,28 +170,15 @@ describe('MembershipsService (unit)', () => {
       ).rejects.toBeInstanceOf(UsuarioYaEsMiembroError);
     });
 
-    it('lanza CustomRoleInvalidoParaTenantError si el customRoleId vive en otro tenant', async () => {
+    it('lanza CustomRoleInvalidoParaTenantError si belongsToTenant retorna false', async () => {
+      // El adapter retorna false tanto para "no existe" como para "otro tenant"
+      // (ver doc del reader port). El service no distingue los dos casos.
       prisma.user.findUnique.mockResolvedValue({
         id: USER_ID,
         email: 'a@b.com',
       });
       repo.findByUserAndTenant.mockResolvedValue(null);
-      prisma.customRole.findUnique.mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        organizationId: OTHER_TENANT_ID,
-      });
-      await expect(
-        service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID }),
-      ).rejects.toBeInstanceOf(CustomRoleInvalidoParaTenantError);
-    });
-
-    it('lanza CustomRoleInvalidoParaTenantError si el customRoleId no existe', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: USER_ID,
-        email: 'a@b.com',
-      });
-      repo.findByUserAndTenant.mockResolvedValue(null);
-      prisma.customRole.findUnique.mockResolvedValue(null);
+      customRoles.belongsToTenant.mockResolvedValue(false);
       await expect(
         service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID }),
       ).rejects.toBeInstanceOf(CustomRoleInvalidoParaTenantError);
@@ -313,14 +308,11 @@ describe('MembershipsService (unit)', () => {
       expect(repo.updateRol).toHaveBeenCalled();
     });
 
-    it('lanza CustomRoleInvalidoParaTenantError si el customRoleId no es del tenant', async () => {
+    it('lanza CustomRoleInvalidoParaTenantError si belongsToTenant retorna false', async () => {
       repo.findById.mockResolvedValue(
         baseMembership() as Awaited<ReturnType<RepoMock['findById']>>,
       );
-      prisma.customRole.findUnique.mockResolvedValue({
-        id: CUSTOM_ROLE_ID,
-        organizationId: OTHER_TENANT_ID,
-      });
+      customRoles.belongsToTenant.mockResolvedValue(false);
 
       await expect(
         service.updateRole(
