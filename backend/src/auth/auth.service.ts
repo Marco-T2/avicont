@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -6,18 +6,16 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { USERS_READER_PORT, type UsersReaderPort } from '../users/ports/users-reader.port';
 import { USERS_WRITER_PORT, type UsersWriterPort } from '../users/ports/users-writer.port';
+import {
+  CredencialesInvalidasError,
+  NoMiembroDeTenantError,
+  TokenInvalidoError,
+} from './domain/auth-errors';
+import { JwtClaims, type JwtPayload } from './domain/jwt-claims';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  activeTenantId?: string;
-  roles?: string[];
-  // Presentes solo en tokens de impersonation (ver ImpersonationService).
-  impersonatedBy?: string;
-  impersonationId?: string;
-}
+export type { JwtPayload };
 
 export interface TokenPair {
   accessToken: string;
@@ -50,15 +48,15 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.usersReader.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new CredencialesInvalidasError();
     }
     const isMatch = await bcrypt.compare(password, user.hashedPassword);
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new CredencialesInvalidasError();
     }
     // Mensaje genérico para no filtrar el estado del usuario al atacante.
     if (!user.isActive) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new CredencialesInvalidasError();
     }
     return user;
   }
@@ -76,14 +74,14 @@ export class AuthService {
     const activeTenantId = memberships[0]?.organizationId;
     const roles = this.extractRolesForTenant(memberships, activeTenantId);
 
-    const payload: JwtPayload = {
-      sub: user.id,
+    const claims = JwtClaims.forUser({
+      userId: user.id,
       email: user.email,
       ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
-    };
+    });
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(claims.toPayload());
     // Login = nueva familia de refresh tokens. Detección de reuso (CLAUDE.md §5.3)
     // pendiente de implementar en Fase 0.6; por ahora sólo persistimos familyId.
     const refreshToken = await this.createRefreshToken(user.id, activeTenantId);
@@ -98,7 +96,7 @@ export class AuthService {
       include: { user: true },
     });
     if (!stored) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new TokenInvalidoError();
     }
 
     // Rotación: marcar el viejo como revocado.
@@ -114,14 +112,14 @@ export class AuthService {
     });
     const roles = this.extractRolesForTenant(memberships, activeTenantId);
 
-    const payload: JwtPayload = {
-      sub: stored.userId,
+    const claims = JwtClaims.forUser({
+      userId: stored.userId,
       email: stored.user.email,
       ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
-    };
+    });
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(claims.toPayload());
     // Rotación preserva la familia del token anterior.
     const newRefreshToken = await this.createRefreshToken(
       stored.userId,
@@ -150,19 +148,19 @@ export class AuthService {
       },
     });
     if (!membership || membership.deactivatedAt) {
-      throw new UnauthorizedException('Not a member of this tenant');
+      throw new NoMiembroDeTenantError(tenantId);
     }
 
     const roles = this.extractRolesForTenant([membership], tenantId);
 
-    const payload: JwtPayload = {
-      sub: userId,
+    const claims = JwtClaims.forUser({
+      userId,
       email: membership.user.email,
       activeTenantId: tenantId,
       roles,
-    };
+    });
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(claims.toPayload());
     const refreshToken = await this.createRefreshToken(userId, tenantId);
 
     return { accessToken, refreshToken };
