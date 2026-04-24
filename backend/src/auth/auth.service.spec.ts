@@ -47,7 +47,7 @@ describe('AuthService (unit)', () => {
       findActivaByUserAndTenant: jest.fn(),
       findActivasConOrganizacionByUserId: jest.fn().mockResolvedValue([]),
     };
-    usersReader = { findByEmail: jest.fn() };
+    usersReader = { findByEmail: jest.fn(), findMinimalByEmail: jest.fn() };
     usersWriter = { create: jest.fn() };
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
     const config = {

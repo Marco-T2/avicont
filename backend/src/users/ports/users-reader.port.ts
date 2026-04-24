@@ -1,11 +1,19 @@
 // Port cross-módulo DEFINIDO por users (dueño del dominio User, CLAUDE.md §3.7)
-// para lecturas orientadas a AUTENTICACIÓN. Superficie mínima (regla #5 del
-// doc de deudas): hoy sólo auth lo consume, y sólo necesita resolver email
-// durante login/register-precheck.
+// para lecturas que NO pueden volcarse al repositorio interno porque otros
+// módulos las invocan. Superficie mínima (regla #5 del doc de deudas):
+// cada método devuelve exactamente el shape que el consumer concreto necesita.
 //
-// No incluye `findById` — `switchTenant` y `refreshTokens` resuelven el user
-// vía prisma.membership/refreshToken include, no vía users. Cuando la sesión B
-// (auth hexagonal) saque esos flujos de Prisma directo, se extiende acá.
+// Consumers:
+// - auth: `findByEmail` durante login y register-precheck — necesita
+//   `hashedPassword` e `isActive` para validar credenciales, el shape es
+//   `UsuarioParaAuth`.
+// - memberships (invite): `findMinimalByEmail` — resuelve el user.id del
+//   invitado para crear la membership. Nunca ve `hashedPassword` ni
+//   `isActive`; shape `UsuarioMinimo`.
+//
+// `findById` no se expone — `switchTenant` y `refreshTokens` resuelven el
+// user vía membership/refreshToken include, no vía users. Si algún flujo
+// futuro lo necesita, se agrega acá.
 
 export const USERS_READER_PORT = Symbol('USERS_READER_PORT');
 
@@ -16,6 +24,26 @@ export interface UsuarioParaAuth {
   isActive: boolean;
 }
 
+/**
+ * Proyección pública de `User` para callers que sólo necesitan identificar
+ * al usuario (memberships.invite). Sin campos sensibles (`hashedPassword`)
+ * ni flags internos (`isActive`); si otro consumer necesita `isActive`
+ * extender con una anotación clara, no widenar este shape.
+ */
+export interface UsuarioMinimo {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+
 export abstract class UsersReaderPort {
   abstract findByEmail(email: string): Promise<UsuarioParaAuth | null>;
+
+  /**
+   * Lookup del user por email sin exponer campos sensibles. Usado hoy por
+   * `memberships.invite` para resolver el user.id del invitado. Normaliza
+   * el email (lowercase + trim) antes de consultar, mismo contrato que
+   * `findByEmail`.
+   */
+  abstract findMinimalByEmail(email: string): Promise<UsuarioMinimo | null>;
 }
