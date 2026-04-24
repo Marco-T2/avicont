@@ -54,6 +54,26 @@ export interface ComprobanteReemplazarBorradorData {
   lineas: LineaPersistData[];
 }
 
+export interface ReversionCreateData {
+  tipo: TipoComprobante; // siempre AJUSTE por ahora
+  numero: string; // asignado por el caller vía SecuenciaComprobantePort
+  fechaContable: Date;
+  periodoFiscalId: string;
+  glosa: string;
+  monedaPrincipal: Moneda;
+  totalDebitoBob: Prisma.Decimal; // igual al totalCreditoBob del original
+  totalCreditoBob: Prisma.Decimal; // igual al totalDebitoBob del original
+  createdByUserId: string;
+  anulaAId: string; // FK 1:1 al comprobante que se anula
+  lineas: LineaPersistData[]; // débitos y créditos invertidos vs el original
+}
+
+export interface AnulacionMetadata {
+  anuladoEn: Date;
+  anuladoPorUserId: string;
+  motivoAnulacion: string;
+}
+
 export interface ListarFiltros {
   periodoFiscalId?: string;
   tipo?: TipoComprobante;
@@ -124,6 +144,30 @@ export abstract class ComprobanteRepositoryPort {
       totalDebitoBob: Prisma.Decimal;
       totalCreditoBob: Prisma.Decimal;
     },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas>;
+
+  /**
+   * Crea un comprobante directamente en estado CONTABILIZADO con anulaAId
+   * apuntando al original. El caller ya asignó el número y calculó los
+   * totales invertidos. Se usa SOLO para el flujo de anulación con
+   * reversión — no es una ruta de contabilización manual.
+   */
+  abstract crearReversion(
+    tenantId: string,
+    data: ReversionCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas>;
+
+  /**
+   * Marca un comprobante CONTABILIZADO como ANULADO y persiste los metadatos
+   * de la anulación. El caller ya debe haber creado la reversión y validado
+   * que el estado actual es CONTABILIZADO.
+   */
+  abstract marcarAnulado(
+    tenantId: string,
+    id: string,
+    metadata: AnulacionMetadata,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas>;
 

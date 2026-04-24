@@ -4,12 +4,14 @@ import { EstadoComprobante, Prisma } from '@prisma/client';
 import { PrismaService } from '@/common/prisma.service';
 
 import {
+  AnulacionMetadata,
   AuditoriaCreateData,
   ComprobanteConLineas,
   ComprobanteCreateBorradorData,
   ComprobanteReemplazarBorradorData,
   ComprobanteRepositoryPort,
   ListarFiltros,
+  ReversionCreateData,
 } from '../ports/comprobante.repository.port';
 
 const LINEAS_INCLUDE = { lineas: { orderBy: { orden: 'asc' as const } } };
@@ -126,6 +128,65 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         numero: data.numero,
         totalDebitoBob: data.totalDebitoBob,
         totalCreditoBob: data.totalCreditoBob,
+      },
+      include: LINEAS_INCLUDE,
+    });
+  }
+
+  async crearReversion(
+    tenantId: string,
+    data: ReversionCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas> {
+    const client = tx ?? this.prisma;
+    return client.comprobante.create({
+      data: {
+        organizationId: tenantId,
+        tipo: data.tipo,
+        numero: data.numero,
+        estado: EstadoComprobante.CONTABILIZADO,
+        fechaContable: data.fechaContable,
+        periodoFiscalId: data.periodoFiscalId,
+        glosa: data.glosa,
+        monedaPrincipal: data.monedaPrincipal,
+        totalDebitoBob: data.totalDebitoBob,
+        totalCreditoBob: data.totalCreditoBob,
+        createdByUserId: data.createdByUserId,
+        anulaAId: data.anulaAId,
+        lineas: {
+          create: data.lineas.map((l) => ({
+            organizationId: tenantId,
+            orden: l.orden,
+            cuentaId: l.cuentaId,
+            contactoId: l.contactoId,
+            moneda: l.moneda,
+            debito: l.debito,
+            credito: l.credito,
+            tipoCambio: l.tipoCambio,
+            debitoBob: l.debitoBob,
+            creditoBob: l.creditoBob,
+            glosaLinea: l.glosaLinea,
+          })),
+        },
+      },
+      include: LINEAS_INCLUDE,
+    });
+  }
+
+  async marcarAnulado(
+    tenantId: string,
+    id: string,
+    metadata: AnulacionMetadata,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas> {
+    const client = tx ?? this.prisma;
+    return client.comprobante.update({
+      where: { id, organizationId: tenantId },
+      data: {
+        estado: EstadoComprobante.ANULADO,
+        anuladoEn: metadata.anuladoEn,
+        anuladoPorUserId: metadata.anuladoPorUserId,
+        motivoAnulacion: metadata.motivoAnulacion,
       },
       include: LINEAS_INCLUDE,
     });

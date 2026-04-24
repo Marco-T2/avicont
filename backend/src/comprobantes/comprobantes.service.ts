@@ -26,8 +26,10 @@ import {
 import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
+  ComprobanteBloqueadoError,
   ComprobanteEstadoInvalidoError,
   ComprobanteNoEncontradoError,
+  ComprobanteYaAnuladoError,
   ContactoRequeridoError,
   CuentaInactivaError,
   CuentaNoDetalleError,
@@ -37,7 +39,9 @@ import {
   LineaAmbiguaDebitoCreditoError,
   MonedaIncompatibleCuentaError,
   MontoBobIncoherenteError,
+  MotivoAnulacionRequeridoError,
   PeriodoNoAbiertoError,
+  PeriodoReversionNoAbiertoError,
   TipoCambioInvalidoError,
 } from './domain/comprobante-errors';
 import {
@@ -349,6 +353,156 @@ export class ComprobantesService {
       );
 
       return toComprobanteResponse(persisted);
+    });
+  }
+
+  // ============================================================
+  // Escritura — ANULAR (CONTABILIZADO → ANULADO + reversión AJUSTE)
+  // ============================================================
+
+  /**
+   * Anula un comprobante CONTABILIZADO creando un comprobante AJUSTE de
+   * reversión con las líneas invertidas (DEBE ↔ HABER, incluyendo
+   * debitoBob ↔ creditoBob). Flujo (todo en una sola TX):
+   *
+   *   1) Valida estado = CONTABILIZADO. Rechaza BLOQUEADO (hay que reabrir
+   *      el período primero), ANULADO (idempotencia) y BORRADOR.
+   *   2) Obtiene el período ABIERTO de HOY (no la fecha del original — la
+   *      anulación es un evento posterior). Rechaza si el período actual
+   *      está cerrado.
+   *   3) Asigna correlativo AJUSTE del mes de hoy vía SecuenciaComprobante
+   *      (prefijo J). El correlativo se revierte si la TX falla.
+   *   4) Crea el comprobante de reversión CONTABILIZADO con anulaAId al
+   *      original, líneas invertidas, totales invertidos y glosa prefijada
+   *      "Reversión de {numeroOriginal}: {motivo}".
+   *   5) Marca el original como ANULADO con metadata (anuladoEn, usuario,
+   *      motivo). La back-ref `original.reversion` queda resuelta por el
+   *      @unique([anulaAId]) del schema.
+   *   6) Audita ambos comprobantes (ANULADO en el original,
+   *      CREADO_POR_REVERSION en la reversión).
+   */
+  async anular(
+    tenantId: string,
+    userId: string,
+    id: string,
+    motivo: string,
+  ): Promise<{ original: ComprobanteResponseDto; reversion: ComprobanteResponseDto }> {
+    const motivoTrim = (motivo ?? '').trim();
+    if (motivoTrim.length < MotivoAnulacionRequeridoError.LONGITUD_MINIMA) {
+      throw new MotivoAnulacionRequeridoError(motivoTrim.length);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const original = await this.repo.findById(tenantId, id, tx);
+      if (!original) throw new ComprobanteNoEncontradoError(id);
+
+      if (original.estado === EstadoComprobante.BLOQUEADO) {
+        throw new ComprobanteBloqueadoError(id);
+      }
+      if (original.estado === EstadoComprobante.ANULADO) {
+        throw new ComprobanteYaAnuladoError(id);
+      }
+      if (original.estado !== EstadoComprobante.CONTABILIZADO) {
+        throw new ComprobanteEstadoInvalidoError(id, original.estado, 'anular');
+      }
+
+      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
+      const periodoReversion = await this.periodos.obtenerPorFecha(tenantId, hoy, tx);
+      if (!periodoReversion || periodoReversion.status !== PeriodoFiscalStatus.ABIERTO) {
+        throw new PeriodoReversionNoAbiertoError(hoy.toIso());
+      }
+
+      const correlativo = await this.secuencia.siguienteCorrelativo(
+        tenantId,
+        TipoComprobante.AJUSTE,
+        hoy.year,
+        hoy.month,
+        tx,
+      );
+      const numeroReversion = formatearNumero(
+        TipoComprobante.AJUSTE,
+        hoy.year,
+        hoy.month,
+        correlativo,
+      );
+
+      // Líneas invertidas: lo que era DEBE pasa a HABER y viceversa. Misma
+      // moneda, mismo tipoCambio, mismo contactoId, mismos montos — el único
+      // swap es la columna debito/credito y la de BOB.
+      const lineasInvertidas: LineaPersistData[] = original.lineas.map((l) => ({
+        orden: l.orden,
+        cuentaId: l.cuentaId,
+        contactoId: l.contactoId,
+        moneda: l.moneda,
+        debito: l.credito,
+        credito: l.debito,
+        tipoCambio: l.tipoCambio,
+        debitoBob: l.creditoBob,
+        creditoBob: l.debitoBob,
+        glosaLinea: l.glosaLinea,
+      }));
+
+      const reversion = await this.repo.crearReversion(
+        tenantId,
+        {
+          tipo: TipoComprobante.AJUSTE,
+          numero: numeroReversion,
+          fechaContable: hoy.toDbDate(),
+          periodoFiscalId: periodoReversion.id,
+          glosa: `Reversión de ${original.numero ?? id}: ${motivoTrim}`,
+          monedaPrincipal: original.monedaPrincipal,
+          totalDebitoBob: original.totalCreditoBob,
+          totalCreditoBob: original.totalDebitoBob,
+          createdByUserId: userId,
+          anulaAId: original.id,
+          lineas: lineasInvertidas,
+        },
+        tx,
+      );
+
+      const originalAnulado = await this.repo.marcarAnulado(
+        tenantId,
+        id,
+        {
+          anuladoEn: this.clock.now(),
+          anuladoPorUserId: userId,
+          motivoAnulacion: motivoTrim,
+        },
+        tx,
+      );
+
+      await this.repo.registrarAuditoria(
+        tenantId,
+        {
+          comprobanteId: id,
+          userId,
+          accion: AccionAuditoriaComprobante.ANULADO,
+          diff: {
+            motivo: motivoTrim,
+            reversionId: reversion.id,
+            reversionNumero: numeroReversion,
+          },
+        },
+        tx,
+      );
+      await this.repo.registrarAuditoria(
+        tenantId,
+        {
+          comprobanteId: reversion.id,
+          userId,
+          accion: AccionAuditoriaComprobante.CREADO_POR_REVERSION,
+          diff: {
+            anulaAId: original.id,
+            anulaANumero: original.numero,
+          },
+        },
+        tx,
+      );
+
+      return {
+        original: toComprobanteResponse(originalAnulado),
+        reversion: toComprobanteResponse(reversion),
+      };
     });
   }
 
