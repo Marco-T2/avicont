@@ -2,7 +2,11 @@ import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../common/prisma.service';
+import {
+  MEMBERSHIPS_READER_PORT,
+  type MembershipActivaParaAuth,
+  type MembershipsReaderPort,
+} from '../memberships/ports/memberships-reader.port';
 import { USERS_READER_PORT, type UsersReaderPort } from '../users/ports/users-reader.port';
 import { USERS_WRITER_PORT, type UsersWriterPort } from '../users/ports/users-writer.port';
 import {
@@ -32,11 +36,12 @@ export interface TokenPair {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
     @Inject(USERS_READER_PORT) private readonly usersReader: UsersReaderPort,
     @Inject(USERS_WRITER_PORT) private readonly usersWriter: UsersWriterPort,
     @Inject(CREDENTIALS_REPOSITORY_PORT)
     private readonly credentials: CredentialsRepositoryPort,
+    @Inject(MEMBERSHIPS_READER_PORT)
+    private readonly memberships: MembershipsReaderPort,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -72,13 +77,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<TokenPair> {
     const user = await this.validateUser(dto.email, dto.password);
-    const memberships = await this.prisma.membership.findMany({
-      where: { userId: user.id, deactivatedAt: null },
-      include: {
-        organization: true,
-        customRole: { select: { slug: true, permissions: true } },
-      },
-    });
+    const memberships = await this.memberships.findActivasByUserId(user.id);
 
     const activeTenantId = memberships[0]?.organizationId;
     const roles = this.extractRolesForTenant(memberships, activeTenantId);
@@ -109,10 +108,7 @@ export class AuthService {
     await this.credentials.revokeById(stored.id, 'rotated');
 
     const activeTenantId = stored.organizationId ?? undefined;
-    const memberships = await this.prisma.membership.findMany({
-      where: { userId: stored.userId, deactivatedAt: null },
-      include: { customRole: { select: { slug: true, permissions: true } } },
-    });
+    const memberships = await this.memberships.findActivasByUserId(stored.userId);
     const roles = this.extractRolesForTenant(memberships, activeTenantId);
 
     const claims = JwtClaims.forUser({
@@ -139,15 +135,11 @@ export class AuthService {
   }
 
   async switchTenant(userId: string, tenantId: string): Promise<TokenPair> {
-    const membership = await this.prisma.membership.findUnique({
-      where: { organizationId_userId: { organizationId: tenantId, userId } },
-      include: {
-        user: true,
-        organization: true,
-        customRole: { select: { slug: true, permissions: true } },
-      },
-    });
-    if (!membership || membership.deactivatedAt) {
+    const membership = await this.memberships.findActivaByUserAndTenant(
+      userId,
+      tenantId,
+    );
+    if (!membership) {
       throw new NoMiembroDeTenantError(tenantId);
     }
 
@@ -155,7 +147,7 @@ export class AuthService {
 
     const claims = JwtClaims.forUser({
       userId,
-      email: membership.user.email,
+      email: membership.userEmail,
       activeTenantId: tenantId,
       roles,
     });
@@ -172,17 +164,13 @@ export class AuthService {
   // Esto alimenta el claim `roles` del JWT. El guard resuelve permisos reales
   // consultando BD (ver Fase 0.6).
   private extractRolesForTenant(
-    memberships: Array<{
-      organizationId: string;
-      systemRole: string | null;
-      customRole?: { slug: string } | null;
-    }>,
+    memberships: MembershipActivaParaAuth[],
     activeTenantId: string | undefined,
   ): string[] {
     if (!activeTenantId) return [];
     return memberships
       .filter((m) => m.organizationId === activeTenantId)
-      .map((m) => m.systemRole ?? m.customRole?.slug ?? null)
+      .map((m) => m.systemRole ?? m.customRoleSlug)
       .filter((r): r is string => r !== null);
   }
 

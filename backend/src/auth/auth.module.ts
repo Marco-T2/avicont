@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaCredentialsRepository } from './adapters/prisma-credentials.repository';
 import { CREDENTIALS_REPOSITORY_PORT } from './ports/credentials.repository.port';
+import { MembershipsModule } from '../memberships/memberships.module';
 import { UsersModule } from '../users/users.module';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
@@ -23,6 +24,7 @@ import { TenantContextService } from '../common/tenant-context/tenant-context.se
       }),
     }),
     UsersModule,
+    MembershipsModule,
   ],
   controllers: [AuthController],
   providers: [
