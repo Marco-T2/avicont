@@ -20,8 +20,15 @@ import {
   SoloOwnerAdminPuedeReabrirError,
   SoloOwnerPuedeMarcarDefinitivoError,
 } from './domain/errors';
+import {
+  PeriodoFiscalResponseDto,
+  toPeriodoResponse,
+} from './dto/periodo-fiscal-response.dto';
 import { ReabrirPeriodoDto } from './dto/reabrir-periodo.dto';
-import { PeriodosFiscalesService } from './periodos-fiscales.service';
+import {
+  PeriodosFiscalesService,
+  ResumenPrecierre,
+} from './periodos-fiscales.service';
 
 interface AuthenticatedRequest {
   user: { sub: string; activeTenantId?: string; roles?: string[] };
@@ -54,22 +61,27 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Listar períodos fiscales (filtros: gestionId, status)',
   })
-  listar(
+  async listar(
     @Req() req: AuthenticatedRequest,
     @Query('gestionId') gestionId?: string,
     @Query('status') status?: PeriodoFiscalStatus,
-  ) {
-    return this.service.listar(resolveTenantId(req), {
+  ): Promise<PeriodoFiscalResponseDto[]> {
+    const periodos = await this.service.listar(resolveTenantId(req), {
       ...(gestionId !== undefined ? { gestionId } : {}),
       ...(status !== undefined ? { status } : {}),
     });
+    return periodos.map(toPeriodoResponse);
   }
 
   @Get(':id')
   @RequirePermissions('contabilidad.periodos.read')
   @ApiOperation({ summary: 'Detalle de un período fiscal' })
-  obtener(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.service.obtenerPorId(id, resolveTenantId(req));
+  async obtener(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<PeriodoFiscalResponseDto> {
+    const periodo = await this.service.obtenerPorId(id, resolveTenantId(req));
+    return toPeriodoResponse(periodo);
   }
 
   @Get(':id/resumen-precierre')
@@ -78,7 +90,10 @@ export class PeriodosFiscalesController {
     summary:
       'Resumen de comprobantes (contabilizados, borradores, anulados) y totales antes de cerrar.',
   })
-  resumen(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+  resumen(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<ResumenPrecierre> {
     return this.service.obtenerResumenPrecierre(id, resolveTenantId(req));
   }
 
@@ -88,8 +103,16 @@ export class PeriodosFiscalesController {
     summary:
       'Cerrar período fiscal (valida 0 borradores; bloquea los CONTABILIZADO).',
   })
-  cerrar(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.service.cerrar(id, resolveTenantId(req), req.user.sub);
+  async cerrar(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<PeriodoFiscalResponseDto> {
+    const periodo = await this.service.cerrar(
+      id,
+      resolveTenantId(req),
+      req.user.sub,
+    );
+    return toPeriodoResponse(periodo);
   }
 
   @Post(':id/reabrir')
@@ -98,18 +121,19 @@ export class PeriodosFiscalesController {
     summary:
       'Reabrir período cerrado (solo OWNER/ADMIN, motivo ≥20 chars, auditado).',
   })
-  reabrir(
+  async reabrir(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: ReabrirPeriodoDto,
-  ) {
+  ): Promise<PeriodoFiscalResponseDto> {
     this.requireOwnerOrAdmin(req);
-    return this.service.reabrir(
+    const periodo = await this.service.reabrir(
       id,
       resolveTenantId(req),
       req.user.sub,
       dto.motivo,
     );
+    return toPeriodoResponse(periodo);
   }
 
   @Post(':id/marcar-definitivo')
@@ -117,12 +141,16 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Marcar período cerrado como definitivo (solo OWNER, irreversible).',
   })
-  marcarDefinitivo(
+  async marcarDefinitivo(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-  ) {
+  ): Promise<PeriodoFiscalResponseDto> {
     this.requireOwner(req);
-    return this.service.marcarDefinitivo(id, resolveTenantId(req));
+    const periodo = await this.service.marcarDefinitivo(
+      id,
+      resolveTenantId(req),
+    );
+    return toPeriodoResponse(periodo);
   }
 
   // Chequeos de rol adicionales al RBAC genérico. El RBAC genérico valida el

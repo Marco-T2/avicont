@@ -17,6 +17,12 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { CrearGestionDto } from './dto/crear-gestion.dto';
+import {
+  GestionConPeriodosResponseDto,
+  GestionResponseDto,
+  toGestionConPeriodosResponse,
+  toGestionResponse,
+} from './dto/gestion-response.dto';
 import { GestionesFiscalesService } from './gestiones-fiscales.service';
 
 interface AuthenticatedRequest {
@@ -51,21 +57,26 @@ export class GestionesFiscalesController {
     summary:
       'Crear gestión fiscal; genera los 12 períodos automáticamente según tipoEmpresaPrincipal del tenant (Ley 843 art. 46).',
   })
-  crear(@Req() req: AuthenticatedRequest, @Body() dto: CrearGestionDto) {
-    return this.service.crear(resolveTenantId(req), dto.year);
+  async crear(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CrearGestionDto,
+  ): Promise<GestionConPeriodosResponseDto> {
+    const gestion = await this.service.crear(resolveTenantId(req), dto.year);
+    return toGestionConPeriodosResponse(gestion);
   }
 
   @Get()
   @RequirePermissions('contabilidad.gestiones.read')
   @ApiOperation({ summary: 'Listar gestiones fiscales del tenant activo' })
-  listar(
+  async listar(
     @Req() req: AuthenticatedRequest,
     @Query('status') status?: GestionFiscalStatus,
-  ) {
-    return this.service.listar(
+  ): Promise<GestionResponseDto[]> {
+    const gestiones = await this.service.listar(
       resolveTenantId(req),
       status !== undefined ? { status } : {},
     );
+    return gestiones.map(toGestionResponse);
   }
 
   @Get(':id')
@@ -73,8 +84,12 @@ export class GestionesFiscalesController {
   @ApiOperation({
     summary: 'Detalle de gestión con los 12 períodos incluidos',
   })
-  obtener(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.service.obtenerPorId(id, resolveTenantId(req));
+  async obtener(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<GestionConPeriodosResponseDto> {
+    const gestion = await this.service.obtenerPorId(id, resolveTenantId(req));
+    return toGestionConPeriodosResponse(gestion);
   }
 
   @Post(':id/cerrar')
@@ -82,7 +97,15 @@ export class GestionesFiscalesController {
   @ApiOperation({
     summary: 'Cerrar gestión fiscal (valida que los 12 períodos estén cerrados)',
   })
-  cerrar(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.service.cerrar(id, resolveTenantId(req), req.user.sub);
+  async cerrar(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<GestionResponseDto> {
+    const gestion = await this.service.cerrar(
+      id,
+      resolveTenantId(req),
+      req.user.sub,
+    );
+    return toGestionResponse(gestion);
   }
 }
