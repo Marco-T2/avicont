@@ -6,6 +6,7 @@ import type {
   MembershipActivaConOrganizacion,
   MembershipActivaDeTenantParaAuth,
   MembershipActivaParaAuth,
+  MembershipParaImpersonation,
   MembershipsReaderPort,
 } from '../ports/memberships-reader.port';
 
@@ -70,5 +71,28 @@ export class MembershipsReaderAdapter implements MembershipsReaderPort {
       systemRole: r.systemRole,
       customRoleSlug: r.customRole?.slug ?? null,
     }));
+  }
+
+  async findForImpersonation(
+    userId: string,
+    tenantId: string,
+  ): Promise<MembershipParaImpersonation | null> {
+    const row = await this.prisma.membership.findUnique({
+      where: { organizationId_userId: { organizationId: tenantId, userId } },
+      select: {
+        systemRole: true,
+        deactivatedAt: true,
+        customRole: { select: { slug: true } },
+        user: { select: { email: true, isActive: true } },
+      },
+    });
+    if (!row) return null;
+    return {
+      systemRole: row.systemRole,
+      deactivatedAt: row.deactivatedAt,
+      customRoleSlug: row.customRole?.slug ?? null,
+      userEmail: row.user.email,
+      userIsActive: row.user.isActive,
+    };
   }
 }

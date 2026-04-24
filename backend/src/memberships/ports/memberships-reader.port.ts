@@ -8,6 +8,10 @@
 //   y `findActivaByUserAndTenant` (switchTenant).
 // - users: `findActivasConOrganizacionByUserId` (getProfile, incluye datos
 //   públicos de la organización).
+// - impersonation: `findForImpersonation` — necesita estado completo
+//   (incluye `deactivatedAt` y `userIsActive` que los otros métodos filtran)
+//   para distinguir "no es miembro" de "miembro desactivado" y emitir el
+//   error específico al caller.
 //
 // No expone `permissions` ni el objeto `Organization` completo — los métodos
 // devuelven DTOs proyectados al shape exacto del consumer.
@@ -30,6 +34,20 @@ export interface MembershipActivaConOrganizacion {
   organizationSlug: string;
   systemRole: string | null;
   customRoleSlug: string | null;
+}
+
+/**
+ * Shape de membership para decisiones de impersonation. A diferencia de los
+ * otros shapes, incluye explícitamente `deactivatedAt` y `userIsActive`
+ * — el caller necesita distinguir "miembro activo" de "miembro desactivado"
+ * o "cuenta desactivada" para emitir errores específicos (CLAUDE.md §5.6).
+ */
+export interface MembershipParaImpersonation {
+  systemRole: string | null;
+  deactivatedAt: Date | null;
+  customRoleSlug: string | null;
+  userEmail: string;
+  userIsActive: boolean;
 }
 
 export abstract class MembershipsReaderPort {
@@ -57,4 +75,16 @@ export abstract class MembershipsReaderPort {
   abstract findActivasConOrganizacionByUserId(
     userId: string,
   ): Promise<MembershipActivaConOrganizacion[]>;
+
+  /**
+   * Busca la membership de un usuario en un tenant específico devolviendo
+   * el shape completo necesario para decidir si puede ser target (o admin)
+   * de una sesión de impersonation — incluye `deactivatedAt` y el estado
+   * `userIsActive` del User. Retorna null sólo si no existe la relación
+   * (no si está desactivada). Usado por `impersonation`.
+   */
+  abstract findForImpersonation(
+    userId: string,
+    tenantId: string,
+  ): Promise<MembershipParaImpersonation | null>;
 }
