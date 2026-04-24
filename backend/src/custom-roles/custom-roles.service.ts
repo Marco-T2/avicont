@@ -7,23 +7,29 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CustomRole } from '@prisma/client';
+
+import { permisoExisteEnCatalogo } from '@/common/permisos/catalogo';
+import { assertValidPermissionPattern } from '@/rbac/domain/permission-matcher';
+import {
+  PERMISSIONS_CACHE_INVALIDATION_PORT,
+  PermissionsCacheInvalidationPort,
+} from '@/rbac/ports/permissions-cache-invalidation.port';
+
+import { CloneCustomRoleDto } from './dto/clone-custom-role.dto';
+import { CreateCustomRoleDto } from './dto/create-custom-role.dto';
+import { UpdateCustomRoleDto } from './dto/update-custom-role.dto';
 import {
   CUSTOM_ROLE_REPOSITORY_PORT,
   CustomRoleRepositoryPort,
 } from './ports/custom-role.repository.port';
-import { CreateCustomRoleDto } from './dto/create-custom-role.dto';
-import { UpdateCustomRoleDto } from './dto/update-custom-role.dto';
-import { CloneCustomRoleDto } from './dto/clone-custom-role.dto';
-import { assertValidPermissionPattern } from '../rbac/domain/permission-matcher';
-import { permisoExisteEnCatalogo } from '../common/permisos/catalogo';
-import { RbacService } from '../rbac/rbac.service';
 
 @Injectable()
 export class CustomRolesService {
   constructor(
     @Inject(CUSTOM_ROLE_REPOSITORY_PORT)
     private readonly repo: CustomRoleRepositoryPort,
-    private readonly rbac: RbacService,
+    @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
+    private readonly rbac: PermissionsCacheInvalidationPort,
   ) {}
 
   list(organizationId: string): Promise<CustomRole[]> {
