@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../../common/prisma.service';
+import { PrismaService } from '@/common/prisma.service';
 import type { CatalogoPuctReaderPort, PuctEntry } from '../ports/catalogo-puct-reader.port';
 
 @Injectable()

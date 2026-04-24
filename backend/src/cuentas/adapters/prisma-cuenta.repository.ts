@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Cuenta, Prisma } from '@prisma/client';
 
-import { PrismaService } from '../../common/prisma.service';
+import { PrismaService } from '@/common/prisma.service';
 import type {
   ActualizarCuentaData,
   CrearCuentaData,

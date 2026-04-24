@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../../common/prisma.service';
+import { PrismaService } from '@/common/prisma.service';
 import type {
   CuentaParaValidacion,
   CuentaReaderPort,
-} from '../../configuracion-contable/ports/cuenta-reader.port';
+} from '@/configuracion-contable/ports/cuenta-reader.port';
 
 // Adapter del port que configuracion-contable define (ver CLAUDE.md §3.7).
 // Vive en src/cuentas/adapters/ porque cuentas es el "dueño" del dato Cuenta.
