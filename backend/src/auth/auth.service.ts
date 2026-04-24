@@ -2,7 +2,6 @@ import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { USERS_READER_PORT, type UsersReaderPort } from '../users/ports/users-reader.port';
 import { USERS_WRITER_PORT, type UsersWriterPort } from '../users/ports/users-writer.port';
@@ -12,8 +11,16 @@ import {
   TokenInvalidoError,
 } from './domain/auth-errors';
 import { JwtClaims, type JwtPayload } from './domain/jwt-claims';
+import { RefreshTokenHash } from './domain/refresh-token-hash';
+import { TokenFamily } from './domain/token-family';
+import {
+  CREDENTIALS_REPOSITORY_PORT,
+  type CredentialsRepositoryPort,
+} from './ports/credentials.repository.port';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+
+import * as crypto from 'crypto';
 
 export type { JwtPayload };
 
@@ -28,6 +35,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     @Inject(USERS_READER_PORT) private readonly usersReader: UsersReaderPort,
     @Inject(USERS_WRITER_PORT) private readonly usersWriter: UsersWriterPort,
+    @Inject(CREDENTIALS_REPOSITORY_PORT)
+    private readonly credentials: CredentialsRepositoryPort,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -90,20 +99,14 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenPair> {
-    const hash = this.hashToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findFirst({
-      where: { tokenHash: hash, revokedAt: null, expiresAt: { gt: new Date() } },
-      include: { user: true },
-    });
+    const hash = RefreshTokenHash.fromRaw(refreshToken);
+    const stored = await this.credentials.findActiveByHash(hash.toString());
     if (!stored) {
       throw new TokenInvalidoError();
     }
 
     // Rotación: marcar el viejo como revocado.
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date(), revokedReason: 'rotated' },
-    });
+    await this.credentials.revokeById(stored.id, 'rotated');
 
     const activeTenantId = stored.organizationId ?? undefined;
     const memberships = await this.prisma.membership.findMany({
@@ -114,7 +117,7 @@ export class AuthService {
 
     const claims = JwtClaims.forUser({
       userId: stored.userId,
-      email: stored.user.email,
+      email: stored.userEmail,
       ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
     });
@@ -124,18 +127,15 @@ export class AuthService {
     const newRefreshToken = await this.createRefreshToken(
       stored.userId,
       activeTenantId,
-      stored.familyId,
+      TokenFamily.of(stored.familyId),
     );
 
     return { accessToken, refreshToken: newRefreshToken };
   }
 
   async logout(refreshToken: string) {
-    const hash = this.hashToken(refreshToken);
-    await this.prisma.refreshToken.updateMany({
-      where: { tokenHash: hash },
-      data: { revokedAt: new Date(), revokedReason: 'logout' },
-    });
+    const hash = RefreshTokenHash.fromRaw(refreshToken);
+    await this.credentials.revokeByHash(hash.toString(), 'logout');
   }
 
   async switchTenant(userId: string, tenantId: string): Promise<TokenPair> {
@@ -189,29 +189,23 @@ export class AuthService {
   private async createRefreshToken(
     userId: string,
     tenantId?: string,
-    familyId?: string,
+    family?: TokenFamily,
   ): Promise<string> {
     const raw = crypto.randomBytes(32).toString('hex');
-    const hash = this.hashToken(raw);
+    const hash = RefreshTokenHash.fromRaw(raw);
     const expiresIn = this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
     const expiresAt = new Date(Date.now() + this.parseDuration(expiresIn));
-    const family = familyId ?? crypto.randomUUID();
+    const tokenFamily = family ?? TokenFamily.generate();
 
-    await this.prisma.refreshToken.create({
-      data: {
-        tokenHash: hash,
-        userId,
-        ...(tenantId !== undefined ? { organizationId: tenantId } : {}),
-        familyId: family,
-        expiresAt,
-      },
+    await this.credentials.create({
+      tokenHash: hash.toString(),
+      userId,
+      ...(tenantId !== undefined ? { organizationId: tenantId } : {}),
+      familyId: tokenFamily.toString(),
+      expiresAt,
     });
 
     return raw;
-  }
-
-  private hashToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private parseDuration(duration: string): number {
