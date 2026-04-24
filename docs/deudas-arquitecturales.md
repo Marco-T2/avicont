@@ -23,7 +23,7 @@
 | rbac | 0 | A− | — |
 | users | 0 | A− | — (2026-04-24: §2.1 Sesión A cerrada) |
 | periodos-fiscales | 1.2 | B+ | `domain/` minimalista, sin response DTOs |
-| impersonation | 0 | B | `domain/` vacío |
+| impersonation | 0 | A | §3.2.d cerrada 2026-04-24 |
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
 | memberships | 0 | A | §3.2.a cerrada 2026-04-24; ambas fugas bidireccionales cerradas (§3.2.b custom-roles + §2.1 remanente users) 2026-04-24; sin deuda viva |
@@ -246,7 +246,7 @@ Introducir **oportunísticamente** cuando se tocan esos archivos:
 - `Token` / `RefreshToken` (auth; invariante: nunca en logs sin redact)
 - `Nit` — **ya existe en common/domain** — extender a más lugares (facturas, LCV)
 - `TenantSlug` (tenants; validación kebab-case)
-- `ImpersonationWindow` (impersonation; hoy es const hardcoded 30min)
+- ✅ ~~`ImpersonationWindow`~~ — extraído 2026-04-24 en §3.2.d.
 
 ### 3.2 Módulos Fase 0 restantes
 
@@ -318,10 +318,44 @@ D+ → A. Desde cero: `domain/`, `ports/`, `adapters/`. VO `TenantSlug`
 (§3.1). Probablemente el más grande del grupo. Menos crítico
 cross-module.
 
-#### 3.2.d impersonation
+#### 3.2.d impersonation — ✅ CERRADA 2026-04-24
 
-B → A. `domain/` vacío; tiene el VO `ImpersonationWindow` listo para
-extraer (§3.1). Sin consumers cross-módulo reportados.
+Entregada en 4 commits atómicos sobre `main` + 1 commit adicional en
+`memberships` para el reader port extendido. B → A.
+
+- ✅ `feat(impersonation): add domain VOs and errors` — VOs
+  `ImpersonationId` (UUID), `ImpersonationReason` (min 10 chars
+  post-trim), `ImpersonationWindow` (TTL default 30min, CLAUDE.md §5.6),
+  `ImpersonationJwtClaims` (factory con claims obligatorios — más
+  estricto que el `JwtPayload` genérico de auth). Jerarquía de domain
+  errors con codes `IMPERSONATION_*` estables (9 errores de negocio +
+  4 errores de VO). 42 tests unit de dominio.
+- ✅ `refactor(impersonation): apply domain errors and VOs in service`
+  — reemplaza HttpException crudos por domain errors. Mismos códigos
+  HTTP, contrato público intacto (e2e pasa sin tocar). Dropea
+  `ConfigService` (inyectado pero sin uso).
+- ✅ `feat(memberships): extend MEMBERSHIPS_READER_PORT with findForImpersonation`
+  — shape `MembershipParaImpersonation` expone `deactivatedAt` y
+  `userIsActive` explícitamente (los otros métodos los filtran). El
+  caller puede distinguir "no miembro" (null) de "miembro desactivado"
+  o "cuenta desactivada". Integration spec nueva (5 tests).
+- ✅ `refactor(impersonation): consume MEMBERSHIPS_READER_PORT; drop PrismaService`
+  — última fuga cross-módulo eliminada. Unit spec del service nueva
+  (18 tests) con ports mockeados. `ImpersonationModule` importa
+  `MembershipsModule`.
+
+**Deuda descubierta pero DESCARTADA**: intentamos sacar
+`TenantContextService` del providers del módulo porque ningún service
+del módulo lo inyecta. E2E falló — `PrismaService` lo requiere
+transitivamente en su constructor. Regla: mientras `PrismaService` se
+registre per-module en lugar de vivir en un `PrismaModule` global,
+`TenantContextService` debe acompañarlo. Aplicará a todos los módulos
+que listan `PrismaService` en providers. Cleanup genuino requiere
+refactor mayor (migrar a `PrismaModule` global) — fuera del scope de
+esta deuda.
+
+780/780 tests verdes al cierre (42 domain impersonation + 5 integration
+reader + 18 unit service + resto de la suite).
 
 ### 3.3 Modelo de super-admin global
 
@@ -408,8 +442,8 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 ---
 
 **Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.1
-remanente + §2.2 + §3.2.a + §3.2.b cerradas; CERO fugas cross-módulo
-documentadas activas. Deuda viva: §3.2.c tenants, §3.2.d impersonation,
+remanente + §2.2 + §3.2.a + §3.2.b + §3.2.d cerradas; CERO fugas
+cross-módulo documentadas activas. Deuda viva: §3.2.c tenants,
 §3.3 super-admin).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
