@@ -71,6 +71,9 @@ export async function cleanupTestData() {
   // cascadea LineaComprobante y ComprobanteAuditoria (schema onDelete: Cascade).
   await prisma.comprobante.deleteMany({});
   await prisma.secuenciaComprobante.deleteMany({});
+  // Contactos (Fase 1.4): van DESPUÉS de comprobantes (LineaComprobante
+  // tiene FK Restrict hacia Contacto) y ANTES de Organization (FK Cascade).
+  await prisma.contacto.deleteMany({});
   // Plan de cuentas: OrgConfiguracionContable tiene FKs Restrict hacia Cuenta,
   // así que los borramos en orden explícito antes de tocar Organization.
   // CatalogoPuct NO se borra — es catálogo compartido read-only entre tests.

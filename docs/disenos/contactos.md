@@ -344,7 +344,7 @@ habría que diseñar una migración separada.
 ### 5.3 Al menos un flag (defense in depth)
 
 - **BD**: CHECK constraint `"esCliente" = true OR "esProveedor" = true`. Ver §4 paso 2.
-- **Service**: misma regla validada antes de llamar al repo; lanza `ContactoFlagsInvalidosError` (422) con mensaje amigable en vez de un error crudo de constraint violation.
+- **Service**: misma regla validada antes de llamar al repo; lanza `ContactoFlagsInvalidosError` (400) con mensaje amigable en vez de un error crudo de constraint violation.
 - Cicatriz F-01 aplicada acá también (§4.8 core): enforcement en BD **y** en service, nunca solo uno. La BD es la red de seguridad frente a bugs de scripts/seeds/data-migrations que salten el service; el service devuelve el mensaje útil en el caso común.
 
 ### 5.4 FK Restrict, no Cascade
@@ -411,11 +411,13 @@ Respuesta: `{ items: ContactoResponseDto[], total: number, page, pageSize }`.
 
 Todos extienden `DomainError` (§6.2 extendido en `docs/claude/errores-y-logs.md`).
 
-### 7.1 Validación (422)
+### 7.1 Validación de input (400)
+
+Subclases de `ValidationError` (HTTP 400). El formato del email no requiere
+un error propio — lo cubre `@IsEmail()` del DTO vía class-validator.
 
 - `ContactoRazonSocialRequeridaError` — razonSocial vacía o < 2 chars.
 - `ContactoFlagsInvalidosError` — ambos flags en false.
-- `ContactoEmailInvalidoError` — email con formato inválido.
 
 ### 7.2 Unicidad (409)
 
@@ -425,11 +427,23 @@ Todos extienden `DomainError` (§6.2 extendido en `docs/claude/errores-y-logs.md
 ### 7.3 Estado / referencias (409)
 
 - `ContactoReferenciadoError` — intento de eliminar un contacto con líneas de comprobante.
-  - `details: { lineasCount }`
+  - `details: { id, lineasCount? }` — `lineasCount` es opcional: el service lo incluye tras el pre-check; el adapter lo omite cuando captura P2003 tras un delete (race condition).
 
 ### 7.4 Not found (404)
 
-- `ContactoNotFoundError` — id no existe o pertenece a otro tenant.
+- `ContactoNoEncontradoError` — id no existe o pertenece a otro tenant.
+
+### 7.5 Errores que viven en el módulo `comprobantes` (422)
+
+Se lanzan desde `comprobantes.service.ts` cuando valida `contactoId` de
+las líneas. Subclases de `InvalidStateError` (HTTP 422):
+
+- `ContactoReferenciadoNoExisteError` — `contactoId` de una línea no existe en el tenant.
+  - `details: { orden, contactoId }`
+  - Se valida en crear, editar borrador y contabilizar.
+- `ContactoInactivoError` — `contactoId` existe pero está inactivo y se intenta contabilizar.
+  - `details: { orden, contactoId }`
+  - **Sólo se valida al contabilizar** (en borrador se permiten inactivos — el contacto puede haberse desactivado mientras se editaba).
 
 ---
 
@@ -437,59 +451,77 @@ Todos extienden `DomainError` (§6.2 extendido en `docs/claude/errores-y-logs.md
 
 ### 8.1 Port owner-owned
 
-El módulo `contactos` expone un port read-only para que `comprobantes`
-valide el `contactoId`:
+El módulo `contactos` expone un port read-only batcheado para que
+`comprobantes` valide los `contactoId` de TODAS las líneas en una sola
+query. Superficie mínima: sólo `id` y `activo`. Patrón idéntico a
+`CuentasReaderPort` (batch de cuentas por `cuentaId`s de las líneas).
 
 ```typescript
 // backend/src/contactos/ports/contactos-reader.port.ts
 export const CONTACTOS_READER_PORT = Symbol('CONTACTOS_READER_PORT');
 
+export interface ContactoParaLinea {
+  id: string;
+  activo: boolean;
+}
+
 export abstract class ContactosReaderPort {
-  abstract existe(organizationId: string, contactoId: string): Promise<boolean>;
-  abstract estaActivo(organizationId: string, contactoId: string): Promise<boolean>;
+  abstract obtenerBatch(
+    tenantId: string,
+    contactoIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Map<string, ContactoParaLinea>>;
 }
 ```
 
-Patrón coherente con `PeriodosReaderPort` y `CuentasReaderPort` de Fase 1.3.
+El adapter dedupe ids repetidos y early-returna si la lista viene vacía.
+Acepta un `tx` opcional para que la lectura participe de la TX del
+contabilizar (aisla contra desactivación concurrente).
 
 ### 8.2 Cambios en `comprobantes.service.ts`
 
-Hoy (línea 293 aprox):
+Se inyecta `CONTACTOS_READER_PORT` y se agrega la validación en dos
+momentos:
+
+**1. Al resolver/validar borrador (crear + editar)** — sólo existencia.
+En borrador se PERMITE referenciar contactos inactivos: un contacto
+puede haberse desactivado entre medio de la edición y no queremos
+romper el flujo.
 
 ```typescript
-if (cuenta.requiereContacto && !linea.contactoId) {
-  throw new ContactoRequeridoError(...);
+const contactoIds = input.lineas
+  .map((l) => l.contactoId)
+  .filter((id): id is string => typeof id === 'string' && id.length > 0);
+const contactos = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
+
+// ... dentro del loop de validación por línea:
+if (linea.contactoId && !contactos.has(linea.contactoId)) {
+  throw new ContactoReferenciadoNoExisteError(orden, linea.contactoId);
 }
 ```
 
-Se agrega validación adicional **cuando viene contactoId** (no solo cuando
-la cuenta lo requiere):
+**2. Al contabilizar** — existencia + activo, dentro de la misma TX.
 
 ```typescript
+const contactosMap = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
+
+// ... dentro del loop por línea del comprobante:
 if (linea.contactoId) {
-  const existe = await this.contactosReader.existe(orgId, linea.contactoId);
-  if (!existe) throw new ContactoNotFoundError(linea.contactoId);
-
-  // Solo al CONTABILIZAR validamos que esté activo. En BORRADOR
-  // permitimos referenciar inactivos para no romper la edición de un
-  // asiento cuyo contacto se desactivó mientras estaba en edición.
-  if (estado === 'CONTABILIZADO') {
-    const activo = await this.contactosReader.estaActivo(orgId, linea.contactoId);
-    if (!activo) throw new ContactoInactivoError(linea.contactoId);
-  }
+  const contacto = contactosMap.get(linea.contactoId);
+  if (!contacto) throw new ContactoReferenciadoNoExisteError(linea.orden, linea.contactoId);
+  if (!contacto.activo) throw new ContactoInactivoError(linea.orden, linea.contactoId);
 }
 ```
 
-Dos errores nuevos en `comprobantes/domain/errors/`:
-
-- `ContactoReferenciadoNoExisteError` (422) — contactoId no existe.
-- `ContactoInactivoError` (422) — contactoId existe pero está inactivo y
-  se intenta contabilizar.
+Los errors viven en `backend/src/comprobantes/domain/comprobante-errors.ts`
+junto al resto del dominio de comprobantes (ambos `InvalidStateError` — 422).
+Ver §7.5.
 
 ### 8.3 Módulo wiring
 
-- `ContactosModule` expone `CONTACTOS_READER_PORT` en su `exports`.
-- `ComprobantesModule` lo importa y lo inyecta en el service.
+- `ContactosModule` expone `CONTACTOS_READER_PORT` en sus `exports`.
+- `ComprobantesModule` importa `ContactosModule` y el service inyecta
+  `@Inject(CONTACTOS_READER_PORT)`.
 
 ---
 
@@ -591,3 +623,27 @@ subsistema tocado. No se mergea a main con rojo.
   `requiereContacto`).
 - `docs/claude/errores-y-logs.md` §6.2–§6.3 (jerarquía `DomainError`).
 - `docs/claude/testing.md` §7.1–§7.3 (pirámide, sufijos, ubicación).
+
+---
+
+## Estado
+
+**CERRADA — 2026-04-23.**
+
+Fase 1.4 slice 1 (Contactos) entregada en 7 commits atómicos, todos con
+typecheck limpio y la suite completa de tests del proyecto en verde:
+
+| # | SHA | Scope |
+|---|-----|-------|
+| 1 | `7bbd945` | `feat(db)`: schema Contacto + migration (CHECK, unique parcial, GIN trigram, FK Restrict desde LineaComprobante) + doc congelado |
+| 2 | `cfe9221` | `feat(contacto)`: domain errors (5) + validator puro + 19 unit tests |
+| 3 | `c45e696` | `feat(contacto)`: ContactosRepositoryPort + PrismaContactosRepository + 23 integration specs vs Postgres real |
+| 4 | `121e856` | `feat(contacto)`: ContactosService CRUD (7 métodos, idempotencia en activar/desactivar) + 30 unit tests |
+| 5 | `46f51cd` | `feat(contacto)`: controller + 4 DTOs + 7 endpoints + 4 permisos en seed |
+| 6 | `00f429c` | `feat(contacto)`: ContactosReaderPort + validación contactoId en comprobantes.service (crear + contabilizar) + 2 errors nuevos en dominio de comprobantes + 5 unit tests nuevos |
+| 7 | *este commit* | `feat(contacto)`: E2E + cleanup helper + cierre del doc — lee `git log --grep="fase 1.4"` para el SHA |
+
+El ContactosReaderPort expuesto en commit 6 es la integración crítica.
+Los demás slices de Fase 1.4 (DocumentoFisico, Libro Mayor, LCV) consumen
+este mismo port cuando necesiten validar contactos — no se duplica
+superficie.
