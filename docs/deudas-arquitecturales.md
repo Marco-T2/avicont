@@ -63,20 +63,25 @@ Al cierre: 547/547 tests verdes en la suite completa (unit + integration + E2E).
 
 ### 1.2 Desacoplar `memberships → rbac` y `invitations → rbac/notifications`
 
-**Próximo paso recomendado**: §1.2 (desacople RBAC).
+### 1.2 Desacoplar `memberships → rbac` y `invitations → rbac/notifications` — ✅ CERRADO 2026-04-24
 
-### 1.2 Desacoplar `memberships → rbac` y `invitations → rbac/notifications`
+Entregado en 5 commits atómicos sobre `main`:
 
-**Por qué primero**: cada cambio en RBAC hoy rompe 3 callers concretos (`memberships`, `invitations`, `custom-roles`). Es el acoplamiento más costoso en el proyecto.
+- ✅ `rbac`: `PermissionsCacheInvalidationPort` (Symbol + abstract class),
+  `RbacService implements` el port, módulo lo exporta vía `useExisting`.
+  Superficie mínima: `invalidateUser` + `invalidateUsersByCustomRole`.
+  `invalidateOrganization` queda interno (nadie externo lo usa).
+- ✅ `notifications`: `InvitationEmailsPort` +
+  `NotificationsInvitationEmailsAdapter` (wraps `NotificationsService`,
+  descarta `EmailResult`). `NotificationPort` preexistente intacto.
+- ✅ `memberships`: inyecta `PERMISSIONS_CACHE_INVALIDATION_PORT`.
+- ✅ `custom-roles`: inyecta `PERMISSIONS_CACHE_INVALIDATION_PORT`.
+  (`assertValidPermissionPattern` sigue como helper de dominio puro.)
+- ✅ `invitations`: inyecta `PERMISSIONS_CACHE_INVALIDATION_PORT` +
+  `INVITATION_EMAILS_PORT`. Sin imports concretos de RbacService ni
+  NotificationsService.
 
-Plan:
-1. **RBAC expone `PermissionsCacheInvalidationPort`** (dueño del dominio cache RBAC). Interface mínima: `invalidateUser(userId)`, `invalidateUsersByCustomRole(roleId)`, `invalidateOrg(orgId)`.
-2. **memberships, invitations, custom-roles** inyectan el port via Symbol + `@Inject`.
-3. **Eliminar imports concretos** de `RbacService` en los 3 callers.
-
-Mismo patrón con **`NotificationsService` → `NotificationPort`** (consumido por invitations).
-
-**Estimación**: 1 sesión de ~3h.
+**Próximo paso**: §2.1 (users/auth hexagonal) o §2.2 (feature-flags).
 
 ---
 
@@ -180,7 +185,7 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 cerrada; próximo: §1.2).
+**Última revisión**: 2026-04-24 (§1.1 + §1.2 cerradas; próximo: §2.1 o §2.2).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
