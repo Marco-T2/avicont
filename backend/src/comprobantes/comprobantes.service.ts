@@ -17,6 +17,7 @@ import {
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
 
+import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
 import { CreateComprobanteDto, CreateLineaDto } from './dto/create-comprobante.dto';
 import {
   ComprobanteResponseDto,
@@ -96,6 +97,15 @@ export class ComprobantesService {
     const c = await this.repo.findById(tenantId, id);
     if (!c) throw new ComprobanteNoEncontradoError(id);
     return toComprobanteResponse(c);
+  }
+
+  async obtenerAuditoria(tenantId: string, id: string): Promise<AuditoriaEntryDto[]> {
+    // Validamos existencia primero para devolver 404 si el comprobante no es
+    // visible desde el tenant (en vez de lista vacía sin contexto).
+    const c = await this.repo.findById(tenantId, id);
+    if (!c) throw new ComprobanteNoEncontradoError(id);
+    const rows = await this.repo.listarAuditoria(tenantId, id);
+    return rows.map(toAuditoriaEntry);
   }
 
   async listar(

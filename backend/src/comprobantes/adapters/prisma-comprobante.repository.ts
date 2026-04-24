@@ -270,4 +270,12 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
       },
     });
   }
+
+  async listarAuditoria(tenantId: string, comprobanteId: string, tx?: Prisma.TransactionClient) {
+    const client = tx ?? this.prisma;
+    return client.comprobanteAuditoria.findMany({
+      where: { organizationId: tenantId, comprobanteId },
+      orderBy: { timestamp: 'asc' },
+    });
+  }
 }

@@ -66,6 +66,11 @@ export async function cleanupTestData() {
   await prisma.membership.deleteMany({});
   await prisma.customRole.deleteMany({});
   await prisma.featureFlag.deleteMany({});
+  // Comprobantes (Fase 1.3): deben borrarse ANTES de cuentas porque
+  // LineaComprobante tiene FK Restrict hacia Cuenta. Borrar Comprobante
+  // cascadea LineaComprobante y ComprobanteAuditoria (schema onDelete: Cascade).
+  await prisma.comprobante.deleteMany({});
+  await prisma.secuenciaComprobante.deleteMany({});
   // Plan de cuentas: OrgConfiguracionContable tiene FKs Restrict hacia Cuenta,
   // así que los borramos en orden explícito antes de tocar Organization.
   // CatalogoPuct NO se borra — es catálogo compartido read-only entre tests.

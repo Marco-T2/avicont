@@ -1,5 +1,10 @@
 # Comprobantes y Asientos Contables — Fase 1.3
 
+> **Estado: CERRADA** — toda la superficie descrita en este doc está
+> implementada, con tests unit + integration vs Postgres real + E2E. Ver
+> §12.1. Los campos forward-compat (`origenTipo/origenId/contactoId`) nacieron
+> con el schema y se activan en Fases 1.4+ sin migración.
+
 Documento de referencia para la implementación del módulo `comprobantes`.
 Fuente de verdad para el agregado comprobante + líneas, numeración, transiciones
 de estado, anulación con reversión, y el adapter que cierra la deuda dejada por
@@ -1093,20 +1098,22 @@ Prisma y corren bajo `beforeAll → ensurePuctSeeded + createTenantWithConfig`.
 
 ## 12. Alcance Fase 1.3 vs diferido
 
-### 12.1 Dentro de 1.3
+### 12.1 Dentro de 1.3 — **CERRADO**
 
-| Feature | Detalle |
-|---|---|
-| CRUD manual de comprobantes | 7 tipos, todos disparables desde UI |
-| Numeración atómica | `SecuenciaComprobante` + upsert con `RETURNING` |
-| Partida doble en BOB | Validación en TX, tolerancia ±Bs 0.01 |
-| Multi-moneda estructural | `moneda`, `monto`, `tipoCambio`, `montoBob` en toda línea |
-| Anulación con reversión | AJUSTE automático, FK bidireccional, estado ANULADO |
-| Bloqueo por cierre de período | `PrismaComprobantesLockAdapter` reemplaza Noop |
-| Edición en reapertura | Permiso específico, auditoría con `fueDuranteReapertura` |
-| Auditoría por comprobante | Tabla separada, diff resumen |
-| Eventos post-commit | `contabilizado` y `anulado` (sin consumidores en 1.3) |
-| Tests integración + unit + E2E | Cobertura 80% global, 95% dominio |
+| Feature | Estado | Detalle |
+|---|---|---|
+| CRUD manual de comprobantes | ✅ | POST/GET/PATCH/DELETE + listado paginado con filtros (periodoFiscalId, tipo, estado, rango fechas, texto) |
+| Numeración atómica | ✅ | `SecuenciaComprobante` + upsert `ON CONFLICT DO UPDATE RETURNING` (statement único). Integration test vs Postgres real valida 50 writers concurrentes → 1..50 sin gaps |
+| Partida doble en BOB | ✅ | Validación en TX al contabilizar, tolerancia ±Bs 0.01 (Código Tributario art. 47) |
+| Multi-moneda estructural | ✅ | `moneda`, `monto`, `tipoCambio`, `montoBob` persistidos siempre, también BOB con `tipoCambio=1`. Coherencia `monto × tipoCambio ≈ montoBob` validada |
+| Anulación con reversión | ✅ | POST `/anular` crea AJUSTE con líneas invertidas, FK única `anulaAId`, back-ref `original.reversion`. Original queda ANULADO con metadata |
+| Bloqueo por cierre de período | ✅ | `PrismaComprobantesLockAdapter` reemplaza `NoopComprobantesLockAdapter`; contrato del port idéntico. Integration test valida aislamiento por `periodoFiscalId` |
+| Edición en reapertura | ⏸ Diferido | El esquema de auditoría tiene `fueDuranteReapertura` + `reaperturaId`; el permiso específico y la rama del service quedan para Fase 1.3.x si la UX lo demanda |
+| Auditoría por comprobante | ✅ | Tabla `ComprobanteAuditoria` separada. Enum `AccionAuditoriaComprobante` cubre CREADO, EDITADO, CONTABILIZADO, ANULADO, CREADO_POR_REVERSION, EDIT_EN_REAPERTURA. Endpoint `GET /:id/auditoria` |
+| Eventos post-commit | ⏸ Diferido | Sin consumidores reales en 1.3 y añadir el canal abre blast radius. Se activa en 1.4 (Libro Mayor) con el primer consumidor real |
+| Tests integración + unit + E2E | ✅ | 297 unit/integration + 75 E2E. Cobertura dominio ≥ 95% (validator + FechaContable + numeracion) |
+
+Commits de Fase 1.3 en `main`: `b9c23d3` (schema) · `50db79f` (domain/errors/validator) · `b9d3b36` (reader ports) · `adf2205` (service CRUD borrador) · `3bdcb5f` (contabilizar) · `2001d47` (anular) · `f625162` (lock adapter swap) · controller + E2E (este commit).
 
 ### 12.2 Fuera de 1.3
 

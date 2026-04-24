@@ -46,6 +46,7 @@ function makeRepoMock(): MockRepo {
     eliminarBorrador: jest.fn(),
     listar: jest.fn(),
     registrarAuditoria: jest.fn(),
+    listarAuditoria: jest.fn(),
   };
 }
 

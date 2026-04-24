@@ -9,6 +9,7 @@
 import type {
   AccionAuditoriaComprobante,
   Comprobante,
+  ComprobanteAuditoria,
   EstadoComprobante,
   LineaComprobante,
   Moneda,
@@ -203,4 +204,15 @@ export abstract class ComprobanteRepositoryPort {
     data: AuditoriaCreateData,
     tx?: Prisma.TransactionClient,
   ): Promise<void>;
+
+  /**
+   * Lista el historial de auditoría de un comprobante en orden cronológico
+   * ascendente. Scopeado al tenant. No pagina — el volumen esperado es bajo
+   * (una decena de entries por comprobante en uso normal).
+   */
+  abstract listarAuditoria(
+    tenantId: string,
+    comprobanteId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteAuditoria[]>;
 }
