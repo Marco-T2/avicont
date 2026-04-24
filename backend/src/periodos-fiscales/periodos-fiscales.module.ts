@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
-import { NoopComprobantesLockAdapter } from '@/comprobantes/adapters/noop-comprobantes-lock.adapter';
+import { PrismaComprobantesLockAdapter } from '@/comprobantes/adapters/prisma-comprobantes-lock.adapter';
 import { COMPROBANTES_LOCK_PORT } from '@/comprobantes/ports/comprobantes-lock.port';
 import { RbacModule } from '@/rbac/rbac.module';
 
@@ -58,10 +58,13 @@ import { PERIODOS_READER_PORT } from './ports/periodos-reader.port';
       useExisting: PrismaPeriodosReaderAdapter,
     },
 
-    // Fase 1.2: adapter stub del lock de comprobantes. Se reemplaza en 1.3.
+    // Fase 1.3: adapter real del lock de comprobantes. Reemplaza el
+    // NoopComprobantesLockAdapter de Fase 1.2 sin cambiar el contrato del
+    // port — los flujos de cierre/reapertura ya estaban escritos contra
+    // `ComprobantesLockPort` y siguen funcionando sin tocar.
     {
       provide: COMPROBANTES_LOCK_PORT,
-      useClass: NoopComprobantesLockAdapter,
+      useClass: PrismaComprobantesLockAdapter,
     },
   ],
   exports: [GESTIONES_READER_PORT, PERIODOS_READER_PORT],

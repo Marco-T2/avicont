@@ -260,7 +260,7 @@ describe('PeriodosFiscales (e2e)', () => {
     expect(res.body).toHaveLength(12);
   });
 
-  it('GET /periodos/:id/resumen-precierre devuelve ceros con Noop adapter y puedeCerrar=true', async () => {
+  it('GET /periodos/:id/resumen-precierre sobre período vacío devuelve ceros y puedeCerrar=true', async () => {
     const { ownerToken } = await seedOrgConOwner();
     const g = await request(app.getHttpServer())
       .post('/api/gestiones')
@@ -285,7 +285,7 @@ describe('PeriodosFiscales (e2e)', () => {
 
   // ----- Cierre de período -----
 
-  it('cerrar período sin borradores → OK (Noop reporta 0)', async () => {
+  it('cerrar período sin borradores → OK', async () => {
     const { ownerToken } = await seedOrgConOwner();
     const g = await request(app.getHttpServer())
       .post('/api/gestiones')
