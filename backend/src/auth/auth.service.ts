@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../common/prisma.service';
-import { UsersService } from '../users/users.service';
+import { USERS_READER_PORT, type UsersReaderPort } from '../users/ports/users-reader.port';
+import { USERS_WRITER_PORT, type UsersWriterPort } from '../users/ports/users-writer.port';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -27,29 +28,27 @@ export interface TokenPair {
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usersService: UsersService,
+    @Inject(USERS_READER_PORT) private readonly usersReader: UsersReaderPort,
+    @Inject(USERS_WRITER_PORT) private readonly usersWriter: UsersWriterPort,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const existing = await this.usersReader.findByEmail(dto.email);
     if (existing) {
       throw new BadRequestException('Email already in use');
     }
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email.toLowerCase().trim(),
-        hashedPassword,
-        ...(dto.displayName !== undefined ? { displayName: dto.displayName } : {}),
-      },
+    return this.usersWriter.create({
+      email: dto.email,
+      hashedPassword,
+      ...(dto.displayName !== undefined ? { displayName: dto.displayName } : {}),
     });
-    return { id: user.id, email: user.email };
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersReader.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
