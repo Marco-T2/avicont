@@ -31,6 +31,9 @@ import { TenantContextService } from '../common/tenant-context/tenant-context.se
     AuthService,
     JwtStrategy,
     PrismaService,
+    // TenantContextService no se consume directamente dentro de auth pero
+    // PrismaService lo inyecta transitivamente — removerlo rompe la DI.
+    // El acople `PrismaService → TenantContextService` es deuda aparte.
     TenantContextService,
     PrismaCredentialsRepository,
     { provide: CREDENTIALS_REPOSITORY_PORT, useExisting: PrismaCredentialsRepository },
