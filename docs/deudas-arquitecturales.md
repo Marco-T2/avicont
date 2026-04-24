@@ -26,7 +26,7 @@
 | impersonation | 0 | B | `domain/` vacío |
 | invitations | 0 | B− | `domain/` vacío + imports concretos cross-module |
 | custom-roles | 0 | C+ | `domain/` |
-| feature-flags | 0 | C | `domain/`, `ports/`, `adapters/` |
+| feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
 | memberships | 0 | C+ | reader port público (2026-04-24 §2.1 Sesión B); falta repo interno + writer port (§3.2) |
 | tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
@@ -179,17 +179,55 @@ tenant-isolation+impersonation. Typecheck limpio.
 - ✅ **`LocalStrategy` registrada pero sin uso** — removida en §2.1
   Sesión B (commit `a0b2fa9`).
 
-### 2.2 Hexagonizar feature-flags
+### 2.2 Hexagonizar feature-flags — ✅ CERRADA 2026-04-24
 
-**Por qué**: cuando granja (Fase 2) o algún slice futuro quiera consultar flags, hoy tiene que importar `FeatureFlagsService` concreto.
+Entregada en 5 commits verdes sobre `main` (`f60711b..27b463b`):
 
-Plan:
-1. Crear `domain/` (VO `FeatureFlagKey` validado, enum-like `FeatureFlagState`).
-2. `ports/feature-flag.repository.port.ts` + `ports/feature-flag-reader.port.ts` (superficie mínima para consumers: `isEnabled(tenantId, key)`).
-3. Adapter Prisma.
-4. Service refactorizado para inyectar ports + cache port (hoy inyecta `CacheService` directo).
+- ✅ `domain/feature-flag-key.ts` + spec (VO con regex y longitud; 22
+  tests). Reemplaza el `@Matches` del DTO como fuente de verdad.
+- ✅ `domain/feature-flag-errors.ts` — `FeatureFlagKeyInvalidaError`,
+  `FeatureFlagNoEncontradaError`, `FeatureFlagDuplicadaError` (subclases
+  de `ValidationError / NotFoundError / ConflictError`). Reemplazan los
+  `NotFoundException / ConflictException` que tiraba el service.
+- ✅ `ports/feature-flag.repository.port.ts` — CRUD interno completo,
+  infra pura (no conoce cache).
+- ✅ `ports/feature-flag-reader.port.ts` — superficie mínima cross-módulo
+  (`isEnabled / getAllForTenant / invalidate`). Único dueño del cache.
+  Pensado para granja (Fase 2) y cualquier consumer futuro sin tener
+  que tocar `FeatureFlagsService`.
+- ✅ `adapters/prisma-feature-flag.repository.ts` — traducción directa
+  a Prisma.
+- ✅ `adapters/prisma-feature-flag-reader.adapter.ts` — concentra el
+  caching (cache → DB → cache, TTL 60s) + invalidación post-commit.
+  Resiliente a Redis caído (GET y SET con `try/catch` y fallback a
+  DB; `invalidate` absorbe errores y deja que el TTL expire).
+- ✅ `FeatureFlagsService` refactorizado: inyecta los 2 ports, dropea
+  `PrismaService` y `CacheService`. `isEnabled` / `getAllForTenant`
+  salieron del service — ahora los controllers consumen el reader
+  directo.
+- ✅ `FeatureFlagGuard` depende sólo de `FEATURE_FLAG_READER_PORT`;
+  queda reusable sin arrastrar la API admin.
+- ✅ `FeatureFlagsAdminController` deja de estar expuesto: agrega
+  `JwtAuthGuard + TenantGuard + PermissionsGuard` y requiere
+  `sistema.feature-flags.admin` (permiso nuevo en el catálogo bajo
+  el módulo `sistema`). Cierra el comentario "should be protected
+  in production" que arrastraba el starter.
 
-**Estimación**: 1 sesión de ~2h.
+**No se hizo** (decisión consciente):
+- `FeatureFlagState` enum-like del plan original — innecesario, es
+  `boolean` + `metadata: Json` opcional; no tiene invariantes propios.
+- `FeatureFlagCachePort` separado — el reader port es dueño único del
+  cache, no hace falta un puerto extra que sólo el adapter usa.
+
+**Deudas descubiertas durante §2.2** (abiertas, no bloqueantes):
+- `FeatureFlagsController` usa `@RequirePermissions('settings.read')`
+  y `settings.write` — **esas keys no existen en el catálogo**. Hoy
+  pasan sólo porque OWNER/ADMIN matchean vía wildcard `*`. Cualquier
+  CustomRole que quisiera otorgarlas sería rechazado por
+  `permisoExisteEnCatalogo`. Fix cuando se necesite: decidir si
+  renombramos a `organizacion.feature-flags.read/update` (que sí
+  existen y son tenant-scoped) o agregamos `settings.*` al catálogo.
+- Modelo de super-admin global (ver §3.3 nueva).
 
 ---
 
@@ -210,6 +248,38 @@ Introducir **oportunísticamente** cuando se tocan esos archivos:
 
 - **tenants**, **custom-roles**, **impersonation**: hexagonizar siguiendo el patrón de contactos cuando se necesite tocarlos. Menos críticos porque tienen menos callers cross-module.
 - **memberships**: después del desacople de 1.2, revisar si vale un refactor completo.
+
+### 3.3 Modelo de super-admin global
+
+El catálogo RBAC es **tenant-scoped**: `PermissionsGuard` exige un
+`tenantId` (JWT `activeTenantId` o header `X-Tenant-ID`) y resuelve
+permisos contra la membership del caller en ese tenant. No existe
+concepto de "super-admin global" en el modelo de datos — `SystemRole`
+es `OWNER | ADMIN` por membership, no a nivel de `User`.
+
+**Consecuencia hoy** (descubierta al cerrar §2.2): las operaciones
+cross-tenant legítimas (p. ej. administrar el catálogo global de
+feature flags en `POST /api/admin/feature-flags`) no tienen un
+modelo natural para decir "sólo un subconjunto de humanos puede
+ejecutar esto". La solución interina que quedó en `sistema.feature-flags.admin`
+es: caller debe ser OWNER o ADMIN de **algún** tenant (matchean vía
+wildcard `*` del rbac resolver) y pasar un `X-Tenant-ID` válido.
+Eso cierra el endpoint frente al público anónimo pero no frente a
+owners de otros tenants — es mejor que el hoyo abierto del starter,
+pero no es la respuesta final.
+
+Para refinar — cuando aparezca la presión real (p. ej. cliente paga
+por onboarding, o compliance):
+1. Agregar `User.isSuperAdmin: Boolean` (o tabla `SuperAdmin` si se
+   quiere auditar mejor) con flag booleano.
+2. Extender el resolver para que `isSuperAdmin` otorgue wildcard
+   global `sistema.*` sin depender de membership.
+3. Endpoint cross-tenant sin `TenantGuard`: guard dedicado
+   `SuperAdminGuard` que valide el flag directamente.
+4. Auditoría obligatoria de cualquier acción `sistema.*`.
+
+Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
+- `sistema.feature-flags.admin`
 
 ---
 
