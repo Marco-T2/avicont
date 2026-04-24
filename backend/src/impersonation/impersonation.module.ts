@@ -6,12 +6,14 @@ import { ImpersonationController } from './impersonation.controller';
 import { ImpersonationAuditInterceptor } from './interceptors/impersonation-audit.interceptor';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
+import { MembershipsModule } from '../memberships/memberships.module';
 import { IMPERSONATION_REPOSITORY_PORT } from './ports/impersonation.repository.port';
 import { PrismaImpersonationRepository } from './adapters/prisma-impersonation.repository';
 
 @Module({
   imports: [
     ConfigModule,
+    MembershipsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

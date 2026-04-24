@@ -1,7 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SystemRole } from '@prisma/client';
-import { PrismaService } from '../common/prisma.service';
+import {
+  MEMBERSHIPS_READER_PORT,
+  MembershipsReaderPort,
+} from '@/memberships/ports/memberships-reader.port';
 import {
   IMPERSONATION_REPOSITORY_PORT,
   ImpersonationRepositoryPort,
@@ -31,7 +34,8 @@ export class ImpersonationService {
   constructor(
     @Inject(IMPERSONATION_REPOSITORY_PORT)
     private readonly repo: ImpersonationRepositoryPort,
-    private readonly prisma: PrismaService,
+    @Inject(MEMBERSHIPS_READER_PORT)
+    private readonly memberships: MembershipsReaderPort,
     private readonly jwt: JwtService,
   ) {}
 
@@ -42,9 +46,10 @@ export class ImpersonationService {
   ): Promise<{ impersonationToken: string; expiresAt: Date; impersonationId: string }> {
     const reason = ImpersonationReason.of(dto.reason);
 
-    const adminMembership = await this.prisma.membership.findUnique({
-      where: { organizationId_userId: { organizationId, userId: adminUserId } },
-    });
+    const adminMembership = await this.memberships.findForImpersonation(
+      adminUserId,
+      organizationId,
+    );
     if (!adminMembership || adminMembership.systemRole !== SystemRole.OWNER) {
       throw new SoloOwnerPuedeImpersonarError(adminUserId, organizationId);
     }
@@ -57,20 +62,17 @@ export class ImpersonationService {
     if (dto.targetUserId === adminUserId) {
       throw new SelfImpersonationError(adminUserId);
     }
-    const targetMembership = await this.prisma.membership.findUnique({
-      where: { organizationId_userId: { organizationId, userId: dto.targetUserId } },
-      include: {
-        user: { select: { id: true, email: true, isActive: true } },
-        customRole: { select: { slug: true } },
-      },
-    });
+    const targetMembership = await this.memberships.findForImpersonation(
+      dto.targetUserId,
+      organizationId,
+    );
     if (!targetMembership) {
       throw new TargetNoMiembroError(dto.targetUserId, organizationId);
     }
     if (targetMembership.deactivatedAt) {
       throw new TargetMembershipDesactivadaError(dto.targetUserId, organizationId);
     }
-    if (!targetMembership.user.isActive) {
+    if (!targetMembership.userIsActive) {
       throw new TargetConCuentaDesactivadaError(dto.targetUserId);
     }
     if (targetMembership.systemRole === SystemRole.OWNER) {
@@ -86,13 +88,13 @@ export class ImpersonationService {
 
     const roles = targetMembership.systemRole
       ? [targetMembership.systemRole]
-      : targetMembership.customRole
-        ? [targetMembership.customRole.slug]
+      : targetMembership.customRoleSlug
+        ? [targetMembership.customRoleSlug]
         : [];
 
     const claims = ImpersonationJwtClaims.forImpersonation({
       targetUserId: dto.targetUserId,
-      targetEmail: targetMembership.user.email,
+      targetEmail: targetMembership.userEmail,
       activeTenantId: organizationId,
       roles,
       adminUserId,
