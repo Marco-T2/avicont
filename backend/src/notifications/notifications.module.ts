@@ -1,10 +1,13 @@
 import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { NotificationsService } from './notifications.service';
-import { NOTIFICATION_PORT } from './ports/notification.port';
-import { SmtpAdapter } from './adapters/smtp.adapter';
-import { ResendAdapter } from './adapters/resend.adapter';
+
 import { ConsoleAdapter } from './adapters/console.adapter';
+import { NotificationsInvitationEmailsAdapter } from './adapters/notifications-invitation-emails.adapter';
+import { ResendAdapter } from './adapters/resend.adapter';
+import { SmtpAdapter } from './adapters/smtp.adapter';
+import { NotificationsService } from './notifications.service';
+import { INVITATION_EMAILS_PORT } from './ports/invitation-emails.port';
+import { NOTIFICATION_PORT } from './ports/notification.port';
 
 export type EmailProvider = 'smtp' | 'resend' | 'console';
 
@@ -32,7 +35,16 @@ export type EmailProvider = 'smtp' | 'resend' | 'console';
       },
       inject: [ConfigService],
     },
+
+    // Port cross-módulo para emails de invitación — consumido por
+    // `invitations`. Envuelve `NotificationsService` descartando el
+    // EmailResult del provider para no filtrar detalle del adapter.
+    NotificationsInvitationEmailsAdapter,
+    {
+      provide: INVITATION_EMAILS_PORT,
+      useExisting: NotificationsInvitationEmailsAdapter,
+    },
   ],
-  exports: [NotificationsService, NOTIFICATION_PORT],
+  exports: [NotificationsService, NOTIFICATION_PORT, INVITATION_EMAILS_PORT],
 })
 export class NotificationsModule {}
