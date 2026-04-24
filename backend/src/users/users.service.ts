@@ -3,6 +3,7 @@ import type { User } from '@prisma/client';
 
 import { PrismaService } from '../common/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { toUserResponseDto, type UserResponseDto } from './dto/user-response.dto';
 import {
   USER_REPOSITORY_PORT,
   type UserRepositoryPort,
@@ -28,8 +29,9 @@ export class UsersService {
     return this.repo.findById(id);
   }
 
-  update(id: string, dto: UpdateUserDto): Promise<User> {
-    return this.repo.update(id, dto);
+  async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
+    const user = await this.repo.update(id, dto);
+    return toUserResponseDto(user);
   }
 
   async getProfile(userId: string) {
