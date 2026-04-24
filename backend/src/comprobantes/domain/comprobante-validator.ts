@@ -20,10 +20,10 @@
  * viven en el servicio porque requieren I/O contra el repo de cuentas.
  */
 
-import { Moneda } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import { Moneda, Prisma } from '@prisma/client';
 
 import { FechaContable } from '@/common/domain/fecha-contable';
+import { Money } from '@/common/domain/money';
 
 import {
   ComprobanteDesbalanceadoError,
@@ -37,8 +37,6 @@ import {
   TipoCambioInvalidoError,
 } from './comprobante-errors';
 
-/** Tolerancia global para comparaciones monetarias en BOB (±Bs 0.01). */
-export const TOLERANCIA_BOB = new Prisma.Decimal('0.01');
 /** Mínimo de líneas para contabilizar (un asiento necesita al menos un DEBE y un HABER). */
 export const MIN_LINEAS_CONTABILIZADO = 2;
 
@@ -101,15 +99,15 @@ export function validarMinimoLineas(lineas: { length: number }): void {
 }
 
 export function validarLinea(linea: LineaParaValidar): void {
-  const debito = toDecimal(linea.debito);
-  const credito = toDecimal(linea.credito);
-  const tipoCambio = toDecimal(linea.tipoCambio);
-  const debitoBob = toDecimal(linea.debitoBob);
-  const creditoBob = toDecimal(linea.creditoBob);
+  const debito = Money.of(linea.debito);
+  const credito = Money.of(linea.credito);
+  const tipoCambio = Money.of(linea.tipoCambio);
+  const debitoBob = Money.of(linea.debitoBob);
+  const creditoBob = Money.of(linea.creditoBob);
 
   // XOR: una línea tiene DEBE O HABER, nunca ambos, nunca ninguno.
-  const tieneDebito = debito.greaterThan(0);
-  const tieneCredito = credito.greaterThan(0);
+  const tieneDebito = debito.isPositive();
+  const tieneCredito = credito.isPositive();
   if (tieneDebito && tieneCredito) {
     throw new LineaAmbiguaDebitoCreditoError(linea.orden);
   }
@@ -118,7 +116,7 @@ export function validarLinea(linea: LineaParaValidar): void {
   }
 
   // Débito/crédito no-negativos (la comparación >0 ya los cubre pero seamos explícitos).
-  if (debito.lessThan(0) || credito.lessThan(0)) {
+  if (debito.isNegative() || credito.isNegative()) {
     throw new LineaSinMontoError(linea.orden);
   }
 
@@ -141,7 +139,7 @@ export function validarLinea(linea: LineaParaValidar): void {
   if (tieneDebito) {
     const esperado = debito.mul(tipoCambio);
     assertMontoBobCoherente(linea.orden, debito, tipoCambio, esperado, debitoBob);
-    if (!creditoBob.equals(0)) {
+    if (!creditoBob.isZero()) {
       throw new MontoBobIncoherenteError(linea.orden, {
         monto: credito.toString(),
         tipoCambio: tipoCambio.toString(),
@@ -152,7 +150,7 @@ export function validarLinea(linea: LineaParaValidar): void {
   } else {
     const esperado = credito.mul(tipoCambio);
     assertMontoBobCoherente(linea.orden, credito, tipoCambio, esperado, creditoBob);
-    if (!debitoBob.equals(0)) {
+    if (!debitoBob.isZero()) {
       throw new MontoBobIncoherenteError(linea.orden, {
         monto: debito.toString(),
         tipoCambio: tipoCambio.toString(),
@@ -165,12 +163,12 @@ export function validarLinea(linea: LineaParaValidar): void {
 
 export function validarPartidaDoble(lineas: LineaParaValidar[]): void {
   const totales = calcularTotalesBob(lineas);
-  const diff = totales.debito.minus(totales.credito).abs();
-  if (diff.greaterThan(TOLERANCIA_BOB)) {
+  if (!totales.debito.balanceadoEnBobCon(totales.credito)) {
+    const diff = totales.debito.minus(totales.credito).abs();
     throw new ComprobanteDesbalanceadoError(
-      totales.debito.toFixed(2),
-      totales.credito.toFixed(2),
-      diff.toFixed(2),
+      totales.debito.toBob(),
+      totales.credito.toBob(),
+      diff.toBob(),
     );
   }
 }
@@ -184,15 +182,15 @@ export function validarMontoPositivo(lineas: LineaParaValidar[]): void {
 }
 
 export function calcularTotalesBob(lineas: LineaParaValidar[]): {
-  debito: Prisma.Decimal;
-  credito: Prisma.Decimal;
+  debito: Money;
+  credito: Money;
 } {
   return lineas.reduce(
     (acc, l) => ({
-      debito: acc.debito.plus(toDecimal(l.debitoBob)),
-      credito: acc.credito.plus(toDecimal(l.creditoBob)),
+      debito: acc.debito.plus(l.debitoBob),
+      credito: acc.credito.plus(l.creditoBob),
     }),
-    { debito: new Prisma.Decimal(0), credito: new Prisma.Decimal(0) },
+    { debito: Money.ZERO, credito: Money.ZERO },
   );
 }
 
@@ -200,24 +198,19 @@ export function calcularTotalesBob(lineas: LineaParaValidar[]): {
 // Helpers internos
 // ------------------------------------------------------------
 
-function toDecimal(v: string | Prisma.Decimal): Prisma.Decimal {
-  return v instanceof Prisma.Decimal ? v : new Prisma.Decimal(v);
-}
-
 function assertMontoBobCoherente(
   orden: number,
-  monto: Prisma.Decimal,
-  tipoCambio: Prisma.Decimal,
-  esperado: Prisma.Decimal,
-  recibido: Prisma.Decimal,
+  monto: Money,
+  tipoCambio: Money,
+  esperado: Money,
+  recibido: Money,
 ): void {
-  const diff = esperado.minus(recibido).abs();
-  if (diff.greaterThan(TOLERANCIA_BOB)) {
+  if (!esperado.balanceadoEnBobCon(recibido)) {
     throw new MontoBobIncoherenteError(orden, {
       monto: monto.toString(),
       tipoCambio: tipoCambio.toString(),
-      montoBobEsperado: esperado.toFixed(2),
-      montoBobRecibido: recibido.toFixed(2),
+      montoBobEsperado: esperado.toBob(),
+      montoBobRecibido: recibido.toBob(),
     });
   }
 }

@@ -10,6 +10,7 @@ import {
 
 import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import { FechaContable } from '@/common/domain/fecha-contable';
+import { Money } from '@/common/domain/money';
 import { PrismaService } from '@/common/prisma.service';
 import {
   CONTACTOS_READER_PORT,
@@ -54,7 +55,6 @@ import {
 import {
   calcularTotalesBob,
   type LineaParaValidar,
-  TOLERANCIA_BOB,
   validarComprobanteParaContabilizar,
 } from './domain/comprobante-validator';
 import { formatearNumero } from './domain/numeracion';
@@ -367,8 +367,8 @@ export class ComprobantesService {
         id,
         {
           numero,
-          totalDebitoBob: totales.debito,
-          totalCreditoBob: totales.credito,
+          totalDebitoBob: totales.debito.toPrismaDecimal(),
+          totalCreditoBob: totales.credito.toPrismaDecimal(),
         },
         tx,
       );
@@ -381,8 +381,8 @@ export class ComprobantesService {
           diff: {
             numero,
             totales: {
-              debito: totales.debito.toFixed(2),
-              credito: totales.credito.toFixed(2),
+              debito: totales.debito.toBob(),
+              credito: totales.credito.toBob(),
             },
           },
         },
@@ -691,13 +691,13 @@ export class ComprobantesService {
 // moneda, y ambigüedad débito+crédito.
 
 function validarCoherenciaLineaBorrador(orden: number, linea: CreateLineaDto): void {
-  const debito = new Prisma.Decimal(linea.debito);
-  const credito = new Prisma.Decimal(linea.credito);
-  const tipoCambio = new Prisma.Decimal(linea.tipoCambio);
-  const debitoBob = new Prisma.Decimal(linea.debitoBob);
-  const creditoBob = new Prisma.Decimal(linea.creditoBob);
+  const debito = Money.of(linea.debito);
+  const credito = Money.of(linea.credito);
+  const tipoCambio = Money.of(linea.tipoCambio);
+  const debitoBob = Money.of(linea.debitoBob);
+  const creditoBob = Money.of(linea.creditoBob);
 
-  if (debito.greaterThan(0) && credito.greaterThan(0)) {
+  if (debito.isPositive() && credito.isPositive()) {
     throw new LineaAmbiguaDebitoCreditoError(orden);
   }
 
@@ -716,21 +716,21 @@ function validarCoherenciaLineaBorrador(orden: number, linea: CreateLineaDto): v
 
   // Coherencia: cada lado debe cuadrar con su moneda original × tipoCambio.
   const esperadoDebitoBob = debito.mul(tipoCambio);
-  if (esperadoDebitoBob.minus(debitoBob).abs().greaterThan(TOLERANCIA_BOB)) {
+  if (!esperadoDebitoBob.balanceadoEnBobCon(debitoBob)) {
     throw new MontoBobIncoherenteError(orden, {
       monto: debito.toString(),
       tipoCambio: tipoCambio.toString(),
-      montoBobEsperado: esperadoDebitoBob.toFixed(2),
-      montoBobRecibido: debitoBob.toFixed(2),
+      montoBobEsperado: esperadoDebitoBob.toBob(),
+      montoBobRecibido: debitoBob.toBob(),
     });
   }
   const esperadoCreditoBob = credito.mul(tipoCambio);
-  if (esperadoCreditoBob.minus(creditoBob).abs().greaterThan(TOLERANCIA_BOB)) {
+  if (!esperadoCreditoBob.balanceadoEnBobCon(creditoBob)) {
     throw new MontoBobIncoherenteError(orden, {
       monto: credito.toString(),
       tipoCambio: tipoCambio.toString(),
-      montoBobEsperado: esperadoCreditoBob.toFixed(2),
-      montoBobRecibido: creditoBob.toFixed(2),
+      montoBobEsperado: esperadoCreditoBob.toBob(),
+      montoBobRecibido: creditoBob.toBob(),
     });
   }
 }

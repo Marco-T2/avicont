@@ -333,14 +333,14 @@ describe('calcularTotalesBob', () => {
       { ...LINEA_CREDITO_BOB_1000, credito: '1000.00', creditoBob: '1000.00' },
     ];
     const totales = calcularTotalesBob(lineas);
-    expect(totales.debito.toFixed(2)).toBe('1000.00');
-    expect(totales.credito.toFixed(2)).toBe('1000.00');
+    expect(totales.debito.toBob()).toBe('1000.00');
+    expect(totales.credito.toBob()).toBe('1000.00');
   });
 
   it('retorna ceros si no hay líneas', () => {
     const totales = calcularTotalesBob([]);
-    expect(totales.debito.equals(0)).toBe(true);
-    expect(totales.credito.equals(0)).toBe(true);
+    expect(totales.debito.isZero()).toBe(true);
+    expect(totales.credito.isZero()).toBe(true);
   });
 
   it('acepta Prisma.Decimal en el input', () => {
@@ -351,7 +351,7 @@ describe('calcularTotalesBob', () => {
         debitoBob: new Prisma.Decimal('250.75'),
       },
     ]);
-    expect(totales.debito.toFixed(2)).toBe('250.75');
+    expect(totales.debito.toBob()).toBe('250.75');
   });
 });
 
