@@ -127,6 +127,22 @@ describe('Auth (e2e)', () => {
         .send({ email: 'nonexistent@example.com', password: 'password123' })
         .expect(401);
     });
+
+    it('should reject deactivated user', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      await prisma.user.create({
+        data: {
+          email: 'deactivated@example.com',
+          hashedPassword,
+          isActive: false,
+        },
+      });
+
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'deactivated@example.com', password: 'password123' })
+        .expect(401);
+    });
   });
 
   describe('POST /api/auth/refresh', () => {

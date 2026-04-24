@@ -56,6 +56,10 @@ export class AuthService {
     if (!isMatch) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    // Mensaje genérico para no filtrar el estado del usuario al atacante.
+    if (!user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
     return user;
   }
 
