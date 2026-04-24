@@ -140,10 +140,9 @@ colgando dentro de auth).
 
 #### Follow-up descubiertos durante Sesión A
 
-- ⚠️ **Leak potencial de `hashedPassword`**: `PATCH /users/me` retorna el
-  `User` entero del Prisma (incluye `hashedPassword`). El refactor **no**
-  introdujo el bug — estaba antes. Atacar con `UserResponseDto` + mapper
-  en el controller, cuando se toque ese endpoint.
+- ✅ **Leak de `hashedPassword`** — fijado 2026-04-24 en commit
+  `d94631a` `fix(users): strip hashedPassword from PATCH /users/me response`.
+  `UserResponseDto` + mapper allow-list + e2e de regresión.
 - ⚠️ **`isActive` no validado en login**: `UsuarioParaAuth` expone
   `isActive` pero `validateUser` no lo chequea — un user desactivado
   podría loguear. Preexistente. Atacar en Sesión B junto con el refactor
