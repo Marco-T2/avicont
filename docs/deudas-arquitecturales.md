@@ -28,7 +28,7 @@
 | feature-flags | 0 | A− | — (2026-04-24: §2.2 cerrada) |
 | memberships | 0 | A | §3.2.a cerrada 2026-04-24; ambas fugas bidireccionales cerradas (§3.2.b custom-roles + §2.1 remanente users) 2026-04-24; sin deuda viva |
 | custom-roles | 0 | A− | domain + CUSTOM_ROLES_READER_PORT + domain errors 2026-04-24 (§3.2.b); invitations también migrado al port en el mismo batch |
-| tenants | 0 | D+ | `domain/`, `ports/`, `adapters/` |
+| tenants | 0 | A | §3.2.c cerrada 2026-04-25; sin deuda viva |
 | auth | 0 | A− | — (2026-04-24: §2.1 Sesión B cerrada) |
 | permissions | 0 | N/A | Stub intencional (catálogo read-only) |
 
@@ -245,7 +245,7 @@ Introducir **oportunísticamente** cuando se tocan esos archivos:
 - `Password` (auth; invariante: nunca circula post-hash)
 - `Token` / `RefreshToken` (auth; invariante: nunca en logs sin redact)
 - `Nit` — **ya existe en common/domain** — extender a más lugares (facturas, LCV)
-- `TenantSlug` (tenants; validación kebab-case)
+- ✅ ~~`TenantSlug`~~ — extraído 2026-04-25 en §3.2.c (vive en `tenants/domain/`).
 - ✅ ~~`ImpersonationWindow`~~ — extraído 2026-04-24 en §3.2.d.
 
 ### 3.2 Módulos Fase 0 restantes
@@ -312,11 +312,54 @@ memberships (bidireccional). Repo port pre-existente (ya desde
   `abstract class` — consistencia con el resto del proyecto.
   Cambio mecánico, sin impacto. Postponed.
 
-#### 3.2.c tenants
+#### 3.2.c tenants — ✅ CERRADA 2026-04-25
 
-D+ → A. Desde cero: `domain/`, `ports/`, `adapters/`. VO `TenantSlug`
-(§3.1). Probablemente el más grande del grupo. Menos crítico
-cross-module.
+Entregada en 5 commits atómicos sobre `main` (`e8a08f4..7975d56`).
+D+ → A.
+
+- ✅ `feat(tenants): add domain VOs and errors` — VOs `OrganizationId`
+  (UUID) y `TenantSlug` (kebab-case 1..100, derivable desde name con
+  `fromName()` y NFKD para preservar diacríticos). Jerarquía de domain
+  errors con codes `TENANT_*` estables: `TenantNoEncontradoError` (404),
+  `TenantSlugDuplicadoError` (409), `TipoEmpresaInmutableError` (409,
+  code `TENANT_EMPRESA_INMUTABLE` preservado del impl previo),
+  `OrganizationIdInvalidoError` (400), `TenantSlugInvalidoError` (400).
+  45 unit tests de dominio.
+- ✅ `feat(tenants): add TENANT_REPOSITORY_PORT and Prisma adapter` —
+  abstract class con superficie mínima (create con nested write
+  atómico, findById, findBySlug, existsBySlug, update con patch parcial,
+  findFeatures con proyección, updateFeatures con patch parcial).
+  Integration spec con 13 tests cubre nested write, UNIQUE constraint
+  en slug, patch parcial y proyección.
+- ✅ `feat(memberships): extend MEMBERSHIPS_READER_PORT with findAllByTenant`
+  — nuevo shape `MembershipDeTenantParaAdmin` (id, userId, systemRole,
+  customRoleId, deactivatedAt, createdAt, user{id,email,displayName},
+  customRole{id,slug,name}|null) para que `tenants.getMembers` consuma
+  el reader en lugar de tocar `prisma.membership.findMany` directo.
+  Integration spec dedicada (5 tests): aislamiento cross-tenant, mix
+  activas/desactivadas, tenant vacío.
+- ✅ `refactor(tenants): apply domain errors and VOs in service` —
+  reemplaza HttpException crudos por domain errors. Centraliza la
+  generación del slug en `TenantSlug.fromName`.
+- ✅ `refactor(tenants): consume ports; drop PrismaService from service`
+  — última fuga cross-módulo eliminada. Unit spec del service nueva
+  (15 tests) con ports mockeados. `TenantsModule` importa
+  `MembershipsModule` y wirea `TenantRepositoryPort -> PrismaTenantRepository`.
+
+**Cambios de contrato deliberados**:
+- `POST /tenants` con slug duplicado: 400 BadRequest → 409 Conflict
+  (code `TENANT_SLUG_DUPLICADO`). Status anterior era un bug — un
+  duplicado es un conflicto de estado, no un input inválido.
+- `POST /tenants` con name sin caracteres alfanuméricos (e.g. `"!!!"`):
+  antes generaba slug vacío y la segunda vez chocaba con la UNIQUE;
+  ahora 400 con `TENANT_SLUG_INVALIDO`.
+
+`TenantsService` ya no inyecta `PrismaService`. `PrismaService` y
+`TenantContextService` siguen registrados como providers porque
+PrismaService los requiere transitivamente (patrón documentado en
+§3.2.d, fuera de scope hasta migrar a un `PrismaModule` global).
+
+874/874 unit + integration + 87/87 e2e verdes al cierre.
 
 #### 3.2.d impersonation — ✅ CERRADA 2026-04-24
 
@@ -441,10 +484,11 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-24 (§1.1 + §1.2 + §2.1 A/B + §2.1
-remanente + §2.2 + §3.2.a + §3.2.b + §3.2.d cerradas; CERO fugas
-cross-módulo documentadas activas. Deuda viva: §3.2.c tenants,
-§3.3 super-admin).
+**Última revisión**: 2026-04-25 (§1.1 + §1.2 + §2.1 A/B + §2.1
+remanente + §2.2 + §3.2.a + §3.2.b + §3.2.c + §3.2.d cerradas;
+CERO fugas cross-módulo documentadas activas, CERO módulos Fase 0
+sin hexagonalizar. Deuda viva: §3.3 super-admin global, §3.1 VOs
+oportunísticos (Email, Password, Token, Nit en más lugares)).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
