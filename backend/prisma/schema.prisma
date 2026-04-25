@@ -171,6 +171,9 @@ model Organization {
   periodosFiscales    PeriodoFiscal[]
   comprobantes        Comprobante[]
   contactos           Contacto[]
+  tiposDocumentoFisico          TipoDocumentoFisico[]
+  documentosFisicos             DocumentoFisico[]
+  comprobantesDocumentosFisicos ComprobanteDocumentoFisico[]
 
   @@map("organizations")
 }
@@ -737,6 +740,7 @@ model Comprobante {
   // Back-ref 1:1 (gracias a @unique([anulaAId])): si este comprobante está
   // ANULADO, su reversión es el único Comprobante cuyo anulaAId = this.id.
   reversion      Comprobante?           @relation("ComprobanteReversion")
+  documentosFisicosAsociados ComprobanteDocumentoFisico[]
 
   // Unicidad del número por (tenant, tipo). numero es NULL en BORRADOR y
   // Postgres permite múltiples NULL en un UNIQUE, así que no colisiona.
@@ -870,10 +874,155 @@ model Contacto {
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lineasComprobante LineaComprobante[]
+  documentosFisicos DocumentoFisico[]
 
   @@index([organizationId])
   @@index([organizationId, activo])
   @@index([organizationId, esCliente])
   @@index([organizationId, esProveedor])
   @@map("contactos")
+}
+
+// ============================================================
+// Documentos físicos (Fase 1.4 slice 2)
+// Ver openspec/changes/documento-fisico/{proposal,spec,design}.md
+// ============================================================
+
+// Tipo de documento físico: catálogo per-tenant del papel que respalda
+// asientos contables. Seed universal de 8 tipos al crear la organización;
+// editable y desactivable. NO eliminable si tiene documentos asociados
+// (FK Restrict desde DocumentoFisico).
+model TipoDocumentoFisico {
+  id             String  @id @default(uuid())
+  organizationId String
+
+  // 1..100 chars, no vacío. Mostrado en UI al contador.
+  nombre         String
+  // 1..20 chars, kebab-case alfanumérico. Estable, único per-tenant.
+  // Ancla del seed (idempotencia vía upsert por (organizationId, codigo)).
+  codigo         String
+
+  // Distingue documentos tributarios (factura, NC, ND) de no-tributarios
+  // (recibo, vale, comprobante interno). Anticipa el slice 3: cuando
+  // esTributario=true, exigirá Factura adjunta antes de asociar al
+  // Comprobante CONTABILIZADO.
+  esTributario   Boolean @default(false)
+
+  // Soft-toggle de visibilidad. NO es soft-delete (CLAUDE.md §4.7) — este
+  // modelo es catálogo, no documento contable.
+  activo         Boolean @default(true)
+
+  // Lista explícita de tipos de comprobante con los que este tipo de
+  // documento puede asociarse (proposal D11). Lista vacía = ningún tipo
+  // aplica (no wildcard). El service valida al asociar.
+  tiposComprobanteAplicables TipoComprobante[]
+
+  createdAt       DateTime @default(now())
+  // Nullable porque el seed corre sin user context (lo crea el sistema).
+  createdByUserId String?
+  updatedAt       DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documentos   DocumentoFisico[]
+
+  @@unique([organizationId, codigo])
+  @@index([organizationId, activo])
+  @@map("tipos_documento_fisico")
+}
+
+// DocumentoFisico = el papel que respalda asientos contables.
+// Cardinalidad N:M con Comprobante vía ComprobanteDocumentoFisico.
+// Inmutable cuando está asociado a un comprobante CONTABILIZADO
+// (proposal D5). Eliminable solo si nunca tuvo asociaciones.
+model DocumentoFisico {
+  id             String  @id @default(uuid())
+  organizationId String
+
+  tipoDocumentoFisicoId String
+
+  // Número impreso. Normalizado en VO NumeroDocumento: trim + uppercase.
+  // Regex: ^[A-Z0-9./-]+$, longitud 1..50. Proposal D3: 0042 ≠ 42.
+  numero         String
+
+  // FechaContable: calendario puro, sin UTC, sin hora (CLAUDE.md §4.6).
+  fechaEmision   DateTime @db.Date
+
+  // Monto/moneda nullable por proposal D4: obligatorios solo si
+  // tipo.esTributario=true. Para no-tributarios DEBE ser NULL — el monto
+  // vive en el Comprobante. Validación condicional en service.
+  monto          Decimal? @db.Decimal(18, 2)
+  moneda         Moneda?
+
+  // Glosa libre opcional, hasta 500 chars (validado en DTO).
+  glosa          String?
+
+  // Contacto opcional. Si esTributario=true (slice 3) será obligatorio
+  // a través de Factura; en este slice se mantiene opcional para que
+  // recibos sin contacto puedan registrarse.
+  contactoId     String?
+
+  createdAt       DateTime @default(now())
+  createdByUserId String
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Restrict: no se puede eliminar un TipoDocumentoFisico si tiene
+  // documentos asociados (deuda histórica protegida).
+  tipoDocumento TipoDocumentoFisico          @relation(fields: [tipoDocumentoFisicoId], references: [id], onDelete: Restrict)
+  contacto      Contacto?                    @relation(fields: [contactoId], references: [id], onDelete: Restrict)
+  asociaciones  ComprobanteDocumentoFisico[]
+
+  // Defense in depth (CLAUDE.md §4.8): UNIQUE en BD + check en service.
+  @@unique([organizationId, tipoDocumentoFisicoId, numero])
+
+  @@index([organizationId, fechaEmision])
+  @@index([organizationId, contactoId])
+  @@index([organizationId, tipoDocumentoFisicoId])
+  @@map("documentos_fisicos")
+}
+
+// Asociación N:M entre Comprobante y DocumentoFisico, a NIVEL CABECERA
+// (proposal D8). organizationId denormalizado para queries y validaciones
+// sin JOIN, consistente con LineaComprobante.
+//
+// Cardinalidad efectiva (proposal D2):
+//   - Un Comprobante puede asociar 0..N DocumentosFisicos.
+//   - Un DocumentoFisico puede aparecer en N comprobantes BORRADOR, pero
+//     a lo sumo 1 comprobante CONTABILIZADO simultáneo.
+//
+// El segundo invariante se enforza con un UNIQUE PARCIAL raw SQL (Postgres
+// `WHERE`) en la migration, porque Prisma no expresa unique parciales
+// nativos. Nombre estable: comprobante_documento_fisico_unique_contabilizado.
+model ComprobanteDocumentoFisico {
+  id             String   @id @default(uuid())
+  organizationId String
+
+  comprobanteId     String
+  documentoFisicoId String
+
+  // Cache denormalizado del estado del Comprobante en el momento de la
+  // asociación. Actualizado por ComprobantesService en la misma TX que
+  // cambia el estado del Comprobante. Necesario para que el UNIQUE PARCIAL
+  // (WHERE comprobanteEstado = 'CONTABILIZADO') funcione sin JOIN en el
+  // índice. Riesgo R1 documentado en design.md.
+  comprobanteEstado EstadoComprobante
+
+  createdAt DateTime @default(now())
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // CASCADE desde Comprobante: si el comprobante se elimina (BORRADOR
+  // descartado), las asociaciones se borran. Los DocumentosFisicos
+  // sobreviven.
+  comprobante     Comprobante      @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  // Restrict desde DocumentoFisico: un documento físico con asociaciones
+  // no se puede eliminar (queda como histórico, proposal D5).
+  documentoFisico DocumentoFisico  @relation(fields: [documentoFisicoId], references: [id], onDelete: Restrict)
+
+  // No se duplica una asociación específica.
+  @@unique([documentoFisicoId, comprobanteId])
+
+  @@index([organizationId])
+  @@index([comprobanteId])
+  @@index([documentoFisicoId])
+  @@map("comprobante_documento_fisico")
 }
