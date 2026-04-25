@@ -12,6 +12,8 @@
 //   (incluye `deactivatedAt` y `userIsActive` que los otros métodos filtran)
 //   para distinguir "no es miembro" de "miembro desactivado" y emitir el
 //   error específico al caller.
+// - tenants: `findAllByTenant` — listado para la UI de admin del tenant
+//   (incluye datos públicos del user y del custom role).
 //
 // No expone `permissions` ni el objeto `Organization` completo — los métodos
 // devuelven DTOs proyectados al shape exacto del consumer.
@@ -48,6 +50,24 @@ export interface MembershipParaImpersonation {
   customRoleSlug: string | null;
   userEmail: string;
   userIsActive: boolean;
+}
+
+/**
+ * Shape de membership para el listado de admin del tenant. Incluye los
+ * datos públicos del user y del custom role que la UI necesita para
+ * renderizar la fila (email, displayName, nombre del rol). Trae todas
+ * las memberships del tenant — activas y desactivadas — para que el
+ * admin pueda re-activarlas.
+ */
+export interface MembershipDeTenantParaAdmin {
+  id: string;
+  userId: string;
+  systemRole: string | null;
+  customRoleId: string | null;
+  deactivatedAt: Date | null;
+  createdAt: Date;
+  user: { id: string; email: string; displayName: string | null };
+  customRole: { id: string; slug: string; name: string } | null;
 }
 
 export abstract class MembershipsReaderPort {
@@ -87,4 +107,13 @@ export abstract class MembershipsReaderPort {
     userId: string,
     tenantId: string,
   ): Promise<MembershipParaImpersonation | null>;
+
+  /**
+   * Lista las memberships del tenant para la UI de admin (usado por
+   * `tenants.getMembers`). Incluye activas Y desactivadas — el admin
+   * necesita ver toda la historia para re-activar o auditar.
+   */
+  abstract findAllByTenant(
+    tenantId: string,
+  ): Promise<MembershipDeTenantParaAdmin[]>;
 }

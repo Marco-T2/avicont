@@ -6,6 +6,7 @@ import type {
   MembershipActivaConOrganizacion,
   MembershipActivaDeTenantParaAuth,
   MembershipActivaParaAuth,
+  MembershipDeTenantParaAdmin,
   MembershipParaImpersonation,
   MembershipsReaderPort,
 } from '../ports/memberships-reader.port';
@@ -94,5 +95,33 @@ export class MembershipsReaderAdapter implements MembershipsReaderPort {
       userEmail: row.user.email,
       userIsActive: row.user.isActive,
     };
+  }
+
+  async findAllByTenant(
+    tenantId: string,
+  ): Promise<MembershipDeTenantParaAdmin[]> {
+    const rows = await this.prisma.membership.findMany({
+      where: { organizationId: tenantId },
+      select: {
+        id: true,
+        userId: true,
+        systemRole: true,
+        customRoleId: true,
+        deactivatedAt: true,
+        createdAt: true,
+        user: { select: { id: true, email: true, displayName: true } },
+        customRole: { select: { id: true, slug: true, name: true } },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      systemRole: r.systemRole,
+      customRoleId: r.customRoleId,
+      deactivatedAt: r.deactivatedAt,
+      createdAt: r.createdAt,
+      user: r.user,
+      customRole: r.customRole,
+    }));
   }
 }

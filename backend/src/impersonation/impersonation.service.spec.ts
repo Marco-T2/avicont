@@ -57,6 +57,7 @@ describe('ImpersonationService (unit)', () => {
       findActivaByUserAndTenant: jest.fn(),
       findActivasConOrganizacionByUserId: jest.fn(),
       findForImpersonation: jest.fn(),
+      findAllByTenant: jest.fn(),
     } as unknown as MembershipsMock;
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
 

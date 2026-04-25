@@ -47,6 +47,7 @@ describe('AuthService (unit)', () => {
       findActivaByUserAndTenant: jest.fn(),
       findActivasConOrganizacionByUserId: jest.fn().mockResolvedValue([]),
       findForImpersonation: jest.fn(),
+      findAllByTenant: jest.fn().mockResolvedValue([]),
     };
     usersReader = { findByEmail: jest.fn(), findMinimalByEmail: jest.fn() };
     usersWriter = { create: jest.fn() };
