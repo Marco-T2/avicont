@@ -987,6 +987,42 @@ npm run format                       # prettier sobre src/ y test/
 
 Para agregar observabilidad al dev, desde la raíz: `docker compose up -d` (todo el stack), entrar a Grafana http://localhost:3001.
 
+### 11.6 Protocolo: revisar migrations regeneradas (DROP de objetos raw SQL)
+
+Algunos objetos Postgres no se expresan en `schema.prisma` y viven como raw
+SQL al final de su migration original (extensiones, índices GIN trigram,
+índices y uniques parciales con `WHERE`, CHECK constraints multi-columna).
+Cada vez que se regenera una migration, Prisma los detecta como **drift** y
+mete un `DROP EXTENSION` o `DROP INDEX` al inicio del `migration.sql` nuevo.
+Si se aplica tal cual, se rompen invariantes de la BD.
+
+Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
+
+**Protocolo obligatorio antes de aplicar una migration regenerada:**
+
+1. Abrir `prisma/migrations/<timestamp>_<nombre>/migration.sql` recién generado.
+2. `grep -E "^DROP (INDEX|EXTENSION|TYPE)" migration.sql`.
+3. Para cada match, verificar si el objeto está en la lista de objetos raw SQL legítimos (abajo). Si lo está, **borrar la línea `DROP …`** y dejar un comentario corto explicando por qué (referenciar la migration de origen).
+4. Si el match es legítimo (un objeto que de verdad debe borrarse), dejarlo.
+5. Aplicar con `DATABASE_URL=... npx prisma migrate dev` (o `migrate deploy` si la migration ya fue editada y solo querés aplicar pending sin re-detección de drift).
+6. Verificar post-apply que los objetos siguen presentes:
+   `docker compose exec postgres psql -U postgres -d saas -c "\d <tabla>"`
+   o
+   `SELECT indexname FROM pg_indexes WHERE tablename = '<tabla>' ORDER BY indexname;`.
+
+**Lista de objetos raw SQL vivos (al 2026-04-25):**
+
+| Objeto | Tipo | Migration de origen |
+|--------|------|---------------------|
+| `pg_trgm` | EXTENSION | `20260424020927_fase_1_4_contactos` |
+| `contactos_razonSocial_trgm_idx` | INDEX (GIN trigram) | `20260424020927_fase_1_4_contactos` |
+| `contactos_nombreComercial_trgm_idx` | INDEX (GIN trigram) | `20260424020927_fase_1_4_contactos` |
+| `contactos_organizationId_documento_partial_key` | UNIQUE PARCIAL `WHERE documento IS NOT NULL` | `20260424020927_fase_1_4_contactos` |
+| CHECK `("esCliente" = true OR "esProveedor" = true)` en `contactos` | CHECK constraint | `20260424020927_fase_1_4_contactos` |
+| `comprobante_documento_fisico_unique_contabilizado` | UNIQUE PARCIAL `WHERE comprobanteEstado = 'CONTABILIZADO'` | `20260425163325_add_documento_fisico_and_tipo_and_asociacion` |
+
+Mantener esta tabla actualizada cuando se agregue un objeto nuevo en raw SQL.
+
 ---
 
 ## 12. Docs extendidos — cuándo cargar cuál

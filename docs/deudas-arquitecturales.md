@@ -432,6 +432,14 @@ por onboarding, o compliance):
 Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
 - `sistema.feature-flags.admin`
 
+### 3.4 A8 — Drift de extensions Postgres no declaradas en `schema.prisma`
+
+- **Problema**: `pg_trgm` + índices GIN trigram (módulo `contactos`), índices/uniques parciales con `WHERE` y CHECK constraints multi-columna viven como raw SQL al final de su migration de origen porque Prisma no los expresa nativamente. Cada vez que se regenera una migration nueva, Prisma los detecta como drift y mete `DROP INDEX`/`DROP EXTENSION` al inicio del `migration.sql` regenerado. Si se aplica tal cual, se destruyen los objetos. Detectado al regenerar la migration de `documento-fisico` (Fase 1.4 slice 2) — los DROP fueron eliminados manualmente del SQL antes de aplicar.
+- **Fix parcial**: activar `previewFeatures = ["postgresqlExtensions"]` en el `generator client` y declarar `extensions = [pgTrgm]` en `datasource db`. Resuelve el drift de la extensión; los índices GIN trigram, parciales y CHECK seguirán como raw SQL drift porque siguen sin ser expresables en schema.
+- **Fix completo**: el protocolo manual del runbook (CLAUDE.md §11.6) — buscar `DROP INDEX`/`DROP EXTENSION`/`DROP TYPE` en cada migration regenerada y verificar contra la lista de objetos raw SQL vivos antes de aplicar. Es un workaround organizacional, no técnico — exige disciplina del agente o dev.
+- **Trigger para revisar**: próxima edición de `schema.prisma` que regenere migration. La deuda no se cierra sola: requiere accionar el fix parcial o aceptar el protocolo manual indefinidamente.
+- **Esfuerzo**: 30 min para activar el preview feature + agregar `pgTrgm` al datasource + verificar que la próxima migration regenerada no tire `DROP EXTENSION pg_trgm`. El protocolo manual ya quedó documentado en CLAUDE.md §11.6.
+
 ---
 
 ## 4. Explícitamente fuera de scope
@@ -488,7 +496,8 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 remanente + §2.2 + §3.2.a + §3.2.b + §3.2.c + §3.2.d cerradas;
 CERO fugas cross-módulo documentadas activas, CERO módulos Fase 0
 sin hexagonalizar. Deuda viva: §3.3 super-admin global, §3.1 VOs
-oportunísticos (Email, Password, Token, Nit en más lugares)).
+oportunísticos (Email, Password, Token, Nit en más lugares),
+§3.4 (A8) drift de extensions Postgres no declaradas).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
