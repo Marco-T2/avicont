@@ -1,0 +1,108 @@
+schema: spec-driven
+
+project: avicont
+language_for_artifacts: spanish
+
+context: |
+  SaaS contable boliviano multi-tenant (NestJS 11 + Prisma + Postgres,
+  Vite + React 19 + TanStack Query). Hexagonal estricto: cada módulo
+  tiene domain/, ports/, adapters/. Multi-tenant flat — cada Organization
+  es una isla; defense-in-depth multi-tenant en guard + service + repo.
+  Idioma: dominio en español (entidades, enums, errores, glosa, NIT,
+  asiento), framework en inglés (Service, Controller, Repository, Dto).
+  Decimales: BOB/USD (18,2), UFV (14,5), TC (14,8), %, cantidades (18,6).
+  FechaContable es value object calendario puro (no UTC, no hora) para
+  comprobantes/facturas; timestamptz UTC sólo para auditoría.
+
+strict_tdd: true
+
+testing:
+  test_runner:
+    framework: jest
+    version: "^30.2.0"
+    command: "npm test"
+    integration_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas npx jest src/"
+    e2e_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh npx jest test/ --runInBand --forceExit"
+  layers:
+    unit:
+      available: true
+      pattern: "*.spec.ts"
+      tool: jest+ts-jest
+    integration:
+      available: true
+      pattern: "*.integration.spec.ts"
+      tool: jest+ts-jest+postgres-real (docker compose, no testcontainers)
+    e2e:
+      available: true
+      pattern: "test/*.e2e-spec.ts"
+      tool: supertest+nestjs-app
+  coverage:
+    available: true
+    command: "npx jest --coverage"
+    targets:
+      global: 80
+      domain_contable: 95
+  quality:
+    linter:
+      tool: eslint@9
+      command: "npm run lint"
+    type_checker:
+      tool: tsc@5.9
+      command: "npx tsc --noEmit -p tsconfig.json"
+    formatter:
+      tool: prettier@3
+      command: "npm run format"
+
+conventions:
+  commit_style: conventional-commits-en
+  scope_per_module: true
+  no_co_authored_by: true
+  no_amend_default: true
+  branch_strategy: github-flow
+  merge_policy: squash-only
+  comments:
+    rule: por-que-no-obvio
+    regulatory: mandatory  # toda regla SIN/Ley 843/RND requiere comentario con la norma
+  imports:
+    alias_root: "@/"
+    no_relative_above_one_level: true
+    no_cross_module_concrete: true  # cross-module siempre via port o evento
+
+rules:
+  proposal:
+    - Identificar módulos afectados y deudas bidireccionales que abrirá.
+    - Listar invariantes del core (CLAUDE.md §4) que el cambio debe respetar.
+    - Plan de rollback explícito si toca schema o dominio contable.
+  specs:
+    - Given/When/Then en escenarios.
+    - RFC 2119 (DEBE/DEBERÁ/PUEDE) en requirements.
+    - Requisitos en español; codes de error TENANT_*, COMPROBANTE_*, etc.
+  design:
+    - Siempre proponer hexagonal: domain/ → ports/ → adapters/.
+    - Diagramas de secuencia para flujos cross-módulo.
+    - Decisiones de schema con nota de migration plan.
+    - Cross-module: siempre via port owner-owned, nunca import concreto.
+  tasks:
+    - Agrupar por commit atómico (1 commit = 1 task entrega).
+    - Numeración jerárquica 1.1, 1.2.
+    - Cada task termina con verde de typecheck + suite del subsistema.
+  apply:
+    - Verde entre cada commit (regla #1 doc deudas).
+    - Commits atómicos (no mezclar refactor de 2 módulos).
+    - DTOs como objetos planos; entidades de dominio en español; ports como abstract class.
+  verify:
+    - Correr tests del subsistema afectado + suite e2e completa.
+    - Validar invariantes contables del core para cualquier cambio en domain/ contable.
+    - Chequear cero `any`, cero query sin tenantId, cero `new Date()` en domain.
+  archive:
+    - Actualizar docs/deudas-arquitecturales.md si el change cierra deuda.
+    - Avisar antes de borrar docs/disenos/ existentes.
+
+paths:
+  backend_root: backend/
+  src_root: backend/src/
+  prisma_schema: backend/prisma/schema.prisma
+  e2e_root: backend/test/
+  docs_disenos: docs/disenos/
+  docs_extended: docs/claude/
+  deudas_doc: docs/deudas-arquitecturales.md
