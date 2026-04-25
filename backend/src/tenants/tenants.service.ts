@@ -1,6 +1,5 @@
-import { Injectable, BadRequestException, Inject, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { SystemRole } from '@prisma/client';
-import { ConflictError } from '../common/errors';
 import { PrismaService } from '../common/prisma.service';
 import { RedisService } from '../cache/redis.service';
 import {
@@ -10,6 +9,12 @@ import {
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
+import { TenantSlug } from './domain/tenant-slug';
+import {
+  TenantNoEncontradoError,
+  TenantSlugDuplicadoError,
+  TipoEmpresaInmutableError,
+} from './domain/tenant-errors';
 
 @Injectable()
 export class TenantsService {
@@ -23,10 +28,10 @@ export class TenantsService {
   ) {}
 
   async create(dto: CreateTenantDto, ownerId: string) {
-    const slug = this.generateSlug(dto.name);
+    const slug = TenantSlug.fromName(dto.name).toString();
     const existing = await this.prisma.organization.findUnique({ where: { slug } });
     if (existing) {
-      throw new BadRequestException('Tenant slug already exists');
+      throw new TenantSlugDuplicadoError(slug);
     }
 
     return this.prisma.organization.create({
@@ -44,7 +49,7 @@ export class TenantsService {
   async findById(id: string) {
     const tenant = await this.prisma.organization.findUnique({ where: { id } });
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new TenantNoEncontradoError({ id });
     }
     return tenant;
   }
@@ -52,7 +57,7 @@ export class TenantsService {
   async findBySlug(slug: string) {
     const tenant = await this.prisma.organization.findUnique({ where: { slug } });
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new TenantNoEncontradoError({ slug });
     }
     return tenant;
   }
@@ -62,11 +67,7 @@ export class TenantsService {
       const tieneGestion = await this.gestionesReader.existeAlgunaGestion(id);
       if (tieneGestion) {
         // Ver docs/disenos/gestiones-periodos-fiscales-v3.md §2.1
-        throw new ConflictError(
-          'TENANT_EMPRESA_INMUTABLE',
-          'El tipo de empresa no se puede cambiar porque ya existe una gestión fiscal. Elimine o cierre las gestiones primero.',
-          { tenantId: id },
-        );
+        throw new TipoEmpresaInmutableError(id);
       }
     }
     return this.prisma.organization.update({
@@ -94,7 +95,7 @@ export class TenantsService {
       where: { id: tenantId },
       select: { contabilidadEnabled: true, granjaEnabled: true },
     });
-    if (!org) throw new NotFoundException('Tenant not found');
+    if (!org) throw new TenantNoEncontradoError({ id: tenantId });
     return org;
   }
 
@@ -118,12 +119,5 @@ export class TenantsService {
     }
 
     return updated;
-  }
-
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
   }
 }
