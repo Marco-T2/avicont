@@ -163,7 +163,7 @@ Superficie mínima por port; `abstract class` + `Symbol` por convención.
 
 ---
 
-### 3.2 ☐ `feat(documentos-fisicos): add repository and cross-module ports`
+### 3.2 ☑ `feat(documentos-fisicos): add repository and cross-module ports`
 
 **Entrega**: contratos del módulo `documentos-fisicos` — repo interno,
 repo de asociación y reader cross-module.
@@ -197,7 +197,7 @@ repo de asociación y reader cross-module.
 
 ## Fase 4 — Adapters Prisma + integration specs
 
-### 4.1 ☐ `feat(tipos-documento-fisico): add PrismaTipoDocumentoFisicoRepository + integration spec`
+### 4.1 ☑ `feat(tipos-documento-fisico): add PrismaTipoDocumentoFisicoRepository + integration spec`
 
 **Entrega**: implementación del `TipoDocumentoFisicoRepositoryPort` contra Postgres real.
 
