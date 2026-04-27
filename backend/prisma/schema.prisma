@@ -926,6 +926,7 @@ model TipoDocumentoFisico {
   documentos   DocumentoFisico[]
 
   @@unique([organizationId, codigo])
+  @@unique([organizationId, nombre])
   @@index([organizationId, activo])
   @@map("tipos_documento_fisico")
 }
