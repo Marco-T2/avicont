@@ -45,10 +45,6 @@ function cuentaFactory(overrides: Partial<Cuenta> = {}): Cuenta {
     id: 'cuenta-1',
     organizationId: TENANT_ID,
     codigoInterno: '1.1.1.001',
-    // Columnas PUCT del schema (se dropean en el commit del drop de schema).
-    codigoPuct: null,
-    nombrePuctSnapshot: null,
-    versionPuctMapeado: null,
     nombre: 'CAJA',
     descripcion: null,
     claseCuenta: ClaseCuenta.ACTIVO,

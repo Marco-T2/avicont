@@ -55,13 +55,8 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
   }
 
-  it('crea 61 cuentas hoja (esDetalle=true) más su jerarquía sin leer CatalogoPuct', async () => {
-    const spy = jest.spyOn(prisma.catalogoPuct, 'findMany');
-
+  it('crea 61 cuentas hoja (esDetalle=true) más su jerarquía de forma autocontenida', async () => {
     const stats = await sembrarPlanCuentasComercial(prisma, organizationId);
-
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
 
     const hojas = await prisma.cuenta.count({
       where: { organizationId, esDetalle: true },

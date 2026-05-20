@@ -76,7 +76,6 @@ export async function cleanupTestData() {
   await prisma.contacto.deleteMany({});
   // Plan de cuentas: OrgConfiguracionContable tiene FKs Restrict hacia Cuenta,
   // así que los borramos en orden explícito antes de tocar Organization.
-  // CatalogoPuct NO se borra — es catálogo compartido read-only entre tests.
   await prisma.orgConfiguracionContable.deleteMany({});
   await prisma.cuenta.deleteMany({});
   // Gestiones + períodos fiscales (Fase 1.2). Orden importa por las FKs.
@@ -85,17 +84,6 @@ export async function cleanupTestData() {
   await prisma.gestionFiscal.deleteMany({});
   await prisma.organization.deleteMany({});
   await prisma.user.deleteMany({});
-}
-
-// Asegura que CatalogoPuct esté sembrado. Se llama en beforeAll de cada suite
-// E2E que lo necesite. Si el catálogo ya tiene filas, no hace nada (idempotente,
-// ~50ms). Si está vacío, corre el parser y siembra 538 registros (~3-5s, solo
-// la primera vez en el entorno local).
-export async function ensurePuctSeeded(): Promise<void> {
-  const count = await prisma.catalogoPuct.count();
-  if (count > 0) return;
-  const { sembrarCatalogoPuct } = await import('../../prisma/seeds/prod/puct/catalogo-puct.seed');
-  await sembrarCatalogoPuct(prisma);
 }
 
 export { prisma };

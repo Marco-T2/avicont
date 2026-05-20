@@ -75,7 +75,7 @@
 
 > Migración destructiva nueva (design Decisión 4). NO editar `20260423023544_add_plan_cuentas_y_catalogo_puct`. Borrar seed PUCT + `ensurePuctSeeded()` en el mismo commit.
 
-### 3.1 ☐ Drop schema PUCT + migración + borrar seed/parser/helper
+### 3.1 ☑ Drop schema PUCT + migración + borrar seed/parser/helper
 
 **Entrega**: tabla `catalogo_puct`, 3 columnas de `Cuenta` e índice eliminados; carpeta `prisma/seeds/prod/puct/` borrada; E2E sin `ensurePuctSeeded`.
 

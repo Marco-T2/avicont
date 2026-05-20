@@ -9,7 +9,6 @@ import {
   cleanupTestData,
   createTestTenant,
   createTestUserWithTenant,
-  ensurePuctSeeded,
   prisma,
 } from './helpers/test-factory';
 
@@ -17,7 +16,6 @@ describe('Cuentas (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    await ensurePuctSeeded();
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
