@@ -16,6 +16,10 @@ FROM node:24-alpine AS runner
 
 WORKDIR /app
 
+# Zona horaria fija en UTC: todo timestamp se persiste en UTC; la conversión a
+# America/La_Paz es responsabilidad de la capa de presentación (CLAUDE.md §4.6).
+ENV TZ=UTC
+
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
