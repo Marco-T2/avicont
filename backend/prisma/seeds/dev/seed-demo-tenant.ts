@@ -86,7 +86,7 @@ async function seedDemoTenant(prisma: PrismaClient): Promise<void> {
   const config = await poblarConfiguracionContableRequerida(
     prisma,
     org.id,
-    stats.porCodigoPuct,
+    stats.porCodigoInterno,
   );
   const mapeados = [
     config.ivaCreditoId,

@@ -182,7 +182,7 @@ describe('ConfiguracionContable (e2e)', () => {
     const { accessToken, tenantId } = await setupTenant();
 
     const stats = await sembrarPlanCuentasComercial(prisma, tenantId);
-    await poblarConfiguracionContableRequerida(prisma, tenantId, stats.porCodigoPuct);
+    await poblarConfiguracionContableRequerida(prisma, tenantId, stats.porCodigoInterno);
 
     const del = await request(app.getHttpServer())
       .delete('/api/configuracion-contable/ivaDebitoId')
