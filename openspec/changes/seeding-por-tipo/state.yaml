@@ -3,8 +3,8 @@ project: avicont
 created: "2026-05-20"
 updated: "2026-05-20"
 
-phase: tasks
-status: ready_for_apply
+phase: apply
+status: apply_completo_opcion1_pendiente_verify_archive
 
 artifact_store: openspec
 
@@ -14,9 +14,9 @@ phases_completed:
   - spec
   - design
   - tasks
+  - apply
 
 phases_pending:
-  - apply
   - verify
   - archive
 
@@ -26,19 +26,18 @@ artifacts:
   design: openspec/changes/seeding-por-tipo/design.md
   tasks: openspec/changes/seeding-por-tipo/tasks.md
 
-apply_progress: ~
+apply_progress: completo (Opción 1)
 
 notes: |
+  Apply completado con Opción 1 (confirmada 2026-05-20): el alta CONTABILIDAD
+  siembra SOLO el plan de cuentas (PlanCuentasSeederPort). El seeder de
+  tipos-documento-fisico queda diferido a documento-fisico task 9.1, que
+  enchufará en el slot del switch (case CONTABILIDAD en tenants.service.ts)
+  cuando el adapter PrismaTiposDocumentoFisicoSeederAdapter esté disponible.
+
   Sin migration de schema (design D1): flags contabilidadEnabled/granjaEnabled
-  ya existen en Organization. Solo cambia DTO, service, port, adapter y firma de
-  comercial.ts. Task 9.1 de documento-fisico ABSORBIDA por este change (ver
-  tasks Fase 0.1).
+  ya existían en Organization. Se modificaron: DTO, service, port, adapter y
+  firma de comercial.ts. Task 0.1 (absorción documental de documento-fisico 9.1)
+  permanece diferida junto con el wiring del TipoDocumentoFisicoSeederPort.
 
-  Prerequisito bloqueante: Fase 1.1 (fix firma comercial.ts) debe completarse
-  ANTES de cualquier otra fase.
-
-  TipoDocumentoFisicoSeederPort ya existe en
-  backend/src/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port.ts
-  (declarado en documento-fisico task 3.1). El adapter PrismaTiposDocumentoFisicoSeederAdapter
-  (task 4.2 de documento-fisico) puede NO existir aún — verificar antes de apply
-  y crear si falta.
+  Prerequisito R1 (fix firma comercial.ts) completado en Fase 1.1.

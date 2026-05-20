@@ -59,7 +59,7 @@ Fase 10 (verde final)
 > switch para que `documento-fisico` task 9.1 enchufe su seeder cuando esté listo.
 > La task 0.1 a continuación NO se ejecuta en Batch 1; permanece pendiente.
 
-### 0.1 - [ ] `chore(docs): mark documento-fisico task 9.1 as absorbed by seeding-por-tipo`
+### 0.1 - [ ] (DIFERIDO Opción 1 → documento-fisico 9.1) `chore(docs): mark documento-fisico task 9.1 as absorbed by seeding-por-tipo`
 
 **Entrega**: coordinar la absorción antes de tocar código, para evitar
 doble wiring del `TipoDocumentoFisicoSeederPort` entre los dos changes.
@@ -93,7 +93,7 @@ de "absorbida por otro change").
 
 ## Fase 1 — Fix R1: ampliar firma de `comercial.ts` (prerequisito de todo)
 
-### 1.1 - [ ] `refactor(db): accept PrismaClient | TransactionClient in plan-cuentas seed functions`
+### 1.1 - [x] `refactor(db): accept PrismaClient | TransactionClient in plan-cuentas seed functions`
 
 **Entrega**: ampliar el tipo del parámetro `prisma` de las dos funciones de
 `comercial.ts` a la unión `PrismaClient | Prisma.TransactionClient`. Sin
@@ -122,7 +122,7 @@ npx tsc --noEmit -p tsconfig.json
 
 ## Fase 2 — Port `PlanCuentasSeederPort` en módulo `cuentas`
 
-### 2.1 - [ ] `feat(cuentas): add PlanCuentasSeederPort`
+### 2.1 - [x] `feat(cuentas): add PlanCuentasSeederPort`
 
 **Entrega**: contrato cross-module que `tenants` consume para sembrar el
 plan de cuentas COMERCIAL + `OrgConfiguracionContable`. Abstract class +
@@ -151,7 +151,7 @@ Symbol. `tx` obligatorio (no `tx?`). JSDoc explica atomicidad e idempotencia.
 
 ## Fase 3 — Adapter `PrismaPlanCuentasSeederAdapter` + integration spec (TDD)
 
-### 3.1 - [ ] `feat(cuentas): add PrismaPlanCuentasSeederAdapter integration spec (RED)`
+### 3.1 - [x] `feat(cuentas): add PrismaPlanCuentasSeederAdapter integration spec (RED)`
 
 **Entrega**: integration spec del adapter en ROJO — escribe los tests primero,
 sin implementación. Los tests deben fallar porque el adapter no existe aún.
@@ -180,7 +180,7 @@ todos fallan con "cannot find module" o similar (ROJO esperado).
 
 ---
 
-### 3.2 - [ ] `feat(cuentas): implement PrismaPlanCuentasSeederAdapter (GREEN)`
+### 3.2 - [x] `feat(cuentas): implement PrismaPlanCuentasSeederAdapter (GREEN)`
 
 **Entrega**: implementación del adapter que encadena `sembrarPlanCuentasComercial`
 + `poblarConfiguracionContableRequerida` con el `tx` recibido. Pasar integration
@@ -218,7 +218,7 @@ REQ-MT-01, Escenarios E-PORT-03, E-IDEM-01, E-IDEM-02.
 Las dos tasks de esta fase son independientes entre sí y pueden comitearse
 en cualquier orden, pero ambas deben completarse antes de la Fase 5.
 
-### 4.1 - [ ] `feat(cuentas): provide and export PLAN_CUENTAS_SEEDER_PORT in CuentasModule`
+### 4.1 - [x] `feat(cuentas): provide and export PLAN_CUENTAS_SEEDER_PORT in CuentasModule`
 
 **Entrega**: registrar y exportar el nuevo port en el módulo dueño.
 
@@ -236,7 +236,7 @@ en cualquier orden, pero ambas deben completarse antes de la Fase 5.
 
 ---
 
-### 4.2 - [ ] `feat(tenants): add modulo field to CreateTenantDto with validation (TDD)`
+### 4.2 - [x] `feat(tenants): add modulo field to CreateTenantDto with validation (TDD)`
 
 **Entrega**: campo `modulo` requerido en `CreateTenantDto`. TDD: spec primero.
 
@@ -268,7 +268,7 @@ Escenarios E-DTO-01, E-DTO-02, E-DTO-03, E-DTO-04.
 
 ## Fase 5 — Actualizar `TenantRepositoryPort` y adapter (TDD)
 
-### 5.1 - [ ] `feat(tenants): extend TenantRepositoryPort.create with tx? and flags (TDD)`
+### 5.1 - [x] `feat(tenants): extend TenantRepositoryPort.create with tx? and flags (TDD)`
 
 **Entrega**: port y adapter del repositorio extendidos para recibir `tx?` y
 persistir los flags derivados. TDD: spec primero.
@@ -307,7 +307,7 @@ persistir los flags derivados. TDD: spec primero.
 
 ## Fase 6 — `TenantsService.create` con switch + TX + unit spec (TDD)
 
-### 6.1 - [ ] `feat(tenants): add unit spec for TenantsService.create with modulo (RED)`
+### 6.1 - [x] `feat(tenants): add unit spec for TenantsService.create with modulo (RED)`
 
 **Entrega**: spec completa de la nueva lógica del service en ROJO.
 Todos los casos de TDD deben fallar porque el service aún no implementa `modulo`.
@@ -322,18 +322,17 @@ Todos los casos de TDD deben fallar porque el service aún no implementa `modulo
 
   **Casos requeridos** (todos en ROJO):
   - `modulo=CONTABILIDAD`: invoca `PlanCuentasSeederPort.seedDefaultsForTenant` con
-    `org.id` y `tx`; invoca `TipoDocumentoFisicoSeederPort.seedDefaultsForTenant`
-    con `org.id` y `tx`; ambos después de `repo.create`.
+    `org.id` y `tx` después de `repo.create`.
+  - `modulo=CONTABILIDAD`: ~~invoca `TipoDocumentoFisicoSeederPort.seedDefaultsForTenant`~~ ⚠️ DIFERIDO (Opción 1 → documento-fisico 9.1)
   - `modulo=CONTABILIDAD`: flags derivados son `contabilidadEnabled=true, granjaEnabled=false`
     → `repo.create` es llamado con esos flags en `data`.
   - `modulo=GRANJA`: NO invoca `PlanCuentasSeederPort` (0 invocaciones);
-    NO invoca `TipoDocumentoFisicoSeederPort` (0 invocaciones);
+    ~~NO invoca `TipoDocumentoFisicoSeederPort` (0 invocaciones)~~ ⚠️ DIFERIDO (Opción 1);
     flags derivados son `granjaEnabled=true, contabilidadEnabled=false`.
-  - `modulo=OTROS`: NO invoca ningún seeder; flags `contabilidadEnabled=false,
-    granjaEnabled=false`.
+  - `modulo=OTROS`: NO invoca `PlanCuentasSeederPort`; ~~NO invoca `TipoDocumentoFisicoSeederPort`~~ ⚠️ DIFERIDO (Opción 1); flags `contabilidadEnabled=false, granjaEnabled=false`.
   - Seeder `PlanCuentasSeederPort` lanza → el error se propaga (simula rollback:
     verificar que el resultado del `create` es el error, no la org).
-  - Seeder `TipoDocumentoFisicoSeederPort` lanza → ídem.
+  - ~~Seeder `TipoDocumentoFisicoSeederPort` lanza → ídem.~~ ⚠️ DIFERIDO (Opción 1 → documento-fisico 9.1)
   - Slug duplicado pre-TX → `TenantSlugDuplicadoError` sin abrir TX (mock de
     `existsBySlug` retorna `true`).
   - `modulo=CONTABILIDAD` golden path: retorna `OrganizationConMemberships`.
@@ -344,7 +343,7 @@ Todos los casos de TDD deben fallar porque el service aún no implementa `modulo
 
 ---
 
-### 6.2 - [ ] `feat(tenants): implement TenantsService.create with modulo switch and TX (GREEN)`
+### 6.2 - [x] `feat(tenants): implement TenantsService.create with modulo switch and TX (GREEN)`
 
 **Entrega**: implementación completa de `TenantsService.create` que pasa la spec de 6.1.
 
@@ -378,7 +377,7 @@ E-PORT-01, E-PORT-02, E-ATOM-01, E-ATOM-02, E-ATOM-04 (pre-TX).
 
 ## Fase 7 — Wiring en `tenants.module`
 
-### 7.1 - [ ] `feat(tenants): wire CuentasModule and TiposDocumentoFisicoModule in TenantsModule`
+### 7.1 - [x] `feat(tenants): wire CuentasModule and TiposDocumentoFisicoModule in TenantsModule`
 
 **Entrega**: cablear los módulos dueños de los seeder ports en el módulo `tenants`
 para que la inyección de `PLAN_CUENTAS_SEEDER_PORT` y `TIPO_DOCUMENTO_FISICO_SEEDER_PORT`
@@ -411,7 +410,7 @@ El contenedor NestJS resuelve los tokens sin circular dependency error.
 
 ## Fase 8 — Integration spec de `tenants` contra Postgres real
 
-### 8.1 - [ ] `test(tenants): add integration spec for TenantsService.create with Postgres (RED)`
+### 8.1 - [x] `test(tenants): add integration spec for TenantsService.create with Postgres (RED)`
 
 **Entrega**: integration spec completa en ROJO — spec antes de que el wiring real
 esté validado end-to-end con la BD.
@@ -443,7 +442,7 @@ esté validado end-to-end con la BD.
 
 ---
 
-### 8.2 - [ ] `test(tenants): integration spec turns GREEN after full wiring`
+### 8.2 - [x] `test(tenants): integration spec turns GREEN after full wiring`
 
 **No hay código nuevo aquí** — este checkpoint verifica que la spec de 8.1
 queda verde tras completar las fases 1–7. Si algún test sigue rojo, es señal
@@ -466,7 +465,7 @@ E-CONT-02, E-MT-01, E-GRAN-01, E-OTROS-01, E-ATOM-01.
 
 ## Fase 9 — E2E `POST /tenants`
 
-### 9.1 - [ ] `test(tenants): add e2e spec for POST /tenants with modulo (RED)`
+### 9.1 - [x] `test(tenants): add e2e spec for POST /tenants with modulo (RED)`
 
 **Entrega**: suite E2E en ROJO — escribe los tests antes del deploy.
 
@@ -480,8 +479,7 @@ E-CONT-02, E-MT-01, E-GRAN-01, E-OTROS-01, E-ATOM-01.
   - **E-DTO-04**: los tres valores del enum producen 201 (3 requests, nombres distintos).
   - **E-CONT-01**: `modulo: 'CONTABILIDAD'` → 201 + `contabilidadEnabled: true` +
     `granjaEnabled: false` en respuesta; GET cuentas devuelve exactamente 111.
-  - **E-CONT-04**: los 8 `TipoDocumentoFisico` sembrados tienen los codes correctos
-    (`factura-emitida`, `factura-recibida`, `nota-credito-emitida`, etc.).
+  - ~~**E-CONT-04**: los 8 `TipoDocumentoFisico` sembrados tienen los codes correctos~~ ⚠️ DIFERIDO (Opción 1 → documento-fisico 9.1)
   - **E-GRAN-01**: `modulo: 'GRANJA'` → 201 + `granjaEnabled: true` +
     `contabilidadEnabled: false`; 0 cuentas.
   - **E-OTROS-01**: `modulo: 'OTROS'` → 201 + ambos flags false; 0 cuentas.
@@ -501,7 +499,7 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
 
 ---
 
-### 9.2 - [ ] `test(tenants): e2e spec turns GREEN`
+### 9.2 - [x] `test(tenants): e2e spec turns GREEN`
 
 **No hay código nuevo** — checkpoint de verde E2E. Si hay fallos, depurar
 antes de continuar.
@@ -522,7 +520,7 @@ E-CONT-01, E-CONT-04, E-GRAN-01, E-OTROS-01, E-MT-03.
 
 ## Fase 10 — Verde final
 
-### 10.1 - [ ] `chore(tenants): final green check — tsc + full test suite`
+### 10.1 - [x] `chore(tenants): final green check — tsc + full test suite`
 
 **Entrega**: verificación de que el change completo no rompió nada.
 
