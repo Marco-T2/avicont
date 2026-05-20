@@ -21,9 +21,6 @@ export interface ListarCuentasResultado {
 export interface CrearCuentaData {
   organizationId: string;
   codigoInterno: string;
-  codigoPuct: string | null;
-  nombrePuctSnapshot: string | null;
-  versionPuctMapeado: string | null;
   nombre: string;
   descripcion: string | null;
   claseCuenta: ClaseCuenta;
@@ -48,12 +45,6 @@ export interface ActualizarCuentaData {
   monedaFuncional?: Moneda;
 }
 
-export interface MapearPuctData {
-  codigoPuct: string;
-  nombrePuctSnapshot: string;
-  versionPuctMapeado: string;
-}
-
 export interface CuentaRepositoryPort {
   findById(id: string, tenantId: string): Promise<Cuenta | null>;
   findByCodigoInterno(tenantId: string, codigoInterno: string): Promise<Cuenta | null>;
@@ -64,7 +55,6 @@ export interface CuentaRepositoryPort {
   actualizar(id: string, tenantId: string, data: ActualizarCuentaData): Promise<Cuenta>;
   desactivar(id: string, tenantId: string): Promise<Cuenta>;
   reactivar(id: string, tenantId: string): Promise<Cuenta>;
-  mapearPuct(id: string, tenantId: string, data: MapearPuctData): Promise<Cuenta>;
 
   // Lista los nombres de los campos de OrgConfiguracionContable que apuntan a esta cuenta.
   // Ej: ['ivaCreditoId', 'resultadoEjercicioId']. Vacío si no está configurada.

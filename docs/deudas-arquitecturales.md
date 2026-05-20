@@ -47,8 +47,7 @@ Los 7 items se entregaron en 7 commits verdes sobre `main` (ver `git log`):
 - ✅ `periodos-fiscales`: `GestionResponseDto`,
   `GestionConPeriodosResponseDto`, `PeriodoFiscalResponseDto` con
   mappers; controllers ya no retornan ORM entities.
-- ✅ `cuentas/domain/`: VOs `CodigoInterno` (1..8 niveles) y `CodigoPuct`
-  (4 segmentos, nivel PUCT del catálogo).
+- ✅ `cuentas/domain/`: VO `CodigoInterno` (1..8 niveles).
 - ✅ `periodos-fiscales/domain/`: VO `RangoPeriodoFiscal.of(year, month)`
   reemplaza las funciones `rangoCalendario`, `diasEnMes`, `esBisiesto`
   que vivían en `common/domain/`.

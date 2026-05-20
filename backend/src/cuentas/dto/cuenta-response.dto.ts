@@ -4,9 +4,6 @@ export interface CuentaResponseDto {
   id: string;
   organizationId: string;
   codigoInterno: string;
-  codigoPuct: string | null;
-  nombrePuctSnapshot: string | null;
-  versionPuctMapeado: string | null;
   nombre: string;
   descripcion: string | null;
   claseCuenta: ClaseCuenta;
@@ -43,9 +40,6 @@ export function toCuentaResponse(c: Cuenta): CuentaResponseDto {
     id: c.id,
     organizationId: c.organizationId,
     codigoInterno: c.codigoInterno,
-    codigoPuct: c.codigoPuct,
-    nombrePuctSnapshot: c.nombrePuctSnapshot,
-    versionPuctMapeado: c.versionPuctMapeado,
     nombre: c.nombre,
     descripcion: c.descripcion,
     claseCuenta: c.claseCuenta,

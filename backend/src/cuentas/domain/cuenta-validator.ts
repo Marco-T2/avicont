@@ -10,14 +10,12 @@
 //   4. esContraria → naturaleza debe ser OPUESTA al default de su clase.
 //      Ej: Depreciación Acumulada (ACTIVO, esContraria=true) → ACREEDORA.
 //   5. subClaseCuenta debe corresponder a la claseCuenta (tabla NIIF/PCGA).
-//   6. codigoPuct: obligatorio nivel 4 en el catálogo (RND-101800000004).
 
 import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 
 import { CuentaErrorCode, cuentaError, type CuentaErrorPayload } from './cuenta-errors';
 
 export const MAX_NIVELES_CODIGO_INTERNO = 8;
-export const NIVEL_PUCT_REQUERIDO = 4;
 const CODIGO_INTERNO_REGEX = /^[0-9]+(\.[0-9]+)*$/;
 
 export type ValidationResult = { valido: true } | { valido: false; error: CuentaErrorPayload };
@@ -160,26 +158,6 @@ export function validarConsistenciaClaseSubclase(
         CuentaErrorCode.SUBCLASE_INCONSISTENTE,
         `La subClase ${subClase} no corresponde a la clase ${clase}`,
         { clase, subClase, subClasesValidas: valores },
-      ),
-    };
-  }
-
-  return { valido: true };
-}
-
-// ------------------------------------------------------------
-// PUCT
-// ------------------------------------------------------------
-
-export function validarNivelPuct(nivel: number): ValidationResult {
-  if (nivel !== NIVEL_PUCT_REQUERIDO) {
-    return {
-      valido: false,
-      error: cuentaError(
-        CuentaErrorCode.CODIGO_PUCT_NIVEL_INSUFICIENTE,
-        // RND 101800000004: el mapeo al PUCT se hace a nivel 4 (cuenta principal).
-        `El código PUCT debe ser de nivel ${NIVEL_PUCT_REQUERIDO}`,
-        { nivelRecibido: nivel, nivelRequerido: NIVEL_PUCT_REQUERIDO },
       ),
     };
   }

@@ -358,40 +358,11 @@ model ImpersonationAction {
 }
 
 // =====================================================================
-// DOMINIO CONTABLE — Catálogo PUCT (compartido) y Plan de Cuentas (per-tenant)
+// DOMINIO CONTABLE — Plan de Cuentas (per-tenant)
 // =====================================================================
 //
-// CatalogoPuct es la fuente de verdad oficial del SIN (RND-101800000004).
-// Compartido entre todos los tenants — read-only desde la app.
-// Seed desde prisma/seeds/prod/puct/source/puct.xlsx (538 registros).
-//
-// Cuenta es el plan de cuentas DEL TENANT. Cada cuenta puede mapear a un
-// codigoPuct para consolidación al SIN. Múltiples cuentas internas pueden
-// mapear al mismo PUCT (consolidación). Ver CLAUDE.md §4.1 y §10.3.
-
-model CatalogoPuct {
-  // codigo es PK simple (no composite). Cuando el SIN actualice y haya
-  // que mantener histórico, agregar HistoricoCatalogoPuct con snapshots.
-  // El snapshot vive en Cuenta.nombrePuctSnapshot + versionPuctMapeado.
-  codigo        String        @id // ej "1.1.1.001"
-  nivel         Int           // 1..4 — nivel 5 (auxiliar) son plantillas y se ignoran al seed
-  nombre        String
-  claseCuenta   ClaseCuenta
-  padre         String?       // codigo del padre, null en nivel 1
-  activo        Boolean       @default(true) // false = deprecado por SIN
-  tiposEmpresa  TipoEmpresa[] // qué tipos de empresa lo utilizan (1 a 8)
-  versionPuct   String        // versión interna ej "2018-03"
-  actualizadoEn DateTime      @updatedAt
-
-  padreCuenta CatalogoPuct?  @relation("PuctJerarquia", fields: [padre], references: [codigo])
-  hijas       CatalogoPuct[] @relation("PuctJerarquia")
-
-  @@index([nivel])
-  @@index([padre])
-  @@index([claseCuenta])
-  @@index([tiposEmpresa], type: Gin)
-  @@map("catalogo_puct")
-}
+// Cuenta es el plan de cuentas DEL TENANT. El plan se siembra de forma
+// autocontenida desde prisma/seeds/prod/planes-cuentas/. Ver CLAUDE.md §4.1.
 
 model Cuenta {
   id             String @id @default(uuid())
@@ -399,16 +370,7 @@ model Cuenta {
 
   // ----- Códigos -----
   // codigoInterno: hasta 8 niveles separados por punto, único por org.
-  // Permite granularidad mayor que el PUCT (ej: 1.1.1.001.001 con sucursal).
   codigoInterno String
-
-  // codigoPuct: opcional, debe mapearse a nivel 4 del CatalogoPuct (regla SIN).
-  // NO es único por tenant: múltiples cuentas internas pueden consolidar al mismo.
-  codigoPuct           String?
-  // Snapshot del nombre PUCT al momento del mapeo (trazabilidad histórica).
-  nombrePuctSnapshot   String?
-  // Versión del catálogo PUCT al momento del mapeo (ej "2018-03").
-  versionPuctMapeado   String?
 
   // ----- Identidad -----
   nombre      String
@@ -476,7 +438,6 @@ model Cuenta {
   lineasComprobante LineaComprobante[]
 
   @@unique([organizationId, codigoInterno])
-  @@index([organizationId, codigoPuct])
   @@index([organizationId, claseCuenta])
   @@index([organizationId, subClaseCuenta])
   @@index([parentId])

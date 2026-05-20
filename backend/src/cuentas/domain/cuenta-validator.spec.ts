@@ -9,7 +9,6 @@ import {
   validarCodigoInterno,
   validarConsistenciaClaseSubclase,
   validarContrariaNaturaleza,
-  validarNivelPuct,
 } from './cuenta-validator';
 
 describe('cuenta-validator (puro)', () => {
@@ -177,26 +176,6 @@ describe('cuenta-validator (puro)', () => {
     it('rechaza cuenta nivel 2 sin subClase', () => {
       const resultado = validarConsistenciaClaseSubclase(ClaseCuenta.ACTIVO, null, 2);
       expect(resultado.valido).toBe(false);
-    });
-  });
-
-  describe('validarNivelPuct', () => {
-    it('acepta nivel 4', () => {
-      expect(validarNivelPuct(4)).toEqual({ valido: true });
-    });
-
-    it('rechaza nivel 3 con código CODIGO_PUCT_NIVEL_INSUFICIENTE', () => {
-      const resultado = validarNivelPuct(3);
-      expect(resultado).toEqual({
-        valido: false,
-        error: expect.objectContaining({
-          code: CuentaErrorCode.CODIGO_PUCT_NIVEL_INSUFICIENTE,
-        }),
-      });
-    });
-
-    it('rechaza nivel 1 (raíz)', () => {
-      expect(validarNivelPuct(1).valido).toBe(false);
     });
   });
 

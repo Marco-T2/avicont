@@ -8,7 +8,6 @@ import type {
   CuentaRepositoryPort,
   ListarCuentasFiltros,
   ListarCuentasResultado,
-  MapearPuctData,
 } from '../ports/cuenta.repository.port';
 
 // Nombres de campos en OrgConfiguracionContable que pueden apuntar a una Cuenta.
@@ -113,14 +112,6 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
 
   reactivar(id: string, tenantId: string): Promise<Cuenta> {
     return this.actualizarCampo(id, tenantId, { activa: true });
-  }
-
-  mapearPuct(id: string, tenantId: string, data: MapearPuctData): Promise<Cuenta> {
-    return this.actualizarCampo(id, tenantId, {
-      codigoPuct: data.codigoPuct,
-      nombrePuctSnapshot: data.nombrePuctSnapshot,
-      versionPuctMapeado: data.versionPuctMapeado,
-    });
   }
 
   async conceptosQueUsanCuenta(tenantId: string, cuentaId: string): Promise<string[]> {

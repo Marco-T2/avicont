@@ -12,7 +12,6 @@ import { AppModule } from '../src/app.module';
 import {
   cleanupTestData,
   createTestUserWithTenant,
-  ensurePuctSeeded,
   prisma,
 } from './helpers/test-factory';
 
@@ -20,7 +19,6 @@ describe('ConfiguracionContable (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    await ensurePuctSeeded();
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -81,7 +79,6 @@ describe('ConfiguracionContable (e2e)', () => {
       data: {
         organizationId: tenantId,
         codigoInterno: '1.1.1.001',
-        codigoPuct: '1.1.1.001',
         nombre: 'CAJA',
         claseCuenta: ClaseCuenta.ACTIVO,
         subClaseCuenta: 'ACTIVO_CORRIENTE',
@@ -182,7 +179,7 @@ describe('ConfiguracionContable (e2e)', () => {
     const { accessToken, tenantId } = await setupTenant();
 
     const stats = await sembrarPlanCuentasComercial(prisma, tenantId);
-    await poblarConfiguracionContableRequerida(prisma, tenantId, stats.porCodigoPuct);
+    await poblarConfiguracionContableRequerida(prisma, tenantId, stats.porCodigoInterno);
 
     const del = await request(app.getHttpServer())
       .delete('/api/configuracion-contable/ivaDebitoId')
