@@ -20,7 +20,7 @@
 
 ## Fase 1 — Schema y migration
 
-### 1.1 ☐ `feat(db): add tipos-documento-fisico, documentos-fisicos and asociacion schema`
+### 1.1 ☑ `feat(db): add tipos-documento-fisico, documentos-fisicos and asociacion schema`
 
 **Entrega**: 3 modelos Prisma nuevos (`TipoDocumentoFisico`, `DocumentoFisico`,
 `ComprobanteDocumentoFisico`) con relaciones inversas en `Organization`, `Contacto`
@@ -62,7 +62,7 @@ generada + edición manual para agregar el UNIQUE PARCIAL raw SQL.
 
 ## Fase 2 — Domain: VOs y errores
 
-### 2.1 ☐ `feat(tipos-documento-fisico): add domain VOs and errors`
+### 2.1 ☑ `feat(tipos-documento-fisico): add domain VOs and errors`
 
 **Entrega**: value objects del catálogo de tipos + errores de dominio.
 Dominio puro, cero dependencias NestJS/Prisma.
@@ -96,7 +96,7 @@ Dominio puro, cero dependencias NestJS/Prisma.
 
 ---
 
-### 2.2 ☐ `feat(documentos-fisicos): add domain VOs and errors`
+### 2.2 ☑ `feat(documentos-fisicos): add domain VOs and errors`
 
 **Entrega**: VO `NumeroDocumento` + errores de dominio del módulo operativo.
 
@@ -135,7 +135,7 @@ REQ-D-13, REQ-D-14, códigos de error §4.2 del spec. Escenario E-D-02 cubierto 
 
 ## Fase 3 — Ports
 
-### 3.1 ☐ `feat(tipos-documento-fisico): add repository and cross-module ports`
+### 3.1 ☑ `feat(tipos-documento-fisico): add repository and cross-module ports`
 
 **Entrega**: contratos (ports) del módulo `tipos-documento-fisico`.
 Superficie mínima por port; `abstract class` + `Symbol` por convención.
