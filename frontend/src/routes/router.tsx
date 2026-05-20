@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
 import { LoginPage } from '@/features/auth/login-page';
+import { RegisterPage } from '@/features/auth/register-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
     element: <AuthShell />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
       { path: '/accept-invite', element: <AcceptInvitePage /> },
     ],
   },
