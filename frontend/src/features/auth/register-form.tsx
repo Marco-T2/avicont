@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -16,6 +16,13 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { createTenant } from '@/features/tenants/api/create-tenant';
 import { switchTenant } from '@/features/tenants/api/switch-tenant';
 import { api } from '@/lib/api';
@@ -24,7 +31,11 @@ import { useAuthStore } from '@/stores/auth-store';
 import type { LoginResponse } from '@/types/api';
 
 import { registerUser } from './api/register';
-import { registerSchema, type RegisterFormValues } from './register-schema';
+import {
+  MODULOS_ORGANIZACION,
+  registerSchema,
+  type RegisterFormValues,
+} from './register-schema';
 
 // Alta self-service: crea la cuenta del usuario y su primera organización.
 // Orquesta endpoints existentes y testeados (no hay register atómico en backend):
@@ -41,6 +52,7 @@ export function RegisterForm(): React.JSX.Element {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<RegisterFormValues>({
@@ -50,6 +62,7 @@ export function RegisterForm(): React.JSX.Element {
       password: '',
       displayName: '',
       organizationName: '',
+      modulo: 'CONTABILIDAD',
     },
   });
 
@@ -72,7 +85,7 @@ export function RegisterForm(): React.JSX.Element {
       setToken(login.data.accessToken);
       authed = true;
 
-      const org = await createTenant(values.organizationName);
+      const org = await createTenant(values.organizationName, values.modulo);
       const switched = await switchTenant(org.id);
       setToken(switched.accessToken);
 
@@ -168,6 +181,35 @@ export function RegisterForm(): React.JSX.Element {
               <p className="text-xs text-destructive">
                 {errors.organizationName.message}
               </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="modulo">Tipo de organización</Label>
+            <Controller
+              control={control}
+              name="modulo"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger
+                    id="modulo"
+                    aria-label="Tipo de organización"
+                    className="w-full"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODULOS_ORGANIZACION.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.modulo !== undefined ? (
+              <p className="text-xs text-destructive">{errors.modulo.message}</p>
             ) : null}
           </div>
 
