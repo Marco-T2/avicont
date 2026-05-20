@@ -257,6 +257,28 @@ export class GestionNoAbiertaError extends InvalidStateError {
   }
 }
 
+/**
+ * Se levanta al asociar un DocumentoFisico a un Comprobante cuyo `tipo`
+ * no está incluido en `TipoDocumentoFisico.tiposComprobanteAplicables`.
+ *
+ * Reside en este módulo porque lo lanza `ComprobantesService.asociarDocumentos`
+ * (design §4.2/§4.6): el flujo de asociación es orquestado por `comprobantes`,
+ * que es la cabecera y dueña del flujo. La matriz de aplicabilidad del tipo
+ * llega proyectada vía `DocumentosFisicosReaderPort` (dependencia unidireccional
+ * comprobantes → documentos-fisicos, §4.5), sin acoplar dominios.
+ *
+ * Cubre REQ-A-11 / proposal D11.
+ */
+export class TipoDocumentoIncompatibleConComprobanteError extends InvalidStateError {
+  constructor(tipoDocumentoNombre: string, tipoComprobante: string, tiposPermitidos: string[]) {
+    super(
+      'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
+      `El tipo de documento '${tipoDocumentoNombre}' no es aplicable a comprobantes de tipo ${tipoComprobante}. Tipos permitidos: ${tiposPermitidos.join(', ')}`,
+      { tipoDocumentoNombre, tipoComprobante, tiposPermitidos },
+    );
+  }
+}
+
 // ============================================================
 // 400 — input malformado a nivel protocolo (DTO)
 // ============================================================
