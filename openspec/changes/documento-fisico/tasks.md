@@ -438,7 +438,11 @@ reubicó a `comprobantes/domain` (commit `f632bf8`).
 
 ## Fase 6 — Controllers + DTOs
 
-### 6.1 ☐ `feat(tipos-documento-fisico): add DTOs, controller and module wiring`
+### 6.1 ☑ `feat(tipos-documento-fisico): add DTOs, controller and module wiring`
+
+> **Nota apply (commit `6c1db82`)**: dos desvíos respecto del texto original, decididos en la sesión:
+> 1. **`descripcion` DIFERIDO** — el spec §7 + REQ-T-01/T-05 lo piden, pero schema (1.1) y service (5.1) lo omitieron. Para no meter una migración en un commit HTTP se sacó `descripcion` de los DTOs (slice queda consistente). **Deuda**: si se quiere, agregar columna nullable `descripcion String?` + service inputs + repo + response mapper en commit aparte. **E-T (fase 10.1) NO debe asertar round-trip de `descripcion`.**
+> 2. **Catálogo RBAC fuera de este commit** — la edición de `catalogo.ts` (permisos del slice + retroactivos de contactos) es responsabilidad de la **task 8.1** (REQ-P-12). Se revirtió de acá para respetar atomicidad/§9.1. `app.module.ts` SÍ se tocó (registrar el módulo es parte legítima de la capa HTTP).
 
 **Entrega**: capa HTTP del catálogo de tipos.
 
