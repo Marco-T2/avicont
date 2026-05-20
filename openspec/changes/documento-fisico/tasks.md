@@ -277,7 +277,7 @@ D4 (filtros + paginación offset), D7 (count para mutabilidad).
 
 ---
 
-### 4.4 ☐ `feat(documentos-fisicos): add PrismaAsociacionComprobanteRepository + integration spec`
+### 4.4 ☑ `feat(documentos-fisicos): add PrismaAsociacionComprobanteRepository + integration spec`
 
 **Entrega**: implementación del `AsociacionComprobanteRepositoryPort`. Commit crítico:
 cubre el UNIQUE PARCIAL y el cache `comprobanteEstado`.
