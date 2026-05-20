@@ -1,13 +1,12 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
-import { ComprobantesModule } from '@/comprobantes/comprobantes.module';
+import { ComprobantesLockModule } from '@/comprobantes/comprobantes-lock.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
 import { PrismaGestionFiscalRepository } from './adapters/prisma-gestion-fiscal.repository';
 import { PrismaPeriodoFiscalRepository } from './adapters/prisma-periodo-fiscal.repository';
-import { PrismaPeriodosReaderAdapter } from './adapters/prisma-periodos-reader.adapter';
 import { GestionesFiscalesController } from './gestiones-fiscales.controller';
 import { GestionesFiscalesService } from './gestiones-fiscales.service';
 import { PeriodosFiscalesController } from './periodos-fiscales.controller';
@@ -15,18 +14,20 @@ import { PeriodosFiscalesService } from './periodos-fiscales.service';
 import { GESTION_FISCAL_REPOSITORY_PORT } from './ports/gestion-fiscal.repository.port';
 import { GESTIONES_READER_PORT } from './ports/gestiones-reader.port';
 import { PERIODO_FISCAL_REPOSITORY_PORT } from './ports/periodo-fiscal.repository.port';
-import { PERIODOS_READER_PORT } from './ports/periodos-reader.port';
 
 // Módulo combinado (ver decisión de arquitectura): Gestiones y Períodos son
 // un único aggregate (gestión = raíz, período = entidad interna). Dos
 // controllers + dos services, pero un solo módulo NestJS y un solo binding
 // de repos.
 //
-// `COMPROBANTES_LOCK_PORT` se consume desde `ComprobantesModule` — el
-// binding vive allí (módulo dueño del dominio). `forwardRef` resuelve el
-// ciclo comprobantes↔periodos.
+// `COMPROBANTES_LOCK_PORT` (cierre/reapertura) entra por `ComprobantesLockModule`
+// (módulo-puerto leaf), NO por `ComprobantesModule`. Eso evita el require de
+// `comprobantes.module.ts` y rompe el ciclo de carga CJS comprobantes↔periodos.
+//
+// El binding de `PERIODOS_READER_PORT` (lo que comprobantes consume de acá)
+// vive en `PeriodosReaderModule`, también leaf.
 @Module({
-  imports: [RbacModule, forwardRef(() => ComprobantesModule)],
+  imports: [RbacModule, ComprobantesLockModule],
   controllers: [GestionesFiscalesController, PeriodosFiscalesController],
   providers: [
     PrismaService,
@@ -52,15 +53,7 @@ import { PERIODOS_READER_PORT } from './ports/periodos-reader.port';
       provide: PERIODO_FISCAL_REPOSITORY_PORT,
       useExisting: PrismaPeriodoFiscalRepository,
     },
-
-    // Lector de períodos por fecha — consumido por `comprobantes` (Fase 1.3+)
-    // para resolver periodoFiscalId y validar el estado del período.
-    PrismaPeriodosReaderAdapter,
-    {
-      provide: PERIODOS_READER_PORT,
-      useExisting: PrismaPeriodosReaderAdapter,
-    },
   ],
-  exports: [GESTIONES_READER_PORT, PERIODOS_READER_PORT],
+  exports: [GESTIONES_READER_PORT],
 })
 export class PeriodosFiscalesModule {}
