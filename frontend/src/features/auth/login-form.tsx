@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -118,6 +118,13 @@ export function LoginForm(): React.JSX.Element {
               'Iniciar sesión'
             )}
           </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            ¿No tenés una cuenta?{' '}
+            <Link to="/register" className="underline">
+              Crear una
+            </Link>
+          </p>
         </form>
       </CardContent>
     </Card>

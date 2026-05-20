@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { useMyProfile } from '@/features/tenants/hooks/use-my-profile';
 import { useAuthStore } from '@/stores/auth-store';
 
 // Dashboard home — espejo del layout de avicont-ia: banner de org, h1 grande,
@@ -17,6 +18,13 @@ import { useAuthStore } from '@/stores/auth-store';
 export function DashboardPage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
   const activeRole = user?.roles[0] ?? '—';
+  const { data: perfil } = useMyProfile();
+
+  // El nombre de la org no viaja en el JWT (solo activeTenantId): se resuelve
+  // contra el perfil cacheado en ['me'], igual que el OrgSwitcher.
+  const tenants = perfil?.tenants ?? [];
+  const orgActiva =
+    tenants.find((t) => t.id === user?.activeTenantId) ?? tenants[0];
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -26,7 +34,7 @@ export function DashboardPage(): React.JSX.Element {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h2 className="text-sm font-medium leading-none truncate">
-              Sin organización seleccionada
+              {orgActiva?.name ?? 'Sin organización seleccionada'}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
               Espacio de trabajo

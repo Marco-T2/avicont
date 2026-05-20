@@ -156,6 +156,19 @@ export interface UserTenant {
   role: string | null;
 }
 
+// POST /api/tenants — crear organización. El backend crea la org + la
+// membership OWNER del usuario autenticado en una transacción.
+export interface CreateTenantRequest {
+  name: string;
+}
+// El response es la Organization creada; acá tipamos solo lo que consume el
+// front (el id es necesario para el switch-tenant posterior al onboarding).
+export interface CreateTenantResponse {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 // POST /api/auth/switch-tenant request + response.
 export interface SwitchTenantRequest {
   tenantId: string;
