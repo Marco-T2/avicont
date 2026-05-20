@@ -307,7 +307,7 @@ E-A-02, E-A-03, E-A-06 a nivel integration.
 
 ---
 
-### 4.5 ☐ `feat(documentos-fisicos): add PrismaDocumentosFisicosReaderAdapter`
+### 4.5 ☑ `feat(documentos-fisicos): add PrismaDocumentosFisicosReaderAdapter`
 
 **Entrega**: implementación del `DocumentosFisicosReaderPort` (cross-module,
 consumido por `comprobantes`). Método renombrado a `obtenerBatchParaAsociar`
