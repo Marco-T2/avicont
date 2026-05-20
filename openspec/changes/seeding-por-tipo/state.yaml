@@ -1,0 +1,43 @@
+change: seeding-por-tipo
+project: avicont
+created: "2026-05-20"
+updated: "2026-05-20"
+
+phase: apply
+status: apply_completo_opcion1_pendiente_verify_archive
+
+artifact_store: openspec
+
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+  - apply
+
+phases_pending:
+  - verify
+  - archive
+
+artifacts:
+  proposal: openspec/changes/seeding-por-tipo/proposal.md
+  spec: openspec/changes/seeding-por-tipo/spec.md
+  design: openspec/changes/seeding-por-tipo/design.md
+  tasks: openspec/changes/seeding-por-tipo/tasks.md
+
+apply_progress: completo (Opción 1)
+
+notes: |
+  Apply completado con Opción 1 (confirmada 2026-05-20): el alta CONTABILIDAD
+  siembra SOLO el plan de cuentas (PlanCuentasSeederPort). El seeder de
+  tipos-documento-fisico queda diferido a documento-fisico task 9.1, que
+  enchufará en el slot del switch (case CONTABILIDAD en tenants.service.ts)
+  cuando el adapter PrismaTiposDocumentoFisicoSeederAdapter esté disponible.
+
+  Sin migration de schema (design D1): flags contabilidadEnabled/granjaEnabled
+  ya existían en Organization. Se modificaron: DTO, service, port, adapter y
+  firma de comercial.ts. Task 0.1 (absorción documental de documento-fisico 9.1)
+  permanece diferida junto con el wiring del TipoDocumentoFisicoSeederPort.
+
+  Prerequisito R1 (fix firma comercial.ts) completado en Fase 1.1.

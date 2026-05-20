@@ -8,6 +8,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { CuentaReaderAdapter } from './adapters/cuenta-reader.adapter';
 import { PrismaCuentaRepository } from './adapters/prisma-cuenta.repository';
 import { PrismaCuentasReaderAdapter } from './adapters/prisma-cuentas-reader.adapter';
+import { PrismaPlanCuentasSeederAdapter } from './adapters/prisma-plan-cuentas-seeder.adapter';
 import { StubMovimientosReader } from './adapters/stub-movimientos-reader';
 import { CuentasController } from './cuentas.controller';
 import { CuentasService } from './cuentas.service';
@@ -17,6 +18,7 @@ import {
   MOVIMIENTOS_READER_PORT,
   type MovimientosReaderPort,
 } from './ports/movimientos-reader.port';
+import { PLAN_CUENTAS_SEEDER_PORT } from './ports/plan-cuentas-seeder.port';
 
 // Guard: durante Fase 1.0.x no existe PrismaMovimientosReader. Cuando se
 // implemente en Fase 1.1, cambiar esta factory para elegir entre stub y
@@ -44,7 +46,10 @@ function movimientosReaderFactory(): MovimientosReaderPort {
     // Port de lectura batch para el validador de comprobantes (Fase 1.3+).
     PrismaCuentasReaderAdapter,
     { provide: CUENTAS_READER_PORT, useExisting: PrismaCuentasReaderAdapter },
+    // Port cross-module: consumido por `tenants` para sembrar el plan de cuentas
+    // COMERCIAL al crear una organización (seeding-por-tipo §4.1).
+    { provide: PLAN_CUENTAS_SEEDER_PORT, useClass: PrismaPlanCuentasSeederAdapter },
   ],
-  exports: [CuentasService, CUENTA_READER_PORT, CUENTAS_READER_PORT],
+  exports: [CuentasService, CUENTA_READER_PORT, CUENTAS_READER_PORT, PLAN_CUENTAS_SEEDER_PORT],
 })
 export class CuentasModule {}

@@ -9,8 +9,13 @@ import {
   MEMBERSHIPS_READER_PORT,
   MembershipsReaderPort,
 } from '../memberships/ports/memberships-reader.port';
+import {
+  PLAN_CUENTAS_SEEDER_PORT,
+  PlanCuentasSeederPort,
+} from '../cuentas/ports/plan-cuentas-seeder.port';
+import { PrismaService } from '../common/prisma.service';
 
-import { CreateTenantDto } from './dto/create-tenant.dto';
+import { CreateTenantDto, ModuloOrganizacion } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
 import { TenantSlug } from './domain/tenant-slug';
@@ -33,14 +38,58 @@ export class TenantsService {
     @Inject(GESTIONES_READER_PORT)
     private readonly gestionesReader: GestionesReaderPort,
     private readonly redis: RedisService,
+    @Inject(PLAN_CUENTAS_SEEDER_PORT)
+    private readonly planCuentasSeeder: PlanCuentasSeederPort,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * Mapea el módulo elegido en el alta a los feature flags de la organización.
+   * El `modulo` es un input transitorio — no se persiste como columna (Design D1).
+   */
+  private flagsParaModulo(modulo: ModuloOrganizacion): {
+    contabilidadEnabled: boolean;
+    granjaEnabled: boolean;
+  } {
+    switch (modulo) {
+      case ModuloOrganizacion.CONTABILIDAD:
+        return { contabilidadEnabled: true, granjaEnabled: false };
+      case ModuloOrganizacion.GRANJA:
+        return { contabilidadEnabled: false, granjaEnabled: true };
+      case ModuloOrganizacion.OTROS:
+        return { contabilidadEnabled: false, granjaEnabled: false };
+    }
+  }
 
   async create(dto: CreateTenantDto, ownerId: string) {
     const slug = TenantSlug.fromName(dto.name).toString();
     if (await this.repo.existsBySlug(slug)) {
       throw new TenantSlugDuplicadoError(slug);
     }
-    return this.repo.create({ slug, name: dto.name, ownerUserId: ownerId });
+
+    const flags = this.flagsParaModulo(dto.modulo);
+
+    return this.prisma.$transaction(async (tx) => {
+      const org = await this.repo.create(
+        { slug, name: dto.name, ownerUserId: ownerId, ...flags },
+        tx,
+      );
+
+      switch (dto.modulo) {
+        case ModuloOrganizacion.CONTABILIDAD:
+          await this.planCuentasSeeder.seedDefaultsForTenant(org.id, tx);
+          // TODO(documento-fisico task 9.1): enchufar aquí tiposDocSeeder.seedDefaultsForTenant(org.id, tx) cuando exista su adapter
+          break;
+        case ModuloOrganizacion.GRANJA:
+          // Placeholder: módulo granja sin código de seeding aún. Flags ya seteados arriba.
+          break;
+        case ModuloOrganizacion.OTROS:
+          // no-op: sin módulo específico, sin seeding adicional
+          break;
+      }
+
+      return org;
+    });
   }
 
   async findById(id: string) {

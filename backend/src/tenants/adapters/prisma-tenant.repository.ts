@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SystemRole } from '@prisma/client';
+import { Prisma, SystemRole } from '@prisma/client';
 import type { Organization } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
@@ -19,11 +19,17 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
     super();
   }
 
-  async create(data: TenantCreateData): Promise<OrganizationConMemberships> {
-    return this.prisma.organization.create({
+  override async create(
+    data: TenantCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<OrganizationConMemberships> {
+    const client = tx ?? this.prisma;
+    return client.organization.create({
       data: {
         name: data.name,
         slug: data.slug,
+        contabilidadEnabled: data.contabilidadEnabled,
+        granjaEnabled: data.granjaEnabled,
         memberships: {
           create: { userId: data.ownerUserId, systemRole: SystemRole.OWNER },
         },
@@ -32,15 +38,15 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
     });
   }
 
-  findById(id: string): Promise<Organization | null> {
+  override findById(id: string): Promise<Organization | null> {
     return this.prisma.organization.findUnique({ where: { id } });
   }
 
-  findBySlug(slug: string): Promise<Organization | null> {
+  override findBySlug(slug: string): Promise<Organization | null> {
     return this.prisma.organization.findUnique({ where: { slug } });
   }
 
-  async existsBySlug(slug: string): Promise<boolean> {
+  override async existsBySlug(slug: string): Promise<boolean> {
     const found = await this.prisma.organization.findUnique({
       where: { slug },
       select: { id: true },
@@ -48,7 +54,7 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
     return found !== null;
   }
 
-  update(id: string, data: TenantUpdateData): Promise<Organization> {
+  override update(id: string, data: TenantUpdateData): Promise<Organization> {
     return this.prisma.organization.update({
       where: { id },
       data: {
@@ -62,14 +68,14 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
     });
   }
 
-  findFeatures(id: string): Promise<TenantFeatures | null> {
+  override findFeatures(id: string): Promise<TenantFeatures | null> {
     return this.prisma.organization.findUnique({
       where: { id },
       select: { contabilidadEnabled: true, granjaEnabled: true },
     });
   }
 
-  updateFeatures(id: string, data: TenantFeaturesUpdate): Promise<TenantFeatures> {
+  override updateFeatures(id: string, data: TenantFeaturesUpdate): Promise<TenantFeatures> {
     return this.prisma.organization.update({
       where: { id },
       data: {
