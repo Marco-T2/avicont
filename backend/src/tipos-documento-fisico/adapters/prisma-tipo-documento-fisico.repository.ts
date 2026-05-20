@@ -40,7 +40,7 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
         },
       });
     } catch (err) {
-      throw this.mapKnownError(err, { codigo: data.codigo, nombre: data.nombre });
+      this.throwMappedError(err, { codigo: data.codigo, nombre: data.nombre });
     }
   }
 
@@ -125,7 +125,7 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
         data: updateData,
       });
     } catch (err) {
-      throw this.mapKnownError(err, { codigo: undefined, nombre: data.nombre });
+      this.throwMappedError(err, { codigo: undefined, nombre: data.nombre });
     }
   }
 
@@ -206,13 +206,14 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
   }
 
   /**
-   * Mapea P2002 (UNIQUE violation) al `DomainError` correcto inspeccionando
-   * `meta.target`. Cualquier otro código de Prisma se propaga sin tocar.
+   * Inspecciona un error de Prisma: si es un P2002 (UNIQUE) conocido lanza el
+   * `DomainError` correspondiente; en otro caso re-lanza el error original.
+   * SIEMPRE lanza (retorno `never`).
    */
-  private mapKnownError(
+  private throwMappedError(
     err: unknown,
     ctx: { codigo: string | undefined; nombre: string | undefined },
-  ): unknown {
+  ): never {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const target = err.meta?.['target'];
       const targetStr = Array.isArray(target)
@@ -223,13 +224,13 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
       // Prisma reporta el target del UNIQUE en distintas formas según la
       // versión: a veces un string con el nombre del index, a veces un array
       // de columnas. Cubrimos ambos casos.
-      if (targetStr.includes('codigo')) {
-        return new TipoDocumentoFisicoCodigoDuplicadoError(ctx.codigo ?? '');
+      if (ctx.codigo !== undefined && targetStr.includes('codigo')) {
+        throw new TipoDocumentoFisicoCodigoDuplicadoError(ctx.codigo);
       }
-      if (targetStr.includes('nombre')) {
-        return new TipoDocumentoFisicoNombreDuplicadoError(ctx.nombre ?? '');
+      if (ctx.nombre !== undefined && targetStr.includes('nombre')) {
+        throw new TipoDocumentoFisicoNombreDuplicadoError(ctx.nombre);
       }
     }
-    return err;
+    throw err;
   }
 }
