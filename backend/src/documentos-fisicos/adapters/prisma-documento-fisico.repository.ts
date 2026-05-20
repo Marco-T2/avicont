@@ -6,6 +6,8 @@ import { PrismaService } from '@/common/prisma.service';
 
 import { DocumentoFisicoNumeroDuplicadoError } from '../domain/documento-fisico-errors';
 import {
+  DocumentoFisicoConDetalle,
+  DocumentoFisicoConRelaciones,
   DocumentoFisicoCreateData,
   DocumentoFisicoListarFiltros,
   DocumentoFisicoListarPagination,
@@ -16,6 +18,14 @@ import {
 // Nombre estable del UNIQUE en BD (defense in depth — CLAUDE.md §4.8).
 // El adapter mapea P2002 con este target al DomainError correcto.
 const UNIQUE_NUMERO_INDEX = 'documentos_fisicos_organizationId_tipoDocumentoFisicoId_numero_key';
+
+// Include reutilizado por todas las lecturas enriquecidas: tipo + contacto.
+// Tipado con `satisfies` para que el resultado de Prisma sea asignable a
+// `DocumentoFisicoConRelaciones` sin `any`.
+const RELACIONES_INCLUDE = {
+  tipoDocumento: { select: { id: true, nombre: true, codigo: true, esTributario: true } },
+  contacto: { select: { id: true, razonSocial: true } },
+} satisfies Prisma.DocumentoFisicoInclude;
 
 @Injectable()
 export class PrismaDocumentoFisicoRepository extends DocumentoFisicoRepositoryPort {
@@ -83,37 +93,81 @@ export class PrismaDocumentoFisicoRepository extends DocumentoFisicoRepositoryPo
   ): Promise<{ items: DocumentoFisico[]; total: number }> {
     const client = tx ?? this.prisma;
 
-    const where: Prisma.DocumentoFisicoWhereInput = {
-      organizationId: tenantId,
-      ...(filtros.tipoDocumentoFisicoId !== undefined
-        ? { tipoDocumentoFisicoId: filtros.tipoDocumentoFisicoId }
-        : {}),
-      ...(filtros.fechaDesde !== undefined || filtros.fechaHasta !== undefined
-        ? {
-            fechaEmision: {
-              ...(filtros.fechaDesde !== undefined ? { gte: filtros.fechaDesde } : {}),
-              ...(filtros.fechaHasta !== undefined ? { lte: filtros.fechaHasta } : {}),
-            },
-          }
-        : {}),
-      ...(filtros.contactoId !== undefined ? { contactoId: filtros.contactoId } : {}),
-      ...(filtros.q !== undefined && filtros.q.trim().length > 0
-        ? { numero: { contains: filtros.q.trim(), mode: 'insensitive' as const } }
-        : {}),
-      // Filtro por estado derivado vía sub-query sobre la tabla de asociaciones.
-      // R5: revisar explain en tablas grandes; candidato a materializar.
-      ...(filtros.estado !== undefined ? this.buildEstadoFilter(filtros.estado) : {}),
-    };
-
-    const orderBy: Prisma.DocumentoFisicoOrderByWithRelationInput = this.buildOrderBy(pagination);
-
+    const where = this.buildWhere(tenantId, filtros);
+    const orderBy = this.buildOrderBy(pagination);
     const skip = (pagination.page - 1) * pagination.limit;
+
     const [items, total] = await Promise.all([
       client.documentoFisico.findMany({
         where,
         orderBy,
         skip,
         take: pagination.limit,
+      }),
+      client.documentoFisico.count({ where }),
+    ]);
+    return { items, total };
+  }
+
+  async findByIdConRelaciones(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConRelaciones | null> {
+    const client = tx ?? this.prisma;
+    return client.documentoFisico.findFirst({
+      where: { id, organizationId: tenantId },
+      include: RELACIONES_INCLUDE,
+    });
+  }
+
+  async findDetalleById(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConDetalle | null> {
+    const client = tx ?? this.prisma;
+    const doc = await client.documentoFisico.findFirst({
+      where: { id, organizationId: tenantId },
+      include: {
+        ...RELACIONES_INCLUDE,
+        asociaciones: {
+          include: { comprobante: { select: { id: true, numero: true, estado: true } } },
+        },
+      },
+    });
+    if (doc === null) return null;
+
+    const { asociaciones, ...rest } = doc;
+    return {
+      ...rest,
+      comprobantesAsociados: asociaciones.map((a) => ({
+        comprobanteId: a.comprobante.id,
+        comprobanteNumero: a.comprobante.numero,
+        comprobanteEstado: a.comprobante.estado,
+      })),
+    };
+  }
+
+  async listarConRelaciones(
+    tenantId: string,
+    filtros: DocumentoFisicoListarFiltros,
+    pagination: DocumentoFisicoListarPagination,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ items: DocumentoFisicoConRelaciones[]; total: number }> {
+    const client = tx ?? this.prisma;
+
+    const where = this.buildWhere(tenantId, filtros);
+    const orderBy = this.buildOrderBy(pagination);
+    const skip = (pagination.page - 1) * pagination.limit;
+
+    const [items, total] = await Promise.all([
+      client.documentoFisico.findMany({
+        where,
+        orderBy,
+        skip,
+        take: pagination.limit,
+        include: RELACIONES_INCLUDE,
       }),
       client.documentoFisico.count({ where }),
     ]);
@@ -186,6 +240,37 @@ export class PrismaDocumentoFisicoRepository extends DocumentoFisicoRepositoryPo
   // ------------------------------------------------------------------
   // Helpers privados
   // ------------------------------------------------------------------
+
+  /**
+   * Construye el `where` compartido por `listar` y `listarConRelaciones`.
+   * Centraliza filtros + tenant para no duplicar la lógica entre ambos.
+   */
+  private buildWhere(
+    tenantId: string,
+    filtros: DocumentoFisicoListarFiltros,
+  ): Prisma.DocumentoFisicoWhereInput {
+    return {
+      organizationId: tenantId,
+      ...(filtros.tipoDocumentoFisicoId !== undefined
+        ? { tipoDocumentoFisicoId: filtros.tipoDocumentoFisicoId }
+        : {}),
+      ...(filtros.fechaDesde !== undefined || filtros.fechaHasta !== undefined
+        ? {
+            fechaEmision: {
+              ...(filtros.fechaDesde !== undefined ? { gte: filtros.fechaDesde } : {}),
+              ...(filtros.fechaHasta !== undefined ? { lte: filtros.fechaHasta } : {}),
+            },
+          }
+        : {}),
+      ...(filtros.contactoId !== undefined ? { contactoId: filtros.contactoId } : {}),
+      ...(filtros.q !== undefined && filtros.q.trim().length > 0
+        ? { numero: { contains: filtros.q.trim(), mode: 'insensitive' as const } }
+        : {}),
+      // Filtro por estado derivado vía sub-query sobre la tabla de asociaciones.
+      // R5: revisar explain en tablas grandes; candidato a materializar.
+      ...(filtros.estado !== undefined ? this.buildEstadoFilter(filtros.estado) : {}),
+    };
+  }
 
   /**
    * Construye el fragmento `where` para el filtro por estado derivado.

@@ -18,6 +18,7 @@ import { PeriodosFiscalesModule } from './periodos-fiscales/periodos-fiscales.mo
 import { ComprobantesModule } from './comprobantes/comprobantes.module';
 import { ContactosModule } from './contactos/contactos.module';
 import { TiposDocumentoFisicoModule } from './tipos-documento-fisico/tipos-documento-fisico.module';
+import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos.module';
 import { ClockModule } from './common/clock';
 import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
 import { AuditModule } from './audit/audit.module';
@@ -75,6 +76,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     ComprobantesModule,
     ContactosModule,
     TiposDocumentoFisicoModule,
+    DocumentosFisicosModule,
   ],
   controllers: [],
   providers: [

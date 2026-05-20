@@ -3,9 +3,36 @@
 // Prisma directamente (Anti-31 CLAUDE.md §8.1). Multi-tenancy defense in
 // depth (CLAUDE.md §4.2): TODA query del adapter filtra por tenantId.
 
-import type { DocumentoFisico, Moneda, Prisma } from '@prisma/client';
+import type { DocumentoFisico, EstadoComprobante, Moneda, Prisma } from '@prisma/client';
 
 export const DOCUMENTO_FISICO_REPOSITORY_PORT = Symbol('DOCUMENTO_FISICO_REPOSITORY_PORT');
+
+// ============================================================
+// Read-models enriquecidos (lectura para la capa de presentación)
+// ============================================================
+//
+// Intersection types (no interface-extends) para no chocar con el
+// type alias `DocumentoFisico` que genera Prisma. La capa de lectura
+// enriquecida vive acá → repo → service → controller; el controller
+// nunca toca Prisma (CLAUDE.md §3.2/§3.5).
+
+/** Documento físico con tipo + contacto embebidos (sin comprobantes). */
+export type DocumentoFisicoConRelaciones = DocumentoFisico & {
+  tipoDocumento: { id: string; nombre: string; codigo: string; esTributario: boolean };
+  contacto: { id: string; razonSocial: string } | null;
+};
+
+/** Vista mínima de un comprobante asociado a un documento físico. */
+export type ComprobanteAsociadoView = {
+  comprobanteId: string;
+  comprobanteNumero: string | null;
+  comprobanteEstado: EstadoComprobante;
+};
+
+/** Detalle completo: tipo + contacto + comprobantes asociados. */
+export type DocumentoFisicoConDetalle = DocumentoFisicoConRelaciones & {
+  comprobantesAsociados: ComprobanteAsociadoView[];
+};
 
 // ============================================================
 // Tipos de datos aceptados por el repo
@@ -118,6 +145,41 @@ export abstract class DocumentoFisicoRepositoryPort {
     pagination: DocumentoFisicoListarPagination,
     tx?: Prisma.TransactionClient,
   ): Promise<{ items: DocumentoFisico[]; total: number }>;
+
+  /**
+   * Lee un documento del tenant con su tipo y contacto embebidos. Retorna
+   * `null` si no existe o pertenece a otro tenant (multi-tenancy defense in
+   * depth — CLAUDE.md §4.2). No trae comprobantes asociados.
+   */
+  abstract findByIdConRelaciones(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConRelaciones | null>;
+
+  /**
+   * Lee el detalle completo del documento: tipo + contacto + los
+   * comprobantes a los que está asociado (id, número, estado). Retorna
+   * `null` si no existe o pertenece a otro tenant (CLAUDE.md §4.2).
+   */
+  abstract findDetalleById(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConDetalle | null>;
+
+  /**
+   * Igual que `listar` (mismos filtros y paginación) pero los items traen
+   * tipo + contacto embebidos. NO trae comprobantes asociados, por
+   * performance del listado (CLAUDE.md §3.5: la lectura enriquecida vive en
+   * el repo, no en el controller).
+   */
+  abstract listarConRelaciones(
+    tenantId: string,
+    filtros: DocumentoFisicoListarFiltros,
+    pagination: DocumentoFisicoListarPagination,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ items: DocumentoFisicoConRelaciones[]; total: number }>;
 
   /**
    * Aplica un PATCH sobre un documento. Sólo toca los campos presentes.

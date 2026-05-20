@@ -14,6 +14,8 @@ import {
 } from './domain/documento-fisico-errors';
 import {
   DOCUMENTO_FISICO_REPOSITORY_PORT,
+  DocumentoFisicoConDetalle,
+  DocumentoFisicoConRelaciones,
   DocumentoFisicoRepositoryPort,
   DocumentoFisicoListarFiltros,
   DocumentoFisicoListarPagination,
@@ -172,6 +174,44 @@ export class DocumentosFisicosService {
     pagination: DocumentoFisicoListarPagination,
   ): Promise<{ items: DocumentoFisico[]; total: number }> {
     return this.repo.listar(tenantId, filtros, pagination);
+  }
+
+  /**
+   * Devuelve el documento con tipo + contacto embebidos para los endpoints
+   * de lectura/escritura del controller. Lanza `DocumentoFisicoNoEncontradoError`
+   * si no existe o pertenece a otro tenant (multi-tenancy defense in depth).
+   */
+  async obtenerConRelaciones(
+    tenantId: string,
+    id: string,
+  ): Promise<DocumentoFisicoConRelaciones> {
+    const doc = await this.repo.findByIdConRelaciones(tenantId, id);
+    if (!doc) throw new DocumentoFisicoNoEncontradoError(id);
+    return doc;
+  }
+
+  /**
+   * Devuelve el detalle completo (tipo + contacto + comprobantes asociados)
+   * para el endpoint GET /:id. Lanza `DocumentoFisicoNoEncontradoError` si no
+   * existe o pertenece a otro tenant.
+   */
+  async obtenerDetalle(tenantId: string, id: string): Promise<DocumentoFisicoConDetalle> {
+    const doc = await this.repo.findDetalleById(tenantId, id);
+    if (!doc) throw new DocumentoFisicoNoEncontradoError(id);
+    return doc;
+  }
+
+  /**
+   * Lista paginada con tipo + contacto embebidos para el endpoint GET /.
+   * No trae comprobantes asociados (performance — la lectura enriquecida
+   * vive en el repo, CLAUDE.md §3.5).
+   */
+  async listarConRelaciones(
+    tenantId: string,
+    filtros: DocumentoFisicoListarFiltros,
+    pagination: DocumentoFisicoListarPagination,
+  ): Promise<{ items: DocumentoFisicoConRelaciones[]; total: number }> {
+    return this.repo.listarConRelaciones(tenantId, filtros, pagination);
   }
 
   /**

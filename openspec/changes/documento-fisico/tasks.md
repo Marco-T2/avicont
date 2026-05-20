@@ -472,7 +472,9 @@ reubicó a `comprobantes/domain` (commit `f632bf8`).
 
 ---
 
-### 6.2 ☐ `feat(documentos-fisicos): add DTOs, controller and module wiring`
+### 6.2 ☑ `feat(documentos-fisicos): add DTOs, controller and module wiring`
+
+> **Nota apply (commit `da66e43`)**: el primer intento metió `PrismaService` directo en el controller para enriquecer lecturas (tipo+contacto+comprobantes) — **violación hexagonal §3.2/§3.5**. Se corrigió DENTRO del mismo commit (amend): el enriquecimiento de lectura vive ahora en repo→service. Se agregaron al `DocumentoFisicoRepositoryPort` los read-models `DocumentoFisicoConRelaciones`/`ComprobanteAsociadoView`/`DocumentoFisicoConDetalle` + métodos `findByIdConRelaciones`/`findDetalleById`/`listarConRelaciones`; el service expone `obtenerConRelaciones`/`obtenerDetalle`/`listarConRelaciones`; el controller solo consume el service. +8 integration specs (read enriquecido + comprobantesAsociados) y +5 unit. `monto`/`moneda` quedaron OPCIONALES+nullable en los DTOs (spec §7, validación condicional en service). **Para 6.3**: el read-model `DocumentoFisicoConRelaciones` vive en el port — importarlo de ahí; NO meter Prisma/repo concreto en el controller de comprobantes (misma violación). El `DOCUMENTOS_FISICOS_READER_PORT` puede no exponer estos read-models enriquecidos — verificar su superficie antes de 6.3.
 
 **Entrega**: capa HTTP del módulo operativo de documentos físicos.
 

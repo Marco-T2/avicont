@@ -43,6 +43,9 @@ function makeRepoMock(): MockRepo {
     findById: jest.fn(),
     findByNumero: jest.fn(),
     listar: jest.fn(),
+    findByIdConRelaciones: jest.fn(),
+    findDetalleById: jest.fn(),
+    listarConRelaciones: jest.fn(),
     update: jest.fn(),
     eliminar: jest.fn(),
     countAsociaciones: jest.fn(),
@@ -498,6 +501,65 @@ describe('DocumentosFisicosService', () => {
         { contactoId: CONTACTO_ID },
         { page: 2, limit: 10 },
       );
+    });
+  });
+
+  // ==========================================================
+  // obtenerConRelaciones / obtenerDetalle / listarConRelaciones
+  // ==========================================================
+
+  describe('obtenerConRelaciones', () => {
+    it('devuelve el documento enriquecido cuando existe', async () => {
+      const enriquecido = makeDocumento();
+      repo.findByIdConRelaciones.mockResolvedValue(enriquecido);
+
+      const result = await service.obtenerConRelaciones(TENANT_ID, DOC_ID);
+
+      expect(result).toBe(enriquecido);
+      expect(repo.findByIdConRelaciones).toHaveBeenCalledWith(TENANT_ID, DOC_ID);
+    });
+
+    it('lanza DocumentoFisicoNoEncontradoError cuando el repo devuelve null', async () => {
+      repo.findByIdConRelaciones.mockResolvedValue(null);
+
+      await expect(service.obtenerConRelaciones(TENANT_ID, DOC_ID)).rejects.toThrow(
+        DocumentoFisicoNoEncontradoError,
+      );
+    });
+  });
+
+  describe('obtenerDetalle', () => {
+    it('devuelve el detalle con comprobantes asociados cuando existe', async () => {
+      const detalle = { ...makeDocumento(), comprobantesAsociados: [] };
+      repo.findDetalleById.mockResolvedValue(detalle);
+
+      const result = await service.obtenerDetalle(TENANT_ID, DOC_ID);
+
+      expect(result).toBe(detalle);
+      expect(repo.findDetalleById).toHaveBeenCalledWith(TENANT_ID, DOC_ID);
+    });
+
+    it('lanza DocumentoFisicoNoEncontradoError cuando el repo devuelve null', async () => {
+      repo.findDetalleById.mockResolvedValue(null);
+
+      await expect(service.obtenerDetalle(TENANT_ID, DOC_ID)).rejects.toThrow(
+        DocumentoFisicoNoEncontradoError,
+      );
+    });
+  });
+
+  describe('listarConRelaciones', () => {
+    it('delega al repo con filtros y paginación', async () => {
+      const items = [makeDocumento()];
+      repo.listarConRelaciones.mockResolvedValue({ items, total: 1 });
+
+      const filtros: DocumentoFisicoListarFiltros = { tipoDocumentoFisicoId: TIPO_ID };
+      const pagination: DocumentoFisicoListarPagination = { page: 1, limit: 20 };
+
+      const result = await service.listarConRelaciones(TENANT_ID, filtros, pagination);
+
+      expect(result).toEqual({ items, total: 1 });
+      expect(repo.listarConRelaciones).toHaveBeenCalledWith(TENANT_ID, filtros, pagination);
     });
   });
 

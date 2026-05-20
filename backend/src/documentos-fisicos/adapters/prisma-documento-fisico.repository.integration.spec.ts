@@ -124,6 +124,10 @@ describe('PrismaDocumentoFisicoRepository (integration)', () => {
       await prisma.documentoFisico.deleteMany({
         where: { organizationId: { in: orgIds } },
       });
+      // Contactos: FK Restrict desde DocumentoFisico → borrar DESPUÉS de documentos.
+      await prisma.contacto.deleteMany({
+        where: { organizationId: { in: orgIds } },
+      });
       await prisma.tipoDocumentoFisico.deleteMany({
         where: { organizationId: { in: orgIds } },
       });
@@ -222,6 +226,18 @@ describe('PrismaDocumentoFisicoRepository (integration)', () => {
         comprobanteEstado: estado,
       },
     });
+  }
+
+  async function createContacto(tenantId: string, razonSocial: string): Promise<string> {
+    const contacto = await prisma.contacto.create({
+      data: {
+        organizationId: tenantId,
+        razonSocial,
+        esProveedor: true,
+        createdByUserId: userId,
+      },
+    });
+    return contacto.id;
   }
 
   // ==========================================================
@@ -589,5 +605,121 @@ describe('PrismaDocumentoFisicoRepository (integration)', () => {
 
     const count = await repo.countAsociacionesContabilizadas(tenantA, doc.id);
     expect(count).toBe(1);
+  });
+
+  // ==========================================================
+  // findByIdConRelaciones — lectura enriquecida (tipo + contacto)
+  // ==========================================================
+
+  it('findByIdConRelaciones — devuelve el documento con tipo y contacto embebidos', async () => {
+    const contactoId = await createContacto(tenantA, 'Proveedor ABC SRL');
+    const doc = await repo.create(tenantA, baseCreateData({ contactoId }));
+
+    const found = await repo.findByIdConRelaciones(tenantA, doc.id);
+
+    expect(found?.id).toBe(doc.id);
+    expect(found?.tipoDocumento).toEqual({
+      id: tipoTributario,
+      nombre: 'Factura',
+      codigo: 'factura',
+      esTributario: true,
+    });
+    expect(found?.contacto).toEqual({ id: contactoId, razonSocial: 'Proveedor ABC SRL' });
+  });
+
+  it('findByIdConRelaciones — contacto = null cuando el documento no tiene contacto', async () => {
+    const doc = await repo.create(tenantA, baseCreateData({ contactoId: null }));
+    const found = await repo.findByIdConRelaciones(tenantA, doc.id);
+    expect(found?.contacto).toBeNull();
+    expect(found?.tipoDocumento.codigo).toBe('factura');
+  });
+
+  it('findByIdConRelaciones — retorna null si el id pertenece a otro tenant (defense in depth)', async () => {
+    const doc = await repo.create(tenantA, baseCreateData());
+    const cross = await repo.findByIdConRelaciones(tenantB, doc.id);
+    expect(cross).toBeNull();
+  });
+
+  // ==========================================================
+  // listarConRelaciones — listado enriquecido
+  // ==========================================================
+
+  it('listarConRelaciones — los items traen tipo y contacto embebidos', async () => {
+    const contactoId = await createContacto(tenantA, 'Cliente XYZ');
+    await repo.create(tenantA, baseCreateData({ numero: 'F-001', contactoId }));
+
+    const { items, total } = await repo.listarConRelaciones(tenantA, {}, defaultPagination);
+
+    expect(total).toBe(1);
+    expect(items[0]?.tipoDocumento.codigo).toBe('factura');
+    expect(items[0]?.contacto).toEqual({ id: contactoId, razonSocial: 'Cliente XYZ' });
+  });
+
+  it('listarConRelaciones — respeta filtros y paginación igual que listar', async () => {
+    await repo.create(
+      tenantA,
+      baseCreateData({ tipoDocumentoFisicoId: tipoTributario, numero: 'F-001' }),
+    );
+    await repo.create(
+      tenantA,
+      baseCreateData({
+        tipoDocumentoFisicoId: tipoNoTributario,
+        numero: 'R-001',
+        monto: null,
+        moneda: null,
+      }),
+    );
+
+    const { items, total } = await repo.listarConRelaciones(
+      tenantA,
+      { tipoDocumentoFisicoId: tipoNoTributario },
+      { page: 1, limit: 1 },
+    );
+
+    expect(total).toBe(1);
+    expect(items.length).toBe(1);
+    expect(items[0]?.tipoDocumento.codigo).toBe('recibo');
+    expect(items[0]?.contacto).toBeNull();
+  });
+
+  it('listarConRelaciones — no trae documentos de otro tenant', async () => {
+    await repo.create(tenantA, baseCreateData());
+    const { total } = await repo.listarConRelaciones(tenantB, {}, defaultPagination);
+    expect(total).toBe(0);
+  });
+
+  // ==========================================================
+  // findDetalleById — detalle con comprobantes asociados
+  // ==========================================================
+
+  it('findDetalleById — array vacío cuando el documento está suelto', async () => {
+    const doc = await repo.create(tenantA, baseCreateData());
+    const detalle = await repo.findDetalleById(tenantA, doc.id);
+    expect(detalle?.id).toBe(doc.id);
+    expect(detalle?.tipoDocumento.codigo).toBe('factura');
+    expect(detalle?.comprobantesAsociados).toEqual([]);
+  });
+
+  it('findDetalleById — devuelve comprobantesAsociados con numero y estado correctos', async () => {
+    const periodoId = await createPeriodo(tenantA);
+    const compId = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+
+    const doc = await repo.create(tenantA, baseCreateData());
+    await asociar(tenantA, compId, doc.id, EstadoComprobante.CONTABILIZADO);
+
+    const detalle = await repo.findDetalleById(tenantA, doc.id);
+
+    expect(detalle?.comprobantesAsociados).toHaveLength(1);
+    expect(detalle?.comprobantesAsociados[0]).toEqual({
+      comprobanteId: compId,
+      comprobanteNumero: null, // BORRADOR/CONTABILIZADO de fixture sin numero asignado
+      comprobanteEstado: EstadoComprobante.CONTABILIZADO,
+    });
+  });
+
+  it('findDetalleById — retorna null si el id pertenece a otro tenant (defense in depth)', async () => {
+    const doc = await repo.create(tenantA, baseCreateData());
+    const cross = await repo.findDetalleById(tenantB, doc.id);
+    expect(cross).toBeNull();
   });
 });
