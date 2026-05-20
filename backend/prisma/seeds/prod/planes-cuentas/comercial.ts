@@ -1,5 +1,6 @@
 import {
   PrismaClient,
+  Prisma,
   NaturalezaCuenta,
   type ClaseCuenta,
   type OrgConfiguracionContable,
@@ -318,7 +319,7 @@ export interface SeedPlanCuentasResult {
 }
 
 export async function sembrarPlanCuentasComercial(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   organizationId: string,
 ): Promise<SeedPlanCuentasResult> {
   // 1. Recolectar TODOS los códigos necesarios (hojas + ancestros únicos).
@@ -431,7 +432,7 @@ export type ConceptoMapeado = (typeof MAPEO_CODIGO_A_CONCEPTO)[keyof typeof MAPE
 // cajaChicaDefaultId, ajustePorInflacionId) quedan null y se mapean manual
 // cuando el tenant los necesita.
 export async function poblarConfiguracionContableRequerida(
-  prisma: PrismaClient,
+  prisma: PrismaClient | Prisma.TransactionClient,
   organizationId: string,
   porCodigoInterno: Record<string, string>,
 ): Promise<OrgConfiguracionContable> {
