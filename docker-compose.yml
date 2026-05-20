@@ -9,6 +9,10 @@ services:
       POSTGRES_DB: saas
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
       PGDATA: /var/lib/postgresql/data/pgdata
+      # CLAUDE.md §4.6: timestamps en UTC. timezone=UTC (command) controla
+      # CURRENT_TIMESTAMP/now(); TZ/PGTZ fijan la zona del OS y del cliente.
+      TZ: UTC
+      PGTZ: UTC
     ports:
       - '5432:5432'
     volumes:
@@ -47,6 +51,8 @@ services:
       - "min_wal_size=1GB"
       - "-c"
       - "max_wal_size=4GB"
+      - "-c"
+      - "timezone=UTC"
 
   redis:
     image: redis:7-alpine
@@ -115,6 +121,7 @@ services:
       - '3000:3000'
     environment:
       NODE_ENV: development
+      TZ: UTC
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/saas
       REDIS_HOST: redis
       REDIS_PORT: 6379

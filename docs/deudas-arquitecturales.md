@@ -441,6 +441,17 @@ Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
 
 ---
 
+### 3.5 A9 — Columnas de timestamp son `timestamp` (sin zona), no `timestamptz`
+
+- **Problema**: CLAUDE.md §4.6 manda `timestamptz` en UTC para `createdAt`/`updatedAt`/`auditoria.timestamp`, pero el schema usa `DateTime` plano → Prisma genera `TIMESTAMP(3)` (sin time zone) con `DEFAULT CURRENT_TIMESTAMP`. El valor que se guarda depende de la zona de la sesión de Postgres, que no estaba pineada. Detectado al revisar el manejo de fechas (2026-05-20). `fechaContable` (`@db.Date`) está correcta y NO entra en esta deuda.
+- **Mitigación YA aplicada** (rama `chore/infra-tz-utc`): `TZ=UTC` + `PGTZ=UTC` + `-c timezone=UTC` en el contenedor `postgres`, y `TZ=UTC` en el contenedor `app` (Dockerfile + compose). Con esto `CURRENT_TIMESTAMP` evalúa en UTC → los valores se persisten en UTC. Cierra el riesgo operativo inmediato, **NO** cambia el tipo de columna.
+- **Fix completo (lo que queda como deuda)**: migrar las columnas de timestamp a `@db.Timestamptz(3)` en `schema.prisma`, para que la zona sea explícita en el tipo y la corrección no dependa de la config del contenedor (defense in depth, §4.6).
+- **Trigger para hacerlo**: ANTES de que entren datos de producción. Sin datos, migrar `timestamp → timestamptz` es 1 migration trivial; con datos reales exige convertir interpretando la zona de cada fila y validar que nada se corra una hora. Barato hoy, caro mañana.
+- **Pendiente relacionado (frontend)**: verificar que la capa de presentación convierte UTC → `America/La_Paz` al mostrar. La corrección de storage NO arregla la presentación — son responsabilidades separadas.
+- **Esfuerzo**: ~30 min (cambiar a `@db.Timestamptz(3)` + 1 migration, sin datos prod) + revisión en frontend.
+
+---
+
 ## 4. Explícitamente fuera de scope
 
 - **permissions**: es un stub intencional (catálogo read-only que expone `common/permisos/catalogo.ts`). No hexagonizar — está bien así.
