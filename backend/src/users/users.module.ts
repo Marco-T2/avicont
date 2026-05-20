@@ -1,7 +1,7 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
-import { MembershipsModule } from '../memberships/memberships.module';
+import { MembershipsReaderModule } from '../memberships/memberships-reader.module';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { PrismaUserRepository } from './adapters/prisma-user.repository';
@@ -11,11 +11,12 @@ import { USER_REPOSITORY_PORT } from './ports/user.repository.port';
 import { USERS_READER_PORT } from './ports/users-reader.port';
 import { USERS_WRITER_PORT } from './ports/users-writer.port';
 
-// forwardRef: MembershipsModule ahora importa UsersModule (para
-// consumir USERS_READER_PORT.findMinimalByEmail en invite). El ciclo
-// se cierra con forwardRef en ambas direcciones.
+// `users.service` consume MEMBERSHIPS_READER_PORT (getProfile) vía
+// `MembershipsReaderModule` (leaf), NO `MembershipsModule`. Importar el leaf
+// evita el require de `memberships.module.ts` y rompe el ciclo de carga CJS
+// memberships↔users que crasheaba el bootstrap del build de prod.
 @Module({
-  imports: [forwardRef(() => MembershipsModule)],
+  imports: [MembershipsReaderModule],
   controllers: [UsersController],
   providers: [
     UsersService,
