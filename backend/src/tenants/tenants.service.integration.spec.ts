@@ -2,12 +2,11 @@ import { PrismaClient, SystemRole } from '@prisma/client';
 
 import type { PrismaService } from '@/common/prisma.service';
 import { PrismaPlanCuentasSeederAdapter } from '@/cuentas/adapters/prisma-plan-cuentas-seeder.adapter';
-import { PLAN_CUENTAS_SEEDER_PORT, PlanCuentasSeederPort } from '@/cuentas/ports/plan-cuentas-seeder.port';
+import { PlanCuentasSeederPort } from '@/cuentas/ports/plan-cuentas-seeder.port';
 
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 import { ModuloOrganizacion } from './dto/create-tenant.dto';
 import { TenantsService } from './tenants.service';
-import { TENANT_REPOSITORY_PORT } from './ports/tenant.repository.port';
 
 /**
  * Integration spec de `TenantsService.create` contra Postgres real.
@@ -86,7 +85,9 @@ describe('TenantsService.create (integration)', () => {
     });
     const orgIds = orgs.map((o) => o.id);
     if (orgIds.length > 0) {
-      await prisma.orgConfiguracionContable.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await prisma.orgConfiguracionContable.deleteMany({
+        where: { organizationId: { in: orgIds } },
+      });
       await prisma.cuenta.deleteMany({ where: { organizationId: { in: orgIds } } });
       await prisma.membership.deleteMany({ where: { organizationId: { in: orgIds } } });
       await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
@@ -162,7 +163,9 @@ describe('TenantsService.create (integration)', () => {
       expect(cuentasB).toBe(111);
 
       // Ninguna cuenta de A tiene el organizationId de B
-      const idsA = (await prisma.cuenta.findMany({ where: { organizationId: orgA.id }, select: { id: true } })).map((c) => c.id);
+      const idsA = (
+        await prisma.cuenta.findMany({ where: { organizationId: orgA.id }, select: { id: true } })
+      ).map((c) => c.id);
       const contaminacion = await prisma.cuenta.count({
         where: { id: { in: idsA }, organizationId: orgB.id },
       });

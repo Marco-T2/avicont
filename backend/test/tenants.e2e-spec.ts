@@ -86,7 +86,10 @@ describe('POST /api/tenants (e2e)', () => {
   // ---------------------------------------------------------------
   describe('modulo CONTABILIDAD', () => {
     it('E-CONT-01: 201 + contabilidadEnabled=true + granjaEnabled=false en respuesta', async () => {
-      const res = await crearTenant({ name: `Org Contabilidad ${Date.now()}`, modulo: 'CONTABILIDAD' });
+      const res = await crearTenant({
+        name: `Org Contabilidad ${Date.now()}`,
+        modulo: 'CONTABILIDAD',
+      });
       expect(res.status).toBe(201);
       expect(res.body.contabilidadEnabled).toBe(true);
       expect(res.body.granjaEnabled).toBe(false);
