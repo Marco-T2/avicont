@@ -580,6 +580,15 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
   `TipoDocumentoFisicoConDocumentosError`. P2003 con FK de `DocumentoFisico` →
   `DocumentoFisicoReferenciadoPorComprobanteError`. Ver design §D6.
 
+  > ⚠️ **Corrección empírica (descubierta en 4.4)**: Prisma NO expone el nombre del
+  > índice raw SQL en `meta.target`. Para el UNIQUE PARCIAL reporta `["documentoFisicoId"]`
+  > (array de 1 campo), y para el UNIQUE normal `(documentoFisicoId, comprobanteId)` reporta
+  > `["documentoFisicoId", "comprobanteId"]` (2 campos). NO mapear por el string
+  > `comprobante_documento_fisico_unique_contabilizado` (eso deja el 500 sin mapear).
+  > El adapter de 4.4 ya distingue por longitud del array; el `GlobalExceptionFilter` es
+  > red de seguridad secundaria — el error ya se mapea en la capa repo/service. Si igual
+  > se agrega al filter, usar el shape normalizado, no el nombre del índice.
+
 **Tests que se agregan**: ampliar `comprobantes.service.spec.ts` con casos:
   - contabilizar sin docs asociados → flujo existente sin cambios.
   - contabilizar con docs válidos → OK + cache actualizado.
@@ -903,11 +912,13 @@ de devs, auditores y próximas fases.
 ## Commit de mayor riesgo
 
 **4.4** (`PrismaAsociacionComprobanteRepository`): es el corazón del UNIQUE PARCIAL.
-Si el nombre del índice `comprobante_documento_fisico_unique_contabilizado` no coincide
-exactamente con lo que Prisma reporta en `meta.target` al lanzar P2002, el mapeo de
-error falla y el usuario recibe un 500 en vez del 409 esperado. Mitigación: en el integration
-spec (4.4), provocar el error de race deliberadamente y verificar que el adapter devuelve
-el `DomainError` correcto (no un error genérico).
+✅ **RESUELTO (commit `988698c`)**. El integration spec confirmó empíricamente que Prisma
+NO reporta el nombre del índice en `meta.target`, sino el shape normalizado de campos:
+`["documentoFisicoId"]` (1 campo) para el UNIQUE PARCIAL, `["documentoFisicoId", "comprobanteId"]`
+(2 campos) para el UNIQUE normal. El adapter distingue por longitud del array y mapea el
+parcial a `DocumentoFisicoYaAsociadoAOtroContabilizadoError`. Verificado: el race deliberado
+en el spec devuelve el `DomainError` (no un 500 genérico). Esto invalida la suposición original
+de mapear por nombre de índice — ver corrección en 7.1.
 
 **7.1** (`contabilizar` + integración documentos): modifica código existente y testeado.
 Riesgo de regresión. Mitigación: correr la suite completa de `comprobantes` antes de
