@@ -224,7 +224,7 @@ E-T-02, E-T-03, E-T-05 (aislamiento tenant) a nivel integration.
 
 ---
 
-### 4.2 ☐ `feat(tipos-documento-fisico): add PrismaTiposDocumentoFisicoReaderAdapter and SeederAdapter`
+### 4.2 ☑ `feat(tipos-documento-fisico): add PrismaTiposDocumentoFisicoReaderAdapter and SeederAdapter`
 
 **Entrega**: implementaciones de los dos ports cross-module del catálogo.
 
