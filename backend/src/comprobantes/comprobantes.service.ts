@@ -498,6 +498,11 @@ export class ComprobantesService {
         throw new PeriodoReversionNoAbiertoError(hoy.toIso());
       }
 
+      // Documentos físicos: borrado inmediato de las asociaciones (design §4.4).
+      // El DocumentoFisico sobrevive y queda re-asociable (típicamente al
+      // comprobante AJUSTE de reversión). Idempotente: no-op si no hay docs.
+      await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+
       const correlativo = await this.secuencia.siguienteCorrelativo(
         tenantId,
         TipoComprobante.AJUSTE,

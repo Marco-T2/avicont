@@ -568,7 +568,9 @@ D5 (endpoints sub-recurso), D11 (compatibilidad tipo). E-A-01, E-A-02, E-A-04, E
 
 ## Fase 7 — Wiring con comprobantes (contabilizar + anular)
 
-### 7.1 ☐ `refactor(comprobante): integrate DocumentosFisicos validation in contabilizar`
+### 7.1 ☑ `refactor(comprobante): integrate DocumentosFisicos validation in contabilizar`
+
+> **Nota apply (commit `1c43958`)**: dentro de la TX de `contabilizar()`, paso "3.5" (después de `validarComprobanteParaContabilizar`, ANTES de `secuencia.siguienteCorrelativo` → si la pre-validación falla NO se consume numeración): `listarPorComprobante` → si hay asociaciones, `idsYaAsociadosAContabilizado(tenantId, ids, id, tx)` → si hay conflicto `throw DocumentoFisicoYaAsociadoAOtroContabilizadoError(<primer id real>)` → `refrescarEstadoComprobante(CONTABILIZADO)`. Lógica contable existente intacta. **`DocumentoFisicoYaAsociadoAOtroContabilizadoError` es SINGULAR (`documentoFisicoId: string`)**, no array — el design §4.3/§4.6 decía array; se tomó el primer id de `idsYaAsociadosAContabilizado()` type-safe (cubre el id vacío que dejaba el adapter en el race). Se IMPORTA de `documentos-fisicos/domain`. **GlobalExceptionFilter SIN cambios**: los adapters 4.3/4.4 ya mapean los P2002 a DomainError; importar errores de módulo al common filter invertiría la dependencia (§3.3/§3.5). +3 unit specs.
 
 **Entrega**: `ComprobantesService.contabilizar()` valida los documentos físicos
 asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
@@ -619,7 +621,9 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
 
 ---
 
-### 7.2 ☐ `refactor(comprobante): integrate DocumentosFisicos cleanup in anular`
+### 7.2 ☑ `refactor(comprobante): integrate DocumentosFisicos cleanup in anular`
+
+> **Nota apply (commit `78ed3ce`)**: dentro de la TX de `anular()` (tras validar período de reversión ABIERTO, antes de `siguienteCorrelativo`): `await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx)`. El DocumentoFisico sobrevive y queda re-asociable. Reversión AJUSTE / líneas invertidas / ANULADO / auditoría intactos. +2 unit specs. (Checkbox de 7.1 y 7.2 folded en este commit HEAD.)
 
 **Entrega**: `ComprobantesService.anular()` desasocia todos los documentos físicos
 del comprobante dentro de la misma TX del anulado.

@@ -1292,6 +1292,36 @@ describe('ComprobantesService', () => {
       const metadata = call[2] as Record<string, unknown>;
       expect(metadata).not.toHaveProperty('numero');
     });
+
+    // ----------------------------------------------------------------
+    // Documentos físicos: cleanup al anular (task 7.2, design §4.4)
+    // ----------------------------------------------------------------
+
+    it('desasocia todos los documentos físicos del comprobante anulado', async () => {
+      const { service, asociacionRepo } = setupAnularHappy();
+      asociacionRepo.desasociarTodasDelComprobante.mockResolvedValue(2);
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-orig',
+        expect.any(Object),
+      );
+    });
+
+    it('llama desasociarTodasDelComprobante aun sin docs asociados (no-op idempotente)', async () => {
+      const { service, asociacionRepo } = setupAnularHappy();
+      // default mock → 0 filas borradas.
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-orig',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('listar', () => {
