@@ -31,10 +31,7 @@ export class GestionesFiscalesService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async crear(
-    tenantId: string,
-    year: number,
-  ): Promise<GestionConPeriodos> {
+  async crear(tenantId: string, year: number): Promise<GestionConPeriodos> {
     const currentYear = this.clock.currentYearLaPaz();
     const yearMax = currentYear + 1;
     if (year < YEAR_MIN || year > yearMax) {
@@ -75,10 +72,7 @@ export class GestionesFiscalesService {
     return this.repo.listByOrganization(tenantId, filters);
   }
 
-  async obtenerPorId(
-    id: string,
-    tenantId: string,
-  ): Promise<GestionConPeriodos> {
+  async obtenerPorId(id: string, tenantId: string): Promise<GestionConPeriodos> {
     const gestion = await this.repo.findByIdWithPeriodos(id, tenantId);
     if (!gestion) {
       throw new GestionNoEncontradaError(id);
@@ -86,11 +80,7 @@ export class GestionesFiscalesService {
     return gestion;
   }
 
-  async cerrar(
-    id: string,
-    tenantId: string,
-    userId: string,
-  ): Promise<GestionFiscal> {
+  async cerrar(id: string, tenantId: string, userId: string): Promise<GestionFiscal> {
     return this.prisma.$transaction(async (tx) => {
       const gestion = await this.repo.findByIdWithPeriodos(id, tenantId);
       if (!gestion) {
@@ -100,9 +90,7 @@ export class GestionesFiscalesService {
         throw new GestionYaCerradaError(id);
       }
 
-      const periodosAbiertos = gestion.periodos.filter(
-        (p) => p.status === 'ABIERTO',
-      );
+      const periodosAbiertos = gestion.periodos.filter((p) => p.status === 'ABIERTO');
       if (periodosAbiertos.length > 0) {
         throw new GestionConPeriodosAbiertosError(
           id,
@@ -121,11 +109,7 @@ export class GestionesFiscalesService {
   // Calcula (year, month, ordenEnGestion) para cada uno de los 12 períodos
   // a partir de year + mesInicio. Los períodos que caen en el calendario del
   // año siguiente (caso INDUSTRIAL, AGROPECUARIA, MINERA) reciben year+1.
-  private generarPeriodos(
-    tenantId: string,
-    year: number,
-    mesInicio: number,
-  ): CrearPeriodoData[] {
+  private generarPeriodos(tenantId: string, year: number, mesInicio: number): CrearPeriodoData[] {
     const result: CrearPeriodoData[] = [];
     for (let i = 0; i < 12; i++) {
       const mesReal = ((mesInicio - 1 + i) % 12) + 1;

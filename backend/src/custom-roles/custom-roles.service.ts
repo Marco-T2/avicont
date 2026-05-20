@@ -100,11 +100,7 @@ export class CustomRolesService {
     });
   }
 
-  async update(
-    organizationId: string,
-    id: string,
-    dto: UpdateCustomRoleDto,
-  ): Promise<CustomRole> {
+  async update(organizationId: string, id: string, dto: UpdateCustomRoleDto): Promise<CustomRole> {
     const role = await this.findById(organizationId, id);
     if (!role.isEditable) {
       throw new CustomRoleNoEditableError(id);

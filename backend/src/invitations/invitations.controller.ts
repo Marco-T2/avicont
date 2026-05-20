@@ -28,7 +28,8 @@ interface AuthenticatedRequest {
 
 function resolveTenantId(req: AuthenticatedRequest): string {
   const fromHeader = req.headers['x-tenant-id'];
-  const tenantId = (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
+  const tenantId =
+    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
   if (!tenantId) throw new ForbiddenException('Se requiere contexto de organización');
   return tenantId;
 }
@@ -69,10 +70,7 @@ export class InvitationsController {
   @UseGuards(AuthGuard('jwt'), PermissionsGuard)
   @RequirePermissions('organizacion.miembros.read')
   @ApiOperation({ summary: 'Listar invitaciones de la organización activa' })
-  list(
-    @Req() req: AuthenticatedRequest,
-    @Query('status') status?: InvitationStatus,
-  ) {
+  list(@Req() req: AuthenticatedRequest, @Query('status') status?: InvitationStatus) {
     return this.service.list(resolveTenantId(req), status);
   }
 

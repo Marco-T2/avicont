@@ -60,10 +60,7 @@ export class PeriodosFiscalesService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async obtenerPorId(
-    id: string,
-    tenantId: string,
-  ): Promise<PeriodoFiscal> {
+  async obtenerPorId(id: string, tenantId: string): Promise<PeriodoFiscal> {
     const periodo = await this.repo.findById(id, tenantId);
     if (!periodo) {
       throw new PeriodoNoEncontradoError(id);
@@ -90,10 +87,7 @@ export class PeriodosFiscalesService {
     });
   }
 
-  async obtenerResumenPrecierre(
-    id: string,
-    tenantId: string,
-  ): Promise<ResumenPrecierre> {
+  async obtenerResumenPrecierre(id: string, tenantId: string): Promise<ResumenPrecierre> {
     const periodo = await this.obtenerPorId(id, tenantId);
     const rango = RangoPeriodoFiscal.of(periodo.year, periodo.month);
 
@@ -101,8 +95,7 @@ export class PeriodosFiscalesService {
       this.comprobantesLock.obtenerResumenEnPeriodo(tx, id),
     );
 
-    const puedeCerrar =
-      periodo.status === 'ABIERTO' && resumen.borradores === 0;
+    const puedeCerrar = periodo.status === 'ABIERTO' && resumen.borradores === 0;
 
     return {
       periodo: {
@@ -136,11 +129,7 @@ export class PeriodosFiscalesService {
     };
   }
 
-  async cerrar(
-    id: string,
-    tenantId: string,
-    userId: string,
-  ): Promise<PeriodoFiscal> {
+  async cerrar(id: string, tenantId: string, userId: string): Promise<PeriodoFiscal> {
     return this.prisma.$transaction(async (tx) => {
       const periodo = await this.repo.findById(id, tenantId);
       if (!periodo) {
@@ -150,10 +139,7 @@ export class PeriodosFiscalesService {
         throw new PeriodoCerradoError(id);
       }
 
-      const borradores = await this.comprobantesLock.contarBorradoresEnPeriodo(
-        tx,
-        id,
-      );
+      const borradores = await this.comprobantesLock.contarBorradoresEnPeriodo(tx, id);
       if (borradores > 0) {
         throw new PeriodoConBorradoresError(id, borradores);
       }
@@ -196,10 +182,7 @@ export class PeriodosFiscalesService {
     });
   }
 
-  async marcarDefinitivo(
-    id: string,
-    tenantId: string,
-  ): Promise<PeriodoFiscal> {
+  async marcarDefinitivo(id: string, tenantId: string): Promise<PeriodoFiscal> {
     return this.prisma.$transaction(async (tx) => {
       const periodo = await this.repo.findById(id, tenantId);
       if (!periodo) {

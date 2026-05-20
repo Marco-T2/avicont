@@ -23,8 +23,5 @@ export abstract class CustomRolesReaderPort {
    * en memberships, equivalente en invitations) para no filtrar la
    * existencia de IDs cross-tenant.
    */
-  abstract belongsToTenant(
-    customRoleId: string,
-    tenantId: string,
-  ): Promise<boolean>;
+  abstract belongsToTenant(customRoleId: string, tenantId: string): Promise<boolean>;
 }

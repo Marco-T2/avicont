@@ -52,11 +52,7 @@ export class NumeroComprobante {
     if (!Number.isInteger(month) || month < 1 || month > 12) {
       throw new RangeError(`NumeroComprobante: mes inválido ${month} (debe estar entre 1 y 12)`);
     }
-    if (
-      !Number.isInteger(correlativo) ||
-      correlativo < 1 ||
-      correlativo > CORRELATIVO_MAX
-    ) {
+    if (!Number.isInteger(correlativo) || correlativo < 1 || correlativo > CORRELATIVO_MAX) {
       throw new RangeError(
         `NumeroComprobante: correlativo inválido ${correlativo} (1..${CORRELATIVO_MAX})`,
       );

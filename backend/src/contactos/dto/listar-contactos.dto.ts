@@ -17,7 +17,8 @@ export const LIST_MAX_PAGE_SIZE = 100;
 
 export class ListarContactosQueryDto {
   @ApiPropertyOptional({
-    description: 'Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram.',
+    description:
+      'Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram.',
   })
   @IsOptional()
   @IsString()

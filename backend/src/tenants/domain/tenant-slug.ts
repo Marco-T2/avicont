@@ -25,10 +25,7 @@ export class TenantSlug {
       throw new TenantSlugInvalidoError('no puede estar vacío');
     }
     if (trimmed.length > MAX_LENGTH) {
-      throw new TenantSlugInvalidoError(
-        `no puede superar los ${MAX_LENGTH} caracteres`,
-        { raw },
-      );
+      throw new TenantSlugInvalidoError(`no puede superar los ${MAX_LENGTH} caracteres`, { raw });
     }
     if (!SLUG_REGEX.test(trimmed)) {
       throw new TenantSlugInvalidoError(

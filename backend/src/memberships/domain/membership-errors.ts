@@ -7,12 +7,7 @@
  * cambian aunque el `message` evolucione (CLAUDE.md §6.3).
  */
 
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '@/common/errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/common/errors';
 
 // ============================================================
 // 404 — recursos no existentes
@@ -47,11 +42,10 @@ export class UsuarioNoRegistradoParaInviteError extends NotFoundError {
 
 export class UsuarioYaEsMiembroError extends ConflictError {
   constructor(email: string, tenantId: string) {
-    super(
-      'MEMBERSHIP_USUARIO_YA_ES_MIEMBRO',
-      'El usuario ya es miembro de esta organización',
-      { email, tenantId },
-    );
+    super('MEMBERSHIP_USUARIO_YA_ES_MIEMBRO', 'El usuario ya es miembro de esta organización', {
+      email,
+      tenantId,
+    });
   }
 }
 
@@ -80,11 +74,9 @@ export class UltimoOwnerError extends ForbiddenError {
  */
 export class AutoDegradacionOwnerError extends ForbiddenError {
   constructor(userId: string) {
-    super(
-      'MEMBERSHIP_AUTO_DEGRADACION_OWNER',
-      'No puede cambiar su propio rol de OWNER',
-      { userId },
-    );
+    super('MEMBERSHIP_AUTO_DEGRADACION_OWNER', 'No puede cambiar su propio rol de OWNER', {
+      userId,
+    });
   }
 }
 
@@ -107,20 +99,13 @@ export class TenantContextRequeridoError extends ForbiddenError {
 
 export class MembershipIdInvalidoError extends ValidationError {
   constructor(raw: unknown) {
-    super(
-      'MEMBERSHIP_ID_INVALIDO',
-      'MembershipId inválido: se esperaba un UUID',
-      { raw },
-    );
+    super('MEMBERSHIP_ID_INVALIDO', 'MembershipId inválido: se esperaba un UUID', { raw });
   }
 }
 
 export class AsignacionRolInvalidaError extends ValidationError {
   constructor(motivo: string) {
-    super(
-      'MEMBERSHIP_ASIGNACION_ROL_INVALIDA',
-      `Asignación de rol inválida: ${motivo}`,
-    );
+    super('MEMBERSHIP_ASIGNACION_ROL_INVALIDA', `Asignación de rol inválida: ${motivo}`);
   }
 }
 
@@ -130,10 +115,9 @@ export class AsignacionRolInvalidaError extends ValidationError {
  */
 export class CustomRoleInvalidoParaTenantError extends ValidationError {
   constructor(customRoleId: string, tenantId: string) {
-    super(
-      'MEMBERSHIP_CUSTOM_ROLE_INVALIDO',
-      'El customRoleId es inválido para esta organización',
-      { customRoleId, tenantId },
-    );
+    super('MEMBERSHIP_CUSTOM_ROLE_INVALIDO', 'El customRoleId es inválido para esta organización', {
+      customRoleId,
+      tenantId,
+    });
   }
 }

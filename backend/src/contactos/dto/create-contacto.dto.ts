@@ -1,11 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsBoolean,
-  IsEmail,
-  IsOptional,
-  IsString,
-  Length,
-} from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, Length } from 'class-validator';
 
 export class CreateContactoDto {
   @ApiProperty({ example: 'Granjas El Sol SRL', minLength: 2, maxLength: 200 })

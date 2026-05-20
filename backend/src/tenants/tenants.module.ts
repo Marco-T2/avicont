@@ -21,11 +21,7 @@ import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 // de vivir en un PrismaModule global, deben acompañarlo — patrón aceptado
 // en §3.2.d (deuda fuera de scope).
 @Module({
-  imports: [
-    RbacModule,
-    forwardRef(() => PeriodosFiscalesModule),
-    MembershipsModule,
-  ],
+  imports: [RbacModule, forwardRef(() => PeriodosFiscalesModule), MembershipsModule],
   controllers: [TenantsController],
   providers: [
     TenantsService,

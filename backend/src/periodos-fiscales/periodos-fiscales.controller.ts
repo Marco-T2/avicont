@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PeriodoFiscalStatus } from '@prisma/client';
@@ -20,15 +11,9 @@ import {
   SoloOwnerAdminPuedeReabrirError,
   SoloOwnerPuedeMarcarDefinitivoError,
 } from './domain/errors';
-import {
-  PeriodoFiscalResponseDto,
-  toPeriodoResponse,
-} from './dto/periodo-fiscal-response.dto';
+import { PeriodoFiscalResponseDto, toPeriodoResponse } from './dto/periodo-fiscal-response.dto';
 import { ReabrirPeriodoDto } from './dto/reabrir-periodo.dto';
-import {
-  PeriodosFiscalesService,
-  ResumenPrecierre,
-} from './periodos-fiscales.service';
+import { PeriodosFiscalesService, ResumenPrecierre } from './periodos-fiscales.service';
 
 interface AuthenticatedRequest {
   user: { sub: string; activeTenantId?: string; roles?: string[] };
@@ -38,13 +23,9 @@ interface AuthenticatedRequest {
 function resolveTenantId(req: AuthenticatedRequest): string {
   const fromHeader = req.headers['x-tenant-id'];
   const tenantId =
-    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) ||
-    req.user.activeTenantId;
+    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
   if (tenantId === undefined || tenantId === '') {
-    throw new ForbiddenError(
-      'TENANT_CONTEXT_REQUIRED',
-      'Se requiere contexto de organización',
-    );
+    throw new ForbiddenError('TENANT_CONTEXT_REQUIRED', 'Se requiere contexto de organización');
   }
   return tenantId;
 }
@@ -90,36 +71,27 @@ export class PeriodosFiscalesController {
     summary:
       'Resumen de comprobantes (contabilizados, borradores, anulados) y totales antes de cerrar.',
   })
-  resumen(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-  ): Promise<ResumenPrecierre> {
+  resumen(@Req() req: AuthenticatedRequest, @Param('id') id: string): Promise<ResumenPrecierre> {
     return this.service.obtenerResumenPrecierre(id, resolveTenantId(req));
   }
 
   @Post(':id/cerrar')
   @RequirePermissions('contabilidad.periodos.cerrar')
   @ApiOperation({
-    summary:
-      'Cerrar período fiscal (valida 0 borradores; bloquea los CONTABILIZADO).',
+    summary: 'Cerrar período fiscal (valida 0 borradores; bloquea los CONTABILIZADO).',
   })
   async cerrar(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<PeriodoFiscalResponseDto> {
-    const periodo = await this.service.cerrar(
-      id,
-      resolveTenantId(req),
-      req.user.sub,
-    );
+    const periodo = await this.service.cerrar(id, resolveTenantId(req), req.user.sub);
     return toPeriodoResponse(periodo);
   }
 
   @Post(':id/reabrir')
   @RequirePermissions('contabilidad.periodos.reabrir')
   @ApiOperation({
-    summary:
-      'Reabrir período cerrado (solo OWNER/ADMIN, motivo ≥20 chars, auditado).',
+    summary: 'Reabrir período cerrado (solo OWNER/ADMIN, motivo ≥20 chars, auditado).',
   })
   async reabrir(
     @Req() req: AuthenticatedRequest,
@@ -127,12 +99,7 @@ export class PeriodosFiscalesController {
     @Body() dto: ReabrirPeriodoDto,
   ): Promise<PeriodoFiscalResponseDto> {
     this.requireOwnerOrAdmin(req);
-    const periodo = await this.service.reabrir(
-      id,
-      resolveTenantId(req),
-      req.user.sub,
-      dto.motivo,
-    );
+    const periodo = await this.service.reabrir(id, resolveTenantId(req), req.user.sub, dto.motivo);
     return toPeriodoResponse(periodo);
   }
 
@@ -146,10 +113,7 @@ export class PeriodosFiscalesController {
     @Param('id') id: string,
   ): Promise<PeriodoFiscalResponseDto> {
     this.requireOwner(req);
-    const periodo = await this.service.marcarDefinitivo(
-      id,
-      resolveTenantId(req),
-    );
+    const periodo = await this.service.marcarDefinitivo(id, resolveTenantId(req));
     return toPeriodoResponse(periodo);
   }
 

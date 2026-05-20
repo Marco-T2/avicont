@@ -9,10 +9,7 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
-import {
-  USERS_READER_PORT,
-  UsersReaderPort,
-} from '@/users/ports/users-reader.port';
+import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
 
 import {
   AutoDegradacionOwnerError,
@@ -75,11 +72,7 @@ export class MembershipsService {
     return created;
   }
 
-  async updateRole(
-    membershipId: string,
-    dto: UpdateMembershipDto,
-    actorUserId: string,
-  ) {
+  async updateRole(membershipId: string, dto: UpdateMembershipDto, actorUserId: string) {
     const tenantId = this.getTenantId();
     const role = MembershipRole.parse(dto);
 
@@ -90,11 +83,7 @@ export class MembershipsService {
 
     // No permitir auto-degradación desde OWNER: el último OWNER debe
     // transferir ownership antes de cambiar su propio rol.
-    if (
-      membership.userId === actorUserId &&
-      membership.systemRole === 'OWNER' &&
-      !role.isOwner()
-    ) {
+    if (membership.userId === actorUserId && membership.systemRole === 'OWNER' && !role.isOwner()) {
       throw new AutoDegradacionOwnerError(actorUserId);
     }
 
@@ -154,10 +143,7 @@ export class MembershipsService {
     return tenantId;
   }
 
-  private async assertCustomRoleBelongsToTenant(
-    customRoleId: string,
-    tenantId: string,
-  ) {
+  private async assertCustomRoleBelongsToTenant(customRoleId: string, tenantId: string) {
     const ok = await this.customRoles.belongsToTenant(customRoleId, tenantId);
     if (!ok) {
       throw new CustomRoleInvalidoParaTenantError(customRoleId, tenantId);

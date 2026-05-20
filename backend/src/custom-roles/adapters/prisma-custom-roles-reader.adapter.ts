@@ -10,10 +10,7 @@ export class PrismaCustomRolesReaderAdapter extends CustomRolesReaderPort {
     super();
   }
 
-  async belongsToTenant(
-    customRoleId: string,
-    tenantId: string,
-  ): Promise<boolean> {
+  async belongsToTenant(customRoleId: string, tenantId: string): Promise<boolean> {
     const row = await this.prisma.customRole.findFirst({
       where: { id: customRoleId, organizationId: tenantId },
       select: { id: true },

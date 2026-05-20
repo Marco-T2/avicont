@@ -76,9 +76,7 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
         ...(data.contabilidadEnabled !== undefined
           ? { contabilidadEnabled: data.contabilidadEnabled }
           : {}),
-        ...(data.granjaEnabled !== undefined
-          ? { granjaEnabled: data.granjaEnabled }
-          : {}),
+        ...(data.granjaEnabled !== undefined ? { granjaEnabled: data.granjaEnabled } : {}),
       },
       select: { contabilidadEnabled: true, granjaEnabled: true },
     });

@@ -25,7 +25,10 @@ export function assertValidPermissionPattern(pattern: string): void {
 
   const segments = pattern.split('.');
   if (segments.length < 2 || segments.length > 3) {
-    throw new InvalidPermissionPatternError(pattern, 'debe tener formato modulo.submodulo[.accion]');
+    throw new InvalidPermissionPatternError(
+      pattern,
+      'debe tener formato modulo.submodulo[.accion]',
+    );
   }
   for (const seg of segments) {
     if (!seg) {

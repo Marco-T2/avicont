@@ -21,9 +21,7 @@ export class RefreshTokenHash {
     }
     const normalizado = raw.toLowerCase();
     if (!HEX64.test(normalizado)) {
-      throw new RefreshTokenHashInvalidoError(
-        'se esperaban 64 caracteres hex (SHA-256)',
-      );
+      throw new RefreshTokenHashInvalidoError('se esperaban 64 caracteres hex (SHA-256)');
     }
     return new RefreshTokenHash(normalizado);
   }

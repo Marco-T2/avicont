@@ -30,6 +30,4 @@ export abstract class PermissionsCacheInvalidationPort {
   abstract invalidateUsersByCustomRole(customRoleId: string): Promise<void>;
 }
 
-export const PERMISSIONS_CACHE_INVALIDATION_PORT = Symbol(
-  'PERMISSIONS_CACHE_INVALIDATION_PORT',
-);
+export const PERMISSIONS_CACHE_INVALIDATION_PORT = Symbol('PERMISSIONS_CACHE_INVALIDATION_PORT');

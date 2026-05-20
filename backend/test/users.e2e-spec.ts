@@ -61,7 +61,15 @@ describe('Users /me (e2e)', () => {
       expect(response.body).not.toHaveProperty('hashedPassword');
       // Allow-list implícita: todos los campos esperados están, ningún otro.
       expect(Object.keys(response.body).sort()).toEqual(
-        ['createdAt', 'displayName', 'email', 'id', 'isActive', 'isEmailVerified', 'updatedAt'].sort(),
+        [
+          'createdAt',
+          'displayName',
+          'email',
+          'id',
+          'isActive',
+          'isEmailVerified',
+          'updatedAt',
+        ].sort(),
       );
       expect(response.body.displayName).toBe('Nuevo Nombre');
       expect(response.body.email).toBe('leak@example.com');

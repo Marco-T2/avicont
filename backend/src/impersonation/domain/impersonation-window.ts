@@ -31,16 +31,10 @@ export class ImpersonationWindow {
       });
     }
     if (minutes < MIN_MINUTES) {
-      throw new ImpersonationWindowInvalidaError(
-        `minutes debe ser >= ${MIN_MINUTES}`,
-        { minutes },
-      );
+      throw new ImpersonationWindowInvalidaError(`minutes debe ser >= ${MIN_MINUTES}`, { minutes });
     }
     if (minutes > MAX_MINUTES) {
-      throw new ImpersonationWindowInvalidaError(
-        `minutes debe ser <= ${MAX_MINUTES}`,
-        { minutes },
-      );
+      throw new ImpersonationWindowInvalidaError(`minutes debe ser <= ${MAX_MINUTES}`, { minutes });
     }
     return new ImpersonationWindow(minutes);
   }

@@ -35,27 +35,17 @@ describe('NumeroDocumento.of', () => {
   });
 
   it('rechaza espacio interno con NumeroDocumentoFormatoInvalidoError', () => {
-    expect(() => NumeroDocumento.of('REC 0042')).toThrow(
-      NumeroDocumentoFormatoInvalidoError,
-    );
+    expect(() => NumeroDocumento.of('REC 0042')).toThrow(NumeroDocumentoFormatoInvalidoError);
   });
 
   it('rechaza acentos con NumeroDocumentoFormatoInvalidoError', () => {
-    expect(() => NumeroDocumento.of('RECÍBO')).toThrow(
-      NumeroDocumentoFormatoInvalidoError,
-    );
+    expect(() => NumeroDocumento.of('RECÍBO')).toThrow(NumeroDocumentoFormatoInvalidoError);
   });
 
   it('rechaza caracteres no permitidos (@, #, _)', () => {
-    expect(() => NumeroDocumento.of('REC@0042')).toThrow(
-      NumeroDocumentoFormatoInvalidoError,
-    );
-    expect(() => NumeroDocumento.of('REC#0042')).toThrow(
-      NumeroDocumentoFormatoInvalidoError,
-    );
-    expect(() => NumeroDocumento.of('REC_0042')).toThrow(
-      NumeroDocumentoFormatoInvalidoError,
-    );
+    expect(() => NumeroDocumento.of('REC@0042')).toThrow(NumeroDocumentoFormatoInvalidoError);
+    expect(() => NumeroDocumento.of('REC#0042')).toThrow(NumeroDocumentoFormatoInvalidoError);
+    expect(() => NumeroDocumento.of('REC_0042')).toThrow(NumeroDocumentoFormatoInvalidoError);
   });
 
   it('acepta longitud exactamente 50 (máximo)', () => {
@@ -64,9 +54,7 @@ describe('NumeroDocumento.of', () => {
   });
 
   it('rechaza longitud 51 (sobre máximo) con NumeroDocumentoLongitudExcedidaError', () => {
-    expect(() => NumeroDocumento.of('A'.repeat(51))).toThrow(
-      NumeroDocumentoLongitudExcedidaError,
-    );
+    expect(() => NumeroDocumento.of('A'.repeat(51))).toThrow(NumeroDocumentoLongitudExcedidaError);
   });
 
   it('aplica trim antes de medir longitud máxima', () => {

@@ -36,9 +36,7 @@ describe('ImpersonationWindow', () => {
     });
 
     it('rechaza NaN', () => {
-      expect(() => ImpersonationWindow.ofMinutes(NaN)).toThrow(
-        ImpersonationWindowInvalidaError,
-      );
+      expect(() => ImpersonationWindow.ofMinutes(NaN)).toThrow(ImpersonationWindowInvalidaError);
     });
   });
 
@@ -60,15 +58,13 @@ describe('ImpersonationWindow', () => {
 
   describe('equals', () => {
     it('true si mismos minutos', () => {
-      expect(
-        ImpersonationWindow.default().equals(ImpersonationWindow.ofMinutes(30)),
-      ).toBe(true);
+      expect(ImpersonationWindow.default().equals(ImpersonationWindow.ofMinutes(30))).toBe(true);
     });
 
     it('false si distintos', () => {
-      expect(
-        ImpersonationWindow.ofMinutes(30).equals(ImpersonationWindow.ofMinutes(60)),
-      ).toBe(false);
+      expect(ImpersonationWindow.ofMinutes(30).equals(ImpersonationWindow.ofMinutes(60))).toBe(
+        false,
+      );
     });
   });
 });

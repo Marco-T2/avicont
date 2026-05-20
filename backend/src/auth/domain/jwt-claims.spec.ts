@@ -50,9 +50,7 @@ describe('JwtClaims', () => {
     });
 
     it('rechaza email vacío', () => {
-      expect(() => JwtClaims.forUser({ userId: 'u', email: '' })).toThrow(
-        JwtClaimsInvalidosError,
-      );
+      expect(() => JwtClaims.forUser({ userId: 'u', email: '' })).toThrow(JwtClaimsInvalidosError);
     });
 
     it('rechaza activeTenantId vacío cuando se pasa', () => {

@@ -88,10 +88,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         exception instanceof Error ? exception : new Error(String(exception)),
       );
     } else {
-      this.logger.debug(
-        `Handled ${mapped.code} on ${request.method} ${request.path}`,
-        { code: mapped.code, httpStatus: mapped.httpStatus, path: request.path },
-      );
+      this.logger.debug(`Handled ${mapped.code} on ${request.method} ${request.path}`, {
+        code: mapped.code,
+        httpStatus: mapped.httpStatus,
+        path: request.path,
+      });
     }
 
     response.status(mapped.httpStatus).json(body);
@@ -187,9 +188,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   // P2003: FK constraint violation → BadRequest
   // P2000: value too long → BadRequest
   // Otros → 500 (bug interno)
-  private mapPrismaError(
-    exception: Prisma.PrismaClientKnownRequestError,
-  ): MappedException {
+  private mapPrismaError(exception: Prisma.PrismaClientKnownRequestError): MappedException {
     switch (exception.code) {
       case 'P2002': {
         const target = (exception.meta as { target?: string[] } | undefined)?.target;

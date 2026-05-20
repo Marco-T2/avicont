@@ -4,9 +4,7 @@ import { TokenFamilyInvalidaError } from './auth-errors';
 describe('TokenFamily', () => {
   describe('of — válidos', () => {
     it('acepta UUID v4 canónico', () => {
-      expect(() =>
-        TokenFamily.of('123e4567-e89b-42d3-a456-426614174000'),
-      ).not.toThrow();
+      expect(() => TokenFamily.of('123e4567-e89b-42d3-a456-426614174000')).not.toThrow();
     });
 
     it('normaliza uppercase a lowercase', () => {
@@ -30,9 +28,7 @@ describe('TokenFamily', () => {
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() => TokenFamily.of(null as unknown as string)).toThrow(
-        TokenFamilyInvalidaError,
-      );
+      expect(() => TokenFamily.of(null as unknown as string)).toThrow(TokenFamilyInvalidaError);
     });
   });
 

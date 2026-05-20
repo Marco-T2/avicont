@@ -3,10 +3,7 @@ import { GestionFiscal, GestionFiscalStatus } from '@prisma/client';
 
 import type { GestionConPeriodos } from '../ports/gestion-fiscal.repository.port';
 
-import {
-  PeriodoFiscalResponseDto,
-  toPeriodoResponse,
-} from './periodo-fiscal-response.dto';
+import { PeriodoFiscalResponseDto, toPeriodoResponse } from './periodo-fiscal-response.dto';
 
 export class GestionResponseDto {
   @ApiProperty() id!: string;
@@ -46,9 +43,7 @@ export function toGestionResponse(g: GestionFiscal): GestionResponseDto {
   };
 }
 
-export function toGestionConPeriodosResponse(
-  g: GestionConPeriodos,
-): GestionConPeriodosResponseDto {
+export function toGestionConPeriodosResponse(g: GestionConPeriodos): GestionConPeriodosResponseDto {
   return {
     ...toGestionResponse(g),
     periodos: g.periodos.map(toPeriodoResponse),

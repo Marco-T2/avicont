@@ -9,11 +9,7 @@ import {
 } from '../prisma/seeds/prod/planes-cuentas/comercial';
 import { AppModule } from '../src/app.module';
 
-import {
-  cleanupTestData,
-  createTestUserWithTenant,
-  prisma,
-} from './helpers/test-factory';
+import { cleanupTestData, createTestUserWithTenant, prisma } from './helpers/test-factory';
 
 describe('ConfiguracionContable (e2e)', () => {
   let app: INestApplication;

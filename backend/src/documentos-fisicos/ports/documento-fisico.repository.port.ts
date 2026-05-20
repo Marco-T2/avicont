@@ -5,9 +5,7 @@
 
 import type { DocumentoFisico, Moneda, Prisma } from '@prisma/client';
 
-export const DOCUMENTO_FISICO_REPOSITORY_PORT = Symbol(
-  'DOCUMENTO_FISICO_REPOSITORY_PORT',
-);
+export const DOCUMENTO_FISICO_REPOSITORY_PORT = Symbol('DOCUMENTO_FISICO_REPOSITORY_PORT');
 
 // ============================================================
 // Tipos de datos aceptados por el repo
@@ -138,11 +136,7 @@ export abstract class DocumentoFisicoRepositoryPort {
    * queda ninguna asociación. Devuelve la cantidad de filas afectadas
    * (0 ó 1).
    */
-  abstract eliminar(
-    tenantId: string,
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number>;
+  abstract eliminar(tenantId: string, id: string, tx?: Prisma.TransactionClient): Promise<number>;
 
   /**
    * Total de filas en `ComprobanteDocumentoFisico` para el documento

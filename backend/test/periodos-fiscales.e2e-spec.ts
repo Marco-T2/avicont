@@ -17,9 +17,7 @@ describe('PeriodosFiscales (e2e)', () => {
     }).compile();
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true }),
-    );
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     prisma = moduleFixture.get(PrismaService);
   });
@@ -67,10 +65,7 @@ describe('PeriodosFiscales (e2e)', () => {
   // ----- Creación de gestión -----
 
   it('COMERCIAL: crear gestión 2026 → 12 períodos enero-diciembre mismo año', async () => {
-    const { ownerToken } = await seedOrgConOwner(
-      TipoEmpresa.COMERCIAL,
-      'org-comercial',
-    );
+    const { ownerToken } = await seedOrgConOwner(TipoEmpresa.COMERCIAL, 'org-comercial');
 
     const res = await request(app.getHttpServer())
       .post('/api/gestiones')
@@ -95,10 +90,7 @@ describe('PeriodosFiscales (e2e)', () => {
   });
 
   it('INDUSTRIAL: crear gestión 2026 → períodos abril/2026 a marzo/2027', async () => {
-    const { ownerToken } = await seedOrgConOwner(
-      TipoEmpresa.INDUSTRIAL,
-      'org-industrial',
-    );
+    const { ownerToken } = await seedOrgConOwner(TipoEmpresa.INDUSTRIAL, 'org-industrial');
 
     const res = await request(app.getHttpServer())
       .post('/api/gestiones')
@@ -130,10 +122,7 @@ describe('PeriodosFiscales (e2e)', () => {
   });
 
   it('AGROPECUARIA: crear gestión 2026 → termina junio/2027', async () => {
-    const { ownerToken } = await seedOrgConOwner(
-      TipoEmpresa.AGROPECUARIA,
-      'org-agro',
-    );
+    const { ownerToken } = await seedOrgConOwner(TipoEmpresa.AGROPECUARIA, 'org-agro');
 
     const res = await request(app.getHttpServer())
       .post('/api/gestiones')
@@ -147,10 +136,7 @@ describe('PeriodosFiscales (e2e)', () => {
   });
 
   it('MINERA: crear gestión 2026 → termina septiembre/2027', async () => {
-    const { ownerToken } = await seedOrgConOwner(
-      TipoEmpresa.MINERA,
-      'org-minera',
-    );
+    const { ownerToken } = await seedOrgConOwner(TipoEmpresa.MINERA, 'org-minera');
 
     const res = await request(app.getHttpServer())
       .post('/api/gestiones')

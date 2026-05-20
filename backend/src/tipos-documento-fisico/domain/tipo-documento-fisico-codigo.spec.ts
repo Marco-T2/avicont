@@ -2,9 +2,7 @@ import { TipoDocumentoFisicoCodigo } from './tipo-documento-fisico-codigo';
 
 describe('TipoDocumentoFisicoCodigo.of', () => {
   it('acepta kebab-case alfanumérico', () => {
-    expect(TipoDocumentoFisicoCodigo.of('factura-recibida').toString()).toBe(
-      'factura-recibida',
-    );
+    expect(TipoDocumentoFisicoCodigo.of('factura-recibida').toString()).toBe('factura-recibida');
   });
 
   it('acepta un solo segmento alfanumérico', () => {

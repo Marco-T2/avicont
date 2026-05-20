@@ -99,8 +99,5 @@ export abstract class TenantRepositoryPort {
    * los campos definidos se aplican. El caller invalida la cache RBAC
    * después de la escritura.
    */
-  abstract updateFeatures(
-    id: string,
-    data: TenantFeaturesUpdate,
-  ): Promise<TenantFeatures>;
+  abstract updateFeatures(id: string, data: TenantFeaturesUpdate): Promise<TenantFeatures>;
 }

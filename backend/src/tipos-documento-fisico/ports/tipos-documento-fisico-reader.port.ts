@@ -9,9 +9,7 @@
 
 import type { Prisma, TipoComprobante } from '@prisma/client';
 
-export const TIPOS_DOCUMENTO_FISICO_READER_PORT = Symbol(
-  'TIPOS_DOCUMENTO_FISICO_READER_PORT',
-);
+export const TIPOS_DOCUMENTO_FISICO_READER_PORT = Symbol('TIPOS_DOCUMENTO_FISICO_READER_PORT');
 
 export interface TipoDocumentoFisicoParaValidacion {
   id: string;

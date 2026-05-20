@@ -129,11 +129,7 @@ export abstract class TipoDocumentoFisicoRepositoryPort {
    * queda, Postgres bloquea con FK Restrict y la operación falla.
    * Devuelve la cantidad de filas afectadas (0 ó 1).
    */
-  abstract eliminar(
-    tenantId: string,
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number>;
+  abstract eliminar(tenantId: string, id: string, tx?: Prisma.TransactionClient): Promise<number>;
 
   /**
    * Upsert idempotente para el seed inicial. Ejecuta `upsert` por

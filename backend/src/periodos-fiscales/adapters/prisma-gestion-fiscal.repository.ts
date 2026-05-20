@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  GestionFiscal,
-  GestionFiscalStatus,
-  Prisma,
-} from '@prisma/client';
+import { GestionFiscal, GestionFiscalStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -24,19 +20,13 @@ export class PrismaGestionFiscalRepository
     super();
   }
 
-  findByYear(
-    organizationId: string,
-    year: number,
-  ): Promise<GestionFiscal | null> {
+  findByYear(organizationId: string, year: number): Promise<GestionFiscal | null> {
     return this.prisma.gestionFiscal.findUnique({
       where: { organizationId_year: { organizationId, year } },
     });
   }
 
-  findByIdWithPeriodos(
-    id: string,
-    organizationId: string,
-  ): Promise<GestionConPeriodos | null> {
+  findByIdWithPeriodos(id: string, organizationId: string): Promise<GestionConPeriodos | null> {
     return this.prisma.gestionFiscal.findFirst({
       where: { id, organizationId },
       include: { periodos: { orderBy: { ordenEnGestion: 'asc' } } },
@@ -102,11 +92,7 @@ export class PrismaGestionFiscalRepository
     return result;
   }
 
-  cerrarGestion(
-    tx: Prisma.TransactionClient,
-    id: string,
-    userId: string,
-  ): Promise<GestionFiscal> {
+  cerrarGestion(tx: Prisma.TransactionClient, id: string, userId: string): Promise<GestionFiscal> {
     return tx.gestionFiscal.update({
       where: { id },
       data: {

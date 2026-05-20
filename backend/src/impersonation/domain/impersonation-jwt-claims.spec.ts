@@ -48,9 +48,9 @@ describe('ImpersonationJwtClaims', () => {
       ['adminUserId', { adminUserId: '' }],
       ['impersonationId', { impersonationId: '' }],
     ])('rechaza %s vacío', (_field, override) => {
-      expect(() =>
-        ImpersonationJwtClaims.forImpersonation({ ...params(), ...override }),
-      ).toThrow(ImpersonationJwtClaimsInvalidosError);
+      expect(() => ImpersonationJwtClaims.forImpersonation({ ...params(), ...override })).toThrow(
+        ImpersonationJwtClaimsInvalidosError,
+      );
     });
 
     it('rechaza roles no-array', () => {

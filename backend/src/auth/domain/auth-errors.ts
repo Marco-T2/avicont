@@ -37,11 +37,9 @@ export class TokenInvalidoError extends UnauthorizedError {
  */
 export class NoMiembroDeTenantError extends UnauthorizedError {
   constructor(tenantId: string) {
-    super(
-      'AUTH_NO_MIEMBRO_DE_TENANT',
-      'El usuario no es miembro activo del tenant solicitado',
-      { tenantId },
-    );
+    super('AUTH_NO_MIEMBRO_DE_TENANT', 'El usuario no es miembro activo del tenant solicitado', {
+      tenantId,
+    });
   }
 }
 
@@ -51,10 +49,7 @@ export class NoMiembroDeTenantError extends UnauthorizedError {
 
 export class RefreshTokenHashInvalidoError extends ValidationError {
   constructor(motivo: string) {
-    super(
-      'AUTH_REFRESH_TOKEN_HASH_INVALIDO',
-      `Hash de refresh token inválido: ${motivo}`,
-    );
+    super('AUTH_REFRESH_TOKEN_HASH_INVALIDO', `Hash de refresh token inválido: ${motivo}`);
   }
 }
 

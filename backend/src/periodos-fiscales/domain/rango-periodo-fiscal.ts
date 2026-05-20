@@ -31,9 +31,7 @@ export class RangoPeriodoFiscal {
       throw new RangeError(`RangoPeriodoFiscal: year inválido ${year}`);
     }
     if (!Number.isInteger(month) || month < 1 || month > 12) {
-      throw new RangeError(
-        `RangoPeriodoFiscal: mes inválido ${month} (debe estar entre 1 y 12)`,
-      );
+      throw new RangeError(`RangoPeriodoFiscal: mes inválido ${month} (debe estar entre 1 y 12)`);
     }
     return new RangoPeriodoFiscal(year, month);
   }

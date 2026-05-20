@@ -144,9 +144,7 @@ describe('ImpersonationService (unit)', () => {
     it('prefiere systemRole sobre customRoleSlug al armar roles del target', async () => {
       memberships.findForImpersonation
         .mockResolvedValueOnce(adminOwner())
-        .mockResolvedValueOnce(
-          mkMembership({ systemRole: 'ADMIN', customRoleSlug: 'contador' }),
-        );
+        .mockResolvedValueOnce(mkMembership({ systemRole: 'ADMIN', customRoleSlug: 'contador' }));
 
       await service.start(ADMIN, TENANT, validDto());
 
@@ -159,9 +157,7 @@ describe('ImpersonationService (unit)', () => {
     it('roles queda vacío si target no tiene ni systemRole ni customRoleSlug', async () => {
       memberships.findForImpersonation
         .mockResolvedValueOnce(adminOwner())
-        .mockResolvedValueOnce(
-          mkMembership({ systemRole: null, customRoleSlug: null }),
-        );
+        .mockResolvedValueOnce(mkMembership({ systemRole: null, customRoleSlug: null }));
 
       await service.start(ADMIN, TENANT, validDto());
 
@@ -215,17 +211,13 @@ describe('ImpersonationService (unit)', () => {
         .mockResolvedValueOnce(adminOwner())
         .mockResolvedValueOnce(null);
 
-      await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(
-        TargetNoMiembroError,
-      );
+      await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(TargetNoMiembroError);
     });
 
     it('rechaza si la membership del target está desactivada', async () => {
       memberships.findForImpersonation
         .mockResolvedValueOnce(adminOwner())
-        .mockResolvedValueOnce(
-          targetContador({ deactivatedAt: new Date('2026-01-15T00:00:00Z') }),
-        );
+        .mockResolvedValueOnce(targetContador({ deactivatedAt: new Date('2026-01-15T00:00:00Z') }));
 
       await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(
         TargetMembershipDesactivadaError,
@@ -249,9 +241,7 @@ describe('ImpersonationService (unit)', () => {
           mkMembership({ systemRole: SystemRole.OWNER, userEmail: 'otro-owner@imp.bo' }),
         );
 
-      await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(
-        TargetEsOwnerError,
-      );
+      await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(TargetEsOwnerError);
     });
 
     it('rechaza reason inválida sin tocar ports', async () => {

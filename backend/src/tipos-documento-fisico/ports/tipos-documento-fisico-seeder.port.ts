@@ -5,9 +5,7 @@
 
 import type { Prisma } from '@prisma/client';
 
-export const TIPO_DOCUMENTO_FISICO_SEEDER_PORT = Symbol(
-  'TIPO_DOCUMENTO_FISICO_SEEDER_PORT',
-);
+export const TIPO_DOCUMENTO_FISICO_SEEDER_PORT = Symbol('TIPO_DOCUMENTO_FISICO_SEEDER_PORT');
 
 export abstract class TipoDocumentoFisicoSeederPort {
   /**
@@ -15,8 +13,5 @@ export abstract class TipoDocumentoFisicoSeederPort {
    * `(organizationId, codigo)`). Recibe `tx` para participar de la TX que
    * crea la organización: el tenant nace listo (con los 8 tipos) o no nace.
    */
-  abstract seedDefaultsForTenant(
-    tenantId: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void>;
+  abstract seedDefaultsForTenant(tenantId: string, tx?: Prisma.TransactionClient): Promise<void>;
 }

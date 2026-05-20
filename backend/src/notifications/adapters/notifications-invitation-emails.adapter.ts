@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import {
-  InvitationEmailsPort,
-  InviteEmailData,
-} from '../ports/invitation-emails.port';
+import { InvitationEmailsPort, InviteEmailData } from '../ports/invitation-emails.port';
 import { NotificationsService } from '../notifications.service';
 
 /**

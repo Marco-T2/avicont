@@ -100,9 +100,9 @@ describe('AuthService (unit)', () => {
         hashedPassword,
         isActive: false,
       });
-      await expect(
-        service.validateUser('x@y.com', 'correcta'),
-      ).rejects.toBeInstanceOf(CredencialesInvalidasError);
+      await expect(service.validateUser('x@y.com', 'correcta')).rejects.toBeInstanceOf(
+        CredencialesInvalidasError,
+      );
     });
 
     it('retorna el user si email, password y estado son válidos', async () => {

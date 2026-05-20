@@ -22,15 +22,11 @@ describe('RefreshTokenHash', () => {
 
   describe('of — inválidos', () => {
     it('rechaza menos de 64 chars', () => {
-      expect(() => RefreshTokenHash.of('a'.repeat(63))).toThrow(
-        RefreshTokenHashInvalidoError,
-      );
+      expect(() => RefreshTokenHash.of('a'.repeat(63))).toThrow(RefreshTokenHashInvalidoError);
     });
 
     it('rechaza más de 64 chars', () => {
-      expect(() => RefreshTokenHash.of('a'.repeat(65))).toThrow(
-        RefreshTokenHashInvalidoError,
-      );
+      expect(() => RefreshTokenHash.of('a'.repeat(65))).toThrow(RefreshTokenHashInvalidoError);
     });
 
     it('rechaza caracteres no-hex', () => {

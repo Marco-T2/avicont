@@ -2,24 +2,18 @@ import { TipoDocumentoFisicoNombre } from './tipo-documento-fisico-nombre';
 
 describe('TipoDocumentoFisicoNombre.of', () => {
   it('acepta nombre normal', () => {
-    expect(TipoDocumentoFisicoNombre.of('Factura recibida').toString()).toBe(
-      'Factura recibida',
-    );
+    expect(TipoDocumentoFisicoNombre.of('Factura recibida').toString()).toBe('Factura recibida');
   });
 
   it('aplica trim sin tocar el casing interno', () => {
-    expect(TipoDocumentoFisicoNombre.of('   Recibo Egreso   ').toString()).toBe(
-      'Recibo Egreso',
-    );
+    expect(TipoDocumentoFisicoNombre.of('   Recibo Egreso   ').toString()).toBe('Recibo Egreso');
   });
 
   it('acepta acentos y caracteres legibles', () => {
-    expect(TipoDocumentoFisicoNombre.of('Nota de débito').toString()).toBe(
-      'Nota de débito',
+    expect(TipoDocumentoFisicoNombre.of('Nota de débito').toString()).toBe('Nota de débito');
+    expect(TipoDocumentoFisicoNombre.of('Comprobante interno (provisional)').toString()).toBe(
+      'Comprobante interno (provisional)',
     );
-    expect(
-      TipoDocumentoFisicoNombre.of('Comprobante interno (provisional)').toString(),
-    ).toBe('Comprobante interno (provisional)');
   });
 
   it('rechaza vacío', () => {

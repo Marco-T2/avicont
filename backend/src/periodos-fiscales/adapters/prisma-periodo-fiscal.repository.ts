@@ -1,10 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  PeriodoFiscal,
-  PeriodoFiscalReopening,
-  PeriodoFiscalStatus,
-  Prisma,
-} from '@prisma/client';
+import { PeriodoFiscal, PeriodoFiscalReopening, PeriodoFiscalStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -16,10 +11,7 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     super();
   }
 
-  findById(
-    id: string,
-    organizationId: string,
-  ): Promise<PeriodoFiscal | null> {
+  findById(id: string, organizationId: string): Promise<PeriodoFiscal | null> {
     return this.prisma.periodoFiscal.findFirst({
       where: { id, organizationId },
     });
@@ -50,11 +42,7 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  cerrar(
-    tx: Prisma.TransactionClient,
-    id: string,
-    userId: string,
-  ): Promise<PeriodoFiscal> {
+  cerrar(tx: Prisma.TransactionClient, id: string, userId: string): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
       where: { id },
       data: {
@@ -65,10 +53,7 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  reabrir(
-    tx: Prisma.TransactionClient,
-    id: string,
-  ): Promise<PeriodoFiscal> {
+  reabrir(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
       where: { id },
       data: {
@@ -79,10 +64,7 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  marcarDefinitivo(
-    tx: Prisma.TransactionClient,
-    id: string,
-  ): Promise<PeriodoFiscal> {
+  marcarDefinitivo(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
       where: { id },
       data: { esDefinitivo: true },

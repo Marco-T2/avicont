@@ -3,16 +3,12 @@ import { TenantSlugInvalidoError } from './tenant-errors';
 
 describe('TenantSlug', () => {
   describe('of — válidos', () => {
-    it.each([
-      'a',
-      'acme',
-      'acme-corp',
-      'granja-norte-1',
-      'avicultor1',
-      '1nombre',
-    ])('acepta "%s"', (raw) => {
-      expect(() => TenantSlug.of(raw)).not.toThrow();
-    });
+    it.each(['a', 'acme', 'acme-corp', 'granja-norte-1', 'avicultor1', '1nombre'])(
+      'acepta "%s"',
+      (raw) => {
+        expect(() => TenantSlug.of(raw)).not.toThrow();
+      },
+    );
 
     it('preserva el valor', () => {
       expect(TenantSlug.of('acme-corp').toString()).toBe('acme-corp');
@@ -40,12 +36,8 @@ describe('TenantSlug', () => {
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() => TenantSlug.of(null as unknown as string)).toThrow(
-        TenantSlugInvalidoError,
-      );
-      expect(() => TenantSlug.of(123 as unknown as string)).toThrow(
-        TenantSlugInvalidoError,
-      );
+      expect(() => TenantSlug.of(null as unknown as string)).toThrow(TenantSlugInvalidoError);
+      expect(() => TenantSlug.of(123 as unknown as string)).toThrow(TenantSlugInvalidoError);
     });
   });
 
@@ -74,9 +66,7 @@ describe('TenantSlug', () => {
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() => TenantSlug.fromName(null as unknown as string)).toThrow(
-        TenantSlugInvalidoError,
-      );
+      expect(() => TenantSlug.fromName(null as unknown as string)).toThrow(TenantSlugInvalidoError);
     });
   });
 

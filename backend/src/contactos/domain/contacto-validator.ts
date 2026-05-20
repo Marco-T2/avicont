@@ -7,10 +7,7 @@
  * referenciadoras) viven en `contactos.service.ts`, no acá.
  */
 
-import {
-  ContactoFlagsInvalidosError,
-  ContactoRazonSocialRequeridaError,
-} from './contacto-errors';
+import { ContactoFlagsInvalidosError, ContactoRazonSocialRequeridaError } from './contacto-errors';
 
 // ------------------------------------------------------------
 // Normalización

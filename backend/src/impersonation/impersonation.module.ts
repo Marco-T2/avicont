@@ -18,10 +18,12 @@ import { PrismaImpersonationRepository } from './adapters/prisma-impersonation.r
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService): JwtModuleOptions => ({
-        secret:
-          config.get<string>('JWT_ACCESS_SECRET') || 'fallback-secret-change-in-production',
+        secret: config.get<string>('JWT_ACCESS_SECRET') || 'fallback-secret-change-in-production',
         signOptions: {
-          expiresIn: config.get<string>('JWT_ACCESS_EXPIRES_IN', '1h') as `${number}${'m' | 'h' | 'd' | 's'}`,
+          expiresIn: config.get<string>(
+            'JWT_ACCESS_EXPIRES_IN',
+            '1h',
+          ) as `${number}${'m' | 'h' | 'd' | 's'}`,
         },
       }),
     }),

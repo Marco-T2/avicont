@@ -44,37 +44,36 @@ describe('MembershipsReaderAdapter.findForImpersonation (integration)', () => {
     tenantA = a.id;
     tenantB = b.id;
 
-    const [owner, memberDesactivado, userCuentaInactiva, userOtroTenant] =
-      await Promise.all([
-        prisma.user.create({
-          data: {
-            email: 'owner-imp-reader@test.bo',
-            hashedPassword: 'x',
-            isActive: true,
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: 'desact-imp-reader@test.bo',
-            hashedPassword: 'x',
-            isActive: true,
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: 'cuenta-inactiva@test.bo',
-            hashedPassword: 'x',
-            isActive: false,
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: 'other-tenant@test.bo',
-            hashedPassword: 'x',
-            isActive: true,
-          },
-        }),
-      ]);
+    const [owner, memberDesactivado, userCuentaInactiva, userOtroTenant] = await Promise.all([
+      prisma.user.create({
+        data: {
+          email: 'owner-imp-reader@test.bo',
+          hashedPassword: 'x',
+          isActive: true,
+        },
+      }),
+      prisma.user.create({
+        data: {
+          email: 'desact-imp-reader@test.bo',
+          hashedPassword: 'x',
+          isActive: true,
+        },
+      }),
+      prisma.user.create({
+        data: {
+          email: 'cuenta-inactiva@test.bo',
+          hashedPassword: 'x',
+          isActive: false,
+        },
+      }),
+      prisma.user.create({
+        data: {
+          email: 'other-tenant@test.bo',
+          hashedPassword: 'x',
+          isActive: true,
+        },
+      }),
+    ]);
     ownerId = owner.id;
     memberDesactivadoId = memberDesactivado.id;
     userCuentaInactivaId = userCuentaInactiva.id;

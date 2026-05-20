@@ -15,10 +15,7 @@ export class Email {
       throw new EmailInvalidoError(raw, 'no puede estar vacío');
     }
     if (normalizado.length > MAX_LONGITUD) {
-      throw new EmailInvalidoError(
-        raw,
-        `excede longitud máxima de ${MAX_LONGITUD} caracteres`,
-      );
+      throw new EmailInvalidoError(raw, `excede longitud máxima de ${MAX_LONGITUD} caracteres`);
     }
     if (!EMAIL_REGEX.test(normalizado)) {
       throw new EmailInvalidoError(raw, 'formato no válido');
