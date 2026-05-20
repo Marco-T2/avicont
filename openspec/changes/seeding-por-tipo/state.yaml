@@ -1,0 +1,44 @@
+change: seeding-por-tipo
+project: avicont
+created: "2026-05-20"
+updated: "2026-05-20"
+
+phase: tasks
+status: ready_for_apply
+
+artifact_store: openspec
+
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+
+phases_pending:
+  - apply
+  - verify
+  - archive
+
+artifacts:
+  proposal: openspec/changes/seeding-por-tipo/proposal.md
+  spec: openspec/changes/seeding-por-tipo/spec.md
+  design: openspec/changes/seeding-por-tipo/design.md
+  tasks: openspec/changes/seeding-por-tipo/tasks.md
+
+apply_progress: ~
+
+notes: |
+  Sin migration de schema (design D1): flags contabilidadEnabled/granjaEnabled
+  ya existen en Organization. Solo cambia DTO, service, port, adapter y firma de
+  comercial.ts. Task 9.1 de documento-fisico ABSORBIDA por este change (ver
+  tasks Fase 0.1).
+
+  Prerequisito bloqueante: Fase 1.1 (fix firma comercial.ts) debe completarse
+  ANTES de cualquier otra fase.
+
+  TipoDocumentoFisicoSeederPort ya existe en
+  backend/src/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port.ts
+  (declarado en documento-fisico task 3.1). El adapter PrismaTiposDocumentoFisicoSeederAdapter
+  (task 4.2 de documento-fisico) puede NO existir aún — verificar antes de apply
+  y crear si falta.
