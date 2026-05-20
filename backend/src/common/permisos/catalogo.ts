@@ -196,6 +196,22 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
       update: 'Modificar configuración contable',
     },
   },
+  // Retroactivo del slice 1 (Fase 1.4 contactos) — REQ-P-12.
+  {
+    modulo: 'contabilidad',
+    submodulo: 'contactos',
+    acciones: CRUD('contactos (clientes y proveedores)'),
+  },
+  {
+    modulo: 'contabilidad',
+    submodulo: 'tipos-documento-fisico',
+    acciones: CRUD('tipos de documento físico'),
+  },
+  {
+    modulo: 'contabilidad',
+    submodulo: 'documentos-fisicos',
+    acciones: CRUD('documentos físicos'),
+  },
 
   // ---------- Granja ----------
   {

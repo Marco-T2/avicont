@@ -648,7 +648,9 @@ del comprobante dentro de la misma TX del anulado.
 
 ## Fase 8 — RBAC y permisos
 
-### 8.1 ☐ `feat(rbac): add documentos-fisicos and tipos-documento-fisico permissions`
+### 8.1 ☑ `feat(rbac): add documentos-fisicos and tipos-documento-fisico permissions`
+
+> **Nota apply**: 12 permisos agregados a `CATALOGO_PERMISOS` vía helper `CRUD()` (read/create/update/delete c/u): `contabilidad.contactos.*` (retroactivo slice 1), `contabilidad.tipos-documento-fisico.*`, `contabilidad.documentos-fisicos.*`. (Originalmente el sub-agent de 6.1 los había metido ahí por error; se revirtieron y se hacen acá, su lugar correcto.) `asientos.update` ya existía (lo usa el POST/DELETE de asociación junto con `documentos-fisicos.update`). No hay spec del catálogo; tsc + rbac/common verdes.
 
 **Entrega**: 8 permisos nuevos del slice + 4 permisos retroactivos de `contactos`
 en el catálogo de permisos.
