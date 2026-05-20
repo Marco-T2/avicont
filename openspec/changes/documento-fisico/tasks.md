@@ -337,7 +337,7 @@ aquí — el adapter es muy delgado (thin).
 
 ## Fase 5 — Services + unit specs (TDD)
 
-### 5.1 ☐ `feat(tipos-documento-fisico): add TiposDocumentoFisicoService + unit spec`
+### 5.1 ☑ `feat(tipos-documento-fisico): add TiposDocumentoFisicoService + unit spec`
 
 **Entrega**: lógica de negocio del catálogo. Inyecta SOLO el port.
 TDD: spec primero (todos los casos en rojo), luego implementación hasta verde.
