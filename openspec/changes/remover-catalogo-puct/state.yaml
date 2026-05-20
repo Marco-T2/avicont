@@ -1,5 +1,35 @@
 change: remover-catalogo-puct
 created_at: '2026-05-19'
-phase: tasks
-completed: [proposal, spec, design, tasks]
-pending: [apply, verify, archive]
+phase: archive
+status: archived
+completed: [proposal, spec, design, tasks, apply, verify, archive]
+pending: []
+archived_at: '2026-05-19'
+branch: refactor/cuentas-remover-puct
+verify:
+  verdict: PASS
+commits:
+  - sha: bd1e3c6
+    message: 'refactor(cuentas): inline catálogo en seed comercial y renombrar mapeo'
+  - sha: ee191f1
+    message: 'refactor(cuentas): remover superficie PUCT del módulo'
+  - sha: a036d51
+    message: 'chore(db): drop CatalogoPuct y columnas codigoPuct de Cuenta'
+  - sha: 276d5ee
+    message: 'docs: remover PUCT de constitución, docs y skill-registry'
+specs_synced:
+  to: openspec/specs/
+  result: none
+  reason: >-
+    Removal-only change. El delta en specs/plan-cuentas/spec.md documenta
+    comportamiento ELIMINADO (endpoint mapear-puct, campos codigoPuct) más
+    guardas de regresión; no introduce ninguna capacidad NUEVA que promover.
+    openspec/specs/ está vacío (aún no existe spec principal de plan-cuentas),
+    así que no hay spec principal que crear ni actualizar.
+notes: >-
+  Deuda cerrada (docs/deudas-arquitecturales.md: VO CodigoPuct) ya actualizada
+  en el commit 276d5ee — no se duplica (config rules.archive). El diseño
+  docs/disenos/plan-cuentas-comercial.md fue ACTUALIZADO (no borrado), correcto.
+  Convención del proyecto: las carpetas de change permanecen en
+  openspec/changes/ (no existe patrón archive/; documento-fisico tampoco se
+  movió); el cierre se registra aquí en state.yaml.
