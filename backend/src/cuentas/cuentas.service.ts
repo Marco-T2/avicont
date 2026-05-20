@@ -23,12 +23,7 @@ import {
   validarCodigoInterno,
   validarConsistenciaClaseSubclase,
   validarContrariaNaturaleza,
-  validarNivelPuct,
 } from './domain/cuenta-validator';
-import {
-  CATALOGO_PUCT_READER_PORT,
-  type CatalogoPuctReaderPort,
-} from './ports/catalogo-puct-reader.port';
 import { CUENTA_REPOSITORY_PORT, type CuentaRepositoryPort } from './ports/cuenta.repository.port';
 import {
   MOVIMIENTOS_READER_PORT,
@@ -56,8 +51,6 @@ export class CuentasService {
   constructor(
     @Inject(CUENTA_REPOSITORY_PORT)
     private readonly repo: CuentaRepositoryPort,
-    @Inject(CATALOGO_PUCT_READER_PORT)
-    private readonly catalogoPuct: CatalogoPuctReaderPort,
     @Inject(MOVIMIENTOS_READER_PORT)
     private readonly movimientosReader: MovimientosReaderPort,
   ) {}
@@ -144,23 +137,9 @@ export class CuentasService {
       throw new BadRequestException(contrariaCheck.error);
     }
 
-    // PUCT snapshot
-    let codigoPuct: string | null = null;
-    let nombrePuctSnapshot: string | null = null;
-    let versionPuctMapeado: string | null = null;
-    if (dto.codigoPuct !== undefined) {
-      const snapshot = await this.resolverPuctSnapshot(dto.codigoPuct);
-      codigoPuct = snapshot.codigo;
-      nombrePuctSnapshot = snapshot.nombre;
-      versionPuctMapeado = snapshot.version;
-    }
-
     const creada = await this.repo.crear({
       organizationId: tenantId,
       codigoInterno: dto.codigoInterno,
-      codigoPuct,
-      nombrePuctSnapshot,
-      versionPuctMapeado,
       nombre: dto.nombre,
       descripcion: dto.descripcion ?? null,
       claseCuenta: dto.claseCuenta,
@@ -271,37 +250,6 @@ export class CuentasService {
   }
 
   // ------------------------------------------------------------
-  // Mapear PUCT
-  // ------------------------------------------------------------
-
-  async mapearPuct(tenantId: string, id: string, codigoPuct: string): Promise<CuentaResponseDto> {
-    const cuenta = await this.findByIdOrThrow(tenantId, id);
-
-    // Cambiar el mapeo afecta retroactivamente el LCV y reportes fiscales:
-    // si la cuenta ya tiene movimientos, bloquear.
-    if (cuenta.codigoPuct !== null && cuenta.codigoPuct !== codigoPuct) {
-      const tieneMov = await this.movimientosReader.tieneMovimientos(id, tenantId);
-      if (tieneMov) {
-        throw new ConflictException(
-          cuentaError(
-            CuentaErrorCode.CON_MOVIMIENTOS,
-            'No se puede cambiar el mapeo PUCT de una cuenta con movimientos',
-            { cuentaId: id, codigoPuctActual: cuenta.codigoPuct, codigoPuctNuevo: codigoPuct },
-          ),
-        );
-      }
-    }
-
-    const snapshot = await this.resolverPuctSnapshot(codigoPuct);
-    const actualizada = await this.repo.mapearPuct(id, tenantId, {
-      codigoPuct: snapshot.codigo,
-      nombrePuctSnapshot: snapshot.nombre,
-      versionPuctMapeado: snapshot.version,
-    });
-    return toCuentaResponse(actualizada);
-  }
-
-  // ------------------------------------------------------------
   // Lecturas
   // ------------------------------------------------------------
 
@@ -354,26 +302,6 @@ export class CuentasService {
       );
     }
     return cuenta;
-  }
-
-  private async resolverPuctSnapshot(
-    codigoPuct: string,
-  ): Promise<{ codigo: string; nombre: string; version: string }> {
-    const entry = await this.catalogoPuct.findByCodigo(codigoPuct);
-    if (entry === null) {
-      throw new BadRequestException(
-        cuentaError(
-          CuentaErrorCode.CODIGO_PUCT_INVALIDO,
-          `El código PUCT ${codigoPuct} no existe en el catálogo oficial`,
-          { codigoPuct },
-        ),
-      );
-    }
-    const nivelCheck = validarNivelPuct(entry.nivel);
-    if (!nivelCheck.valido) {
-      throw new BadRequestException(nivelCheck.error);
-    }
-    return { codigo: entry.codigo, nombre: entry.nombre, version: entry.versionPuct };
   }
 
   private armarArbol(cuentas: Cuenta[]): CuentaTreeNodeDto[] {

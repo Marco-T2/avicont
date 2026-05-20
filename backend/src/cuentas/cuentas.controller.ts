@@ -21,7 +21,6 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CuentasService } from './cuentas.service';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { ListarCuentasQueryDto } from './dto/listar-cuentas.dto';
-import { MapearPuctDto } from './dto/mapear-puct.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
 
 interface AuthenticatedRequest {
@@ -95,19 +94,6 @@ export class CuentasController {
     @Body() dto: UpdateCuentaDto,
   ) {
     return this.service.actualizar(resolveTenantId(req), id, dto);
-  }
-
-  @Post(':id/mapear-puct')
-  @RequirePermissions('contabilidad.plan-cuentas.update')
-  @ApiOperation({
-    summary: 'Asignar o cambiar el código PUCT mapeado (captura snapshot de nombre y versión)',
-  })
-  mapearPuct(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-    @Body() dto: MapearPuctDto,
-  ) {
-    return this.service.mapearPuct(resolveTenantId(req), id, dto.codigoPuct);
   }
 
   @Delete(':id')

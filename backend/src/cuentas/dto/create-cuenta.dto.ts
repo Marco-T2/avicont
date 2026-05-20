@@ -13,14 +13,6 @@ export class CreateCuentaDto {
   })
   codigoInterno!: string;
 
-  @ApiPropertyOptional({
-    example: '1.1.1.001',
-    description: 'Código PUCT oficial (nivel 4). Snapshot se captura al guardar.',
-  })
-  @IsOptional()
-  @IsString()
-  codigoPuct?: string;
-
   @ApiProperty({ example: 'CAJA MONEDA NACIONAL' })
   @IsString()
   @Length(1, 200)

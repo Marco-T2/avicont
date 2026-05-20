@@ -42,7 +42,7 @@
 
 > Retirar VO/port/adapter/DTO/endpoint/validador/error codes y limpiar service/controller/module/repo/response. **TDD: ajustar specs (quitar casos PUCT) en el mismo commit que el código.**
 
-### 2.1 ☐ Quitar maquinaria PUCT del módulo y ajustar specs
+### 2.1 ☑ Quitar maquinaria PUCT del módulo y ajustar specs
 
 **Entrega**: módulo `cuentas` sin superficie PUCT. CRUD/tree/conceptos intactos.
 

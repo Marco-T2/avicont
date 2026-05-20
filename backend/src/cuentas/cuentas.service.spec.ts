@@ -4,7 +4,6 @@ import { ClaseCuenta, type Cuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } fr
 import { CuentasService } from './cuentas.service';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { CuentaErrorCode } from './domain/cuenta-errors';
-import type { CatalogoPuctReaderPort, PuctEntry } from './ports/catalogo-puct-reader.port';
 import type { CuentaRepositoryPort } from './ports/cuenta.repository.port';
 import type { MovimientosReaderPort } from './ports/movimientos-reader.port';
 
@@ -19,7 +18,6 @@ const expectErrorCode = (promise: Promise<unknown>, code: string): Promise<void>
 const TENANT_ID = 'org-1';
 
 type MockRepo = { [K in keyof CuentaRepositoryPort]: jest.Mock };
-type MockCatalogo = { [K in keyof CatalogoPuctReaderPort]: jest.Mock };
 type MockMovimientos = { [K in keyof MovimientosReaderPort]: jest.Mock };
 
 function makeRepoMock(): MockRepo {
@@ -33,13 +31,8 @@ function makeRepoMock(): MockRepo {
     actualizar: jest.fn(),
     desactivar: jest.fn(),
     reactivar: jest.fn(),
-    mapearPuct: jest.fn(),
     conceptosQueUsanCuenta: jest.fn(),
   };
-}
-
-function makeCatalogoMock(): MockCatalogo {
-  return { findByCodigo: jest.fn() };
 }
 
 function makeMovimientosMock(): MockMovimientos {
@@ -52,6 +45,7 @@ function cuentaFactory(overrides: Partial<Cuenta> = {}): Cuenta {
     id: 'cuenta-1',
     organizationId: TENANT_ID,
     codigoInterno: '1.1.1.001',
+    // Columnas PUCT del schema (se dropean en el commit del drop de schema).
     codigoPuct: null,
     nombrePuctSnapshot: null,
     versionPuctMapeado: null,
@@ -102,17 +96,14 @@ function buildDtoRaiz(overrides: Partial<CreateCuentaDto> = {}): CreateCuentaDto
 
 describe('CuentasService', () => {
   let repo: MockRepo;
-  let catalogo: MockCatalogo;
   let movimientos: MockMovimientos;
   let service: CuentasService;
 
   beforeEach(() => {
     repo = makeRepoMock();
-    catalogo = makeCatalogoMock();
     movimientos = makeMovimientosMock();
     service = new CuentasService(
       repo as unknown as CuentaRepositoryPort,
-      catalogo as unknown as CatalogoPuctReaderPort,
       movimientos as unknown as MovimientosReaderPort,
     );
   });
@@ -196,61 +187,6 @@ describe('CuentasService', () => {
       await expectErrorCode(
         service.crear(TENANT_ID, dto),
         CuentaErrorCode.CONTRARIA_NATURALEZA_INVALIDA,
-      );
-    });
-
-    it('rechaza codigoPuct que no existe en el catálogo', async () => {
-      repo.findByCodigoInterno.mockResolvedValue(null);
-      catalogo.findByCodigo.mockResolvedValue(null);
-      const dto = buildDtoRaiz({ codigoPuct: '9.9.9.999' });
-      await expectErrorCode(service.crear(TENANT_ID, dto), CuentaErrorCode.CODIGO_PUCT_INVALIDO);
-    });
-
-    it('rechaza codigoPuct con nivel distinto a 4', async () => {
-      repo.findByCodigoInterno.mockResolvedValue(null);
-      const entry: PuctEntry = {
-        codigo: '1.1.1',
-        nivel: 3,
-        nombre: 'SUBGRUPO',
-        versionPuct: '2018-03',
-      };
-      catalogo.findByCodigo.mockResolvedValue(entry);
-      const dto = buildDtoRaiz({ codigoPuct: '1.1.1' });
-      await expectErrorCode(
-        service.crear(TENANT_ID, dto),
-        CuentaErrorCode.CODIGO_PUCT_NIVEL_INSUFICIENTE,
-      );
-    });
-
-    it('crea captura snapshot PUCT (nombre + versión)', async () => {
-      repo.findByCodigoInterno.mockResolvedValue(null);
-      repo.findParent.mockResolvedValue(
-        cuentaFactory({ id: 'p', nivel: 3, esDetalle: false, activa: true }),
-      );
-      const entry: PuctEntry = {
-        codigo: '1.1.1.001',
-        nivel: 4,
-        nombre: 'CAJA',
-        versionPuct: '2018-03',
-      };
-      catalogo.findByCodigo.mockResolvedValue(entry);
-      repo.crear.mockImplementation(async (data) => cuentaFactory(data));
-
-      await service.crear(
-        TENANT_ID,
-        buildDto({
-          codigoInterno: '1.1.1.001',
-          parentId: 'p',
-          codigoPuct: '1.1.1.001',
-        }),
-      );
-
-      expect(repo.crear).toHaveBeenCalledWith(
-        expect.objectContaining({
-          codigoPuct: '1.1.1.001',
-          nombrePuctSnapshot: 'CAJA',
-          versionPuctMapeado: '2018-03',
-        }),
       );
     });
 
@@ -380,69 +316,6 @@ describe('CuentasService', () => {
       repo.reactivar.mockResolvedValue(cuentaFactory({ activa: true }));
       const resp = await service.reactivar(TENANT_ID, 'c1');
       expect(resp.activa).toBe(true);
-    });
-  });
-
-  // -------------------- mapearPuct --------------------
-
-  describe('mapearPuct', () => {
-    it('rechaza codigoPuct que no existe', async () => {
-      repo.findById.mockResolvedValue(cuentaFactory());
-      catalogo.findByCodigo.mockResolvedValue(null);
-      await expectErrorCode(
-        service.mapearPuct(TENANT_ID, 'c1', '9.9.9.999'),
-        CuentaErrorCode.CODIGO_PUCT_INVALIDO,
-      );
-    });
-
-    it('rechaza codigoPuct de nivel 3', async () => {
-      repo.findById.mockResolvedValue(cuentaFactory());
-      catalogo.findByCodigo.mockResolvedValue({
-        codigo: '1.1.1',
-        nivel: 3,
-        nombre: 'SUB',
-        versionPuct: '2018-03',
-      });
-      await expectErrorCode(
-        service.mapearPuct(TENANT_ID, 'c1', '1.1.1'),
-        CuentaErrorCode.CODIGO_PUCT_NIVEL_INSUFICIENTE,
-      );
-    });
-
-    it('bloquea cambio de mapeo PUCT cuando la cuenta tiene movimientos', async () => {
-      repo.findById.mockResolvedValue(cuentaFactory({ codigoPuct: '1.1.1.001' }));
-      movimientos.tieneMovimientos.mockResolvedValue(true);
-      catalogo.findByCodigo.mockResolvedValue({
-        codigo: '1.1.1.002',
-        nivel: 4,
-        nombre: 'OTRO',
-        versionPuct: '2018-03',
-      });
-      await expectErrorCode(
-        service.mapearPuct(TENANT_ID, 'c1', '1.1.1.002'),
-        CuentaErrorCode.CON_MOVIMIENTOS,
-      );
-    });
-
-    it('permite primer mapeo PUCT aunque tenga movimientos', async () => {
-      repo.findById.mockResolvedValue(cuentaFactory({ codigoPuct: null }));
-      catalogo.findByCodigo.mockResolvedValue({
-        codigo: '1.1.1.001',
-        nivel: 4,
-        nombre: 'CAJA',
-        versionPuct: '2018-03',
-      });
-      repo.mapearPuct.mockResolvedValue(
-        cuentaFactory({
-          codigoPuct: '1.1.1.001',
-          nombrePuctSnapshot: 'CAJA',
-          versionPuctMapeado: '2018-03',
-        }),
-      );
-      const resp = await service.mapearPuct(TENANT_ID, 'c1', '1.1.1.001');
-      expect(resp.codigoPuct).toBe('1.1.1.001');
-      expect(resp.nombrePuctSnapshot).toBe('CAJA');
-      expect(movimientos.tieneMovimientos).not.toHaveBeenCalled();
     });
   });
 

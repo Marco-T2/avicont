@@ -116,9 +116,9 @@ describe('Cuentas (e2e)', () => {
   });
 
   // ---------------------------------------------------------------
-  // 3. codigoPuct inexistente → CUENTA_CODIGO_PUCT_INVALIDO
+  // 3. codigoPuct enviado en el body se ignora (campo PUCT removido)
   // ---------------------------------------------------------------
-  it('3. POST /cuentas con codigoPuct inexistente devuelve CUENTA_CODIGO_PUCT_INVALIDO', async () => {
+  it('3. POST /cuentas ignora codigoPuct enviado y no persiste ningún dato PUCT', async () => {
     const { accessToken, tenantId } = await setupTenant();
     const res = await crearCuenta(accessToken, tenantId, {
       codigoInterno: '1',
@@ -128,26 +128,33 @@ describe('Cuentas (e2e)', () => {
       esDetalle: false,
       codigoPuct: '9.9.9.999',
     });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('CUENTA_CODIGO_PUCT_INVALIDO');
+    expect(res.status).toBe(201);
+    expect(res.body.codigoInterno).toBe('1');
+    expect(res.body).not.toHaveProperty('codigoPuct');
+    expect(res.body).not.toHaveProperty('nombrePuctSnapshot');
+    expect(res.body).not.toHaveProperty('versionPuctMapeado');
   });
 
   // ---------------------------------------------------------------
-  // 4. codigoPuct de nivel 3 → CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE
+  // 4. El endpoint mapear-puct ya no existe → 404
   // ---------------------------------------------------------------
-  it('4. POST /cuentas con codigoPuct de nivel 3 devuelve CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE', async () => {
+  it('4. POST /cuentas/:id/mapear-puct ya no existe (404)', async () => {
     const { accessToken, tenantId } = await setupTenant();
-    // 1.1.1 es un subgrupo de nivel 3 real del PUCT (DISPONIBILIDADES → CAJA).
-    const res = await crearCuenta(accessToken, tenantId, {
+    const creada = await crearCuenta(accessToken, tenantId, {
       codigoInterno: '1',
       nombre: 'ACTIVO',
       claseCuenta: ClaseCuenta.ACTIVO,
       naturaleza: NaturalezaCuenta.DEUDORA,
       esDetalle: false,
-      codigoPuct: '1.1.1',
     });
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('CUENTA_CODIGO_PUCT_NIVEL_INSUFICIENTE');
+    expect(creada.status).toBe(201);
+
+    const res = await request(app.getHttpServer())
+      .post(`/api/cuentas/${creada.body.id}/mapear-puct`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('x-tenant-id', tenantId)
+      .send({ codigoPuct: '1.1.1.001' });
+    expect(res.status).toBe(404);
   });
 
   // ---------------------------------------------------------------
@@ -226,33 +233,6 @@ describe('Cuentas (e2e)', () => {
     });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('CUENTA_CONTRARIA_NATURALEZA_INVALIDA');
-  });
-
-  // ---------------------------------------------------------------
-  // 8. mapear-puct captura snapshot (nombre + versión)
-  // ---------------------------------------------------------------
-  it('8. POST /cuentas/:id/mapear-puct captura nombrePuctSnapshot y versionPuctMapeado', async () => {
-    const { accessToken, tenantId } = await setupTenant();
-    const creada = await crearCuenta(accessToken, tenantId, {
-      codigoInterno: '1',
-      nombre: 'ACTIVO',
-      claseCuenta: ClaseCuenta.ACTIVO,
-      naturaleza: NaturalezaCuenta.DEUDORA,
-      esDetalle: false,
-    });
-    expect(creada.status).toBe(201);
-
-    // 1.1.1.001 = CAJA (nivel 4 en el PUCT).
-    const map = await request(app.getHttpServer())
-      .post(`/api/cuentas/${creada.body.id}/mapear-puct`)
-      .set('Authorization', `Bearer ${accessToken}`)
-      .set('x-tenant-id', tenantId)
-      .send({ codigoPuct: '1.1.1.001' });
-
-    expect(map.status).toBe(201);
-    expect(map.body.codigoPuct).toBe('1.1.1.001');
-    expect(map.body.nombrePuctSnapshot).toBe('CAJA');
-    expect(map.body.versionPuctMapeado).toBeTruthy();
   });
 
   // ---------------------------------------------------------------
