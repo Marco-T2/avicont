@@ -39,7 +39,7 @@
 
 **Standards**:
 - Adapter Prisma `extends XxxPort` y `super()` en constructor. Inyecta `PrismaService`.
-- Toda query DEBE filtrar por `tenantId` (Anti-31, defense in depth). Excepto catálogos compartidos (PUCT, CotizacionUfv, TipoCambio) que no tienen tenantId.
+- Toda query DEBE filtrar por `tenantId` (Anti-31, defense in depth). Excepto catálogos compartidos (CotizacionUfv, TipoCambio) que no tienen tenantId.
 - Prisma usa `@db.Decimal` para dinero (BOB/USD 18,2 / UFV 14,5 / TC 14,8 / % 5,4 / cantidades 18,6). En TS, `Money` value object con `decimal.js`.
 - Integration spec hermana `*.integration.spec.ts` contra Postgres real (docker compose), patrón: `beforeAll` connect, `beforeEach` cleanup + setup, `afterAll` cleanup + disconnect. Crea `Organization` + `User` + dependencias mínimas.
 
@@ -72,7 +72,7 @@
 ### Trigger: editar `backend/prisma/schema.prisma`
 
 **Standards**:
-- Toda entidad de dominio con `tenantId String` indexado y FK a `Organization`. Catálogos compartidos exceptos (PUCT, CotizacionUfv, TipoCambio).
+- Toda entidad de dominio con `tenantId String` indexado y FK a `Organization`. Catálogos compartidos exceptos (CotizacionUfv, TipoCambio).
 - Decimales con `@db.Decimal(p, s)` exacto: BOB/USD `(18,2)`, UFV `(14,5)`, TC `(14,8)`, `%` `(5,4)`, cantidades `(18,6)`.
 - `FechaContable` como `@db.Date` (sin time, sin timezone). `createdAt`/`updatedAt` como `DateTime @db.Timestamptz`.
 - UNIQUE constraints para invariantes (Anti-22): `(tenantId, ...)` siempre. Defense in depth: UNIQUE en BD + chequeo en service.
@@ -83,7 +83,7 @@
 
 **Standards**:
 - Setup full stack via `Test.createTestingModule({ imports: [AppModule] })` + `app.init()` + `app.use()` global pipes/filters/interceptors igual que `main.ts`.
-- Helpers de `test/helpers/test-factory.ts` para crear orgs/users/memberships. `ensurePuctSeeded()` en `beforeAll` si el test toca cuentas.
+- Helpers de `test/helpers/test-factory.ts` para crear orgs/users/memberships y limpiar datos entre tests.
 - Auth: usa `app.getHttpServer()` con Supertest, login real o token firmado a mano con `JWT_ACCESS_SECRET=test-secret`.
 - `--runInBand --forceExit` obligatorio para e2e.
 

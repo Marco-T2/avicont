@@ -8,7 +8,7 @@ Documento de referencia con las 4 decisiones clave para la implementación del m
 
 **Decisión: Sí, mínimo obligatorio, filtrado por tipo de empresa.**
 
-Al crear el tenant se pregunta su `TipoEmpresa` (COMERCIAL, SERVICIOS, TRANSPORTE, INDUSTRIAL, PETROLERA, CONSTRUCCION, AGROPECUARIA, MINERA). El seed inicial crea un plan de cuentas operativo aplicable a ese tipo, basado en el PUCT oficial del SIN.
+Al crear el tenant se pregunta su `TipoEmpresa` (COMERCIAL, SERVICIOS, TRANSPORTE, INDUSTRIAL, PETROLERA, CONSTRUCCION, AGROPECUARIA, MINERA). El seed inicial crea un plan de cuentas operativo aplicable a ese tipo, con la numeración contable boliviana estándar inlineada en la plantilla del seed.
 
 ### Flags en cada cuenta del seed
 
@@ -44,13 +44,12 @@ Las restricciones de inmutabilidad de atributos de la cuenta (`codigoInterno`, `
 ```
 1. auth + tenant + usuario
 2. plan-cuentas (seed + CRUD)
-3. catalogo-puct (seed desde xlsx)
-4. contactos
-5. documento-fisico (tipos configurables)
-6. gestion + periodo
-7. comprobante + asiento
-8. libros (mayor, compras-ventas)
-9. reportes
+3. contactos
+4. documento-fisico (tipos configurables)
+5. gestion + periodo
+6. comprobante + asiento
+7. libros (mayor, compras-ventas)
+8. reportes
 ```
 
 ---
@@ -122,138 +121,71 @@ model ConfiguracionTenant {
 
 ---
 
-## Pregunta 3: CatalogoPuct — seed completo desde xlsx oficial
+## Pregunta 3: Catálogo de cuentas — ¿catálogo PUCT separado? (DECISIÓN REVERTIDA)
 
-**Decisión: Seed automático al boot desde `puct.xlsx` oficial del SIN, commiteado al repo.**
+> **OBSOLETO (2026-05-19).** La decisión original — sembrar un catálogo
+> `CatalogoPuct` separado desde un `puct.xlsx` oficial del SIN, mapear cada
+> `Cuenta` contra él y persistir un snapshot (`codigoPuct`,
+> `nombrePuctSnapshot`, `versionPuctMapeado`) — **se revirtió** en el change
+> `remover-catalogo-puct`. Se eliminaron la tabla `CatalogoPuct`, las 3
+> columnas de snapshot en `Cuenta`, su índice, el endpoint
+> `POST /cuentas/:id/mapear-puct`, el VO/port/adapter/validador asociados y el
+> pipeline de seed (`prisma/seeds/prod/puct/`). Esta sección se conserva como
+> registro histórico; **no describe el estado actual del sistema.**
 
-### Volumen del PUCT oficial
+**Decisión vigente: NO hay catálogo separado. La plantilla del seed es
+autocontenida.**
 
-538 cuentas oficiales distribuidas en:
+El plan de cuentas se siembra directamente desde la plantilla por tipo de
+empresa (`prisma/seeds/prod/planes-cuentas/comercial.ts`). El nombre de cada
+cuenta hoja viene inlineado en la plantilla; el `nivel` se deriva de la cantidad
+de segmentos del código y la `claseCuenta` del primer dígito (helpers locales
+`claseCuentaDe` / `nombreDe`). El `codigoInterno` ES el código propio de la
+cuenta — no existe un código externo contra el cual mapear.
 
-- 5 clases (nivel 1): ACTIVO, PASIVO, PATRIMONIO, INGRESO, EGRESO
-- 15 grupos (nivel 2)
-- 54 subgrupos (nivel 3)
-- 464 cuentas principales (nivel 4)
+El mapeo de conceptos del sistema a cuentas (`OrgConfiguracionContable`) opera
+sobre `codigoInterno` mediante la constante `MAPEO_CODIGO_A_CONCEPTO` (antes
+`MAPEO_PUCT_A_CONCEPTO`). No hay tabla compartida, ni snapshot, ni versión de
+catálogo, ni cache Redis del catálogo: el seed es la única fuente de verdad de
+los nombres y la jerarquía.
 
-El nivel 5 (Cuenta Analítica) es libre del tenant, no viene en el seed.
+### Motivo de la reversión
 
-### Estructura de archivos
-
-```
-prisma/seeds/prod/puct/
-├── source/
-│   ├── puct.xlsx              ← archivo oficial del SIN
-│   └── README.md              ← versión, fecha, URL origen
-├── parser.ts                  ← procesa xlsx → records
-├── catalogo-puct.seed.ts      ← upsert al DB
-└── __tests__/
-    └── parser.spec.ts         ← valida estructura
-```
-
-### Schema
-
-```prisma
-model CatalogoPuct {
-  codigo        String         @id                 // "1.1.1.001"
-  nivel         Int                                // 1, 2, 3 o 4
-  nombre        String
-  claseCuenta   ClaseCuenta
-  padre         String?
-  activo        Boolean        @default(true)      // false = deprecado por SIN
-  tiposEmpresa  TipoEmpresa[]                      // Postgres array
-  versionPuct   String         @default("2024-01") // versión del SIN que trajo el registro
-  actualizadoEn DateTime       @updatedAt
-  
-  padreCuenta   CatalogoPuct?  @relation("Jerarquia", fields: [padre], references: [codigo])
-  hijas         CatalogoPuct[] @relation("Jerarquia")
-  
-  @@index([nivel])
-  @@index([padre])
-  @@index([claseCuenta])
-  @@index([tiposEmpresa], type: Gin)
-}
-
-enum ClaseCuenta {
-  ACTIVO
-  PASIVO
-  PATRIMONIO
-  INGRESO
-  EGRESO
-}
-
-enum TipoEmpresa {
-  COMERCIAL
-  SERVICIOS
-  TRANSPORTE
-  INDUSTRIAL
-  PETROLERA
-  CONSTRUCCION
-  AGROPECUARIA
-  MINERA
-}
-```
-
-**Tabla compartida sin `tenantId`** — es catálogo oficial, no data de tenant.
-
-### Proceso del parser
-
-1. Lee `puct.xlsx` con librería `xlsx`.
-2. Ignora filas con nombre `XXX` (plantillas del 5to nivel).
-3. Extrae los 4 niveles (C, G, SG, CP).
-4. Mapea cada fila a un registro de `CatalogoPuct`.
-5. Genera el array `tiposEmpresa` leyendo columnas COMERCIAL, SERVICIOS, etc.
-6. Construye la jerarquía (`padre` FK).
-7. Hace `upsert` al correr el seed (idempotente).
-
-### Tests obligatorios del parser
-
-- Mínimo 500 registros oficiales.
-- Exactamente 5 clases de primer nivel.
-- Cuentas específicas por industria (minería, agropecuaria, construcción).
-- No incluye filas "XXX".
-- Todos los registros tienen jerarquía válida (padre existente).
-
-### Cache y actualización
-
-- **Cache Redis al arrancar** con TTL 24h, invalidación explícita al re-seedear.
-- **Actualización:** cuando el SIN publique nueva versión del PUCT, se reemplaza el xlsx, se actualiza README con fecha/versión, se corre `npm run seed:puct`, se commitea. CI aplica en producción.
-
-### Versionado Slowly Changing Dimension (Type 2)
-
-- Tabla principal `CatalogoPuct` con clave simple por `codigo` → queries rápidas.
-- Campo `versionPuct` en la tabla principal para trazar qué versión trajo el registro.
-- Snapshot embebido en `Cuenta` (`nombrePuctSnapshot`, `versionPuctMapeado`) → trazabilidad sin joins.
-- Tabla `HistoricoCatalogoPuct` **diferida** hasta el primer cambio real del SIN.
-
-```prisma
-model Cuenta {
-  codigoPuct         String?
-  nombrePuctSnapshot String?   // nombre al momento del mapeo
-  versionPuctMapeado String?   // versión del PUCT usada al mapear
-}
-```
+El catálogo PUCT separado introducía una dependencia de infraestructura (xlsx +
+parser + tabla + cache) y un acoplamiento (snapshot embebido en `Cuenta`) cuyo
+único valor era la futura consolidación al SIN — que está **fuera de scope**
+(CLAUDE.md §10.9). La numeración estándar boliviana ya queda capturada en la
+plantilla del seed; mantener un segundo catálogo redundante solo agregaba
+superficie que podía desincronizarse.
 
 ---
 
 ## Pregunta 4: Niveles máximos de jerarquía
 
-**Decisión: Dos sistemas de codificación coexistiendo.**
+**Decisión: Un único sistema de codificación interno por tenant.**
+
+> **Nota (2026-05-19).** La versión original describía DOS sistemas de
+> codificación coexistiendo (PUCT oficial + código interno) y un mapeo entre
+> ellos. Tras la reversión del catálogo PUCT (ver Pregunta 3) queda **un solo
+> código**: `codigoInterno`, propio de la cuenta.
 
 ### Profundidad máxima
 
 | Código | Niveles | Regla |
 |---|---|---|
-| **PUCT oficial** | 5 fijos | Impuesto por el SIN: C(1) + G(1) + SG(1) + CP(3) + CA(3) |
-| **Código interno del tenant** | 8 máximo | Puede ser más profundo que el PUCT para granularidad interna |
+| **Código interno del tenant** | 8 máximo | Numeración propia de la cuenta, jerárquica por segmentos |
 
 ### Convención de codificación
 
-**Opción A confirmada:** código interno **igual al código PUCT hasta nivel 4**, con extensión libre del 5 al 8 para granularidad interna del tenant.
+Código jerárquico por segmentos separados por punto, hasta 8 niveles. La
+plantilla del seed arranca con la numeración contable boliviana estándar
+(niveles 1-4); el tenant extiende libremente del nivel 5 al 8 para granularidad
+interna.
 
 Ejemplo:
 
 ```
-PUCT oficial:         1.1.1.001                (Caja — nivel 4, no-detalle)
+Cuenta sembrada:      1.1.1.001                (Caja — nivel 4, no-detalle)
 Cuenta del tenant:    1.1.1.001.01             (Caja MN — nivel 5, detalle)
 Sub-cuenta interna:   1.1.1.001.01.001         (Caja MN Sucursal SCZ — nivel 6, interno)
 ```
@@ -265,9 +197,6 @@ model Cuenta {
   id                        String       @id @default(cuid())
   tenantId                  String
   codigoInterno             String       // hasta 8 niveles
-  codigoPuct                String?      // 5 niveles max, opcional pero recomendado
-  nombrePuctSnapshot        String?      // snapshot al momento del mapeo
-  versionPuctMapeado        String?      // versión del PUCT usada
   nombre                    String
   claseCuenta               ClaseCuenta
   esDetalle                 Boolean
@@ -286,12 +215,13 @@ model Cuenta {
   lineas                    LineaComprobante[]
   
   @@unique([tenantId, codigoInterno])
-  @@index([tenantId, codigoPuct])  // para queries de consolidación
   @@index([padreId])
 }
 ```
 
-**Importante:** sin `@@unique([tenantId, codigoPuct])`. Múltiples cuentas internas pueden mapear al mismo código PUCT (ese es el propósito de la consolidación al SIN).
+> **Nota (2026-05-19).** El schema original incluía `codigoPuct`,
+> `nombrePuctSnapshot`, `versionPuctMapeado` y un `@@index([tenantId, codigoPuct])`.
+> Las tres columnas y el índice se eliminaron con el change `remover-catalogo-puct`.
 
 ### Tabla de configuración contable (separada)
 
@@ -327,19 +257,11 @@ model OrgConfiguracionContable {
 
 ### Invariantes del plan de cuentas
 
-**PUCT mapeado debe ser nivel 4.** Mapear al nivel 3 o superior pierde granularidad que el SIN necesita. Hard-error en el servicio si se intenta nivel < 4.
-
-```ts
-if (puct.nivel < 4) {
-  throw new CodigoPuctNivelInsuficienteError(codigoPuct, puct.nivel);
-}
-```
-
 **Validación de código interno:**
 
 - Máximo 8 niveles separados por punto.
 - Cada nivel es numérico.
-- Niveles 1-4 deben coincidir con el PUCT si está mapeado.
+- Cada cuenta no raíz debe tener un padre válido y activo cuyo código sea el prefijo del propio.
 
 **Inmutabilidad una vez que la cuenta tiene movimientos:**
 
@@ -350,7 +272,6 @@ if (puct.nivel < 4) {
 | `esDetalle` | ✅ | ❌ |
 | `nombre` | ✅ | ✅ |
 | `activa` | ✅ | ✅ (ver regla especial) |
-| `codigoPuct` | ✅ | ⚠️ solo dentro del mismo nivel PUCT |
 
 **Regla especial para desactivar (`activa = false`):** no se puede desactivar una cuenta referenciada desde `OrgConfiguracionContable`. El servicio valida antes de intentar el update:
 
@@ -389,7 +310,6 @@ model Organization {
 
 - **Reportar al SIN:** se usa `tipoEmpresaPrincipal` (un solo valor).
 - **Seed inicial del plan:** mergea plantillas de todos los `tiposEmpresaActivos`.
-- **Filtrar PUCT sugerido:** `tiposEmpresa: { hasSome: tiposEmpresaActivos }`.
 
 ---
 
@@ -399,24 +319,21 @@ model Organization {
 |---|---|---|
 | 1 | Plan pre-sembrado | Sí, mínimo por `tipoEmpresa`. Cuentas `esSystemSeed` editables; `esRequeridaSistema` con 9 cuentas obligatorias. Plantilla inicial: COMERCIAL. |
 | 2 | Multi-moneda | A nivel de línea de comprobante. Tri-valor `monto + tipoCambio + montoBob`. Partida doble en Bs. Cuenta tiene `monedaFuncional` y `permiteMultiMoneda` como metadata opcional. Backend siempre persiste todas las monedas; UI configurable por tenant. |
-| 3 | CatalogoPuct | Seed completo desde `puct.xlsx` oficial commiteado al repo. Parser + upsert idempotente. 538 cuentas en 4 niveles oficiales + array `tiposEmpresa` por cuenta. Cache Redis 24h. Versionado SCD Type 2 con snapshot en `Cuenta`. |
-| 4 | Niveles jerárquicos | PUCT fijo en 5 (regla SIN). Código interno del tenant hasta 8 niveles, **igual al PUCT en niveles 1-4**. Ambos persistidos en `Cuenta`. PUCT opcional; si presente, validado contra catálogo oficial y debe ser nivel 4. |
+| 3 | Catálogo de cuentas | **Revertido (2026-05-19).** Sin catálogo `CatalogoPuct` separado. La plantilla del seed (`comercial.ts`) es autocontenida: nombres inlineados, `nivel`/`claseCuenta` derivados del código. Mapeo de conceptos por `MAPEO_CODIGO_A_CONCEPTO` sobre `codigoInterno`. |
+| 4 | Niveles jerárquicos | Un único código interno por tenant, hasta 8 niveles, jerárquico por segmentos. Sembrado con numeración boliviana estándar (niveles 1-4); tenant extiende del 5 al 8. |
 
 ## Schema final consolidado
 
 | Modelo | Rol clave |
 |---|---|
-| `CatalogoPuct` | PK simple por código, `versionPuct` field, `tiposEmpresa[]` con GIN index |
-| `HistoricoCatalogoPuct` | Diferido hasta primer cambio del SIN |
-| `Cuenta` | `codigoInterno` único por tenant, `codigoPuct` NO único (consolidación), `nombrePuctSnapshot` + `versionPuctMapeado` para trazabilidad |
+| `Cuenta` | `codigoInterno` único por tenant (`@@unique([tenantId, codigoInterno])`), jerarquía por `padreId` |
 | `OrgConfiguracionContable` | 12 FKs nullable a `Cuenta`. `onDelete: Restrict` + validación servicio |
 | `Organization` | `tipoEmpresaPrincipal` (inmutable post-asiento) + `tiposEmpresaActivos: TipoEmpresa[]` |
 
 ## Próximos pasos de implementación
 
-1. Schema Prisma con los 4 modelos nuevos + updates a `Organization`.
-2. Migration + seed del `CatalogoPuct` desde el xlsx oficial (commitear xlsx + parser).
-3. Seed plantilla COMERCIAL del plan de cuentas (~60 cuentas de detalle).
-4. Módulo `cuentas/` hexagonal con CRUD + validaciones.
-5. Módulo `configuracion-contable/` con CRUD para mapear conceptos.
-6. Tests E2E del flujo completo: crear org COMERCIAL → ver plan auto-sembrado → editar config → reasignar concepto.
+1. Schema Prisma con los modelos nuevos + updates a `Organization`.
+2. Seed plantilla COMERCIAL del plan de cuentas autocontenida (~60 cuentas de detalle, nombres inlineados).
+3. Módulo `cuentas/` hexagonal con CRUD + validaciones.
+4. Módulo `configuracion-contable/` con CRUD para mapear conceptos.
+5. Tests E2E del flujo completo: crear org COMERCIAL → ver plan auto-sembrado → editar config → reasignar concepto.

@@ -586,7 +586,7 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 - Todo registro tiene `tenantId` no nulo. Toda query de entidad de dominio filtra por `tenantId`.
 - **Query sin filtro por `tenantId` es bug de seguridad.** Defense in depth: guard + servicio + repositorio. Ninguna capa confía en que la anterior hizo su trabajo.
 - Fuente de `tenantId`: `JWT.activeTenantId`. Header `X-Tenant-ID` solo para super-admin, siempre auditado.
-- Excepción: catálogos compartidos (`CatalogoPuct`, `CotizacionUfv`, `TipoCambio` BCB) no tienen `tenantId` — solo lectura desde cualquier tenant.
+- Excepción: catálogos compartidos (`CotizacionUfv`, `TipoCambio` BCB) no tienen `tenantId` — solo lectura desde cualquier tenant.
 
 ### 4.3 Inmutabilidad post-CONTABILIZADO
 
@@ -657,7 +657,7 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 
 | Scope | Cuándo |
 |-------|--------|
-| Nombre del módulo (`asiento`, `comprobante`, `plan-cuentas`, `periodo`, `puct`, `ufv`, `rbac`, `auth`, `tenant`, `granja`, etc.) | Cambios dentro de un módulo específico |
+| Nombre del módulo (`asiento`, `comprobante`, `plan-cuentas`, `periodo`, `cuentas`, `ufv`, `rbac`, `auth`, `tenant`, `granja`, etc.) | Cambios dentro de un módulo específico |
 | `common` | Cambios en `src/common/*` |
 | `infra` | Docker, CI, scripts, configs de deploy |
 | `deps` | Actualización de dependencias |
@@ -674,7 +674,7 @@ feat(comprobante): agregar numeración correlativa por mes
 fix(common): corregir redondeo en Money.toBob
 chore(infra): forzar TZ=UTC en Dockerfile
 chore(deps): bump decimal.js to 10.4.3
-feat(db): agregar tabla CatalogoPuct
+feat(db): agregar tabla SecuenciaComprobante
 docs: actualizar sección 8 con Anti-31
 test(comprobante): agregar cobertura de anulación
 ```
@@ -780,7 +780,6 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Moneda | Multi-moneda desde día 1, BOB como funcional | §4.2 |
 | Decimales | BOB: (18,2), UFV: (14,5), TC: (14,8), %: (5,4), cantidades: (18,6) | §4.2 |
 | Numeración | `{prefijo}{YY}{MM}-{correlativo}`, `SecuenciaComprobante` con `FOR UPDATE` | §4.1 |
-| PUCT | Catálogo compartido (no por tenant), adopción opcional no estricta | §4.1 |
 | Integración SIN | **Fuera de scope**: sistema no emite facturas ni envía LCV | §4.1 |
 
 ### 10.4 Seguridad
@@ -922,7 +921,6 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma mig
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate deploy
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate status
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma generate
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts
 ```
 
 Para el caller humano, los scripts npm funcionan sin exportar variables porque leen del `.env`:
@@ -951,7 +949,7 @@ npm test                                                                # equiva
 - `*.integration.spec.ts` — integración contra infra real (Postgres). Requiere `DATABASE_URL` en el ambiente. Vive al lado del adapter que testea.
 - `*.e2e-spec.ts` — E2E full stack a través de HTTP (Supertest + AppModule). Vive en `test/`.
 
-**E2E (requieren Postgres arriba + CatalogoPuct sembrado)**:
+**E2E (requieren Postgres arriba)**:
 ```bash
 cd backend
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
@@ -961,8 +959,6 @@ npx jest test/ --runInBand --forceExit
 ```
 
 `--runInBand` es necesario para que los tests E2E de distintos módulos no pisen el mismo Postgres en paralelo. `--forceExit` porque PrismaClient deja handles que Jest no detecta (patrón consistente con el resto de los E2E del proyecto).
-
-`ensurePuctSeeded()` en `test/helpers/test-factory.ts` se llama en `beforeAll` de cada suite que necesite el catálogo — idempotente, solo siembra si `CatalogoPuct` está vacío.
 
 ### 11.4 Lint y typecheck
 
@@ -980,8 +976,7 @@ npm run format                       # prettier sobre src/ y test/
 
 1. Desde la raíz del repo: `docker compose up -d postgres redis` (mínimo viable)
 2. Si es la primera vez, desde `backend/`:
-   `DATABASE_URL=... npx prisma migrate deploy` +
-   `DATABASE_URL=... npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts`
+   `DATABASE_URL=... npx prisma migrate deploy`
 3. Desde `backend/`: `npm run start:dev` para el backend en watch mode
 4. Abrir http://localhost:3000/api/docs para el Swagger
 
@@ -1050,7 +1045,7 @@ Antes de editar código que caiga en los paths de la tabla, o antes de las opera
 | Detectás cálculo repetido, mock sospechoso, `new Date()` en dominio, `any`, query sin `tenantId`, o cualquier smell contable | Buscar en `docs/claude/antipatrones.md` por keyword antes de normalizar el patrón |
 | Escribís un asiento automático generado por otro módulo (venta→asiento, pago→asiento) | `docs/claude/dominio-contable.md` §4.1 + `docs/claude/antipatrones.md` Anti-14, Anti-17 |
 | Tocás cálculo de IVA, IT, UFV, conversión de moneda, cierre mensual/anual | `docs/claude/dominio-contable.md` completo, no solo la sección relevante |
-| Creás o modificás un seed (`prisma/seeds/**`), especialmente plan de cuentas o catálogo-puct | `docs/claude/dominio-contable.md` §4.1 (plan de cuentas) + `docs/claude/antipatrones.md` Anti-42 |
+| Creás o modificás un seed (`prisma/seeds/**`), especialmente plan de cuentas | `docs/claude/dominio-contable.md` §4.1 (plan de cuentas) + `docs/claude/antipatrones.md` Anti-42 |
 
 ### 12.3 Regla anti-drift entre core y docs extendidos
 

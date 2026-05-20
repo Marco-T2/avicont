@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-04-23
-Última revisión contra core: 2026-04-23
+Última edición: 2026-05-19
+Última revisión contra core: 2026-05-19
 Owner: backend-lead
 -->
 
@@ -61,8 +61,7 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 
 #### Plan de cuentas
 
-- Código interno único por tenant.
-- Código PUCT opcional, pero si está presente debe respetar estructura jerárquica de 5 niveles y los 4 primeros niveles deben existir en el catálogo PUCT oficial.
+- Código interno único por tenant. `codigoInterno` es el código propio de la cuenta; respeta una estructura jerárquica de hasta 5 niveles (un segmento por nivel, separados por punto).
 - Cuenta con movimientos no se puede eliminar, solo desactivar.
 - No se puede cambiar el tipo (Activo/Pasivo/Patrimonio/Ingreso/Egreso) de una cuenta con movimientos.
 - Cambio de `esDetalle: true → false` solo si la cuenta no tiene movimientos.
@@ -113,7 +112,7 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 - Todo registro tiene `tenantId` no nulo.
 - **Query sin filtro por `tenantId` es bug de seguridad.** Se enforza en el repositorio base, no en el servicio.
 - Un usuario no puede leer ni escribir datos de un tenant al que no pertenece. Verificación en guard + repositorio (**defense in depth**).
-- Tablas compartidas (`CatalogoPuct`, `CotizacionUfv`, `TipoCambio` oficial del BCB) **no tienen `tenantId`**. Se leen en modo solo-lectura desde cualquier tenant.
+- Tablas compartidas (`CotizacionUfv`, `TipoCambio` oficial del BCB) **no tienen `tenantId`**. Se leen en modo solo-lectura desde cualquier tenant.
 
 ---
 

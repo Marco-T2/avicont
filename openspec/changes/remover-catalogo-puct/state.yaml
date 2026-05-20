@@ -1,0 +1,5 @@
+change: remover-catalogo-puct
+created_at: '2026-05-19'
+phase: tasks
+completed: [proposal, spec, design, tasks]
+pending: [apply, verify, archive]

@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-04-23
-Última revisión contra core: 2026-04-23
+Última edición: 2026-05-19
+Última revisión contra core: 2026-05-19
 Owner: backend-lead
 -->
 
@@ -344,9 +344,9 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 - **Regla**: `CuentasService.desactivar` consulta `OrgConfiguracionContable` y rechaza con `CUENTA_CONFIGURADA_COMO_CONCEPTO` devolviendo en `details.conceptos` la lista de campos que apuntan a la cuenta (ej. `['ivaCreditoId', 'resultadoEjercicioId']`). El usuario debe remapear primero vía `PATCH /api/configuracion-contable`.
 - **Enforcement**: validación en el service + FK `onDelete: Restrict` en cada relación de `OrgConfiguracionContable` (defense in depth) + test unitario `cuentas.service.spec.ts#desactivar › rechaza con lista de conceptos`.
 
-#### Anti-42: Proponer códigos del PUCT/SIN sin validar contra catálogo real
+#### Anti-42: Inventar códigos/nombres de cuenta en la plantilla del seed sin verificar la numeración contable real
 
-- **Qué**: asumir un código PUCT (por ejemplo "5.3.1.001 INTERESES PAGADOS") basado en memoria, convención o suposición sin verificar contra el xlsx/catálogo oficial (`prisma/seeds/prod/puct/source/puct.xlsx`).
-- **Por qué duele**: cicatriz — durante el seed inicial de la plantilla COMERCIAL (Fase 1.0.6), >50% de los códigos propuestos a primera vista no existían o tenían otro nombre en el PUCT real (ej. 5.3.1.001 es SUELDOS Y SALARIOS, no INTERESES PAGADOS). De haber pasado a producción, el LCV y los EEFF habrían sido inconsistentes con el catálogo que revisa el SIN.
-- **Regla**: todo código PUCT se verifica en `CatalogoPuct` (o se greppea en el xlsx oficial) antes de usarlo en código o seeds. Nunca pasar `codigoPuct` sin que haya atravesado `CatalogoPuctReaderPort.findByCodigo` + `validarNivelPuct(4)`.
-- **Enforcement**: en runtime — lookup obligatorio en `CuentasService.resolverPuctSnapshot` antes de persistir; en seed — test de coherencia `prisma/seeds/prod/planes-cuentas/__tests__/puct-a-concepto.spec.ts` (toda cuenta `esRequeridaSistema: true` debe estar en `MAPEO_PUCT_A_CONCEPTO` y vice-versa); en ingesta del catálogo — `catalogo-puct.seed.ts` upsertea directo desde el xlsx oficial.
+- **Qué**: asumir un código o nombre de cuenta (por ejemplo "5.3.1.001 INTERESES PAGADOS") basado en memoria, convención o suposición, e inlinearlo en la plantilla del seed (`prisma/seeds/prod/planes-cuentas/comercial.ts`) sin verificarlo contra la numeración contable boliviana real.
+- **Por qué duele**: cicatriz — durante el seed inicial de la plantilla COMERCIAL (Fase 1.0.6), >50% de los códigos propuestos a primera vista no existían o tenían otro nombre en la numeración estándar (ej. 5.3.1.001 es SUELDOS Y SALARIOS, no INTERESES PAGADOS). De haber pasado a producción, el LCV y los EEFF habrían sido inconsistentes con lo que revisa el SIN.
+- **Regla**: todo código/nombre que se inlinea en `comercial.ts` se verifica contra la numeración contable boliviana antes de commitearlo. El `codigoInterno` es la fuente de verdad: `nivel` se deriva de la cantidad de segmentos y `claseCuenta` del primer dígito; el `nombre` es texto libre que debe corresponder al código.
+- **Enforcement**: en seed — test de coherencia `prisma/seeds/prod/planes-cuentas/__tests__/codigo-a-concepto.spec.ts` (toda cuenta `esRequeridaSistema: true` debe estar en `MAPEO_CODIGO_A_CONCEPTO` y vice-versa); guarda de regresión del seed: 61 hojas, jerarquía y distribución por nivel idénticas, 8 conceptos requeridos.

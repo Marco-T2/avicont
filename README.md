@@ -19,7 +19,7 @@ avicont/
 
 ## Qué hace el sistema
 
-- **Contabilidad boliviana**: plan de cuentas (PUCT oficial RND 101800000004), asientos con partida doble, períodos fiscales, libros mayor y compras/ventas, estados financieros. Sin integración automática al SIN — el contador sube el LCV manualmente.
+- **Contabilidad boliviana**: plan de cuentas, asientos con partida doble, períodos fiscales, libros mayor y compras/ventas, estados financieros. Sin integración automática al SIN — el contador sube el LCV manualmente.
 - **Módulo granja**: operativo simple con asistente IA para registros productivos.
 - **Multi-tenant flat**: cada organización es una isla. Un usuario puede pertenecer a varias con distintos roles.
 
@@ -36,7 +36,6 @@ cd backend
 npm install
 cp .env.example .env    # ajustar si hace falta
 npm run prisma:migrate
-npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts   # siembra el catálogo PUCT
 npm run start:dev
 ```
 
@@ -69,7 +68,7 @@ Puertos expuestos (ver `CLAUDE.md §11.1` para la tabla completa):
 ## Contribuir
 
 1. Leer `CLAUDE.md` completo antes de tocar código.
-2. Seguir conventional commits con scope por módulo (`feat(cuentas): ...`, `fix(puct): ...`).
+2. Seguir conventional commits con scope por módulo (`feat(cuentas): ...`, `fix(comprobante): ...`).
 3. Squash merge only. Branches cortas (≤3 días).
 4. Todo PR responde **Qué / Por qué / Cómo probar** en la descripción.
 

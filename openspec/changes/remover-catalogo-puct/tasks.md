@@ -103,7 +103,7 @@
 
 > Anti-drift §12.3: core/docs en el MISMO PR. Avisar antes de borrar `docs/disenos/plan-cuentas-comercial.md` (config archive).
 
-### 4.1 ☐ Sincronizar constitución, docs extendidos, README y skill-registry
+### 4.1 ☑ Sincronizar constitución, docs extendidos, README y skill-registry
 
 **Entrega**: cero referencias a `CatalogoPuct`/`seed:puct`/`codigoPuct`; ejemplos de catálogo compartido → `CotizacionUfv`/`TipoCambio`.
 
@@ -120,7 +120,7 @@
 
 ## Commit final — Verificación integral
 
-### 5.1 ☐ Suite completa verde + typecheck + lint
+### 5.1 ☑ Suite completa verde + typecheck + lint
 
 **Entrega**: gate de cierre antes del squash merge.
 
