@@ -22,6 +22,7 @@ import {
   toDocumentoFisicoAsociadoDto,
   type DocumentoFisicoAsociadoDto,
 } from '@/documentos-fisicos/dto/documento-fisico-response.dto';
+import { DocumentoFisicoYaAsociadoAOtroContabilizadoError } from '@/documentos-fisicos/domain/documento-fisico-errors';
 import {
   ASOCIACION_COMPROBANTE_REPOSITORY_PORT,
   AsociacionComprobanteRepositoryPort,
@@ -362,6 +363,33 @@ export class ComprobantesService {
         hoy,
         lineas: lineasParaValidar,
       });
+
+      // 3.5) Documentos físicos asociados (design §4.3). Solo si el comprobante
+      // tiene asociaciones. Antes del correlativo: si falla, no consumimos
+      // numeración. La pre-validación lanza con ids REALES (el adapter, al
+      // chocar el UNIQUE PARCIAL en el UPDATE, no tiene contexto del id —
+      // riesgo heredado de la asociación). El UNIQUE PARCIAL en BD sigue
+      // siendo la última línea de defensa contra races (CLAUDE.md §4.8).
+      const asociaciones = await this.asociacionRepo.listarPorComprobante(tenantId, id, tx);
+      if (asociaciones.length > 0) {
+        const documentoFisicoIds = asociaciones.map((a) => a.documentoFisicoId);
+        const yaContabilizados = await this.documentosFisicosReader.idsYaAsociadosAContabilizado(
+          tenantId,
+          documentoFisicoIds,
+          id,
+          tx,
+        );
+        const [primerYaContabilizado] = yaContabilizados;
+        if (primerYaContabilizado !== undefined) {
+          throw new DocumentoFisicoYaAsociadoAOtroContabilizadoError(primerYaContabilizado);
+        }
+        await this.asociacionRepo.refrescarEstadoComprobante(
+          tenantId,
+          id,
+          EstadoComprobante.CONTABILIZADO,
+          tx,
+        );
+      }
 
       // 4) Correlativo atómico en la misma TX (si esta TX falla más abajo,
       //    el correlativo se revierte y no queda "consumido").

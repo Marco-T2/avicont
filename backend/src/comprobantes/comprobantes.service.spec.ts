@@ -961,6 +961,79 @@ describe('ComprobantesService', () => {
         estado: EstadoComprobante.CONTABILIZADO,
       });
     });
+
+    // ----------------------------------------------------------------
+    // Documentos físicos asociados al contabilizar (task 7.1, design §4.3)
+    // ----------------------------------------------------------------
+
+    it('sin docs asociados: no consulta docs ni refresca el cache de estado', async () => {
+      const { service, docsReader, asociacionRepo } = setupHappyPath();
+      // listarPorComprobante default → [] (sin asociaciones).
+
+      await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(asociacionRepo.listarPorComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-b',
+        expect.any(Object),
+      );
+      expect(docsReader.idsYaAsociadosAContabilizado).not.toHaveBeenCalled();
+      expect(asociacionRepo.refrescarEstadoComprobante).not.toHaveBeenCalled();
+    });
+
+    it('con docs válidos: refresca el cache de estado a CONTABILIZADO', async () => {
+      const DOC_1 = '11111111-1111-4111-a111-111111111111';
+      const { service, docsReader, asociacionRepo } = setupHappyPath();
+      asociacionRepo.listarPorComprobante.mockResolvedValue([
+        {
+          id: 'asoc-1',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-b',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.BORRADOR,
+          createdAt: new Date(),
+        },
+      ]);
+      docsReader.idsYaAsociadosAContabilizado.mockResolvedValue([]);
+
+      await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(docsReader.idsYaAsociadosAContabilizado).toHaveBeenCalledWith(
+        TENANT_ID,
+        [DOC_1],
+        'comp-b',
+        expect.any(Object),
+      );
+      expect(asociacionRepo.refrescarEstadoComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-b',
+        EstadoComprobante.CONTABILIZADO,
+        expect.any(Object),
+      );
+    });
+
+    it('con doc ya contabilizado en otro: lanza error con el id real y NO refresca', async () => {
+      const DOC_1 = '11111111-1111-4111-a111-111111111111';
+      const { service, docsReader, asociacionRepo, repo } = setupHappyPath();
+      asociacionRepo.listarPorComprobante.mockResolvedValue([
+        {
+          id: 'asoc-1',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-b',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.BORRADOR,
+          createdAt: new Date(),
+        },
+      ]);
+      docsReader.idsYaAsociadosAContabilizado.mockResolvedValue([DOC_1]);
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO',
+        details: { documentoFisicoId: DOC_1 },
+      });
+      expect(asociacionRepo.refrescarEstadoComprobante).not.toHaveBeenCalled();
+      expect(repo.contabilizar).not.toHaveBeenCalled();
+    });
   });
 
   describe('anular', () => {
