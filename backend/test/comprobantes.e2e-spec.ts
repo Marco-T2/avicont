@@ -176,7 +176,14 @@ describe('Comprobantes (e2e)', () => {
     expect(anularRes.status).toBe(201);
     expect(anularRes.body.original.estado).toBe(EstadoComprobante.ANULADO);
     expect(anularRes.body.reversion.estado).toBe(EstadoComprobante.CONTABILIZADO);
-    expect(anularRes.body.reversion.numero).toMatch(/^J2604-\d{6}$/);
+    // La reversión se contabiliza con la fecha de HOY (anulación en el período
+    // abierto actual, ver comprobantes.service anular), así que su correlativo
+    // usa el mes de SU PROPIA fechaContable — no el del comprobante original.
+    // Derivamos el prefijo de la respuesta para que el test sea determinístico
+    // sin importar el mes en que corra (antes hardcodeaba J2604 → rompía fuera de abril).
+    const fechaRev = anularRes.body.reversion.fechaContable as string; // 'YYYY-MM-DD'
+    const prefijoReversion = `J${fechaRev.slice(2, 4)}${fechaRev.slice(5, 7)}`;
+    expect(anularRes.body.reversion.numero).toMatch(new RegExp(`^${prefijoReversion}-\\d{6}$`));
     expect(anularRes.body.reversion.anulaAId).toBe(id);
 
     // Líneas invertidas en la reversión: lo que era DEBE pasa a HABER.
