@@ -248,7 +248,7 @@ El reader no tiene spec propio — cubierto por E2E de fase 8 (la integración m
 
 ---
 
-### 4.3 ☐ `feat(documentos-fisicos): add PrismaDocumentoFisicoRepository + integration spec`
+### 4.3 ☑ `feat(documentos-fisicos): add PrismaDocumentoFisicoRepository + integration spec`
 
 **Entrega**: implementación del `DocumentoFisicoRepositoryPort`.
 
