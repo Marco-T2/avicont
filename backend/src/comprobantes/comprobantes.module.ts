@@ -4,6 +4,7 @@ import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import { ContactosModule } from '@/contactos/contactos.module';
 import { CuentasModule } from '@/cuentas/cuentas.module';
+import { DocumentosFisicosModule } from '@/documentos-fisicos/documentos-fisicos.module';
 import { PeriodosReaderModule } from '@/periodos-fiscales/periodos-reader.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
@@ -25,7 +26,16 @@ import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
 // `COMPROBANTES_LOCK_PORT` (lo que periodos consume de acá) vive en
 // `ComprobantesLockModule`, también leaf.
 @Module({
-  imports: [RbacModule, CuentasModule, PeriodosReaderModule, ContactosModule],
+  imports: [
+    RbacModule,
+    CuentasModule,
+    PeriodosReaderModule,
+    ContactosModule,
+    // Dependencia unidireccional: comprobantes consume DOCUMENTOS_FISICOS_READER_PORT
+    // y ASOCIACION_COMPROBANTE_REPOSITORY_PORT para asociar/desasociar/listar
+    // documentos físicos. SIN forwardRef — documentos-fisicos NO importa comprobantes.
+    DocumentosFisicosModule,
+  ],
   controllers: [ComprobantesController],
   providers: [
     PrismaService,

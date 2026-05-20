@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
+import type { DocumentoFisicoConRelaciones } from '../ports/documento-fisico.repository.port';
 import {
   DocumentoFisicoParaAsociar,
   DocumentosFisicosReaderPort,
@@ -34,7 +35,7 @@ export class PrismaDocumentosFisicosReaderAdapter extends DocumentosFisicosReade
       where: { id: { in: ids }, organizationId: tenantId },
       include: {
         tipoDocumento: {
-          select: { esTributario: true, tiposComprobanteAplicables: true },
+          select: { nombre: true, esTributario: true, tiposComprobanteAplicables: true },
         },
       },
     });
@@ -45,6 +46,7 @@ export class PrismaDocumentosFisicosReaderAdapter extends DocumentosFisicosReade
         id: row.id,
         numero: row.numero,
         tipoDocumentoFisicoId: row.tipoDocumentoFisicoId,
+        tipoDocumentoNombre: row.tipoDocumento.nombre,
         esTributario: row.tipoDocumento.esTributario,
         fechaEmision: row.fechaEmision,
         monto: row.monto,
@@ -84,5 +86,34 @@ export class PrismaDocumentosFisicosReaderAdapter extends DocumentosFisicosReade
     });
 
     return asociaciones.map((a) => a.documentoFisicoId);
+  }
+
+  async listarAsociadosDeComprobante(
+    tenantId: string,
+    comprobanteId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConRelaciones[]> {
+    const client = tx ?? this.prisma;
+
+    // JOIN comprobante_documento_fisico → documentoFisico → tipoDocumento.
+    // organizationId en where: defense in depth (CLAUDE.md §4.2, Anti-31).
+    // El include trae tipo + contacto embebidos para que el mapper
+    // `toDocumentoFisicoAsociadoDto` arme el read-model sin segundo query.
+    const asociaciones = await client.comprobanteDocumentoFisico.findMany({
+      where: { organizationId: tenantId, comprobanteId },
+      include: {
+        documentoFisico: {
+          include: {
+            tipoDocumento: {
+              select: { id: true, nombre: true, codigo: true, esTributario: true },
+            },
+            contacto: { select: { id: true, razonSocial: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return asociaciones.map((a) => a.documentoFisico);
   }
 }

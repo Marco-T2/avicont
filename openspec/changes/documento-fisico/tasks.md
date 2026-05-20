@@ -509,7 +509,13 @@ reubicó a `comprobantes/domain` (commit `f632bf8`).
 
 ---
 
-### 6.3 ☐ `feat(comprobante): add asociacion sub-resource endpoints`
+### 6.3 ☑ `feat(comprobante): add asociacion sub-resource endpoints`
+
+> **Nota apply (commit `1ce0ec1`)**: implementada con opus. 3 endpoints sub-recurso bajo `/:comprobanteId/documentos-fisicos` (POST/DELETE/GET) + `ComprobantesService.asociarDocumentos/desasociarDocumento/listarDocumentosAsociados` (asociar dentro de `this.prisma.$transaction`, patrón existente) + 3 errores nuevos en `comprobantes/domain` (`ComprobanteNoEsBorradorError`, `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`) + `asociar-documentos.dto.ts` + `comprobantes.module` importa `DocumentosFisicosModule` (sin forwardRef, §4.5) + 18 unit specs. Dirección comprobantes→documentos-fisicos solo vía ports; cero Prisma en comprobantes (controller y service, salvo `$transaction`). Detalles:
+> - **Permisos**: se siguió el SPEC (REQ-P-09/10/11), no el design §4.1 (que pedía solo `asientos.update`). POST y DELETE requieren `documentos-fisicos.update` **Y** `asientos.update`; GET requiere `documentos-fisicos.read`. El design §4.1 quedó desactualizado en este punto.
+> - **`listarDocumentosAsociados` enriquecido**: el reader port `DocumentosFisicosReaderPort` se extendió con `listarAsociadosDeComprobante` (JOIN a tipo+contacto en el adapter) — NO se metió Prisma en comprobantes. + 3 integration specs.
+> - **Calidad**: `DocumentoFisicoParaAsociar` se extendió con `tipoDocumentoNombre` (denormalizado del tipo, como `esTributario`) para que `TipoDocumentoIncompatibleConComprobanteError` muestre el NOMBRE del tipo y no el número del documento (§1, mensajes claros).
+> - **Riesgos 7.1/7.2**: `refrescarEstadoComprobante` mapea el P2002 del UNIQUE parcial a `DocumentoFisicoYaAsociadoAOtroContabilizadoError` con `documentoFisicoId` vacío (placeholder) — en 7.1 enriquecer el id desde el contexto de la TX. `DocumentoFisicoYaAsociadoAOtroContabilizadoError` se IMPORTA de `documentos-fisicos/domain` (no recrear).
 
 **Entrega**: 3 endpoints de asociación en `comprobantes.controller.ts` +
 métodos delegadores en `ComprobantesService`.

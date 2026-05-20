@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AccionAuditoriaComprobante,
+  type ComprobanteDocumentoFisico,
   EstadoComprobante,
   Moneda,
   PeriodoFiscalStatus,
@@ -18,6 +19,18 @@ import {
 } from '@/contactos/ports/contactos-reader.port';
 import { CUENTAS_READER_PORT, CuentasReaderPort } from '@/cuentas/ports/cuentas-reader.port';
 import {
+  toDocumentoFisicoAsociadoDto,
+  type DocumentoFisicoAsociadoDto,
+} from '@/documentos-fisicos/dto/documento-fisico-response.dto';
+import {
+  ASOCIACION_COMPROBANTE_REPOSITORY_PORT,
+  AsociacionComprobanteRepositoryPort,
+} from '@/documentos-fisicos/ports/asociacion-comprobante.repository.port';
+import {
+  DOCUMENTOS_FISICOS_READER_PORT,
+  DocumentosFisicosReaderPort,
+} from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
+import {
   PERIODOS_READER_PORT,
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
@@ -33,8 +46,10 @@ import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-com
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
   ComprobanteBloqueadoError,
+  ComprobanteDocumentoNoDesasociableContabilizadoError,
   ComprobanteEstadoInvalidoError,
   ComprobanteNoEncontradoError,
+  ComprobanteNoEsBorradorError,
   ComprobanteYaAnuladoError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
@@ -42,6 +57,7 @@ import {
   CuentaInactivaError,
   CuentaNoDetalleError,
   CuentaNoEncontradaError,
+  DocumentoFisicoReferenciadoNoExisteError,
   FechaFuturaNoPermitidaError,
   GestionNoAbiertaError,
   LineaAmbiguaDebitoCreditoError,
@@ -51,6 +67,7 @@ import {
   PeriodoNoAbiertoError,
   PeriodoReversionNoAbiertoError,
   TipoCambioInvalidoError,
+  TipoDocumentoIncompatibleConComprobanteError,
 } from './domain/comprobante-errors';
 import {
   calcularTotalesBob,
@@ -94,6 +111,10 @@ export class ComprobantesService {
     private readonly clock: ClockPort,
     @Inject(SECUENCIA_COMPROBANTE_PORT)
     private readonly secuencia: SecuenciaComprobantePort,
+    @Inject(DOCUMENTOS_FISICOS_READER_PORT)
+    private readonly documentosFisicosReader: DocumentosFisicosReaderPort,
+    @Inject(ASOCIACION_COMPROBANTE_REPOSITORY_PORT)
+    private readonly asociacionRepo: AsociacionComprobanteRepositoryPort,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -541,6 +562,126 @@ export class ComprobantesService {
         reversion: toComprobanteResponse(reversion),
       };
     });
+  }
+
+  // ============================================================
+  // Documentos físicos asociados (sub-recurso del comprobante)
+  // ============================================================
+
+  /**
+   * Asocia uno o más documentos físicos a un comprobante en BORRADOR.
+   * Operación aditiva (REQ-A-01) e idempotente: re-asociar un par existente
+   * es no-op. Toda la lógica corre en una sola TX (design §4.2):
+   *   1) Comprobante existe + estado BORRADOR (inmutabilidad post-CONTABILIZADO,
+   *      CLAUDE.md §4.3).
+   *   2) Cada documento existe, pertenece al tenant (defense in depth §4.2) y
+   *      su tipo es compatible con el tipo del comprobante (REQ-A-11 / D11).
+   *   3) Inserta solo las asociaciones que aún no existen.
+   *
+   * `documentoFisicoIds` vacío → no-op (return []).
+   */
+  async asociarDocumentos(
+    tenantId: string,
+    comprobanteId: string,
+    documentoFisicoIds: string[],
+  ): Promise<ComprobanteDocumentoFisico[]> {
+    if (documentoFisicoIds.length === 0) return [];
+
+    return this.prisma.$transaction(async (tx) => {
+      const comp = await this.repo.findById(tenantId, comprobanteId, tx);
+      if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
+      if (comp.estado !== EstadoComprobante.BORRADOR) {
+        throw new ComprobanteNoEsBorradorError(comprobanteId, comp.estado);
+      }
+
+      const docMap = await this.documentosFisicosReader.obtenerBatchParaAsociar(
+        tenantId,
+        documentoFisicoIds,
+        tx,
+      );
+      for (const id of documentoFisicoIds) {
+        const doc = docMap.get(id);
+        if (!doc) throw new DocumentoFisicoReferenciadoNoExisteError(id);
+        if (!doc.tiposComprobanteAplicables.includes(comp.tipo)) {
+          throw new TipoDocumentoIncompatibleConComprobanteError(
+            doc.tipoDocumentoNombre,
+            comp.tipo,
+            doc.tiposComprobanteAplicables,
+          );
+        }
+      }
+
+      // Idempotencia (REQ-A-01): re-asociar un par ya existente es no-op.
+      // Filtramos contra las asociaciones actuales del comprobante para no
+      // chocar con el UNIQUE normal (documentoFisicoId, comprobanteId), que
+      // el adapter relanza tal cual.
+      const yaAsociados = await this.asociacionRepo.listarPorComprobante(
+        tenantId,
+        comprobanteId,
+        tx,
+      );
+      const yaAsociadosIds = new Set(yaAsociados.map((a) => a.documentoFisicoId));
+      const idsAInsertar = [...new Set(documentoFisicoIds)].filter((id) => !yaAsociadosIds.has(id));
+
+      const result: ComprobanteDocumentoFisico[] = [];
+      for (const id of idsAInsertar) {
+        result.push(
+          await this.asociacionRepo.asociar(
+            tenantId,
+            {
+              comprobanteId,
+              documentoFisicoId: id,
+              comprobanteEstado: EstadoComprobante.BORRADOR,
+            },
+            tx,
+          ),
+        );
+      }
+      return result;
+    });
+  }
+
+  /**
+   * Desasocia un documento físico de un comprobante en BORRADOR (REQ-A-02 /
+   * E-A-04). Si el comprobante está CONTABILIZADO, rechaza con
+   * `ComprobanteDocumentoNoDesasociableContabilizadoError` (REQ-A-03 / E-A-05):
+   * el comprobante ya consumió numeración y es inmutable (CLAUDE.md §4.3).
+   */
+  async desasociarDocumento(
+    tenantId: string,
+    comprobanteId: string,
+    documentoFisicoId: string,
+  ): Promise<void> {
+    const comp = await this.repo.findById(tenantId, comprobanteId);
+    if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
+    if (comp.estado !== EstadoComprobante.BORRADOR) {
+      throw new ComprobanteDocumentoNoDesasociableContabilizadoError(
+        comprobanteId,
+        documentoFisicoId,
+      );
+    }
+    await this.asociacionRepo.desasociar(tenantId, comprobanteId, documentoFisicoId);
+  }
+
+  /**
+   * Lista los documentos físicos asociados a un comprobante, enriquecidos
+   * para display (REQ-A-09). Valida que el comprobante pertenezca al tenant
+   * (REQ-S-04) antes de listar. La lectura enriquecida la resuelve el reader
+   * port de `documentos-fisicos` (owner-owned, CLAUDE.md §3.5/§3.7);
+   * `comprobantes` no toca Prisma ni el repo concreto.
+   */
+  async listarDocumentosAsociados(
+    tenantId: string,
+    comprobanteId: string,
+  ): Promise<DocumentoFisicoAsociadoDto[]> {
+    const comp = await this.repo.findById(tenantId, comprobanteId);
+    if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
+
+    const docs = await this.documentosFisicosReader.listarAsociadosDeComprobante(
+      tenantId,
+      comprobanteId,
+    );
+    return docs.map(toDocumentoFisicoAsociadoDto);
   }
 
   // ============================================================

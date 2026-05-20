@@ -6,6 +6,8 @@
 
 import type { Moneda, Prisma, TipoComprobante } from '@prisma/client';
 
+import type { DocumentoFisicoConRelaciones } from './documento-fisico.repository.port';
+
 export const DOCUMENTOS_FISICOS_READER_PORT = Symbol('DOCUMENTOS_FISICOS_READER_PORT');
 
 // ============================================================
@@ -14,15 +16,18 @@ export const DOCUMENTOS_FISICOS_READER_PORT = Symbol('DOCUMENTOS_FISICOS_READER_
 
 /**
  * Proyección que recibe `comprobantes.service` al asociar un documento
- * físico. Incluye `esTributario` y `tiposComprobanteAplicables`
- * denormalizados desde `TipoDocumentoFisico` (proposal Decisión 11)
- * para que la validación de compatibilidad de tipo no exija un
- * segundo query.
+ * físico. Incluye `esTributario`, `tiposComprobanteAplicables` y
+ * `tipoDocumentoNombre` denormalizados desde `TipoDocumentoFisico`
+ * (proposal Decisión 11) para que la validación de compatibilidad de
+ * tipo no exija un segundo query, y para que los errores al usuario
+ * reflejen el nombre del tipo (no el número del documento).
  */
 export interface DocumentoFisicoParaAsociar {
   id: string;
   numero: string;
   tipoDocumentoFisicoId: string;
+  /** Denormalizado desde el tipo. */
+  tipoDocumentoNombre: string;
   /** Denormalizado desde el tipo. */
   esTributario: boolean;
   fechaEmision: Date;
@@ -79,4 +84,19 @@ export abstract class DocumentosFisicosReaderPort {
     excluyendoComprobanteId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<string[]>;
+
+  /**
+   * Lista los documentos físicos asociados a un comprobante, enriquecidos
+   * para display (tipo + contacto embebidos). El service de comprobantes lo
+   * usa en `GET /comprobantes/:id/documentos-fisicos` (REQ-A-09): la lectura
+   * enriquecida vive en este port (owner-owned), no en `comprobantes` —
+   * así `comprobantes` nunca toca Prisma ni el repo concreto (CLAUDE.md
+   * §3.5). El read-model `DocumentoFisicoConRelaciones` es la fuente de
+   * verdad y lo consume el mapper `toDocumentoFisicoAsociadoDto`.
+   */
+  abstract listarAsociadosDeComprobante(
+    tenantId: string,
+    comprobanteId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<DocumentoFisicoConRelaciones[]>;
 }

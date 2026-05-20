@@ -30,6 +30,21 @@ export class CuentaNoEncontradaError extends NotFoundError {
   }
 }
 
+/**
+ * Se levanta al asociar un documento físico cuyo id no existe en la
+ * organización (inexistente o de otro tenant — defense in depth, CLAUDE.md
+ * §4.2). Cubre design §4.6 / REQ-A-10 / escenario E-A-07.
+ */
+export class DocumentoFisicoReferenciadoNoExisteError extends NotFoundError {
+  constructor(documentoFisicoId: string) {
+    super(
+      'COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE',
+      'El documento físico referenciado no existe en la organización',
+      { documentoFisicoId },
+    );
+  }
+}
+
 // ============================================================
 // 409 — estado del comprobante / período incompatible con la operación
 // ============================================================
@@ -55,6 +70,37 @@ export class ComprobanteBloqueadoError extends ConflictError {
 export class ComprobanteYaAnuladoError extends ConflictError {
   constructor(id: string) {
     super('COMPROBANTE_YA_ANULADO', 'El comprobante ya está anulado', { id });
+  }
+}
+
+/**
+ * Se levanta al asociar/desasociar documentos físicos a un comprobante que
+ * NO está en BORRADOR. Asociar post-CONTABILIZADO viola la inmutabilidad
+ * (CLAUDE.md §4.3). Cubre design §4.6 / REQ-A-02.
+ */
+export class ComprobanteNoEsBorradorError extends ConflictError {
+  constructor(comprobanteId: string, estadoActual: string) {
+    super(
+      'COMPROBANTE_NO_ES_BORRADOR',
+      'El comprobante no admite cambios en sus asociaciones porque no está en BORRADOR',
+      { comprobanteId, estadoActual },
+    );
+  }
+}
+
+/**
+ * Se levanta al intentar desasociar un documento físico de un comprobante
+ * CONTABILIZADO. El comprobante ya consumió su numeración y es inmutable;
+ * la única vía de corrección es anular + re-crear (CLAUDE.md §4.3).
+ * Cubre REQ-A-03 / escenario E-A-05.
+ */
+export class ComprobanteDocumentoNoDesasociableContabilizadoError extends ConflictError {
+  constructor(comprobanteId: string, documentoFisicoId: string) {
+    super(
+      'COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO',
+      'No se puede desasociar un documento de un comprobante contabilizado',
+      { comprobanteId, documentoFisicoId },
+    );
   }
 }
 
