@@ -366,7 +366,7 @@ TDD: spec primero (todos los casos en rojo), luego implementación hasta verde.
 
 ---
 
-### 5.2 ☐ `feat(documentos-fisicos): add DocumentosFisicosService + unit spec`
+### 5.2 ☑ `feat(documentos-fisicos): add DocumentosFisicosService + unit spec`
 
 **Entrega**: lógica de negocio del módulo operativo (CRUD + política de mutabilidad).
 TDD strict.
