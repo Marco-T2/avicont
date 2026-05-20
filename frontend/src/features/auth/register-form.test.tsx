@@ -30,6 +30,13 @@ describe('RegisterForm', () => {
     ).toBeInTheDocument();
   });
 
+  it('incluye el selector de tipo de organización', () => {
+    renderRegisterForm();
+    expect(
+      screen.getByRole('combobox', { name: /tipo de organización/i }),
+    ).toBeInTheDocument();
+  });
+
   it('muestra error si el password tiene menos de 8 caracteres', async () => {
     const user = userEvent.setup();
     renderRegisterForm();

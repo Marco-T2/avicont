@@ -156,10 +156,15 @@ export interface UserTenant {
   role: string | null;
 }
 
+// Módulo vertical de la organización. Define el seeding inicial y los feature
+// flags que el backend activa al crear la org (ver CreateTenantDto del backend).
+export type ModuloOrganizacion = 'CONTABILIDAD' | 'GRANJA' | 'OTROS';
+
 // POST /api/tenants — crear organización. El backend crea la org + la
 // membership OWNER del usuario autenticado en una transacción.
 export interface CreateTenantRequest {
   name: string;
+  modulo: ModuloOrganizacion;
 }
 // El response es la Organization creada; acá tipamos solo lo que consume el
 // front (el id es necesario para el switch-tenant posterior al onboarding).
