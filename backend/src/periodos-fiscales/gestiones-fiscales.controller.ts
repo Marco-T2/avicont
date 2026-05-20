@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GestionFiscalStatus } from '@prisma/client';
@@ -33,13 +24,9 @@ interface AuthenticatedRequest {
 function resolveTenantId(req: AuthenticatedRequest): string {
   const fromHeader = req.headers['x-tenant-id'];
   const tenantId =
-    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) ||
-    req.user.activeTenantId;
+    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
   if (tenantId === undefined || tenantId === '') {
-    throw new ForbiddenError(
-      'TENANT_CONTEXT_REQUIRED',
-      'Se requiere contexto de organización',
-    );
+    throw new ForbiddenError('TENANT_CONTEXT_REQUIRED', 'Se requiere contexto de organización');
   }
   return tenantId;
 }
@@ -101,11 +88,7 @@ export class GestionesFiscalesController {
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
   ): Promise<GestionResponseDto> {
-    const gestion = await this.service.cerrar(
-      id,
-      resolveTenantId(req),
-      req.user.sub,
-    );
+    const gestion = await this.service.cerrar(id, resolveTenantId(req), req.user.sub);
     return toGestionResponse(gestion);
   }
 }

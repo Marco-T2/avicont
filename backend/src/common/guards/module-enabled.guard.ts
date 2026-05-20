@@ -9,10 +9,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../../cache/redis.service';
-import {
-  FeatureModule,
-  REQUIRE_MODULE_KEY,
-} from '../decorators/require-module.decorator';
+import { FeatureModule, REQUIRE_MODULE_KEY } from '../decorators/require-module.decorator';
 
 const CACHE_TTL_SECONDS = 5 * 60;
 
@@ -45,8 +42,7 @@ export class ModuleEnabledGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user as { activeTenantId?: string } | undefined;
-    const tenantId =
-      (request.headers['x-tenant-id'] as string | undefined) || user?.activeTenantId;
+    const tenantId = (request.headers['x-tenant-id'] as string | undefined) || user?.activeTenantId;
     if (!tenantId) {
       throw new ForbiddenException('Se requiere contexto de organización');
     }

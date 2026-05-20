@@ -69,14 +69,9 @@ export class InvitationsService {
     // pertenece a otro tenant (no se distinguen los casos, para no
     // filtrar IDs cross-tenant).
     if (dto.customRoleId) {
-      const ok = await this.customRoles.belongsToTenant(
-        dto.customRoleId,
-        organizationId,
-      );
+      const ok = await this.customRoles.belongsToTenant(dto.customRoleId, organizationId);
       if (!ok) {
-        throw new BadRequestException(
-          'customRoleId inválido para esta organización',
-        );
+        throw new BadRequestException('customRoleId inválido para esta organización');
       }
     }
 

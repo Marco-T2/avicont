@@ -120,8 +120,5 @@ export abstract class MembershipRepositoryPort {
    * "no eliminar/degradar al último OWNER" antes de `deleteById`,
    * `deleteByUserAndTenant` o `updateRol`.
    */
-  abstract countOwners(
-    tenantId: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number>;
+  abstract countOwners(tenantId: string, tx?: Prisma.TransactionClient): Promise<number>;
 }

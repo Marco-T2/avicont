@@ -8,10 +8,7 @@ import {
 
 import type { ClockPort } from '@/common/clock/clock.port';
 import type { PrismaService } from '@/common/prisma.service';
-import type {
-  ContactoParaLinea,
-  ContactosReaderPort,
-} from '@/contactos/ports/contactos-reader.port';
+import type { ContactosReaderPort } from '@/contactos/ports/contactos-reader.port';
 import type { CuentaParaLinea, CuentasReaderPort } from '@/cuentas/ports/cuentas-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 

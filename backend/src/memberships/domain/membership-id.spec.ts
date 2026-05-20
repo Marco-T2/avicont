@@ -27,15 +27,11 @@ describe('MembershipId', () => {
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() => MembershipId.of(null as unknown as string)).toThrow(
-        MembershipIdInvalidoError,
-      );
+      expect(() => MembershipId.of(null as unknown as string)).toThrow(MembershipIdInvalidoError);
       expect(() => MembershipId.of(undefined as unknown as string)).toThrow(
         MembershipIdInvalidoError,
       );
-      expect(() => MembershipId.of(42 as unknown as string)).toThrow(
-        MembershipIdInvalidoError,
-      );
+      expect(() => MembershipId.of(42 as unknown as string)).toThrow(MembershipIdInvalidoError);
     });
   });
 

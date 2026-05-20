@@ -1,7 +1,6 @@
 import { ImpersonationIdInvalidoError } from './impersonation-errors';
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Identificador de una sesión de impersonation (UUID del `ImpersonationLog`).

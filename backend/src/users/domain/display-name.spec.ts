@@ -34,7 +34,9 @@ describe('DisplayName', () => {
 
     it('rechaza tipos no-string', () => {
       expect(() => DisplayName.of(null as unknown as string)).toThrow(DisplayNameInvalidoError);
-      expect(() => DisplayName.of(undefined as unknown as string)).toThrow(DisplayNameInvalidoError);
+      expect(() => DisplayName.of(undefined as unknown as string)).toThrow(
+        DisplayNameInvalidoError,
+      );
       expect(() => DisplayName.of(123 as unknown as string)).toThrow(DisplayNameInvalidoError);
     });
   });

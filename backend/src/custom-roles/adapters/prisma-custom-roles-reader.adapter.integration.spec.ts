@@ -24,9 +24,7 @@ describe('PrismaCustomRolesReaderAdapter (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaClient();
     await prisma.$connect();
-    adapter = new PrismaCustomRolesReaderAdapter(
-      prisma as unknown as PrismaService,
-    );
+    adapter = new PrismaCustomRolesReaderAdapter(prisma as unknown as PrismaService);
   });
 
   afterAll(async () => {
@@ -71,23 +69,16 @@ describe('PrismaCustomRolesReaderAdapter (integration)', () => {
   });
 
   it('retorna false si el customRole existe en OTRO tenant', async () => {
-    await expect(adapter.belongsToTenant(roleAId, tenantB)).resolves.toBe(
-      false,
-    );
+    await expect(adapter.belongsToTenant(roleAId, tenantB)).resolves.toBe(false);
   });
 
   it('retorna false si el customRoleId no existe', async () => {
     await expect(
-      adapter.belongsToTenant(
-        '00000000-0000-4000-8000-000000000000',
-        tenantA,
-      ),
+      adapter.belongsToTenant('00000000-0000-4000-8000-000000000000', tenantA),
     ).resolves.toBe(false);
   });
 
   it('retorna false si el customRoleId no es un UUID válido', async () => {
-    await expect(adapter.belongsToTenant('not-a-uuid', tenantA)).resolves.toBe(
-      false,
-    );
+    await expect(adapter.belongsToTenant('not-a-uuid', tenantA)).resolves.toBe(false);
   });
 });

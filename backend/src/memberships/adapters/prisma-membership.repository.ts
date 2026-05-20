@@ -96,10 +96,7 @@ export class PrismaMembershipRepository extends MembershipRepositoryPort {
     });
   }
 
-  async countOwners(
-    tenantId: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number> {
+  async countOwners(tenantId: string, tx?: Prisma.TransactionClient): Promise<number> {
     const client = tx ?? this.prisma;
     return client.membership.count({
       where: { organizationId: tenantId, systemRole: 'OWNER' },

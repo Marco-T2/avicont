@@ -11,8 +11,7 @@ export class PeriodoFiscalResponseDto {
   ordenEnGestion!: number;
   @ApiProperty({ enum: PeriodoFiscalStatus }) status!: PeriodoFiscalStatus;
   @ApiProperty({
-    description:
-      'Marcado manualmente; un período definitivo no se puede reabrir.',
+    description: 'Marcado manualmente; un período definitivo no se puede reabrir.',
   })
   esDefinitivo!: boolean;
 

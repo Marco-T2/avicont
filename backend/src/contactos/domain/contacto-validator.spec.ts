@@ -1,7 +1,4 @@
-import {
-  ContactoFlagsInvalidosError,
-  ContactoRazonSocialRequeridaError,
-} from './contacto-errors';
+import { ContactoFlagsInvalidosError, ContactoRazonSocialRequeridaError } from './contacto-errors';
 import {
   normalizarDocumento,
   normalizarOpcional,

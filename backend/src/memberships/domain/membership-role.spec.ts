@@ -43,18 +43,16 @@ describe('MembershipRole', () => {
       ['not-a-uuid', 'formato arbitrario'],
       ['550e8400-e29b-41d4-a716', 'truncado'],
     ])('rechaza "%s" (%s)', (raw) => {
-      expect(() => MembershipRole.ofCustom(raw)).toThrow(
-        AsignacionRolInvalidaError,
-      );
+      expect(() => MembershipRole.ofCustom(raw)).toThrow(AsignacionRolInvalidaError);
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() =>
-        MembershipRole.ofCustom(null as unknown as string),
-      ).toThrow(AsignacionRolInvalidaError);
-      expect(() =>
-        MembershipRole.ofCustom(undefined as unknown as string),
-      ).toThrow(AsignacionRolInvalidaError);
+      expect(() => MembershipRole.ofCustom(null as unknown as string)).toThrow(
+        AsignacionRolInvalidaError,
+      );
+      expect(() => MembershipRole.ofCustom(undefined as unknown as string)).toThrow(
+        AsignacionRolInvalidaError,
+      );
     });
   });
 
@@ -112,15 +110,11 @@ describe('MembershipRole', () => {
     });
 
     it('rechaza ninguno presente', () => {
-      expect(() => MembershipRole.parse({})).toThrow(
-        AsignacionRolInvalidaError,
-      );
+      expect(() => MembershipRole.parse({})).toThrow(AsignacionRolInvalidaError);
     });
 
     it('trata customRoleId vacío como no-presente', () => {
-      expect(() => MembershipRole.parse({ customRoleId: '' })).toThrow(
-        AsignacionRolInvalidaError,
-      );
+      expect(() => MembershipRole.parse({ customRoleId: '' })).toThrow(AsignacionRolInvalidaError);
     });
 
     it('trata customRoleId con solo espacios como no-presente', () => {

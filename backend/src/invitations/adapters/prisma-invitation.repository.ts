@@ -67,10 +67,7 @@ export class PrismaInvitationRepository implements InvitationRepositoryPort {
     });
   }
 
-  findActivePendingForEmail(
-    organizationId: string,
-    email: string,
-  ): Promise<Invitation | null> {
+  findActivePendingForEmail(organizationId: string, email: string): Promise<Invitation | null> {
     return this.prisma.invitation.findFirst({
       where: {
         organizationId,

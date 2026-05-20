@@ -135,10 +135,7 @@ export class AuthService {
   }
 
   async switchTenant(userId: string, tenantId: string): Promise<TokenPair> {
-    const membership = await this.memberships.findActivaByUserAndTenant(
-      userId,
-      tenantId,
-    );
+    const membership = await this.memberships.findActivaByUserAndTenant(userId, tenantId);
     if (!membership) {
       throw new NoMiembroDeTenantError(tenantId);
     }

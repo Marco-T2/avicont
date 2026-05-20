@@ -26,9 +26,7 @@ describe('CustomRoleId', () => {
     });
 
     it('rechaza tipos no-string', () => {
-      expect(() => CustomRoleId.of(null as unknown as string)).toThrow(
-        CustomRoleIdInvalidoError,
-      );
+      expect(() => CustomRoleId.of(null as unknown as string)).toThrow(CustomRoleIdInvalidoError);
       expect(() => CustomRoleId.of(undefined as unknown as string)).toThrow(
         CustomRoleIdInvalidoError,
       );

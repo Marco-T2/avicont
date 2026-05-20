@@ -1,9 +1,4 @@
-import type {
-  GestionFiscal,
-  GestionFiscalStatus,
-  PeriodoFiscal,
-  Prisma,
-} from '@prisma/client';
+import type { GestionFiscal, GestionFiscalStatus, PeriodoFiscal, Prisma } from '@prisma/client';
 
 export type GestionConPeriodos = GestionFiscal & { periodos: PeriodoFiscal[] };
 
@@ -22,10 +17,7 @@ export interface CrearPeriodoData {
 }
 
 export abstract class GestionFiscalRepositoryPort {
-  abstract findByYear(
-    organizationId: string,
-    year: number,
-  ): Promise<GestionFiscal | null>;
+  abstract findByYear(organizationId: string, year: number): Promise<GestionFiscal | null>;
 
   abstract findByIdWithPeriodos(
     id: string,
@@ -56,6 +48,4 @@ export abstract class GestionFiscalRepositoryPort {
   ): Promise<GestionFiscal>;
 }
 
-export const GESTION_FISCAL_REPOSITORY_PORT = Symbol(
-  'GESTION_FISCAL_REPOSITORY_PORT',
-);
+export const GESTION_FISCAL_REPOSITORY_PORT = Symbol('GESTION_FISCAL_REPOSITORY_PORT');

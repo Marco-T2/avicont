@@ -113,7 +113,5 @@ export abstract class MembershipsReaderPort {
    * `tenants.getMembers`). Incluye activas Y desactivadas — el admin
    * necesita ver toda la historia para re-activar o auditar.
    */
-  abstract findAllByTenant(
-    tenantId: string,
-  ): Promise<MembershipDeTenantParaAdmin[]>;
+  abstract findAllByTenant(tenantId: string): Promise<MembershipDeTenantParaAdmin[]>;
 }

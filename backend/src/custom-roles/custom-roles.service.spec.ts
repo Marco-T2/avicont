@@ -87,9 +87,7 @@ describe('CustomRolesService (unit)', () => {
 
   describe('findById', () => {
     it('retorna el rol si pertenece al tenant', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
       const role = await service.findById(TENANT_ID, ROLE_ID);
       expect(role.id).toBe(ROLE_ID);
     });
@@ -119,9 +117,7 @@ describe('CustomRolesService (unit)', () => {
   describe('create', () => {
     it('crea un rol con permisos válidos', async () => {
       repo.findBySlug.mockResolvedValue(null);
-      repo.create.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['create']>>,
-      );
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
 
       await service.create(TENANT_ID, ACTOR_USER_ID, {
         slug: 'contador',
@@ -141,9 +137,7 @@ describe('CustomRolesService (unit)', () => {
 
     it('acepta wildcards en permisos sin chequear catálogo', async () => {
       repo.findBySlug.mockResolvedValue(null);
-      repo.create.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['create']>>,
-      );
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
 
       await service.create(TENANT_ID, ACTOR_USER_ID, {
         slug: 'contador',
@@ -155,9 +149,7 @@ describe('CustomRolesService (unit)', () => {
     });
 
     it('lanza CustomRoleSlugDuplicadoError si el slug ya existe', async () => {
-      repo.findBySlug.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findBySlug']>>,
-      );
+      repo.findBySlug.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findBySlug']>>);
       await expect(
         service.create(TENANT_ID, ACTOR_USER_ID, {
           slug: 'contador',
@@ -194,13 +186,9 @@ describe('CustomRolesService (unit)', () => {
 
   describe('clone', () => {
     it('clona un rol con un slug nuevo', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
       repo.findBySlug.mockResolvedValue(null);
-      repo.create.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['create']>>,
-      );
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
 
       await service.clone(TENANT_ID, ACTOR_USER_ID, ROLE_ID, {
         slug: 'contador-jr',
@@ -215,12 +203,8 @@ describe('CustomRolesService (unit)', () => {
     });
 
     it('lanza CustomRoleSlugDuplicadoError si el nuevo slug ya existe', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
-      repo.findBySlug.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findBySlug']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
+      repo.findBySlug.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findBySlug']>>);
 
       await expect(
         service.clone(TENANT_ID, ACTOR_USER_ID, ROLE_ID, { slug: 'contador' }),
@@ -241,12 +225,8 @@ describe('CustomRolesService (unit)', () => {
 
   describe('update', () => {
     it('actualiza nombre y descripción sin invalidar cache RBAC', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
-      repo.update.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['update']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
+      repo.update.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['update']>>);
 
       await service.update(TENANT_ID, ROLE_ID, { name: 'Nuevo Nombre' });
 
@@ -257,12 +237,8 @@ describe('CustomRolesService (unit)', () => {
     });
 
     it('invalida cache RBAC cuando cambian los permisos', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
-      repo.update.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['update']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
+      repo.update.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['update']>>);
 
       await service.update(TENANT_ID, ROLE_ID, {
         permissions: ['contabilidad.compras.read'],
@@ -277,15 +253,13 @@ describe('CustomRolesService (unit)', () => {
         isEditable: false,
       } as Awaited<ReturnType<RepoMock['findById']>>);
 
-      await expect(
-        service.update(TENANT_ID, ROLE_ID, { name: 'X' }),
-      ).rejects.toBeInstanceOf(CustomRoleNoEditableError);
+      await expect(service.update(TENANT_ID, ROLE_ID, { name: 'X' })).rejects.toBeInstanceOf(
+        CustomRoleNoEditableError,
+      );
     });
 
     it('valida permisos antes de actualizar', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
 
       await expect(
         service.update(TENANT_ID, ROLE_ID, {
@@ -302,9 +276,7 @@ describe('CustomRolesService (unit)', () => {
 
   describe('delete', () => {
     it('elimina un rol editable sin miembros activos', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
       repo.countActiveMembers.mockResolvedValue(0);
 
       await service.delete(TENANT_ID, ROLE_ID);
@@ -326,9 +298,7 @@ describe('CustomRolesService (unit)', () => {
     });
 
     it('lanza CustomRoleConMiembrosActivosError si tiene miembros activos', async () => {
-      repo.findById.mockResolvedValue(
-        baseRole() as Awaited<ReturnType<RepoMock['findById']>>,
-      );
+      repo.findById.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['findById']>>);
       repo.countActiveMembers.mockResolvedValue(3);
 
       await expect(service.delete(TENANT_ID, ROLE_ID)).rejects.toBeInstanceOf(

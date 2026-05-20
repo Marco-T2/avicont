@@ -10,10 +10,7 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   type PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
-import {
-  USERS_READER_PORT,
-  type UsersReaderPort,
-} from '@/users/ports/users-reader.port';
+import { USERS_READER_PORT, type UsersReaderPort } from '@/users/ports/users-reader.port';
 
 import {
   AsignacionRolInvalidaError,
@@ -137,10 +134,7 @@ describe('MembershipsService (unit)', () => {
 
       await service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID });
 
-      expect(customRoles.belongsToTenant).toHaveBeenCalledWith(
-        CUSTOM_ROLE_ID,
-        TENANT_ID,
-      );
+      expect(customRoles.belongsToTenant).toHaveBeenCalledWith(CUSTOM_ROLE_ID, TENANT_ID);
       expect(repo.create).toHaveBeenCalledWith(TENANT_ID, {
         userId: USER_ID,
         systemRole: null,
@@ -384,17 +378,17 @@ describe('MembershipsService (unit)', () => {
       } as Awaited<ReturnType<RepoMock['findById']>>);
       repo.countOwners.mockResolvedValue(1);
 
-      await expect(
-        service.remove(MEMBERSHIP_ID, ACTOR_USER_ID),
-      ).rejects.toBeInstanceOf(UltimoOwnerError);
+      await expect(service.remove(MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
+        UltimoOwnerError,
+      );
       expect(repo.deleteById).not.toHaveBeenCalled();
     });
 
     it('lanza MembershipNoEncontradoError si no existe en el tenant', async () => {
       repo.findById.mockResolvedValue(null);
-      await expect(
-        service.remove(MEMBERSHIP_ID, ACTOR_USER_ID),
-      ).rejects.toBeInstanceOf(MembershipNoEncontradoError);
+      await expect(service.remove(MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
+        MembershipNoEncontradoError,
+      );
     });
   });
 
@@ -416,22 +410,15 @@ describe('MembershipsService (unit)', () => {
 
     it('elimina la membership del user y invalida su cache RBAC', async () => {
       repo.findByUserAndTenant.mockResolvedValue(
-        adminMembership() as Awaited<
-          ReturnType<RepoMock['findByUserAndTenant']>
-        >,
+        adminMembership() as Awaited<ReturnType<RepoMock['findByUserAndTenant']>>,
       );
       repo.deleteByUserAndTenant.mockResolvedValue(
-        adminMembership() as Awaited<
-          ReturnType<RepoMock['deleteByUserAndTenant']>
-        >,
+        adminMembership() as Awaited<ReturnType<RepoMock['deleteByUserAndTenant']>>,
       );
 
       await service.leave(TENANT_ID, USER_ID);
 
-      expect(repo.deleteByUserAndTenant).toHaveBeenCalledWith(
-        TENANT_ID,
-        USER_ID,
-      );
+      expect(repo.deleteByUserAndTenant).toHaveBeenCalledWith(TENANT_ID, USER_ID);
       expect(rbac.invalidateUser).toHaveBeenCalledWith(USER_ID, TENANT_ID);
     });
 
@@ -442,9 +429,7 @@ describe('MembershipsService (unit)', () => {
       } as Awaited<ReturnType<RepoMock['findByUserAndTenant']>>);
       repo.countOwners.mockResolvedValue(1);
 
-      await expect(service.leave(TENANT_ID, USER_ID)).rejects.toBeInstanceOf(
-        UltimoOwnerError,
-      );
+      await expect(service.leave(TENANT_ID, USER_ID)).rejects.toBeInstanceOf(UltimoOwnerError);
       expect(repo.deleteByUserAndTenant).not.toHaveBeenCalled();
     });
 

@@ -97,9 +97,7 @@ export class MembershipsReaderAdapter implements MembershipsReaderPort {
     };
   }
 
-  async findAllByTenant(
-    tenantId: string,
-  ): Promise<MembershipDeTenantParaAdmin[]> {
+  async findAllByTenant(tenantId: string): Promise<MembershipDeTenantParaAdmin[]> {
     const rows = await this.prisma.membership.findMany({
       where: { organizationId: tenantId },
       select: {

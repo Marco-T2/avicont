@@ -16,15 +16,12 @@ describe('CIERRE_FISCAL_POR_TIPO (Ley 843 Art. 46)', () => {
     ['PETROLERA', 4, 3],
     ['AGROPECUARIA', 7, 6],
     ['MINERA', 10, 9],
-  ] as const)(
-    '%s → mesInicio=%i, mesCierre=%i',
-    (tipo, mesInicio, mesCierre) => {
-      expect(CIERRE_FISCAL_POR_TIPO[tipo as TipoEmpresa]).toEqual({
-        mesInicio,
-        mesCierre,
-      });
-    },
-  );
+  ] as const)('%s → mesInicio=%i, mesCierre=%i', (tipo, mesInicio, mesCierre) => {
+    expect(CIERRE_FISCAL_POR_TIPO[tipo as TipoEmpresa]).toEqual({
+      mesInicio,
+      mesCierre,
+    });
+  });
 
   it('calcularMesInicio() devuelve el mes correcto', () => {
     expect(calcularMesInicio('COMERCIAL')).toBe(1);

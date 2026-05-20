@@ -38,9 +38,7 @@ export class PrismaCredentialsRepository implements CredentialsRepositoryPort {
       data: {
         tokenHash: data.tokenHash,
         userId: data.userId,
-        ...(data.organizationId !== undefined
-          ? { organizationId: data.organizationId }
-          : {}),
+        ...(data.organizationId !== undefined ? { organizationId: data.organizationId } : {}),
         familyId: data.familyId,
         expiresAt: data.expiresAt,
       },

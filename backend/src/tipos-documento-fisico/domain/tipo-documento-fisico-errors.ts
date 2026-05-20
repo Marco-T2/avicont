@@ -7,11 +7,7 @@
  * cambian aunque el `message` evolucione (CLAUDE.md §6.3).
  */
 
-import {
-  ConflictError,
-  InvalidStateError,
-  NotFoundError,
-} from '@/common/errors';
+import { ConflictError, InvalidStateError, NotFoundError } from '@/common/errors';
 
 // ============================================================
 // 404 — recurso no existente (o no visible para el tenant actual)
@@ -19,11 +15,7 @@ import {
 
 export class TipoDocumentoFisicoNoEncontradoError extends NotFoundError {
   constructor(id: string) {
-    super(
-      'TIPO_DOCUMENTO_FISICO_NO_ENCONTRADO',
-      'El tipo de documento físico no existe',
-      { id },
-    );
+    super('TIPO_DOCUMENTO_FISICO_NO_ENCONTRADO', 'El tipo de documento físico no existe', { id });
   }
 }
 
@@ -94,11 +86,7 @@ export class TipoDocumentoFisicoInactivoError extends InvalidStateError {
  * Cubre REQ-A-11 / proposal D11.
  */
 export class TipoDocumentoIncompatibleConComprobanteError extends InvalidStateError {
-  constructor(
-    tipoDocumentoNombre: string,
-    tipoComprobante: string,
-    tiposPermitidos: string[],
-  ) {
+  constructor(tipoDocumentoNombre: string, tipoComprobante: string, tiposPermitidos: string[]) {
     super(
       'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
       `El tipo de documento '${tipoDocumentoNombre}' no es aplicable a comprobantes de tipo ${tipoComprobante}. Tipos permitidos: ${tiposPermitidos.join(', ')}`,

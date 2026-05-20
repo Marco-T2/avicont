@@ -25,11 +25,7 @@ export class UsuarioNoEncontradoError extends NotFoundError {
 
 export class UsuarioEmailDuplicadoError extends ConflictError {
   constructor(email: string) {
-    super(
-      'USER_EMAIL_DUPLICADO',
-      `Ya existe un usuario con el email "${email}"`,
-      { email },
-    );
+    super('USER_EMAIL_DUPLICADO', `Ya existe un usuario con el email "${email}"`, { email });
   }
 }
 
@@ -45,11 +41,7 @@ export class EmailInvalidoError extends ValidationError {
 
 export class UserIdInvalidoError extends ValidationError {
   constructor(raw: unknown) {
-    super(
-      'USER_ID_INVALIDO',
-      'UserId inválido: se esperaba un UUID',
-      { raw },
-    );
+    super('USER_ID_INVALIDO', 'UserId inválido: se esperaba un UUID', { raw });
   }
 }
 

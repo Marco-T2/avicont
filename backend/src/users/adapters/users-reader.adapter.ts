@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 
-import {
-  UsersReaderPort,
-  UsuarioMinimo,
-  UsuarioParaAuth,
-} from '../ports/users-reader.port';
+import { UsersReaderPort, UsuarioMinimo, UsuarioParaAuth } from '../ports/users-reader.port';
 
 @Injectable()
 export class PrismaUsersReaderAdapter extends UsersReaderPort {

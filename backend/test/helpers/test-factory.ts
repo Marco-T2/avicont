@@ -52,7 +52,11 @@ export async function createTestUserWithTenant(
     ...(options.tenantName !== undefined ? { name: options.tenantName } : {}),
   });
 
-  const membership = await createTestMembership(user.id, tenant.id, options.role ?? SystemRole.OWNER);
+  const membership = await createTestMembership(
+    user.id,
+    tenant.id,
+    options.role ?? SystemRole.OWNER,
+  );
 
   return { user, tenant, membership };
 }

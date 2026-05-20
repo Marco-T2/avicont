@@ -170,10 +170,7 @@ describe('PrismaMembershipRepository (integration)', () => {
     });
 
     it('retorna null si el ID no existe', async () => {
-      const found = await repo.findById(
-        tenantA,
-        '00000000-0000-4000-8000-000000000000',
-      );
+      const found = await repo.findById(tenantA, '00000000-0000-4000-8000-000000000000');
       expect(found).toBeNull();
     });
   });

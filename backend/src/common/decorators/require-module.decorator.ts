@@ -10,5 +10,4 @@ export type FeatureModule = 'contabilidad' | 'granja';
 // con 404 si el módulo está deshabilitado para la organización activa.
 // Usar 404 (y no 403) es deliberado: el endpoint no existe a efectos prácticos
 // si el módulo está apagado, no debe revelar que está apagado.
-export const RequireModule = (module: FeatureModule) =>
-  SetMetadata(REQUIRE_MODULE_KEY, module);
+export const RequireModule = (module: FeatureModule) => SetMetadata(REQUIRE_MODULE_KEY, module);

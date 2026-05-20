@@ -36,9 +36,7 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaClient();
     await prisma.$connect();
-    repo = new PrismaTipoDocumentoFisicoRepository(
-      prisma as unknown as PrismaService,
-    );
+    repo = new PrismaTipoDocumentoFisicoRepository(prisma as unknown as PrismaService);
   });
 
   afterAll(async () => {
@@ -123,10 +121,7 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
   });
 
   it('create — acepta lista vacía en tiposComprobanteAplicables', async () => {
-    const t = await repo.create(
-      tenantA,
-      baseData({ tiposComprobanteAplicables: [] }),
-    );
+    const t = await repo.create(tenantA, baseData({ tiposComprobanteAplicables: [] }));
     expect(t.tiposComprobanteAplicables).toEqual([]);
   });
 
@@ -144,9 +139,9 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('UNIQUE codigo — rechaza duplicado en el mismo tenant con TipoDocumentoFisicoCodigoDuplicadoError', async () => {
     await repo.create(tenantA, baseData());
-    await expect(
-      repo.create(tenantA, baseData({ nombre: 'Factura B' })),
-    ).rejects.toBeInstanceOf(TipoDocumentoFisicoCodigoDuplicadoError);
+    await expect(repo.create(tenantA, baseData({ nombre: 'Factura B' }))).rejects.toBeInstanceOf(
+      TipoDocumentoFisicoCodigoDuplicadoError,
+    );
   });
 
   it('UNIQUE codigo — el mismo codigo SÍ se permite entre tenants distintos', async () => {
@@ -168,9 +163,9 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('UNIQUE nombre — rechaza duplicado en el mismo tenant con TipoDocumentoFisicoNombreDuplicadoError', async () => {
     await repo.create(tenantA, baseData());
-    await expect(
-      repo.create(tenantA, baseData({ codigo: 'factura-b' })),
-    ).rejects.toBeInstanceOf(TipoDocumentoFisicoNombreDuplicadoError);
+    await expect(repo.create(tenantA, baseData({ codigo: 'factura-b' }))).rejects.toBeInstanceOf(
+      TipoDocumentoFisicoNombreDuplicadoError,
+    );
   });
 
   it('UNIQUE nombre — el mismo nombre SÍ se permite entre tenants distintos', async () => {
@@ -220,42 +215,24 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('listar — no cruza tenants', async () => {
     await repo.create(tenantA, baseData());
-    const { total } = await repo.listar(
-      tenantB,
-      {},
-      { page: 1, limit: 20 },
-    );
+    const { total } = await repo.listar(tenantB, {}, { page: 1, limit: 20 });
     expect(total).toBe(0);
   });
 
   it('listar — por default excluye inactivos', async () => {
     const a = await repo.create(tenantA, baseData());
-    const b = await repo.create(
-      tenantA,
-      baseData({ codigo: 'recibo', nombre: 'Recibo' }),
-    );
+    const b = await repo.create(tenantA, baseData({ codigo: 'recibo', nombre: 'Recibo' }));
     await repo.setActivo(tenantA, b.id, false);
-    const { items, total } = await repo.listar(
-      tenantA,
-      {},
-      { page: 1, limit: 20 },
-    );
+    const { items, total } = await repo.listar(tenantA, {}, { page: 1, limit: 20 });
     expect(total).toBe(1);
     expect(items[0]?.id).toBe(a.id);
   });
 
   it('listar activo=all — trae activos e inactivos', async () => {
     const a = await repo.create(tenantA, baseData());
-    const b = await repo.create(
-      tenantA,
-      baseData({ codigo: 'recibo', nombre: 'Recibo' }),
-    );
+    const b = await repo.create(tenantA, baseData({ codigo: 'recibo', nombre: 'Recibo' }));
     await repo.setActivo(tenantA, b.id, false);
-    const { total } = await repo.listar(
-      tenantA,
-      { activo: 'all' },
-      { page: 1, limit: 20 },
-    );
+    const { total } = await repo.listar(tenantA, { activo: 'all' }, { page: 1, limit: 20 });
     expect(total).toBe(2);
     void a;
   });
@@ -263,41 +240,38 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
   it('listar q — match parcial case-insensitive sobre nombre', async () => {
     await repo.create(tenantA, baseData({ codigo: 'factura', nombre: 'Factura A' }));
     await repo.create(tenantA, baseData({ codigo: 'recibo', nombre: 'Recibo Interno' }));
-    const { items, total } = await repo.listar(
-      tenantA,
-      { q: 'recib' },
-      { page: 1, limit: 20 },
-    );
+    const { items, total } = await repo.listar(tenantA, { q: 'recib' }, { page: 1, limit: 20 });
     expect(total).toBe(1);
     expect(items[0]?.codigo).toBe('recibo');
   });
 
   it('listar — orden por defecto esTributario DESC, nombre ASC (REQ-T-09)', async () => {
-    await repo.create(tenantA, baseData({
-      codigo: 'recibo',
-      nombre: 'Recibo',
-      esTributario: false,
-    }));
-    await repo.create(tenantA, baseData({
-      codigo: 'nota-debito',
-      nombre: 'Nota de Débito',
-      esTributario: true,
-    }));
-    await repo.create(tenantA, baseData({
-      codigo: 'factura',
-      nombre: 'Factura',
-      esTributario: true,
-    }));
-    const { items } = await repo.listar(
+    await repo.create(
       tenantA,
-      { activo: 'all' },
-      { page: 1, limit: 20 },
+      baseData({
+        codigo: 'recibo',
+        nombre: 'Recibo',
+        esTributario: false,
+      }),
     );
-    expect(items.map((i) => i.codigo)).toEqual([
-      'factura',
-      'nota-debito',
-      'recibo',
-    ]);
+    await repo.create(
+      tenantA,
+      baseData({
+        codigo: 'nota-debito',
+        nombre: 'Nota de Débito',
+        esTributario: true,
+      }),
+    );
+    await repo.create(
+      tenantA,
+      baseData({
+        codigo: 'factura',
+        nombre: 'Factura',
+        esTributario: true,
+      }),
+    );
+    const { items } = await repo.listar(tenantA, { activo: 'all' }, { page: 1, limit: 20 });
+    expect(items.map((i) => i.codigo)).toEqual(['factura', 'nota-debito', 'recibo']);
   });
 
   // ==========================================================
@@ -399,8 +373,18 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('upsertSeed — primer ejecución crea las filas del seed', async () => {
     await repo.upsertSeed(tenantA, [
-      { codigo: 'factura', nombre: 'Factura', esTributario: true, tiposComprobanteAplicables: [TipoComprobante.EGRESO] },
-      { codigo: 'recibo', nombre: 'Recibo', esTributario: false, tiposComprobanteAplicables: [TipoComprobante.INGRESO] },
+      {
+        codigo: 'factura',
+        nombre: 'Factura',
+        esTributario: true,
+        tiposComprobanteAplicables: [TipoComprobante.EGRESO],
+      },
+      {
+        codigo: 'recibo',
+        nombre: 'Recibo',
+        esTributario: false,
+        tiposComprobanteAplicables: [TipoComprobante.INGRESO],
+      },
     ]);
     const total = await prisma.tipoDocumentoFisico.count({
       where: { organizationId: tenantA },
@@ -410,8 +394,18 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('upsertSeed — segunda ejecución es idempotente (no duplica filas)', async () => {
     const seeds = [
-      { codigo: 'factura', nombre: 'Factura', esTributario: true, tiposComprobanteAplicables: [TipoComprobante.EGRESO] },
-      { codigo: 'recibo', nombre: 'Recibo', esTributario: false, tiposComprobanteAplicables: [TipoComprobante.INGRESO] },
+      {
+        codigo: 'factura',
+        nombre: 'Factura',
+        esTributario: true,
+        tiposComprobanteAplicables: [TipoComprobante.EGRESO],
+      },
+      {
+        codigo: 'recibo',
+        nombre: 'Recibo',
+        esTributario: false,
+        tiposComprobanteAplicables: [TipoComprobante.INGRESO],
+      },
     ];
     await repo.upsertSeed(tenantA, seeds);
     await repo.upsertSeed(tenantA, seeds);
@@ -423,10 +417,20 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
 
   it('upsertSeed — actualiza nombre/esTributario/tiposComprobanteAplicables si cambian', async () => {
     await repo.upsertSeed(tenantA, [
-      { codigo: 'factura', nombre: 'Factura v1', esTributario: false, tiposComprobanteAplicables: [TipoComprobante.EGRESO] },
+      {
+        codigo: 'factura',
+        nombre: 'Factura v1',
+        esTributario: false,
+        tiposComprobanteAplicables: [TipoComprobante.EGRESO],
+      },
     ]);
     await repo.upsertSeed(tenantA, [
-      { codigo: 'factura', nombre: 'Factura v2', esTributario: true, tiposComprobanteAplicables: [TipoComprobante.EGRESO, TipoComprobante.DIARIO] },
+      {
+        codigo: 'factura',
+        nombre: 'Factura v2',
+        esTributario: true,
+        tiposComprobanteAplicables: [TipoComprobante.EGRESO, TipoComprobante.DIARIO],
+      },
     ]);
     const row = await prisma.tipoDocumentoFisico.findFirst({
       where: { organizationId: tenantA, codigo: 'factura' },

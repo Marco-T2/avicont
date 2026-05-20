@@ -45,9 +45,7 @@ export class JwtClaims {
       sub: params.userId,
       email: params.email,
       roles: params.roles ?? [],
-      ...(params.activeTenantId !== undefined
-        ? { activeTenantId: params.activeTenantId }
-        : {}),
+      ...(params.activeTenantId !== undefined ? { activeTenantId: params.activeTenantId } : {}),
     };
     return new JwtClaims(payload);
   }

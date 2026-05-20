@@ -27,7 +27,8 @@ interface AuthenticatedRequest {
 
 function resolveTenantId(req: AuthenticatedRequest): string {
   const fromHeader = req.headers['x-tenant-id'];
-  const tenantId = (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
+  const tenantId =
+    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
   if (!tenantId) throw new ForbiddenException('Se requiere contexto de organización');
   return tenantId;
 }

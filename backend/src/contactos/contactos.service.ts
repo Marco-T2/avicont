@@ -81,11 +81,7 @@ export class ContactosService {
     private readonly repo: ContactosRepositoryPort,
   ) {}
 
-  async crear(
-    tenantId: string,
-    userId: string,
-    input: CrearContactoInput,
-  ): Promise<Contacto> {
+  async crear(tenantId: string, userId: string, input: CrearContactoInput): Promise<Contacto> {
     validarRazonSocial(input.razonSocial);
     validarFlags(input.esCliente, input.esProveedor);
 
@@ -166,10 +162,7 @@ export class ContactosService {
     return c;
   }
 
-  async listar(
-    tenantId: string,
-    input: ListarContactosInput,
-  ): Promise<ListarContactosResult> {
+  async listar(tenantId: string, input: ListarContactosInput): Promise<ListarContactosResult> {
     const page = input.page && input.page > 0 ? input.page : 1;
     const limit = Math.min(
       input.limit && input.limit > 0 ? input.limit : LIST_DEFAULT_LIMIT,

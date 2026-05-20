@@ -1,11 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ClaseCuenta,
-  NaturalezaCuenta,
-  SystemRole,
-  TipoComprobante,
-} from '@prisma/client';
+import { ClaseCuenta, NaturalezaCuenta, SystemRole, TipoComprobante } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 

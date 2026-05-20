@@ -7,12 +7,7 @@
  * cambian aunque el `message` evolucione (CLAUDE.md §6.3).
  */
 
-import {
-  ConflictError,
-  InvalidStateError,
-  NotFoundError,
-  ValidationError,
-} from '@/common/errors';
+import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '@/common/errors';
 
 // ============================================================
 // 404 — recurso no existente (o no visible para el tenant actual)
@@ -20,11 +15,7 @@ import {
 
 export class DocumentoFisicoNoEncontradoError extends NotFoundError {
   constructor(id: string) {
-    super(
-      'DOCUMENTO_FISICO_NO_ENCONTRADO',
-      'El documento físico no existe',
-      { id },
-    );
+    super('DOCUMENTO_FISICO_NO_ENCONTRADO', 'El documento físico no existe', { id });
   }
 }
 
@@ -53,11 +44,7 @@ export class DocumentoFisicoInmutablePorComprobanteContabilizadoError extends Co
 }
 
 export class DocumentoFisicoReferenciadoPorComprobanteError extends ConflictError {
-  constructor(
-    documentoFisicoId: string,
-    comprobanteId: string,
-    estado: string,
-  ) {
+  constructor(documentoFisicoId: string, comprobanteId: string, estado: string) {
     super(
       'DOCUMENTO_FISICO_REFERENCIADO_POR_COMPROBANTE',
       'El documento físico no puede eliminarse porque está referenciado por un comprobante',

@@ -24,16 +24,14 @@ export class CustomRoleSlug {
     }
     const trimmed = raw.trim();
     if (trimmed.length < MIN_LENGTH) {
-      throw new CustomRoleSlugInvalidoError(
-        `debe tener al menos ${MIN_LENGTH} caracteres`,
-        { raw },
-      );
+      throw new CustomRoleSlugInvalidoError(`debe tener al menos ${MIN_LENGTH} caracteres`, {
+        raw,
+      });
     }
     if (trimmed.length > MAX_LENGTH) {
-      throw new CustomRoleSlugInvalidoError(
-        `no puede superar los ${MAX_LENGTH} caracteres`,
-        { raw },
-      );
+      throw new CustomRoleSlugInvalidoError(`no puede superar los ${MAX_LENGTH} caracteres`, {
+        raw,
+      });
     }
     if (!SLUG_REGEX.test(trimmed)) {
       throw new CustomRoleSlugInvalidoError(

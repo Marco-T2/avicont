@@ -26,10 +26,7 @@ import {
   toContactoResponse,
 } from './dto/contacto-response.dto';
 import { CreateContactoDto } from './dto/create-contacto.dto';
-import {
-  LIST_DEFAULT_PAGE_SIZE,
-  ListarContactosQueryDto,
-} from './dto/listar-contactos.dto';
+import { LIST_DEFAULT_PAGE_SIZE, ListarContactosQueryDto } from './dto/listar-contactos.dto';
 import { UpdateContactoDto } from './dto/update-contacto.dto';
 
 // Mismo resolver que el resto de controllers (gestiones, cuentas,
@@ -61,8 +58,7 @@ export class ContactosController {
   @Post()
   @RequirePermissions('contabilidad.contactos.create')
   @ApiOperation({
-    summary:
-      'Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa.',
+    summary: 'Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa.',
   })
   async crear(
     @Req() req: AuthenticatedRequest,

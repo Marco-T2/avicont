@@ -21,16 +21,14 @@ export class ImpersonationReason {
     }
     const trimmed = raw.trim();
     if (trimmed.length < MIN_LENGTH) {
-      throw new ImpersonationReasonInvalidaError(
-        `debe tener al menos ${MIN_LENGTH} caracteres`,
-        { raw },
-      );
+      throw new ImpersonationReasonInvalidaError(`debe tener al menos ${MIN_LENGTH} caracteres`, {
+        raw,
+      });
     }
     if (trimmed.length > MAX_LENGTH) {
-      throw new ImpersonationReasonInvalidaError(
-        `no puede superar los ${MAX_LENGTH} caracteres`,
-        { raw },
-      );
+      throw new ImpersonationReasonInvalidaError(`no puede superar los ${MAX_LENGTH} caracteres`, {
+        raw,
+      });
     }
     return new ImpersonationReason(trimmed);
   }

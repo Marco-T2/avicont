@@ -169,9 +169,7 @@ describe('TenantsService (unit)', () => {
     it('lanza TenantNoEncontradoError (404) si no existe', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.findById(TENANT_ID)).rejects.toBeInstanceOf(
-        TenantNoEncontradoError,
-      );
+      await expect(service.findById(TENANT_ID)).rejects.toBeInstanceOf(TenantNoEncontradoError);
     });
   });
 
@@ -265,9 +263,7 @@ describe('TenantsService (unit)', () => {
     it('lanza TenantNoEncontradoError si no existe', async () => {
       repo.findFeatures.mockResolvedValue(null);
 
-      await expect(service.getFeatures(TENANT_ID)).rejects.toBeInstanceOf(
-        TenantNoEncontradoError,
-      );
+      await expect(service.getFeatures(TENANT_ID)).rejects.toBeInstanceOf(TenantNoEncontradoError);
     });
   });
 

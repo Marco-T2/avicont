@@ -5,10 +5,7 @@ import {
   matchesPermission,
 } from './domain/permission-matcher';
 import { PermissionsCacheInvalidationPort } from './ports/permissions-cache-invalidation.port';
-import {
-  PERMISSIONS_CACHE_PORT,
-  PermissionsCachePort,
-} from './ports/permissions-cache.port';
+import { PERMISSIONS_CACHE_PORT, PermissionsCachePort } from './ports/permissions-cache.port';
 import {
   PERMISSIONS_RESOLVER_PORT,
   PermissionsResolverPort,
@@ -42,11 +39,7 @@ export class RbacService implements PermissionsCacheInvalidationPort {
     return fresh;
   }
 
-  async hasPermission(
-    userId: string,
-    organizationId: string,
-    required: string,
-  ): Promise<boolean> {
+  async hasPermission(userId: string, organizationId: string, required: string): Promise<boolean> {
     const perms = await this.getPermissions(userId, organizationId);
     if (perms.esOwner || perms.esAdmin) return true;
     return perms.wildcards.some((g) => matchesPermission(g, required));

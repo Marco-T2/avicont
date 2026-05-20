@@ -8,11 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import {
-  ConflictError,
-  NotFoundError,
-  ValidationError,
-} from '../errors';
+import { ConflictError, NotFoundError, ValidationError } from '../errors';
 import type { LoggerPort } from '../../logger/ports/logger.port';
 import type { TracingPort } from '../../tracing/ports/tracing.port';
 
@@ -63,11 +59,11 @@ function makeTracingMock(traceId?: string): jest.Mocked<TracingPort> {
     startSpan: jest.fn(),
     startActiveSpan: jest.fn(),
     getActiveSpan: jest.fn(),
-    getCurrentContext: jest.fn().mockReturnValue(
-      traceId !== undefined
-        ? { traceId, spanId: 'span-1', traceFlags: 1 }
-        : undefined,
-    ),
+    getCurrentContext: jest
+      .fn()
+      .mockReturnValue(
+        traceId !== undefined ? { traceId, spanId: 'span-1', traceFlags: 1 } : undefined,
+      ),
     inject: jest.fn(),
     extract: jest.fn(),
     shutdown: jest.fn(),
@@ -128,10 +124,7 @@ describe('GlobalExceptionFilter', () => {
       const { filter } = makeFilter();
       const { host, captured } = makeHost();
 
-      filter.catch(
-        new NotFoundError('ASIENTO_NO_ENCONTRADO', 'Asiento no existe'),
-        host,
-      );
+      filter.catch(new NotFoundError('ASIENTO_NO_ENCONTRADO', 'Asiento no existe'), host);
 
       expect(captured.status).toBe(404);
       expect(captured.body.error.code).toBe('ASIENTO_NO_ENCONTRADO');
@@ -211,15 +204,10 @@ describe('GlobalExceptionFilter', () => {
         message: ['email must be an email', 'password too short'],
         error: 'Bad Request',
       };
-      filter.catch(
-        new HttpException(validationResponse, HttpStatus.BAD_REQUEST),
-        host,
-      );
+      filter.catch(new HttpException(validationResponse, HttpStatus.BAD_REQUEST), host);
 
       expect(captured.status).toBe(400);
-      expect(captured.body.error.message).toBe(
-        'email must be an email; password too short',
-      );
+      expect(captured.body.error.message).toBe('email must be an email; password too short');
       expect(captured.body.error.details).toEqual({
         validationErrors: ['email must be an email', 'password too short'],
       });
@@ -240,9 +228,7 @@ describe('GlobalExceptionFilter', () => {
 
       expect(captured.status).toBe(400);
       expect(captured.body.error.code).toBe('CUENTA_PADRE_INVALIDA');
-      expect(captured.body.error.message).toBe(
-        'La cuenta padre no existe en este tenant',
-      );
+      expect(captured.body.error.message).toBe('La cuenta padre no existe en este tenant');
       expect(captured.body.error.details).toEqual({ parentId: 'abc-123' });
     });
 
@@ -336,10 +322,7 @@ describe('GlobalExceptionFilter', () => {
       const { filter } = makeFilter('trace-abc-123');
       const { host, captured } = makeHost();
 
-      filter.catch(
-        new ValidationError('TEST_CODE', 'test message'),
-        host,
-      );
+      filter.catch(new ValidationError('TEST_CODE', 'test message'), host);
 
       expect(captured.body.error.traceId).toBe('trace-abc-123');
     });
@@ -348,10 +331,7 @@ describe('GlobalExceptionFilter', () => {
       const { filter } = makeFilter();
       const { host, captured } = makeHost();
 
-      filter.catch(
-        new ValidationError('TEST_CODE', 'test message'),
-        host,
-      );
+      filter.catch(new ValidationError('TEST_CODE', 'test message'), host);
 
       expect(captured.body.error.traceId).toBeUndefined();
     });
@@ -362,10 +342,7 @@ describe('GlobalExceptionFilter', () => {
       const { filter, logger } = makeFilter();
       const { host } = makeHost();
 
-      filter.catch(
-        new NotFoundError('TEST_NF', 'not found'),
-        host,
-      );
+      filter.catch(new NotFoundError('TEST_NF', 'not found'), host);
 
       expect(logger._child.debug).toHaveBeenCalled();
       expect(logger._child.error).not.toHaveBeenCalled();

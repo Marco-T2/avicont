@@ -14,9 +14,7 @@ describe('ImpersonationReason', () => {
 
     it('acepta razón típica del caso de soporte', () => {
       expect(() =>
-        ImpersonationReason.of(
-          'Soporte: usuario reporta no poder ver sus comprobantes de marzo',
-        ),
+        ImpersonationReason.of('Soporte: usuario reporta no poder ver sus comprobantes de marzo'),
       ).not.toThrow();
     });
   });
@@ -27,9 +25,7 @@ describe('ImpersonationReason', () => {
       ['corta', 'menor al mínimo'],
       ['         9', 'post-trim queda corta'],
     ])('rechaza "%s" (%s)', (raw) => {
-      expect(() => ImpersonationReason.of(raw)).toThrow(
-        ImpersonationReasonInvalidaError,
-      );
+      expect(() => ImpersonationReason.of(raw)).toThrow(ImpersonationReasonInvalidaError);
     });
 
     it('rechaza razón que excede el máximo', () => {

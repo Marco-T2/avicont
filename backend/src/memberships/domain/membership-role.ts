@@ -2,8 +2,7 @@ import { SystemRole } from '@prisma/client';
 
 import { AsignacionRolInvalidaError } from './membership-errors';
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Value object que encapsula la asignación de rol de una membership.
@@ -25,9 +24,7 @@ export class MembershipRole {
   /** Rol custom por ID — sin systemRole. Valida formato UUID. */
   static ofCustom(customRoleId: string): MembershipRole {
     if (typeof customRoleId !== 'string' || !UUID_REGEX.test(customRoleId)) {
-      throw new AsignacionRolInvalidaError(
-        'customRoleId debe ser un UUID válido',
-      );
+      throw new AsignacionRolInvalidaError('customRoleId debe ser un UUID válido');
     }
     return new MembershipRole(null, customRoleId.toLowerCase());
   }
@@ -42,8 +39,7 @@ export class MembershipRole {
     customRoleId?: string | null;
   }): MembershipRole {
     const hasSystem = input.systemRole != null;
-    const customIdTrim =
-      typeof input.customRoleId === 'string' ? input.customRoleId.trim() : null;
+    const customIdTrim = typeof input.customRoleId === 'string' ? input.customRoleId.trim() : null;
     const hasCustom = customIdTrim !== null && customIdTrim !== '';
     if (hasSystem === hasCustom) {
       throw new AsignacionRolInvalidaError(
@@ -64,9 +60,6 @@ export class MembershipRole {
   }
 
   equals(other: MembershipRole): boolean {
-    return (
-      this.systemRole === other.systemRole &&
-      this.customRoleId === other.customRoleId
-    );
+    return this.systemRole === other.systemRole && this.customRoleId === other.customRoleId;
   }
 }

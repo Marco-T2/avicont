@@ -44,9 +44,7 @@ export class NumeroDocumentoFormatoInvalidoError extends RangeError {
 
 export class NumeroDocumentoLongitudExcedidaError extends RangeError {
   constructor(longitud: number) {
-    super(
-      `NumeroDocumento: longitud excedida ${longitud} (máximo ${LONGITUD_MAX})`,
-    );
+    super(`NumeroDocumento: longitud excedida ${longitud} (máximo ${LONGITUD_MAX})`);
     this.name = 'NumeroDocumentoLongitudExcedidaError';
   }
 }

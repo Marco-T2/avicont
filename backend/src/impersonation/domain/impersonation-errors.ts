@@ -18,11 +18,10 @@ import {
 
 export class TargetNoMiembroError extends NotFoundError {
   constructor(targetUserId: string, tenantId: string) {
-    super(
-      'IMPERSONATION_TARGET_NO_MIEMBRO',
-      'Target no es miembro de la organización',
-      { targetUserId, tenantId },
-    );
+    super('IMPERSONATION_TARGET_NO_MIEMBRO', 'Target no es miembro de la organización', {
+      targetUserId,
+      tenantId,
+    });
   }
 }
 
@@ -66,11 +65,7 @@ export class SoloOwnerPuedeImpersonarError extends ForbiddenError {
 
 export class TargetEsOwnerError extends ForbiddenError {
   constructor(targetUserId: string) {
-    super(
-      'IMPERSONATION_TARGET_ES_OWNER',
-      'No se puede impersonar a otro OWNER',
-      { targetUserId },
-    );
+    super('IMPERSONATION_TARGET_ES_OWNER', 'No se puede impersonar a otro OWNER', { targetUserId });
   }
 }
 
@@ -80,11 +75,10 @@ export class TargetEsOwnerError extends ForbiddenError {
 
 export class NoAutorizadoACerrarSesionError extends UnauthorizedError {
   constructor(impersonationId: string, callerUserId: string) {
-    super(
-      'IMPERSONATION_NO_AUTORIZADO_A_CERRAR',
-      'No autorizado a cerrar esta sesión',
-      { impersonationId, callerUserId },
-    );
+    super('IMPERSONATION_NO_AUTORIZADO_A_CERRAR', 'No autorizado a cerrar esta sesión', {
+      impersonationId,
+      callerUserId,
+    });
   }
 }
 
@@ -94,31 +88,24 @@ export class NoAutorizadoACerrarSesionError extends UnauthorizedError {
 
 export class SelfImpersonationError extends ValidationError {
   constructor(userId: string) {
-    super(
-      'IMPERSONATION_SELF_NO_PERMITIDA',
-      'No se puede impersonar a uno mismo',
-      { userId },
-    );
+    super('IMPERSONATION_SELF_NO_PERMITIDA', 'No se puede impersonar a uno mismo', { userId });
   }
 }
 
 export class TargetMembershipDesactivadaError extends ValidationError {
   constructor(targetUserId: string, tenantId: string) {
-    super(
-      'IMPERSONATION_TARGET_MEMBERSHIP_DESACTIVADA',
-      'Target está desactivado',
-      { targetUserId, tenantId },
-    );
+    super('IMPERSONATION_TARGET_MEMBERSHIP_DESACTIVADA', 'Target está desactivado', {
+      targetUserId,
+      tenantId,
+    });
   }
 }
 
 export class TargetConCuentaDesactivadaError extends ValidationError {
   constructor(targetUserId: string) {
-    super(
-      'IMPERSONATION_TARGET_CUENTA_DESACTIVADA',
-      'Target tiene cuenta desactivada',
-      { targetUserId },
-    );
+    super('IMPERSONATION_TARGET_CUENTA_DESACTIVADA', 'Target tiene cuenta desactivada', {
+      targetUserId,
+    });
   }
 }
 
@@ -128,39 +115,24 @@ export class TargetConCuentaDesactivadaError extends ValidationError {
 
 export class ImpersonationIdInvalidoError extends ValidationError {
   constructor(raw: unknown) {
-    super(
-      'IMPERSONATION_ID_INVALIDO',
-      'ImpersonationId inválido: se esperaba un UUID',
-      { raw },
-    );
+    super('IMPERSONATION_ID_INVALIDO', 'ImpersonationId inválido: se esperaba un UUID', { raw });
   }
 }
 
 export class ImpersonationReasonInvalidaError extends ValidationError {
   constructor(motivo: string, details?: Record<string, unknown>) {
-    super(
-      'IMPERSONATION_REASON_INVALIDA',
-      `Reason inválida: ${motivo}`,
-      details,
-    );
+    super('IMPERSONATION_REASON_INVALIDA', `Reason inválida: ${motivo}`, details);
   }
 }
 
 export class ImpersonationWindowInvalidaError extends ValidationError {
   constructor(motivo: string, details?: Record<string, unknown>) {
-    super(
-      'IMPERSONATION_WINDOW_INVALIDA',
-      `Ventana de impersonation inválida: ${motivo}`,
-      details,
-    );
+    super('IMPERSONATION_WINDOW_INVALIDA', `Ventana de impersonation inválida: ${motivo}`, details);
   }
 }
 
 export class ImpersonationJwtClaimsInvalidosError extends ValidationError {
   constructor(motivo: string) {
-    super(
-      'IMPERSONATION_JWT_CLAIMS_INVALIDOS',
-      `Claims de impersonation inválidos: ${motivo}`,
-    );
+    super('IMPERSONATION_JWT_CLAIMS_INVALIDOS', `Claims de impersonation inválidos: ${motivo}`);
   }
 }

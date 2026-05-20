@@ -232,7 +232,9 @@ describe('ContactosService', () => {
 
     it('documento duplicado en otro contacto — lanza duplicado', async () => {
       repo.findById.mockResolvedValue(makeContacto({ documento: '1111111' }));
-      repo.findByDocumento.mockResolvedValue(makeContacto({ id: CONTACTO_B_ID, documento: '9999999' }));
+      repo.findByDocumento.mockResolvedValue(
+        makeContacto({ id: CONTACTO_B_ID, documento: '9999999' }),
+      );
 
       await expect(
         service.actualizar(TENANT_ID, CONTACTO_ID, { documento: '9999999' }),

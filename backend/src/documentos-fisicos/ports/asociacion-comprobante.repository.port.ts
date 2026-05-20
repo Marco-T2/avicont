@@ -3,11 +3,7 @@
 // asociación (CLAUDE.md §3.7 — owner-owned). Multi-tenancy defense in
 // depth: TODA query del adapter filtra por tenantId.
 
-import type {
-  ComprobanteDocumentoFisico,
-  EstadoComprobante,
-  Prisma,
-} from '@prisma/client';
+import type { ComprobanteDocumentoFisico, EstadoComprobante, Prisma } from '@prisma/client';
 
 export const ASOCIACION_COMPROBANTE_REPOSITORY_PORT = Symbol(
   'ASOCIACION_COMPROBANTE_REPOSITORY_PORT',

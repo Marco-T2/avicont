@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { SystemRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
-import {
-  PermissionsResolverPort,
-  ResolvedPermissions,
-} from '../ports/permissions-resolver.port';
+import { PermissionsResolverPort, ResolvedPermissions } from '../ports/permissions-resolver.port';
 
 @Injectable()
 export class PrismaPermissionsResolver implements PermissionsResolverPort {

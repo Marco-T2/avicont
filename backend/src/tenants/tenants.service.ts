@@ -19,10 +19,7 @@ import {
   TenantSlugDuplicadoError,
   TipoEmpresaInmutableError,
 } from './domain/tenant-errors';
-import {
-  TENANT_REPOSITORY_PORT,
-  TenantRepositoryPort,
-} from './ports/tenant.repository.port';
+import { TENANT_REPOSITORY_PORT, TenantRepositoryPort } from './ports/tenant.repository.port';
 
 @Injectable()
 export class TenantsService {

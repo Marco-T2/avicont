@@ -27,8 +27,8 @@ if (enabled) {
         ignoreIncomingRequestHook: (req) =>
           Boolean(
             req.url?.includes('/health') ||
-              req.url?.includes('/metrics') ||
-              req.url?.includes('/favicon'),
+            req.url?.includes('/metrics') ||
+            req.url?.includes('/favicon'),
           ),
       }),
       new ExpressInstrumentation(),

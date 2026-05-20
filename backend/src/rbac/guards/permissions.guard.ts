@@ -34,8 +34,7 @@ export class PermissionsGuard implements CanActivate {
 
     // tenantId puede venir del JWT (caso normal) o del header X-Tenant-ID
     // (caso super-admin con impersonation, validado en otro guard).
-    const tenantId =
-      (request.headers['x-tenant-id'] as string | undefined) || user.activeTenantId;
+    const tenantId = (request.headers['x-tenant-id'] as string | undefined) || user.activeTenantId;
     if (!tenantId) {
       throw new ForbiddenException('Se requiere contexto de organización');
     }

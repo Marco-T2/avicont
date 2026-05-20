@@ -12,7 +12,10 @@ export class CloneCustomRoleDto {
   @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, { message: 'slug debe ser kebab-case alfanumérico' })
   slug!: string;
 
-  @ApiPropertyOptional({ description: 'Nombre del nuevo rol. Si se omite, se reutiliza el original con sufijo "(copia)".' })
+  @ApiPropertyOptional({
+    description:
+      'Nombre del nuevo rol. Si se omite, se reutiliza el original con sufijo "(copia)".',
+  })
   @IsOptional()
   @IsString()
   @Length(2, 80)

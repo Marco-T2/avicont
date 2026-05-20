@@ -7,10 +7,7 @@ import {
 
 import { UpdateUserDto } from './dto/update-user.dto';
 import { toUserResponseDto, type UserResponseDto } from './dto/user-response.dto';
-import {
-  USER_REPOSITORY_PORT,
-  type UserRepositoryPort,
-} from './ports/user.repository.port';
+import { USER_REPOSITORY_PORT, type UserRepositoryPort } from './ports/user.repository.port';
 
 @Injectable()
 export class UsersService {

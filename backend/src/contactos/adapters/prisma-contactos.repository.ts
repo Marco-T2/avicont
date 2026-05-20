@@ -146,11 +146,7 @@ export class PrismaContactosRepository extends ContactosRepositoryPort {
     return { items, total };
   }
 
-  async eliminar(
-    tenantId: string,
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number> {
+  async eliminar(tenantId: string, id: string, tx?: Prisma.TransactionClient): Promise<number> {
     const client = tx ?? this.prisma;
     // Convertimos P2003 (FK Restrict violada) a ContactoReferenciadoError
     // para cubrir la race condition donde una línea aparece entre el

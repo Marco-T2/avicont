@@ -6,9 +6,7 @@
 
 import type { Moneda, Prisma, TipoComprobante } from '@prisma/client';
 
-export const DOCUMENTOS_FISICOS_READER_PORT = Symbol(
-  'DOCUMENTOS_FISICOS_READER_PORT',
-);
+export const DOCUMENTOS_FISICOS_READER_PORT = Symbol('DOCUMENTOS_FISICOS_READER_PORT');
 
 // ============================================================
 // Shape proyectado al consumer (subset de DocumentoFisico + tipo)

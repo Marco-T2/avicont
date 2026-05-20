@@ -74,7 +74,9 @@ describe('PrismaContactosRepository (integration)', () => {
     });
   }
 
-  const baseData = (overrides: Partial<Parameters<PrismaContactosRepository['create']>[1]> = {}) => ({
+  const baseData = (
+    overrides: Partial<Parameters<PrismaContactosRepository['create']>[1]> = {},
+  ) => ({
     razonSocial: 'Granjas El Sol SRL',
     nombreComercial: null,
     documento: null,
@@ -143,13 +145,8 @@ describe('PrismaContactosRepository (integration)', () => {
   });
 
   it('CHECK constraint — rechaza update que deja ambos flags false', async () => {
-    const c = await repo.create(
-      tenantA,
-      baseData({ esCliente: true, esProveedor: false }),
-    );
-    await expect(
-      repo.update(tenantA, c.id, { esCliente: false }),
-    ).rejects.toThrow();
+    const c = await repo.create(tenantA, baseData({ esCliente: true, esProveedor: false }));
+    await expect(repo.update(tenantA, c.id, { esCliente: false })).rejects.toThrow();
   });
 
   // ==========================================================
@@ -192,11 +189,7 @@ describe('PrismaContactosRepository (integration)', () => {
   it('listar q — encuentra por infix sobre razonSocial (case-insensitive)', async () => {
     await repo.create(tenantA, baseData({ razonSocial: 'Marcos Pérez Olivera' }));
     await repo.create(tenantA, baseData({ razonSocial: 'Granjas El Sol' }));
-    const { items, total } = await repo.listar(
-      tenantA,
-      { q: 'marc' },
-      { page: 1, limit: 20 },
-    );
+    const { items, total } = await repo.listar(tenantA, { q: 'marc' }, { page: 1, limit: 20 });
     expect(total).toBe(1);
     expect(items[0]?.razonSocial).toBe('Marcos Pérez Olivera');
   });
@@ -204,13 +197,12 @@ describe('PrismaContactosRepository (integration)', () => {
   it('listar q — también matchea en nombreComercial', async () => {
     await repo.create(
       tenantA,
-      baseData({ razonSocial: 'Sociedad Avícola Santa Cruz SA', nombreComercial: 'Granjas El Sol' }),
+      baseData({
+        razonSocial: 'Sociedad Avícola Santa Cruz SA',
+        nombreComercial: 'Granjas El Sol',
+      }),
     );
-    const { items } = await repo.listar(
-      tenantA,
-      { q: 'sol' },
-      { page: 1, limit: 20 },
-    );
+    const { items } = await repo.listar(tenantA, { q: 'sol' }, { page: 1, limit: 20 });
     expect(items).toHaveLength(1);
     expect(items[0]?.nombreComercial).toBe('Granjas El Sol');
   });
@@ -219,11 +211,7 @@ describe('PrismaContactosRepository (integration)', () => {
     const c1 = await repo.create(tenantA, baseData({ razonSocial: 'Activo' }));
     const c2 = await repo.create(tenantA, baseData({ razonSocial: 'Inactivo' }));
     await repo.setActivo(tenantA, c2.id, false);
-    const { items, total } = await repo.listar(
-      tenantA,
-      {},
-      { page: 1, limit: 20 },
-    );
+    const { items, total } = await repo.listar(tenantA, {}, { page: 1, limit: 20 });
     expect(total).toBe(1);
     expect(items[0]?.id).toBe(c1.id);
   });
@@ -232,11 +220,7 @@ describe('PrismaContactosRepository (integration)', () => {
     await repo.create(tenantA, baseData({ razonSocial: 'A' }));
     const c = await repo.create(tenantA, baseData({ razonSocial: 'I' }));
     await repo.setActivo(tenantA, c.id, false);
-    const { items, total } = await repo.listar(
-      tenantA,
-      { activo: false },
-      { page: 1, limit: 20 },
-    );
+    const { items, total } = await repo.listar(tenantA, { activo: false }, { page: 1, limit: 20 });
     expect(total).toBe(1);
     expect(items[0]?.id).toBe(c.id);
   });
@@ -245,11 +229,7 @@ describe('PrismaContactosRepository (integration)', () => {
     await repo.create(tenantA, baseData({ razonSocial: 'A' }));
     const c = await repo.create(tenantA, baseData({ razonSocial: 'I' }));
     await repo.setActivo(tenantA, c.id, false);
-    const { total } = await repo.listar(
-      tenantA,
-      { activo: 'all' },
-      { page: 1, limit: 20 },
-    );
+    const { total } = await repo.listar(tenantA, { activo: 'all' }, { page: 1, limit: 20 });
     expect(total).toBe(2);
   });
 

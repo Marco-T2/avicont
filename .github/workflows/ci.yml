@@ -9,6 +9,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # El backend es un proyecto Node autocontenido dentro del monorepo.
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
         image: postgres:14
@@ -34,6 +38,8 @@ jobs:
         with:
           node-version: '24.11.0'
           cache: 'npm'
+          # El lock vive en backend/, no en la raíz del monorepo.
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -52,14 +58,16 @@ jobs:
       - name: Lint
         run: npm run lint --if-present
 
-      - name: Tests
+      - name: Unit + Integration tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
-        run: npm run test -- --runInBand
+        run: npx jest src/ --runInBand
 
-      - name: E2E Tests
+      # E2E full-stack a través de HTTP (Supertest + AppModule). Ver CLAUDE.md §11.3.
+      # --forceExit porque PrismaClient deja handles que Jest no detecta.
+      - name: E2E tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
-        run: npm run test:e2e -- --runInBand
+        run: npx jest test/ --runInBand --forceExit

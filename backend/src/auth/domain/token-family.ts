@@ -2,8 +2,7 @@ import * as crypto from 'crypto';
 
 import { TokenFamilyInvalidaError } from './auth-errors';
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * Identificador de familia de refresh tokens. Todos los tokens emitidos en

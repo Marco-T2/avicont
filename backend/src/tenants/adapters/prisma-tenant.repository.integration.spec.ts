@@ -70,9 +70,9 @@ describe('PrismaTenantRepository (integration)', () => {
 
     it('falla con UNIQUE violation si el slug ya existe', async () => {
       await repo.create({ slug: SLUG_A, name: 'A1', ownerUserId: ownerId });
-      await expect(
-        repo.create({ slug: SLUG_A, name: 'A2', ownerUserId: ownerId }),
-      ).rejects.toThrow(/Unique/i);
+      await expect(repo.create({ slug: SLUG_A, name: 'A2', ownerUserId: ownerId })).rejects.toThrow(
+        /Unique/i,
+      );
     });
   });
 
@@ -157,9 +157,7 @@ describe('PrismaTenantRepository (integration)', () => {
     });
 
     it('retorna null si no existe', async () => {
-      const features = await repo.findFeatures(
-        '11111111-2222-4333-8444-555555555555',
-      );
+      const features = await repo.findFeatures('11111111-2222-4333-8444-555555555555');
       expect(features).toBeNull();
     });
   });

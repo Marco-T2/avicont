@@ -4,12 +4,7 @@
  * Los `code` son IDs ESTABLES hacia el cliente (CLAUDE.md §6.3).
  */
 
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from '@/common/errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/common/errors';
 
 // ============================================================
 // 404
@@ -17,11 +12,9 @@ import {
 
 export class CustomRoleNoEncontradoError extends NotFoundError {
   constructor(customRoleId: string) {
-    super(
-      'CUSTOM_ROLE_NO_ENCONTRADO',
-      'El rol personalizado no existe en esta organización',
-      { customRoleId },
-    );
+    super('CUSTOM_ROLE_NO_ENCONTRADO', 'El rol personalizado no existe en esta organización', {
+      customRoleId,
+    });
   }
 }
 
@@ -55,21 +48,13 @@ export class CustomRoleConMiembrosActivosError extends ConflictError {
 
 export class CustomRoleNoEditableError extends ForbiddenError {
   constructor(customRoleId: string) {
-    super(
-      'CUSTOM_ROLE_NO_EDITABLE',
-      'Este rol está marcado como no editable',
-      { customRoleId },
-    );
+    super('CUSTOM_ROLE_NO_EDITABLE', 'Este rol está marcado como no editable', { customRoleId });
   }
 }
 
 export class CustomRoleDelSistemaError extends ForbiddenError {
   constructor(customRoleId: string) {
-    super(
-      'CUSTOM_ROLE_DEL_SISTEMA',
-      'No se pueden eliminar roles del sistema',
-      { customRoleId },
-    );
+    super('CUSTOM_ROLE_DEL_SISTEMA', 'No se pueden eliminar roles del sistema', { customRoleId });
   }
 }
 
@@ -79,21 +64,13 @@ export class CustomRoleDelSistemaError extends ForbiddenError {
 
 export class CustomRoleIdInvalidoError extends ValidationError {
   constructor(raw: unknown) {
-    super(
-      'CUSTOM_ROLE_ID_INVALIDO',
-      'CustomRoleId inválido: se esperaba un UUID',
-      { raw },
-    );
+    super('CUSTOM_ROLE_ID_INVALIDO', 'CustomRoleId inválido: se esperaba un UUID', { raw });
   }
 }
 
 export class CustomRoleSlugInvalidoError extends ValidationError {
   constructor(motivo: string, details?: Record<string, unknown>) {
-    super(
-      'CUSTOM_ROLE_SLUG_INVALIDO',
-      `Slug inválido: ${motivo}`,
-      details,
-    );
+    super('CUSTOM_ROLE_SLUG_INVALIDO', `Slug inválido: ${motivo}`, details);
   }
 }
 
@@ -108,11 +85,7 @@ export class CustomRoleSlugInvalidoError extends ValidationError {
  */
 export class PermisoInvalidoError extends ValidationError {
   constructor(permiso: string, motivo: string) {
-    super(
-      'CUSTOM_ROLE_PERMISO_INVALIDO',
-      `Permiso inválido "${permiso}": ${motivo}`,
-      { permiso },
-    );
+    super('CUSTOM_ROLE_PERMISO_INVALIDO', `Permiso inválido "${permiso}": ${motivo}`, { permiso });
   }
 }
 
@@ -123,10 +96,6 @@ export class PermisoInvalidoError extends ValidationError {
  */
 export class PermisoDesconocidoError extends ValidationError {
   constructor(permiso: string) {
-    super(
-      'CUSTOM_ROLE_PERMISO_DESCONOCIDO',
-      `Permiso desconocido: "${permiso}"`,
-      { permiso },
-    );
+    super('CUSTOM_ROLE_PERMISO_DESCONOCIDO', `Permiso desconocido: "${permiso}"`, { permiso });
   }
 }

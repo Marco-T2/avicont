@@ -7,11 +7,7 @@
  * cambian aunque el `message` evolucione (CLAUDE.md §6.3).
  */
 
-import {
-  ConflictError,
-  NotFoundError,
-  ValidationError,
-} from '@/common/errors';
+import { ConflictError, NotFoundError, ValidationError } from '@/common/errors';
 
 // ============================================================
 // 404 — recursos no existentes
@@ -29,11 +25,7 @@ export class TenantNoEncontradoError extends NotFoundError {
 
 export class TenantSlugDuplicadoError extends ConflictError {
   constructor(slug: string) {
-    super(
-      'TENANT_SLUG_DUPLICADO',
-      'Ya existe una organización con ese identificador',
-      { slug },
-    );
+    super('TENANT_SLUG_DUPLICADO', 'Ya existe una organización con ese identificador', { slug });
   }
 }
 

@@ -18,21 +18,20 @@ export class GestionNoEncontradaError extends NotFoundError {
 
 export class GestionDuplicadaError extends ConflictError {
   constructor(organizationId: string, year: number) {
-    super(
-      'GESTION_DUPLICADA',
-      `Ya existe una gestión fiscal para el año ${year}`,
-      { organizationId, year },
-    );
+    super('GESTION_DUPLICADA', `Ya existe una gestión fiscal para el año ${year}`, {
+      organizationId,
+      year,
+    });
   }
 }
 
 export class GestionYearFueraDeRangoError extends InvalidStateError {
   constructor(year: number, min: number, max: number) {
-    super(
-      'GESTION_YEAR_FUERA_DE_RANGO',
-      `El año fiscal debe estar entre ${min} y ${max}`,
-      { year, min, max },
-    );
+    super('GESTION_YEAR_FUERA_DE_RANGO', `El año fiscal debe estar entre ${min} y ${max}`, {
+      year,
+      min,
+      max,
+    });
   }
 }
 
@@ -43,10 +42,7 @@ export class GestionYaCerradaError extends ConflictError {
 }
 
 export class GestionConPeriodosAbiertosError extends InvalidStateError {
-  constructor(
-    id: string,
-    periodosAbiertos: Array<{ year: number; month: number; orden: number }>,
-  ) {
+  constructor(id: string, periodosAbiertos: Array<{ year: number; month: number; orden: number }>) {
     super(
       'GESTION_CON_PERIODOS_ABIERTOS',
       'No se puede cerrar la gestión: hay períodos todavía abiertos',
@@ -57,11 +53,9 @@ export class GestionConPeriodosAbiertosError extends InvalidStateError {
 
 export class TenantSinTipoEmpresaError extends InvalidStateError {
   constructor(tenantId: string) {
-    super(
-      'TENANT_SIN_TIPO_EMPRESA',
-      'La organización no tiene tipo de empresa definido',
-      { tenantId },
-    );
+    super('TENANT_SIN_TIPO_EMPRESA', 'La organización no tiene tipo de empresa definido', {
+      tenantId,
+    });
   }
 }
 
@@ -128,10 +122,7 @@ export class MotivoReaperturaInvalidoError extends ValidationError {
 
 export class SoloOwnerAdminPuedeReabrirError extends ForbiddenError {
   constructor() {
-    super(
-      'SOLO_OWNER_ADMIN_PUEDE_REABRIR',
-      'Solo OWNER o ADMIN pueden reabrir períodos',
-    );
+    super('SOLO_OWNER_ADMIN_PUEDE_REABRIR', 'Solo OWNER o ADMIN pueden reabrir períodos');
   }
 }
 

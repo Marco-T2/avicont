@@ -30,11 +30,7 @@ export class RedisPermissionsCache implements PermissionsCachePort {
     }
   }
 
-  async set(
-    userId: string,
-    organizationId: string,
-    value: ResolvedPermissions,
-  ): Promise<void> {
+  async set(userId: string, organizationId: string, value: ResolvedPermissions): Promise<void> {
     try {
       await this.redis.set(this.key(userId, organizationId), value, TTL_SECONDS);
     } catch (err) {

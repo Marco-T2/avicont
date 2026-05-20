@@ -153,11 +153,7 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
     });
   }
 
-  async eliminar(
-    tenantId: string,
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<number> {
+  async eliminar(tenantId: string, id: string, tx?: Prisma.TransactionClient): Promise<number> {
     const client = tx ?? this.prisma;
     try {
       const result = await client.tipoDocumentoFisico.deleteMany({
@@ -167,10 +163,7 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
     } catch (err) {
       // FK Restrict desde documentos_fisicos.tipoDocumentoFisicoId →
       // race contra el pre-check del service (defense in depth).
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2003'
-      ) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
         throw new TipoDocumentoFisicoConDocumentosError(id);
       }
       throw err;
@@ -220,10 +213,7 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
     err: unknown,
     ctx: { codigo: string | undefined; nombre: string | undefined },
   ): unknown {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === 'P2002'
-    ) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const target = err.meta?.['target'];
       const targetStr = Array.isArray(target)
         ? target.join(',')
