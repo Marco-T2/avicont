@@ -54,6 +54,10 @@ Para el stack completo con observabilidad (Grafana, Loki, Prometheus, Tempo, dbg
 docker compose up -d
 ```
 
+> Cómo está montado el stack (servicios, volúmenes, red, dependencias), las recetas
+> completas para levantarlo y los gotchas de WSL2 (Grafana sin dashboards): ver
+> [`docs/entorno-local.md`](./docs/entorno-local.md).
+
 Puertos expuestos (ver `CLAUDE.md §11.1` para la tabla completa):
 
 | Servicio   | URL                          |
