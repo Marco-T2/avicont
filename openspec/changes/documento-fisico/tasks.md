@@ -414,39 +414,25 @@ E-D-01 a E-D-16, E-E-01 a E-E-05, E-EL-01, E-EL-03. D10 (validación monto condi
 
 ---
 
-### 5.3 ☐ `feat(documentos-fisicos): add AsociacionService + unit spec`
+### 5.3 ⊘ ANULADA — reconciliada con design §4.2/§4.5/§4.6
 
-**Entrega**: lógica de negocio de la asociación comprobante ↔ documento.
-Puede vivir como métodos en `DocumentosFisicosService` o en un `AsociacionService`
-separado. **Decisión de implementación**: agregar métodos a `DocumentosFisicosService`
-(no requiere clase extra ya que el servicio tiene los ports necesarios).
+**Por qué se anula**: esta task ubicaba la orquestación asociar/desasociar/listar
+en `DocumentosFisicosService`. El design la asigna a `ComprobantesService` (§4.2:
+`asociarDocumentos` valida el comprobante con su propio repo y consume
+`DocumentosFisicosReaderPort` + `AsociacionComprobanteRepositoryPort`). Implementarla
+en `documentos-fisicos` exigiría leer `comprobantes` → **dependencia inversa que el
+§4.5 prohíbe** ("comprobantes consume documentos-fisicos, no al revés") y reintroduce
+el ciclo de prod (cicatriz `prod-build-crash-ciclos`). El reader cross-module ya
+proyecta `esTributario` + `tiposComprobanteAplicables`, así que `ComprobantesService`
+tiene todo para validar sin tocar `documentos-fisicos`.
 
-**Archivos** (modificados/nuevos):
-- `backend/src/documentos-fisicos/documentos-fisicos.service.spec.ts` (ampliado)
-  — nuevos casos en el mismo spec file:
-  - `asociarAComprobante`: lista de ids vacía → no-op OK, id de otro tenant →
-    `DocumentoFisicoNoEncontradoError` (E-A-07), estado comprobante no BORRADOR →
-    `ComprobanteNoEsBorradorError`, id ya asociado al mismo comprobante → idempotente OK,
-    múltiples ids de una sola llamada OK (E-A-08).
-  - `asociarAComprobante` (validación compatibilidad — REQ-A-11):
-    - `tiposComprobanteAplicables` del tipo no incluye `comprobante.tipo` →
-      `TipoDocumentoIncompatibleConComprobanteError` (E-A-09).
-    - `tiposComprobanteAplicables` incluye `comprobante.tipo` → asociación creada (E-A-10).
-    - `comprobante-interno` (array de 7 tipos, incluye TRASPASO) + comp TRASPASO → OK (E-A-11).
-  - `desasociarDeComprobante`: BORRADOR OK (E-A-04), CONTABILIZADO →
-    `ComprobanteDocumentoNoDesasociableContabilizadoError` (E-A-05).
-  - `listarAsociacionesDeComprobante`: devuelve los docs del comprobante, solo del tenant.
-- `backend/src/documentos-fisicos/documentos-fisicos.service.ts` (ampliado)
-  — nuevos métodos: `asociarAComprobante(tenantId, comprobanteId, ids[])`,
-  `desasociarDeComprobante(tenantId, comprobanteId, docId)`,
-  `listarAsociacionesDeComprobante(tenantId, comprobanteId)`.
-  Inyecta adicionalmente `AsociacionComprobanteRepositoryPort`.
+**Dónde vive ahora**: la lógica + los ≥15 unit specs se **absorben en task 6.3**
+(`ComprobantesService.asociarDocumentos/desasociarDocumento/listarDocumentosAsociados`
++ casos en `comprobantes.service.spec.ts`). Los errores del flujo de asociar se crean
+en 6.3 (`comprobantes/domain`); `TipoDocumentoIncompatibleConComprobanteError` ya se
+reubicó a `comprobantes/domain` (commit `f632bf8`).
 
-**Tests que se agregan**: ≥ 15 unit specs adicionales.
-
-**Verificación**: `npx tsc --noEmit` + `npx jest src/documentos-fisicos/` verde.
-
-**Cubre**: REQ-A-01 a REQ-A-11. E-A-01, E-A-02, E-A-04, E-A-05, E-A-07, E-A-08, E-A-09, E-A-10, E-A-11. D11 (validación compatibilidad tipo).
+**Cubría** (todo migrado a 6.3): REQ-A-01 a REQ-A-11. E-A-01, E-A-02, E-A-04, E-A-05, E-A-07, E-A-08, E-A-09, E-A-10, E-A-11. D11.
 
 ---
 
@@ -534,19 +520,37 @@ métodos delegadores en `ComprobantesService`.
     no tiene monto.
   - `DELETE /:documentoFisicoId`: permisos REQ-P-10.
   - `GET`: permiso `contabilidad.documentos-fisicos.read` (REQ-P-11).
-  Los 3 delegan al `DocumentosFisicosService` (inyectado como dependency nueva del controller).
+  Los 3 endpoints viven en el controller de **comprobantes** y delegan a
+  `ComprobantesService` (su propio service, que orquesta el flujo §4.2). El controller
+  NO inyecta `DocumentosFisicosService` — la dependencia es unidireccional
+  (comprobantes → documentos-fisicos vía ports, §4.5).
 - `backend/src/comprobantes/comprobantes.service.ts`
-  — agregar 3 métodos públicos: `asociarDocumentos`, `desasociarDocumento`,
-  `listarDocumentosAsociados`. Lógica según design §4.2. Inyectar `DOCUMENTOS_FISICOS_READER_PORT`
-  y `ASOCIACION_COMPROBANTE_REPOSITORY_PORT`.
+  — agregar 3 métodos públicos con la **lógica completa** (absorbida de la ex-task 5.3):
+  `asociarDocumentos`, `desasociarDocumento`, `listarDocumentosAsociados`, según design §4.2.
+  Inyectar `DOCUMENTOS_FISICOS_READER_PORT` y `ASOCIACION_COMPROBANTE_REPOSITORY_PORT`.
+  Validar comprobante BORRADOR (su propio `repo.findById`), existencia/tenant de los docs
+  y compatibilidad de tipo (`tiposComprobanteAplicables` del reader vs `comprobante.tipo`).
+- `backend/src/comprobantes/domain/comprobante-errors.ts`
+  — crear los errores del flujo de asociar (design §4.6): `ComprobanteNoEsBorradorError`,
+  `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`.
+  `TipoDocumentoIncompatibleConComprobanteError` ya vive acá (commit `f632bf8`).
 - `backend/src/comprobantes/comprobantes.module.ts`
   — importar `DocumentosFisicosModule`.
 
-**Tests que se agregan**: ninguno en este commit — cubiertos por E2E fase 8.3.
+**Tests que se agregan**: ≥ 15 unit specs en `comprobantes.service.spec.ts` (absorbidos
+de la ex-task 5.3), mockeando el comprobante-repo + `DOCUMENTOS_FISICOS_READER_PORT` +
+`ASOCIACION_COMPROBANTE_REPOSITORY_PORT`. Casos: `asociarDocumentos` (ids vacíos no-op;
+doc de otro tenant → `DocumentoFisicoReferenciadoNoExisteError` E-A-07; comprobante no
+BORRADOR → `ComprobanteNoEsBorradorError`; idempotente; multi-id E-A-08; incompatibilidad
+de tipo → `TipoDocumentoIncompatibleConComprobanteError` E-A-09/10/11);
+`desasociarDocumento` (BORRADOR OK E-A-04; CONTABILIZADO →
+`ComprobanteDocumentoNoDesasociableContabilizadoError` E-A-05); `listarDocumentosAsociados`
+(solo del tenant). El flujo completo se valida además por E2E (fase 8.3).
 
 **Verificación**: `npx tsc --noEmit` + `npx jest src/comprobantes/` verde.
 
-**Cubre**: REQ-A-01, REQ-A-02, REQ-A-09. REQ-P-09 a REQ-P-11. D5 (endpoints sub-recurso).
+**Cubre**: REQ-A-01 a REQ-A-11 (lógica de asociar, absorbida de 5.3). REQ-P-09 a REQ-P-11.
+D5 (endpoints sub-recurso), D11 (compatibilidad tipo). E-A-01, E-A-02, E-A-04, E-A-05, E-A-07 a E-A-11.
 
 ---
 
@@ -563,14 +567,17 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
   — dentro de `contabilizar()`, dentro del bloque `$transaction`:
   1. `asociaciones = await this.asociacionRepo.listarPorComprobante(tenantId, id, tx)`.
   2. Si `asociaciones.length > 0`: llamar `documentosFisicosReader.idsYaAsociadosAContabilizado(tenantId, ids, comprobanteId, tx)`.
-  _Nota: el método `obtenerBatchParaAsociar` (renombrado desde `obtenerBatchParaValidacion`) se usa en el flujo de ASOCIAR (task 5.3), no en el de contabilizar. El contabilizar usa `idsYaAsociadosAContabilizado` que no cambia de nombre._
+  _Nota: el método `obtenerBatchParaAsociar` (renombrado desde `obtenerBatchParaValidacion`) se usa en el flujo de ASOCIAR (task 6.3, `ComprobantesService.asociarDocumentos`), no en el de contabilizar. El contabilizar usa `idsYaAsociadosAContabilizado` que no cambia de nombre._
   3. Si `yaContab.length > 0`: throw `DocumentoFisicoYaAsociadoAOtroContabilizadoError(yaContab)`.
   4. `await this.asociacionRepo.refrescarEstadoComprobante(tenantId, comprobanteId, 'CONTABILIZADO', tx)`.
   Ver design §4.3 para pseudocódigo exacto.
 - `backend/src/comprobantes/domain/comprobante-errors.ts`
-  — agregar `DocumentoFisicoReferenciadoNoExisteError`,
-  `DocumentoFisicoYaAsociadoAOtroContabilizadoError`,
-  `ComprobanteNoEsBorradorError`. Ver design §4.6.
+  — el contabilizar usa `DocumentoFisicoYaAsociadoAOtroContabilizadoError`, que **ya existe
+  en `documentos-fisicos/domain`** (creado en task 4.4; lo lanza el adapter al chocar el
+  UNIQUE PARCIAL). Importarlo desde ahí (dirección permitida comprobantes → documentos-fisicos,
+  §4.5) — NO recrearlo. Los errores de ASOCIAR (`ComprobanteNoEsBorradorError`,
+  `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`)
+  ya se crearon en 6.3.
 - `backend/src/common/filters/global-exception.filter.ts`
   — agregar mapping de P2002 con `meta.target`:
   `documentos_fisicos_organizationId_tipoDocumentoFisicoId_numero_key` →
