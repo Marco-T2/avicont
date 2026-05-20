@@ -1,9 +1,8 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { MembershipsController } from './memberships.controller';
-import { MembershipsReaderAdapter } from './adapters/memberships-reader.adapter';
+import { MembershipsReaderModule } from './memberships-reader.module';
 import { PrismaMembershipRepository } from './adapters/prisma-membership.repository';
-import { MEMBERSHIPS_READER_PORT } from './ports/memberships-reader.port';
 import { MEMBERSHIP_REPOSITORY_PORT } from './ports/membership.repository.port';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
@@ -11,22 +10,24 @@ import { RbacModule } from '../rbac/rbac.module';
 import { CustomRolesModule } from '../custom-roles/custom-roles.module';
 import { UsersModule } from '../users/users.module';
 
-// forwardRef porque UsersModule ya importa MembershipsModule (para
-// consumir MEMBERSHIPS_READER_PORT en getProfile); cerrar el ciclo
-// con forwardRef en ambas direcciones es el patrón establecido
-// (cf. comprobantes ↔ periodos-fiscales en §1.1).
+// `MEMBERSHIPS_READER_PORT` se bindea en `MembershipsReaderModule` (leaf) y se
+// re-exporta acá para los consumidores que importan el módulo completo (auth,
+// impersonation, tenants). `UsersModule` lo consume directo del leaf, sin tirar
+// del require de este módulo — eso rompe el ciclo de carga CJS memberships↔users
+// que crasheaba el bootstrap del build de prod.
+//
+// La dirección memberships→users se conserva: el servicio consume
+// USERS_READER_PORT en el flujo de invitación.
 @Module({
-  imports: [RbacModule, CustomRolesModule, forwardRef(() => UsersModule)],
+  imports: [RbacModule, CustomRolesModule, UsersModule, MembershipsReaderModule],
   controllers: [MembershipsController],
   providers: [
     MembershipsService,
     PrismaService,
     TenantContextService,
-    MembershipsReaderAdapter,
-    { provide: MEMBERSHIPS_READER_PORT, useExisting: MembershipsReaderAdapter },
     PrismaMembershipRepository,
     { provide: MEMBERSHIP_REPOSITORY_PORT, useExisting: PrismaMembershipRepository },
   ],
-  exports: [MEMBERSHIPS_READER_PORT],
+  exports: [MembershipsReaderModule],
 })
 export class MembershipsModule {}
