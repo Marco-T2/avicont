@@ -14,10 +14,7 @@ export class PrismaPlanCuentasSeederAdapter extends PlanCuentasSeederPort {
     tenantId: string,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    const { porCodigoInterno } = await sembrarPlanCuentasComercial(
-      tx,
-      tenantId,
-    );
+    const { porCodigoInterno } = await sembrarPlanCuentasComercial(tx, tenantId);
     await poblarConfiguracionContableRequerida(tx, tenantId, porCodigoInterno);
   }
 }

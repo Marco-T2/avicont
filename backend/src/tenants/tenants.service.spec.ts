@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Plan, OrganizationStatus, SystemRole, TipoEmpresa } from '@prisma/client';
-import type { Organization } from '@prisma/client';
+import type { Organization, Prisma } from '@prisma/client';
 
 import { RedisService } from '@/cache/redis.service';
 import {
@@ -24,28 +24,74 @@ import {
   type TenantRepositoryPort,
 } from './ports/tenant.repository.port';
 import { TenantsService } from './tenants.service';
+import { ModuloOrganizacion } from './dto/create-tenant.dto';
+import {
+  PLAN_CUENTAS_SEEDER_PORT,
+  type PlanCuentasSeederPort,
+} from '@/cuentas/ports/plan-cuentas-seeder.port';
+import { PrismaService } from '@/common/prisma.service';
 
 /**
- * Unit tests de TenantsService. Cubren el cableado entre el service y los
- * ports (TenantRepositoryPort + MembershipsReaderPort + GestionesReaderPort)
- * sin tocar Postgres. La integración full-stack vive en
- * `test/tenant-isolation.e2e-spec.ts` y los e2e de feature-flags y
- * periodos-fiscales.
+ * Unit tests de TenantsService. Cubren:
+ *   - El mapeo modulo→flags (contabilidadEnabled/granjaEnabled).
+ *   - Que CONTABILIDAD invoca PlanCuentasSeederPort.seedDefaultsForTenant.
+ *   - Que GRANJA/OTROS no invocan ningún seeder.
+ *   - Que todo ocurre dentro de prisma.$transaction.
+ *   - Rollback semántico: si el seeder lanza, el error se propaga.
+ *   - Casos previos: slug duplicado, slug inválido, findById, etc.
  */
 describe('TenantsService (unit)', () => {
   const TENANT_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
   const OWNER_ID = '11111111-2222-4333-8444-555555555555';
 
+  // Tx falso que simula el Prisma.TransactionClient que recibe el callback
+  const TX_MOCK = { __isTxMock: true } as unknown as Prisma.TransactionClient;
+
   type RepoMock = jest.Mocked<TenantRepositoryPort>;
   type MembershipsMock = jest.Mocked<MembershipsReaderPort>;
   type GestionesMock = jest.Mocked<GestionesReaderPort>;
   type RedisMock = { del: jest.Mock };
+  type PrismaMock = { $transaction: jest.Mock };
+  type PlanCuentasSeederMock = jest.Mocked<PlanCuentasSeederPort>;
 
   let service: TenantsService;
   let repo: RepoMock;
   let memberships: MembershipsMock;
   let gestiones: GestionesMock;
   let redis: RedisMock;
+  let prismaMock: PrismaMock;
+  let planCuentasSeeder: PlanCuentasSeederMock;
+
+  function mkOrg(overrides: Partial<Organization> = {}): Organization {
+    return {
+      id: TENANT_ID,
+      slug: 'acme-corp',
+      name: 'Acme Corp',
+      status: OrganizationStatus.ACTIVE,
+      plan: Plan.FREE,
+      contabilidadEnabled: true,
+      granjaEnabled: false,
+      tipoEmpresaPrincipal: TipoEmpresa.COMERCIAL,
+      tiposEmpresaActivos: [TipoEmpresa.COMERCIAL],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      ...overrides,
+    } as Organization;
+  }
+
+  function mkOrgConMemberships(overrides: Partial<Organization> = {}): OrganizationConMemberships {
+    return {
+      ...mkOrg(overrides),
+      memberships: [
+        {
+          id: 'mb1',
+          organizationId: TENANT_ID,
+          userId: OWNER_ID,
+          systemRole: SystemRole.OWNER,
+        } as never,
+      ],
+    };
+  }
 
   beforeEach(async () => {
     repo = {
@@ -72,6 +118,19 @@ describe('TenantsService (unit)', () => {
 
     redis = { del: jest.fn().mockResolvedValue(0) };
 
+    planCuentasSeeder = {
+      seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
+    } as unknown as PlanCuentasSeederMock;
+
+    // $transaction ejecuta el callback con TX_MOCK y retorna lo que devuelve el callback
+    prismaMock = {
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+          cb(TX_MOCK),
+        ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TenantsService,
@@ -79,81 +138,178 @@ describe('TenantsService (unit)', () => {
         { provide: MEMBERSHIPS_READER_PORT, useValue: memberships },
         { provide: GESTIONES_READER_PORT, useValue: gestiones },
         { provide: RedisService, useValue: redis },
+        { provide: PLAN_CUENTAS_SEEDER_PORT, useValue: planCuentasSeeder },
+        { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();
 
     service = module.get(TenantsService);
   });
 
-  function mkOrg(overrides: Partial<Organization> = {}): Organization {
-    return {
-      id: TENANT_ID,
-      slug: 'acme-corp',
-      name: 'Acme Corp',
-      status: OrganizationStatus.ACTIVE,
-      plan: Plan.FREE,
-      contabilidadEnabled: true,
-      granjaEnabled: false,
-      tipoEmpresaPrincipal: TipoEmpresa.COMERCIAL,
-      tiposEmpresaActivos: [TipoEmpresa.COMERCIAL],
-      createdAt: new Date('2026-01-01T00:00:00Z'),
-      updatedAt: new Date('2026-01-01T00:00:00Z'),
-      ...overrides,
-    } as Organization;
-  }
-
-  describe('create', () => {
-    it('genera slug desde el name y crea organización + membership OWNER', async () => {
-      const created: OrganizationConMemberships = {
-        ...mkOrg({ name: 'Acme Corp', slug: 'acme-corp' }),
-        memberships: [
-          {
-            id: 'mb1',
-            organizationId: TENANT_ID,
-            userId: OWNER_ID,
-            systemRole: SystemRole.OWNER,
-          } as never,
-        ],
-      };
+  describe('create — mapeo modulo → flags y seeders', () => {
+    it('CONTABILIDAD: repo.create recibe contabilidadEnabled=true, granjaEnabled=false', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
       repo.create.mockResolvedValue(created);
 
-      const result = await service.create({ name: 'Acme Corp' }, OWNER_ID);
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
 
-      expect(repo.existsBySlug).toHaveBeenCalledWith('acme-corp');
-      expect(repo.create).toHaveBeenCalledWith({
-        slug: 'acme-corp',
-        name: 'Acme Corp',
-        ownerUserId: OWNER_ID,
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ contabilidadEnabled: true, granjaEnabled: false }),
+        TX_MOCK,
+      );
+    });
+
+    it('CONTABILIDAD: invoca planCuentasSeeder.seedDefaultsForTenant con org.id y tx', async () => {
+      const created = mkOrgConMemberships({
+        id: TENANT_ID,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(planCuentasSeeder.seedDefaultsForTenant).toHaveBeenCalledTimes(1);
+      expect(planCuentasSeeder.seedDefaultsForTenant).toHaveBeenCalledWith(TENANT_ID, TX_MOCK);
+    });
+
+    it('CONTABILIDAD golden path: retorna OrganizationConMemberships', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      const result = await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
       expect(result.memberships[0]?.systemRole).toBe(SystemRole.OWNER);
     });
 
-    it('lanza TenantSlugDuplicadoError (409) si el slug ya existe', async () => {
+    it('GRANJA: repo.create recibe contabilidadEnabled=false, granjaEnabled=true', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ contabilidadEnabled: false, granjaEnabled: true }),
+        TX_MOCK,
+      );
+    });
+
+    it('GRANJA: NO invoca planCuentasSeeder', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
+
+      expect(planCuentasSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('OTROS: repo.create recibe ambos flags en false', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Otros SA', modulo: ModuloOrganizacion.OTROS }, OWNER_ID);
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ contabilidadEnabled: false, granjaEnabled: false }),
+        TX_MOCK,
+      );
+    });
+
+    it('OTROS: NO invoca ningún seeder', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Otros SA', modulo: ModuloOrganizacion.OTROS }, OWNER_ID);
+
+      expect(planCuentasSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('todo ocurre dentro de prisma.$transaction', async () => {
+      const created = mkOrgConMemberships();
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('seeder lanza → el error se propaga (rollback semántico)', async () => {
+      const seederError = new Error('fallo de plantilla COMERCIAL');
+      planCuentasSeeder.seedDefaultsForTenant.mockRejectedValue(seederError);
+
+      // También hacer que $transaction propague el error del callback
+      prismaMock.$transaction.mockImplementation(
+        async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
+          // Simula que la TX propaga el error del seeder
+          const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+          repo.create.mockResolvedValue(created);
+          return cb(TX_MOCK);
+        },
+      );
+
+      await expect(
+        service.create({ name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD }, OWNER_ID),
+      ).rejects.toThrow('fallo de plantilla COMERCIAL');
+    });
+  });
+
+  describe('create — validaciones previas a la TX', () => {
+    it('genera slug desde el name y verifica existencia pre-TX', async () => {
+      const created = mkOrgConMemberships({ name: 'Acme Corp', slug: 'acme-corp' });
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(repo.existsBySlug).toHaveBeenCalledWith('acme-corp');
+    });
+
+    it('lanza TenantSlugDuplicadoError (409) si el slug ya existe — sin abrir TX', async () => {
       repo.existsBySlug.mockResolvedValue(true);
 
-      await expect(service.create({ name: 'Acme Corp' }, OWNER_ID)).rejects.toBeInstanceOf(
-        TenantSlugDuplicadoError,
-      );
+      await expect(
+        service.create({ name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD }, OWNER_ID),
+      ).rejects.toBeInstanceOf(TenantSlugDuplicadoError);
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
     });
 
     it('lanza TenantSlugInvalidoError (400) si el name no produce caracteres alfanuméricos', async () => {
-      await expect(service.create({ name: '!!!' }, OWNER_ID)).rejects.toBeInstanceOf(
-        TenantSlugInvalidoError,
-      );
+      await expect(
+        service.create({ name: '!!!', modulo: ModuloOrganizacion.CONTABILIDAD }, OWNER_ID),
+      ).rejects.toBeInstanceOf(TenantSlugInvalidoError);
+
       expect(repo.existsBySlug).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
     });
 
     it('preserva diacríticos al slugificar (NFKD)', async () => {
-      repo.create.mockResolvedValue({
-        ...mkOrg({ name: 'José Martínez', slug: 'jose-martinez' }),
-        memberships: [],
-      });
+      const created = mkOrgConMemberships({ name: 'José Martínez', slug: 'jose-martinez' });
+      repo.create.mockResolvedValue(created);
 
-      await service.create({ name: 'José Martínez' }, OWNER_ID);
+      await service.create(
+        { name: 'José Martínez', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
 
       expect(repo.create).toHaveBeenCalledWith(
         expect.objectContaining({ slug: 'jose-martinez', name: 'José Martínez' }),
+        TX_MOCK,
       );
     });
   });

@@ -59,6 +59,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'Tenant A',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
 
       expect(org.slug).toBe(SLUG_A);
@@ -69,10 +71,22 @@ describe('PrismaTenantRepository (integration)', () => {
     });
 
     it('falla con UNIQUE violation si el slug ya existe', async () => {
-      await repo.create({ slug: SLUG_A, name: 'A1', ownerUserId: ownerId });
-      await expect(repo.create({ slug: SLUG_A, name: 'A2', ownerUserId: ownerId })).rejects.toThrow(
-        /Unique/i,
-      );
+      await repo.create({
+        slug: SLUG_A,
+        name: 'A1',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+      await expect(
+        repo.create({
+          slug: SLUG_A,
+          name: 'A2',
+          ownerUserId: ownerId,
+          contabilidadEnabled: true,
+          granjaEnabled: false,
+        }),
+      ).rejects.toThrow(/Unique/i);
     });
   });
 
@@ -82,6 +96,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'Tenant A',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
       const found = await repo.findById(created.id);
       expect(found?.slug).toBe(SLUG_A);
@@ -93,7 +109,13 @@ describe('PrismaTenantRepository (integration)', () => {
     });
 
     it('findBySlug retorna la organización si existe', async () => {
-      await repo.create({ slug: SLUG_A, name: 'Tenant A', ownerUserId: ownerId });
+      await repo.create({
+        slug: SLUG_A,
+        name: 'Tenant A',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
       const found = await repo.findBySlug(SLUG_A);
       expect(found?.name).toBe('Tenant A');
     });
@@ -106,7 +128,13 @@ describe('PrismaTenantRepository (integration)', () => {
 
   describe('existsBySlug', () => {
     it('true si existe', async () => {
-      await repo.create({ slug: SLUG_A, name: 'A', ownerUserId: ownerId });
+      await repo.create({
+        slug: SLUG_A,
+        name: 'A',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
       expect(await repo.existsBySlug(SLUG_A)).toBe(true);
     });
 
@@ -121,6 +149,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'Original',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
 
       const updated = await repo.update(created.id, { name: 'Renombrado' });
@@ -134,6 +164,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'A',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
       const updated = await repo.update(created.id, {
         tipoEmpresaPrincipal: 'SERVICIOS',
@@ -148,6 +180,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'A',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
       const features = await repo.findFeatures(created.id);
       expect(features).toEqual({
@@ -168,6 +202,8 @@ describe('PrismaTenantRepository (integration)', () => {
         slug: SLUG_A,
         name: 'A',
         ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
       });
 
       const updated = await repo.updateFeatures(created.id, {

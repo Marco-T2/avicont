@@ -10,6 +10,7 @@ import type {
   Organization,
   OrganizationStatus,
   Plan,
+  Prisma,
   TipoEmpresa,
 } from '@prisma/client';
 
@@ -31,6 +32,10 @@ export interface TenantCreateData {
   slug: string;
   name: string;
   ownerUserId: string;
+  /** Derivado del módulo elegido en `CreateTenantDto.modulo` (Design D1). */
+  contabilidadEnabled: boolean;
+  /** Derivado del módulo elegido en `CreateTenantDto.modulo` (Design D1). */
+  granjaEnabled: boolean;
 }
 
 export interface TenantUpdateData {
@@ -59,8 +64,14 @@ export abstract class TenantRepositoryPort {
    * Crea una organización + la membership inicial del OWNER en una sola
    * operación atómica (nested write de Prisma). Asume que el caller ya
    * validó que el slug no existe.
+   *
+   * `tx` es opcional para mantener compatibilidad. Cuando se provee, la
+   * operación participa de la transacción del caller (Design D6).
    */
-  abstract create(data: TenantCreateData): Promise<OrganizationConMemberships>;
+  abstract create(
+    data: TenantCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<OrganizationConMemberships>;
 
   /**
    * Busca por id. Retorna null si no existe — el service lo traduce a

@@ -24,8 +24,5 @@ export abstract class PlanCuentasSeederPort {
    *   requeridas por el sistema (fail loud de comercial.ts — es un bug de
    *   plantilla, no un error de dominio del usuario).
    */
-  abstract seedDefaultsForTenant(
-    tenantId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<void>;
+  abstract seedDefaultsForTenant(tenantId: string, tx: Prisma.TransactionClient): Promise<void>;
 }
