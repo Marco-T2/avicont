@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CuentaFormValues } from '../schemas/cuenta-form-schema';
 import { createCuenta } from '../api/create-cuenta';
 import { deactivateCuenta } from '../api/deactivate-cuenta';
-import { mapearPuct } from '../api/mapear-puct';
 import { updateCuenta } from '../api/update-cuenta';
 
 // Invalida todo el cache de cuentas de la feature. Usado post-mutation:
@@ -37,17 +36,6 @@ export function useDeactivateCuenta() {
   const invalidate = useInvalidateCuentas();
   return useMutation({
     mutationFn: (id: string) => deactivateCuenta(id),
-    onSuccess: () => invalidate(),
-  });
-}
-
-export function useMapearPuct(id: string | null) {
-  const invalidate = useInvalidateCuentas();
-  return useMutation({
-    mutationFn: (codigoPuct: string) => {
-      if (id === null) throw new Error('id requerido para mapearPuct');
-      return mapearPuct(id, codigoPuct);
-    },
     onSuccess: () => invalidate(),
   });
 }

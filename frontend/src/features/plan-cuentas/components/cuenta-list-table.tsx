@@ -54,7 +54,6 @@ export function CuentaListTable({
           <TableRow>
             <TableHead className="sticky left-0 z-10 bg-background w-32">Código</TableHead>
             <TableHead className="min-w-[220px]">Nombre</TableHead>
-            <TableHead>PUCT</TableHead>
             <TableHead>Clase</TableHead>
             <TableHead>Nivel</TableHead>
             <TableHead className="text-center">Detalle</TableHead>
@@ -72,9 +71,6 @@ export function CuentaListTable({
                 {c.codigoInterno}
               </TableCell>
               <TableCell className="font-medium">{c.nombre}</TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {c.codigoPuct ?? '—'}
-              </TableCell>
               <TableCell>
                 <ClaseBadge clase={c.claseCuenta} />
               </TableCell>

@@ -164,7 +164,7 @@ export function CuentaForm({
   }, [mode, claseCuenta, subClasesValidas, form, setValue]);
 
   // Al cambiar claseCuenta, reset de parentId si el padre seleccionado ya no
-  // pertenece a la nueva clase. Regla implícita del PUCT: el árbol no cruza
+  // pertenece a la nueva clase. Regla del plan de cuentas: el árbol no cruza
   // clases. El backend no lo valida explícito, el frontend previene el bug.
   useEffect(() => {
     if (mode === 'edit') return;

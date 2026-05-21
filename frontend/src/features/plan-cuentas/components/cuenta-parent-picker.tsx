@@ -19,7 +19,7 @@ interface CuentaParentPickerProps {
   agrupadores: CuentaTreeNode[];
   value: string | undefined;
   onChange: (id: string | undefined) => void;
-  /** Si se provee, filtra los agrupadores a esa sola clase (regla del PUCT). */
+  /** Si se provee, filtra los agrupadores a esa sola clase (el árbol no cruza clases). */
   filterByClase?: ClaseCuenta;
   disabled?: boolean;
   placeholder?: string;
@@ -30,7 +30,7 @@ interface CuentaParentPickerProps {
 // (código o nombre) además de por clase contable.
 //
 // Filtrado por clase: cuando el form tiene clase = "ACTIVO", solo mostramos
-// agrupadores de clase ACTIVO. Regla implícita del PUCT: el árbol no cruza
+// agrupadores de clase ACTIVO. Regla del plan de cuentas: el árbol no cruza
 // clases (no hay cuenta pasivo bajo un padre activo).
 export function CuentaParentPicker({
   agrupadores,

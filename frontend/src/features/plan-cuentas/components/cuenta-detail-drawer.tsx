@@ -1,14 +1,7 @@
-import { Link2, MoreHorizontal, Pencil, Power } from 'lucide-react';
+import { Pencil, Power } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -26,7 +19,6 @@ import { useCuentaDetail } from '../hooks/use-cuenta-detail';
 import { ClaseBadge } from './clase-badge';
 import { CuentaFormSheet } from './cuenta-form-sheet';
 import { DeactivateCuentaDialog } from './deactivate-cuenta-dialog';
-import { MapearPuctDialog } from './mapear-puct-dialog';
 
 interface CuentaDetailDrawerProps {
   cuentaId: string | null;
@@ -34,8 +26,8 @@ interface CuentaDetailDrawerProps {
 }
 
 // Drawer lateral con los detalles de una Cuenta + acciones CRUD del slice
-// Plan de cuentas: Editar (otro Sheet con CuentaForm), Mapear PUCT (Dialog
-// con input) y Desactivar (AlertDialog de confirmación).
+// Plan de cuentas: Editar (otro Sheet con CuentaForm) y Desactivar
+// (AlertDialog de confirmación).
 // Las cuentas esRequeridaSistema ocultan el botón Desactivar — el backend
 // las protege con el error CUENTA_REQUERIDA_SISTEMA_INMUTABLE, pero la UI
 // lo previene explícitamente para no invitar el intento.
@@ -45,7 +37,6 @@ export function CuentaDetailDrawer({
 }: CuentaDetailDrawerProps): React.JSX.Element {
   const { data, isLoading, isError } = useCuentaDetail(cuentaId);
   const [editOpen, setEditOpen] = useState(false);
-  const [mapearOpen, setMapearOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
 
   const cuenta = data ?? null;
@@ -60,15 +51,15 @@ export function CuentaDetailDrawer({
       >
         <SheetContent
           side="right"
-          // max-w-xl (576px) + overflow-x-hidden: los 4 botones del footer
-          // (Cerrar, Cambiar PUCT, Editar, Desactivar) no entran en 512px,
+          // max-w-xl (576px) + overflow-x-hidden: los botones del footer
+          // (Cerrar, Editar, Desactivar) no entran cómodos en 512px,
           // y max-w-xl les da margen sin invadir mobile.
           className="w-full sm:max-w-xl overflow-y-auto overflow-x-hidden"
         >
           <SheetHeader>
             <SheetTitle>Detalle de cuenta</SheetTitle>
             <SheetDescription>
-              Información completa según el PUCT y la configuración del tenant.
+              Información completa de la cuenta y la configuración del tenant.
             </SheetDescription>
           </SheetHeader>
 
@@ -82,54 +73,30 @@ export function CuentaDetailDrawer({
             {cuenta !== null ? <DetailBody cuenta={cuenta} /> : null}
           </div>
 
-          {/* Footer: patrón estándar de admin apps — primary CTA "Editar" +
-              "Más acciones" en dropdown. Así entran limpio incluso en 576px.
-              Cerrar queda a la izquierda separado del grupo de acciones. */}
+          {/* Footer: Cerrar a la izquierda, acciones a la derecha. Editar es el
+              CTA primario; Desactivar solo aparece cuando aplica. */}
           <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button variant="outline" onClick={onClose}>
               Cerrar
             </Button>
             {cuenta !== null ? (
               <div className="flex gap-2 sm:justify-end">
+                {puedeDesactivar ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeactivateOpen(true)}
+                    className="flex-1 sm:flex-none text-destructive hover:text-destructive"
+                  >
+                    <Power className="h-4 w-4 mr-2" />
+                    Desactivar
+                  </Button>
+                ) : null}
                 {cuenta.activa ? (
                   <Button onClick={() => setEditOpen(true)} className="flex-1 sm:flex-none">
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
                   </Button>
                 ) : null}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      aria-label="Más acciones"
-                      className="sm:flex-none"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="ml-2 sm:hidden">Más</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem
-                      onClick={() => setMapearOpen(true)}
-                      disabled={cuenta.esRequeridaSistema}
-                    >
-                      <Link2 className="h-4 w-4 mr-2" />
-                      {cuenta.codigoPuct !== null ? 'Cambiar PUCT' : 'Mapear PUCT'}
-                    </DropdownMenuItem>
-                    {puedeDesactivar ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setDeactivateOpen(true)}
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                        >
-                          <Power className="h-4 w-4 mr-2" />
-                          Desactivar
-                        </DropdownMenuItem>
-                      </>
-                    ) : null}
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
             ) : null}
           </SheetFooter>
@@ -145,11 +112,6 @@ export function CuentaDetailDrawer({
             initialData={cuenta}
             open={editOpen}
             onOpenChange={setEditOpen}
-          />
-          <MapearPuctDialog
-            cuenta={cuenta}
-            open={mapearOpen}
-            onOpenChange={setMapearOpen}
           />
           <DeactivateCuentaDialog
             cuenta={cuenta}
@@ -217,25 +179,6 @@ function DetailBody({ cuenta }: DetailBodyProps): React.JSX.Element {
           value={cuenta.esContraria ? 'Sí' : 'No'}
         />
       </dl>
-
-      <div className="border-t pt-3 space-y-3 text-sm">
-        <div className="font-medium">PUCT</div>
-        {cuenta.codigoPuct !== null ? (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <Field label="Código" value={cuenta.codigoPuct} mono />
-            <Field label="Versión" value={cuenta.versionPuctMapeado ?? '—'} />
-            <Field
-              label="Nombre snapshot"
-              value={cuenta.nombrePuctSnapshot ?? '—'}
-              span2
-            />
-          </dl>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">
-            Esta cuenta no está mapeada al catálogo PUCT.
-          </p>
-        )}
-      </div>
 
       {cuenta.esRequeridaSistema || cuenta.esSystemSeed ? (
         <div className="border-t pt-3 space-y-1 text-xs text-muted-foreground">

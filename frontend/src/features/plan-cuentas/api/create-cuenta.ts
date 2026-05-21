@@ -3,8 +3,6 @@ import type { Cuenta } from '@/types/api';
 
 import type { CuentaFormValues } from '../schemas/cuenta-form-schema';
 
-// El backend acepta el DTO con codigoPuct opcional; en este slice el mapeo
-// PUCT va por el endpoint dedicado, así que NO se envía desde el form.
 export async function createCuenta(values: CuentaFormValues): Promise<Cuenta> {
   const body = {
     codigoInterno: values.codigoInterno,

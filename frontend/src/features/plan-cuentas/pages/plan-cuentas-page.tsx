@@ -63,7 +63,7 @@ export function PlanCuentasPage(): React.JSX.Element {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Plan de cuentas</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Catálogo contable del tenant — jerárquico según PUCT.
+            Catálogo contable del tenant — jerárquico por clase y nivel.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="self-start">
@@ -132,8 +132,8 @@ export function PlanCuentasPage(): React.JSX.Element {
 // Construye los valores del form pre-rellenados cuando se crea una hija
 // desde el botón "+" del árbol. La clase/subclase/naturaleza se heredan
 // del padre; el codigoInterno se sugiere (max+1 de las hijas existentes).
-// Ver CLAUDE.md §4 para la regla implícita del PUCT (el árbol no cruza
-// clases, por eso heredar claseCuenta del padre es siempre correcto).
+// El árbol no cruza clases, por eso heredar claseCuenta del padre es
+// siempre correcto.
 function buildPrefillForChild(parent: CuentaTreeNode): Partial<CuentaFormValues> {
   return {
     codigoInterno: sugerirCodigoHijo(parent, parent.hijas),
