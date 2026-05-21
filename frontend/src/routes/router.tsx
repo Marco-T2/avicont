@@ -4,6 +4,7 @@ import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
 import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
+import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <DashboardPage /> },
           { path: '/plan-cuentas', element: <PlanCuentasPage /> },
+          { path: '/contactos', element: <ContactosPage /> },
           { path: '/settings/members', element: <MembersPage /> },
           { path: '/settings/roles', element: <RolesPage /> },
           { path: '/settings/features', element: <FeaturesPage /> },
