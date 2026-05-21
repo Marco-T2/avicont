@@ -712,7 +712,14 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ## Fase 10 — E2E tests
 
-### 10.1 ☐ `test(tipos-documento-fisico): add e2e for tipos catalog CRUD`
+### 10.1 ☑ `test(tipos-documento-fisico): add e2e for tipos catalog CRUD`
+
+> **Nota apply (commit `f68836d`)**: 12 escenarios verdes. La org de fixtures se crea
+> directo por Prisma (`prisma.organization.create`) → arranca SIN tipos sembrados (control
+> total del catálogo). 403 (E-MT-04): miembro con `CustomRole` de permisos limitados (sin
+> `systemRole` → no es OWNER/ADMIN, entra al chequeo de wildcards). El `cleanupTestData` de
+> `test/helpers/test-factory.ts` se extendió con las 3 tablas nuevas (`comprobanteDocumentoFisico`,
+> `documentoFisico`, `tipoDocumentoFisico`) en orden de FK — incluido en este commit.
 
 **Entrega**: suite E2E completa para el catálogo de tipos.
 
@@ -740,7 +747,23 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ---
 
-### 10.2 ☐ `test(documentos-fisicos): add e2e for documentos CRUD and listado`
+### 10.2 ☑ `test(documentos-fisicos): add e2e for documentos CRUD and listado`
+
+> **Nota apply (commits `40861c9` fix + `5a8508d` e2e)**: 27 escenarios verdes.
+> - **Gap encontrado y corregido (E-D-07)**: el spec REQ-D-01 + E-D-07 exigen `monto > 0`
+>   (400 a nivel DTO), pero Fases 5/6 nunca lo implementaron — un documento tributario con
+>   `monto: "0.00"` devolvía 201. Fix en commit aparte `40861c9`: `@Matches(DECIMAL_POSITIVO)`
+>   en `create`/`update` DTO (`/^(?!0+(\.0+)?$)\d+(\.\d+)?$/`, análogo a `DECIMAL_NO_NEG` de
+>   comprobantes) + unit spec del DTO. Decisión del usuario: implementar ahora (la rama no está
+>   mergeada, completar el invariante es parte del apply).
+> - **E-D-10** (contacto de otro tenant): el service lanza `ContactoNoEncontradoError` →
+>   404 `CONTACTO_NO_ENCONTRADO` (no un error propio del módulo).
+> - **E-D-13** (round-trip de monto): `Decimal.toString()` descarta ceros finales
+>   ("1150.00" → "1150"), igual que en comprobantes. El test usa `"1150.55"` para una aserción
+>   determinística.
+> - Los escenarios de mutabilidad/eliminación (E-E-02/03/04, E-EL-03, E-D-11/12) requieren
+>   maquinaria de comprobantes (gestión + cuentas + asociar/contabilizar), montada con helpers
+>   en la misma suite.
 
 **Entrega**: suite E2E del módulo operativo.
 
@@ -783,7 +806,25 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ---
 
-### 10.3 ☐ `test(documentos-fisicos): add e2e for asociacion and contabilizar`
+### 10.3 ☑ `test(documentos-fisicos): add e2e for asociacion and contabilizar`
+
+> **Nota apply (commit `9cf9796`)**: 17 escenarios verdes. Desvíos vs el texto original
+> (escrito antes de implementar la capa HTTP):
+> - **Status de asociar**: el POST `/:comprobanteId/documentos-fisicos` NO tiene `@HttpCode`
+>   → devuelve **201** (default), no 200 como decían E-A-01/02/08/10/11. Los tests asertan 201.
+> - **E-A-03 código real**: el conflicto del UNIQUE PARCIAL emite
+>   `DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO` (409), NO
+>   `COMPROBANTE_DOCUMENTO_FISICO_YA_CONTABILIZADO` del texto. Se asertó el código real.
+> - **E-A-07 código**: doc de otro tenant → 404 `COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE`
+>   (de `comprobantes/domain`, no de `documentos-fisicos`).
+> - **E-SEED**: la org se crea por el flujo real `POST /api/tenants {modulo: CONTABILIDAD}`
+>   (siembra 8 tipos + 111 cuentas) + re-login para que el JWT lleve `activeTenantId` de la
+>   nueva org (CLAUDE.md §4.2 — tenantId sale del JWT, no de header). Matriz de
+>   `tiposComprobanteAplicables` comparada importando `TIPOS_UNIVERSALES`.
+> - **E-SEED-02 idempotencia**: no hay endpoint para re-disparar el seed → se obtiene el
+>   `TipoDocumentoFisicoSeederPort` del contenedor DI (`app.get(SYMBOL, { strict: false })`)
+>   y se re-ejecuta `seedDefaultsForTenant`; el upsert mantiene 8 (no 16).
+> - **E-T-11/12**: el `codigo` respeta `@MaxLength(20)` (códigos cortos kebab-case).
 
 **Entrega**: suite E2E del flujo de asociación + contabilizar + anular.
 Cubre el caso crítico del UNIQUE PARCIAL (concurrencia simulada).
