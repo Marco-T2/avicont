@@ -1,5 +1,5 @@
 change: documento-fisico
 created_at: '2026-04-25'
-phase: verify
-completed: [explore, proposal, spec, design, tasks, apply]
-pending: [verify, archive]
+phase: archive
+completed: [explore, proposal, spec, design, tasks, apply, verify]
+pending: [archive]
