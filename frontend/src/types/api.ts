@@ -368,6 +368,25 @@ export interface ContactoListResponse {
   pageSize: number;
 }
 
+// Tipo de entrada para crear/actualizar un contacto.
+// Los campos de texto opcionales llegan como string vacío desde el form;
+// la capa api los convierte a null antes de enviarlos al backend (el backend
+// tiene un unique parcial WHERE documento IS NOT NULL, y rechaza '').
+// Fase 4/7: cuando se cree el zod schema, ContactoFormValues = z.infer<schema>
+// debe ser compatible con esta shape (mismos campos, mismos tipos).
+// Si el schema introduce refinements adicionales, reemplazar esta importación
+// por la del schema en create-contacto.ts y update-contacto.ts.
+export interface ContactoInput {
+  razonSocial: string;
+  nombreComercial: string;
+  documento: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  esCliente: boolean;
+  esProveedor: boolean;
+}
+
 // Query params para GET /api/contactos.
 // activo: boolean → filtra por estado; 'all' → sin filtro; undefined → sin filtro.
 export interface ListarContactosParams {
