@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-05-19
-Última revisión contra core: 2026-05-19
+Última edición: 2026-05-21
+Última revisión contra core: 2026-05-21
 Owner: backend-lead
 -->
 
@@ -72,7 +72,7 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 - NIT emisor válido: 7-12 dígitos numéricos, formato correcto. Sin consulta a padrón SIN.
 - NIT receptor válido o `0` (ventas sin nominativa).
 - `fechaEmision <= fechaActual`.
-- Unicidad por `(tenantId, tipo, nitEmisor, numero, fecha)` para facturas recibidas y emitidas. Evita duplicados en LCV.
+- Unicidad por `(tenantId, tipo, nitEmisor, numero, fecha)` para facturas recibidas y emitidas. Evita duplicados en el registro tributario interno (el RCV/SIN es externo — ver `CLAUDE.md §10.9`).
 - IVA calculado `= 13% del subtotal gravado`, con tolerancia `±Bs 0.01` por redondeo.
 - IT calculado `= 3%` cuando aplica, con misma tolerancia.
 
@@ -90,7 +90,7 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 - **Libro Mayor**: saldo de cuenta en momento T `= saldoInicial + SUM(movimientos en BOB hasta T)`. Debe reconciliar contra comprobantes contabilizados.
 - **Balance de Comprobación**: `SUM(saldosDeudores) === SUM(saldosAcreedores)` siempre, en BOB.
 - **Balance de Sumas y Saldos al SIN**: se exporta con libros abiertos y saldos ajustados (sin asientos de cierre de gestión).
-- **LCV**: cada fila referencia un documento tributario único `(NIT + número + fecha + tipo)`, no duplicados dentro del período.
+- **LCV/RCV** ⊘ **fuera de scope**: el SIN reemplazó el LCV por el RCV y lo genera con sus propias herramientas (SIAT). El sistema no construye el libro (decisión 2026-05-21, `CLAUDE.md §10.9`). La unicidad de documentos tributarios `(NIT + número + fecha + tipo)` igual aplica para el control interno.
 
 #### UFV y conversiones
 

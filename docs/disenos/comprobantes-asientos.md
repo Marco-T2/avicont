@@ -1122,8 +1122,8 @@ Commits de Fase 1.3 en `main`: `b9c23d3` (schema) · `50db79f` (domain/errors/va
 | Documentos físicos (`DocumentoFisico`, asociación con comprobante) | 1.4 (slice 2 — implementado, cabecera-cabecera vía `comprobante_documento_fisico`; ver `docs/disenos/documento-fisico.md`) |
 | Contactos como tabla FK (`Contacto`) | 1.4 |
 | Libro Mayor / Balance de Comprobación | 1.4 |
-| Libro de Compras IVA (LCV) | 1.4 |
-| Libro de Ventas IVA | 1.4 |
+| ~~Libro de Compras IVA (LCV)~~ | ⊘ FUERA DE SCOPE — reemplazado por el RCV del SIN (SIAT), externo. Decisión 2026-05-21, ver `CLAUDE.md §10.9` |
+| ~~Libro de Ventas IVA~~ | ⊘ FUERA DE SCOPE — ídem (RCV externo) |
 | Cargador automático de Tipo de Cambio (BCB) | 1.5 |
 | Cargador automático de UFV | 1.5 |
 | Auto-entries de ventas/compras/pagos | 1.5 |
@@ -1171,7 +1171,8 @@ con millones de filas.
 | Auditoría | Tabla `ComprobanteAuditoria` separada del `AuditLog` genérico. Diff resumen, flag `fueDuranteReapertura`. |
 | Documentos físicos | Implementado en Fase 1.4 (slice 2): relación cabecera-cabecera N:M `comprobante_documento_fisico`, NO un campo en `LineaComprobante`. Ver `docs/disenos/documento-fisico.md`. |
 | Auto-entries (ventas/compras/pagos) | Fuera de scope. Fase 1.5. Campos `origenTipo/origenId` presentes para evitar migración futura. |
-| Libro Mayor / LCV | Fuera de scope. Fase 1.4. Eventos `comprobante.contabilizado`/`anulado` ya emitidos (sin consumidores). |
+| Libro Mayor | Fuera de scope de 1.3, **planificado para 1.4**. Eventos `comprobante.contabilizado`/`anulado` ya emitidos esperando este primer consumidor. |
+| LCV/RCV (Libro/Registro de Compras y Ventas IVA) | ⊘ FUERA DE SCOPE — lo genera el SIN (SIAT/RCV). No se construye in-house (decisión 2026-05-21, `CLAUDE.md §10.9`). |
 
 ---
 

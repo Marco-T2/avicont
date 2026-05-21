@@ -174,17 +174,22 @@ documentado en la cicatriz `prod-build-crash-ciclos`).
 
 ## 7. Forward-compat
 
-### Slice 3 — Factura
-- Tabla `Factura` con FK 1:1 opcional a `DocumentoFisico` (`documentoFisicoId String? @unique`).
-- `DocumentoFisico.monto` = total del papel (neto + IVA + IT); `Factura` agrega los
-  desgloses (`montoNeto`, `montoIva`, `montoIt?`) + datos tributarios (`nitEmisor`,
-  `codigoAutorizacion`, etc.) sin tocar `DocumentoFisico`.
-- Nuevo invariante: si `tipo.esTributario`, exigir `Factura` adjunta antes de asociar a
-  un comprobante CONTABILIZADO.
+> **DESCOPE (decisión 2026-05-21)**: el **LCV** fue reemplazado por el **RCV** (Registro
+> de Compras y Ventas), que el SIN genera/consume con sus propias herramientas (SIAT).
+> Por eso **NO se construye el módulo de libros IVA in-house** (ver `CLAUDE.md §10.9`).
+> Como consecuencia, el slice **Factura** pierde su único destino (alimentar el RCV) y
+> queda **descartado/diferido**: `documentos-fisicos` ya cubre el control interno del papel
+> (número, monto, fecha, contacto, `esTributario`). Las dos secciones de abajo se conservan
+> como referencia histórica de cómo se había anticipado, NO como trabajo planificado.
 
-### Slice 4 — LCV
-- El Libro de Compras y Ventas itera sobre `Factura` (no sobre `DocumentoFisico` directo),
-  vía `FACTURAS_READER_PORT`. JOIN a `DocumentoFisico` solo para el detalle visual.
+### Slice 3 — Factura ⊘ DESCARTADO/DIFERIDO (RCV externo)
+- ~~Tabla `Factura` con FK 1:1 opcional a `DocumentoFisico`~~ — sin RCV que alimentar, el
+  desglose `montoNeto`/`montoIva`/`montoIt` + `nitEmisor`/`codigoAutorizacion` ya no aporta
+  valor interno. Si en el futuro hace falta un control tributario más fino, se reabre.
 
-Este slice deja listo: el flag `esTributario`, `monto` ya poblado para tributarios, y la
-separación arquitectural que hace la migración a `Factura` trivial.
+### Slice 4 — LCV/RCV ⊘ FUERA DE SCOPE (lo maneja el SIN)
+- ~~Libro de Compras y Ventas sobre `Factura` vía `FACTURAS_READER_PORT`~~ — el RCV vive en
+  las herramientas del SIN; el sistema no lo genera.
+
+Lo que este slice igual dejó útil: el flag `esTributario` y `monto` poblado para
+documentos tributarios sirven para reportes/control interno aunque no exista Factura ni RCV.
