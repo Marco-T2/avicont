@@ -181,10 +181,7 @@ export class DocumentosFisicosService {
    * de lectura/escritura del controller. Lanza `DocumentoFisicoNoEncontradoError`
    * si no existe o pertenece a otro tenant (multi-tenancy defense in depth).
    */
-  async obtenerConRelaciones(
-    tenantId: string,
-    id: string,
-  ): Promise<DocumentoFisicoConRelaciones> {
+  async obtenerConRelaciones(tenantId: string, id: string): Promise<DocumentoFisicoConRelaciones> {
     const doc = await this.repo.findByIdConRelaciones(tenantId, id);
     if (!doc) throw new DocumentoFisicoNoEncontradoError(id);
     return doc;

@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsEnum, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { TipoComprobante } from '@prisma/client';
 
 export class CreateTipoDocumentoFisicoDto {
@@ -22,7 +30,10 @@ export class CreateTipoDocumentoFisicoDto {
   @MaxLength(20)
   codigo!: string;
 
-  @ApiProperty({ example: false, description: 'true para documentos con requisitos tributarios (factura, NC, ND).' })
+  @ApiProperty({
+    example: false,
+    description: 'true para documentos con requisitos tributarios (factura, NC, ND).',
+  })
   @IsBoolean()
   esTributario!: boolean;
 
@@ -30,7 +41,8 @@ export class CreateTipoDocumentoFisicoDto {
     example: ['EGRESO', 'DIARIO'],
     isArray: true,
     enum: TipoComprobante,
-    description: 'Tipos de comprobante con los que este tipo puede asociarse. Array vacío = ninguno.',
+    description:
+      'Tipos de comprobante con los que este tipo puede asociarse. Array vacío = ninguno.',
   })
   @IsArray()
   @IsEnum(TipoComprobante, { each: true })

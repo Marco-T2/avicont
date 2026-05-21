@@ -59,10 +59,21 @@ export class TiposDocumentoFisicoController {
   @Get()
   @RequirePermissions('contabilidad.tipos-documento-fisico.read')
   @ApiOperation({
-    summary: 'Lista los tipos de documento físico del tenant activo. Orden: tributarios primero, luego por nombre.',
+    summary:
+      'Lista los tipos de documento físico del tenant activo. Orden: tributarios primero, luego por nombre.',
   })
-  @ApiQuery({ name: 'activo', required: false, type: Boolean, description: 'Filtrar por estado activo. Omitir para listar solo activos.' })
-  @ApiQuery({ name: 'q', required: false, type: String, description: 'Búsqueda parcial sobre nombre.' })
+  @ApiQuery({
+    name: 'activo',
+    required: false,
+    type: Boolean,
+    description: 'Filtrar por estado activo. Omitir para listar solo activos.',
+  })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    type: String,
+    description: 'Búsqueda parcial sobre nombre.',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
   async listar(
@@ -118,7 +129,8 @@ export class TiposDocumentoFisicoController {
   @RequirePermissions('contabilidad.tipos-documento-fisico.update')
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
-    summary: 'PATCH del tipo. Campos opcionales; solo toca los que vienen. El campo `codigo` es inmutable y se ignora si se envía.',
+    summary:
+      'PATCH del tipo. Campos opcionales; solo toca los que vienen. El campo `codigo` es inmutable y se ignora si se envía.',
   })
   async actualizar(
     @Req() req: AuthenticatedRequest,

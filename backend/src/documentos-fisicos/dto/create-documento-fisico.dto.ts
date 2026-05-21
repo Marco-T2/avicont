@@ -55,8 +55,7 @@ export class CreateDocumentoFisicoDto {
   monto?: string | null;
 
   @ApiPropertyOptional({
-    description:
-      'Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.',
+    description: 'Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.',
     enum: Moneda,
     nullable: true,
   })

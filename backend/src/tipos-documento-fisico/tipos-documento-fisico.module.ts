@@ -27,16 +27,25 @@ import { TiposDocumentoFisicoService } from './tipos-documento-fisico.service';
     TiposDocumentoFisicoService,
 
     PrismaTipoDocumentoFisicoRepository,
-    { provide: TIPO_DOCUMENTO_FISICO_REPOSITORY_PORT, useExisting: PrismaTipoDocumentoFisicoRepository },
+    {
+      provide: TIPO_DOCUMENTO_FISICO_REPOSITORY_PORT,
+      useExisting: PrismaTipoDocumentoFisicoRepository,
+    },
 
     PrismaTiposDocumentoFisicoReaderAdapter,
-    { provide: TIPOS_DOCUMENTO_FISICO_READER_PORT, useExisting: PrismaTiposDocumentoFisicoReaderAdapter },
+    {
+      provide: TIPOS_DOCUMENTO_FISICO_READER_PORT,
+      useExisting: PrismaTiposDocumentoFisicoReaderAdapter,
+    },
 
     // SeederAdapter depende de TipoDocumentoFisicoRepositoryPort (no de PrismaService
     // directamente); el token se resuelve porque PrismaTipoDocumentoFisicoRepository
     // está listado arriba y bindeado via useExisting.
     PrismaTiposDocumentoFisicoSeederAdapter,
-    { provide: TIPO_DOCUMENTO_FISICO_SEEDER_PORT, useExisting: PrismaTiposDocumentoFisicoSeederAdapter },
+    {
+      provide: TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
+      useExisting: PrismaTiposDocumentoFisicoSeederAdapter,
+    },
   ],
   exports: [TIPOS_DOCUMENTO_FISICO_READER_PORT, TIPO_DOCUMENTO_FISICO_SEEDER_PORT],
 })
