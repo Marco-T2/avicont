@@ -94,7 +94,6 @@ en RBAC, UI y mensajes al usuario → "asiento". Ver
 - `nit`, `razonSocial`, `representanteLegal`, `nroPatronal`
 - `numeroFactura`, `codigoAutorizacion`, `codigoControl`
 - `estadoSIN`, `glosa`, `dosificacion`
-- `libroCompras`, `libroVentas` (IVA)
 
 **Entidades del módulo granja:**
 - `Lote`, `TipoRegistro`, `MovimientoInversion`, `MovimientoCantidad`
@@ -128,7 +127,6 @@ en RBAC, UI y mensajes al usuario → "asiento". Ver
 
 - URLs en **español** siguiendo el dominio:
   - `/api/asientos`, `/api/plan-cuentas`, `/api/libro-mayor`
-  - `/api/libro-compras`, `/api/libro-ventas`
   - `/api/lotes`, `/api/granja/chat`
 - URLs en inglés SOLO para recursos puramente técnicos:
   - `/api/auth/login`, `/api/auth/refresh`, `/api/metrics`, `/api/health`
@@ -780,7 +778,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Moneda | Multi-moneda desde día 1, BOB como funcional | §4.2 |
 | Decimales | BOB: (18,2), UFV: (14,5), TC: (14,8), %: (5,4), cantidades: (18,6) | §4.2 |
 | Numeración | `{prefijo}{YY}{MM}-{correlativo}`, `SecuenciaComprobante` con `FOR UPDATE` | §4.1 |
-| Integración SIN | **Fuera de scope**: sistema no emite facturas ni envía LCV | §4.1 |
+| Integración SIN | **Fuera de scope**: el sistema no emite facturas ni genera el RCV (ex-LCV). El SIN los maneja con sus propias herramientas (SIAT) | §4.1 |
 
 ### 10.4 Seguridad
 
@@ -843,7 +841,8 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Fuera de scope | Motivo |
 |----------------|--------|
 | Facturación electrónica con SIN (emisión de CUF/CUFD) | No es el problema que estamos resolviendo |
-| Envío directo del LCV al portal SIN | El contador lo sube manualmente |
+| Libro/Registro de Compras y Ventas IVA (ex-LCV → **RCV**) | El SIN reemplazó el LCV por el RCV y lo genera/consume con sus propias herramientas (SIAT). No se construye módulo in-house (decisión 2026-05-21) |
+| Módulo `Factura` (desglose IVA/IT, NIT emisor/receptor, código de autorización) | Su único destino era alimentar el LCV/RCV, ahora externo. `documentos-fisicos` ya cubre el control interno del papel. Descartado/diferido junto con el RCV |
 | Validación online de NIT con padrón SIN | Solo formato (7-12 dígitos), sin consulta externa |
 | Alertas por período abierto demasiado tiempo | Descartado — no lo piden los contadores |
 
