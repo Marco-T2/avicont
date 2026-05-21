@@ -1,5 +1,7 @@
 import { api } from '@/lib/api';
-import type { Contacto, ContactoInput } from '@/types/api';
+import type { Contacto } from '@/types/api';
+
+import type { ContactoFormValues } from '../schemas/contacto-form-schema';
 
 // El PATCH /api/contactos/:id NO acepta el campo `activo`.
 // Para desactivar/reactivar usar desactivar-contacto.ts / reactivar-contacto.ts.
@@ -7,7 +9,7 @@ import type { Contacto, ContactoInput } from '@/types/api';
 // que createContacto — ver create-contacto.ts).
 export async function updateContacto(
   id: string,
-  values: ContactoInput,
+  values: ContactoFormValues,
 ): Promise<Contacto> {
   const body = {
     razonSocial: values.razonSocial,

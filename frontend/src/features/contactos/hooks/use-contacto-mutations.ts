@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { ContactoInput } from '@/types/api';
-
 import { createContacto } from '../api/create-contacto';
 import { desactivarContacto } from '../api/desactivar-contacto';
 import { reactivarContacto } from '../api/reactivar-contacto';
 import { updateContacto } from '../api/update-contacto';
+import type { ContactoFormValues } from '../schemas/contacto-form-schema';
 
 // Invalida todo el cache de contactos de la feature. Usado post-mutation:
 // lista paginada y detalle individual quedan stale → re-fetch en el próximo
@@ -18,7 +17,7 @@ export function useInvalidateContactos(): () => void {
 export function useCreateContacto() {
   const invalidate = useInvalidateContactos();
   return useMutation({
-    mutationFn: (values: ContactoInput) => createContacto(values),
+    mutationFn: (values: ContactoFormValues) => createContacto(values),
     onSuccess: () => invalidate(),
   });
 }
@@ -26,7 +25,7 @@ export function useCreateContacto() {
 export function useUpdateContacto(id: string | null) {
   const invalidate = useInvalidateContactos();
   return useMutation({
-    mutationFn: (values: ContactoInput) => {
+    mutationFn: (values: ContactoFormValues) => {
       if (id === null) throw new Error('id requerido para updateContacto');
       return updateContacto(id, values);
     },
