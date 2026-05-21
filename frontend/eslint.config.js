@@ -19,4 +19,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Primitivos shadcn (la capa "ladrillo", frontend/CLAUDE.md §2): co-exportan
+    // el componente y su función `cva` de variantes (badgeVariants, etc.).
+    // react-refresh/only-export-components es una regla de DX/HMR, no de
+    // correctitud — el costo de un reload completo de un primitivo es nulo.
+    files: ['src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
