@@ -30,6 +30,15 @@ export function conceptosBloqueantes(err: unknown): string[] {
     : [];
 }
 
+// Extrae el id del contacto existente que bloquea la creación por duplicado
+// de documento (payload del error CONTACTO_DOCUMENTO_DUPLICADO).
+// Útil para que el caller pueda ofrecer "ver contacto existente".
+export function contactoExistenteId(err: unknown): string | null {
+  const p = extractBackendError(err);
+  const id = p.details?.contactoExistenteId;
+  return typeof id === 'string' ? id : null;
+}
+
 // Labels humanizados para los conceptos de OrgConfiguracionContable.
 export const CONCEPTO_LABELS: Record<string, string> = {
   ivaCreditoId: 'IVA Crédito Fiscal',
