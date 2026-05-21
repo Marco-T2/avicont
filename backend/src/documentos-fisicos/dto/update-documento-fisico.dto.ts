@@ -5,10 +5,13 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { Moneda } from '@prisma/client';
+
+import { DECIMAL_POSITIVO } from './create-documento-fisico.dto';
 
 export class UpdateDocumentoFisicoDto {
   @ApiPropertyOptional({
@@ -48,6 +51,7 @@ export class UpdateDocumentoFisicoDto {
   })
   @IsOptional()
   @IsString()
+  @Matches(DECIMAL_POSITIVO, { message: 'monto debe ser un decimal mayor a 0 (ej "1250.50")' })
   monto?: string | null;
 
   @ApiPropertyOptional({

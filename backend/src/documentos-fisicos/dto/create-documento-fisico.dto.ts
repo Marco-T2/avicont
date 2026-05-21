@@ -5,10 +5,16 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { Moneda } from '@prisma/client';
+
+// Decimal estrictamente positivo (> 0). El lookahead rechaza valores que son
+// solo ceros ("0", "0.0", "0.00") — spec REQ-D-01: el monto debe ser > 0 cuando
+// se provee. Análogo a DECIMAL_NO_NEG de comprobantes, pero excluyendo el cero.
+export const DECIMAL_POSITIVO = /^(?!0+(\.0+)?$)\d+(\.\d+)?$/;
 
 export class CreateDocumentoFisicoDto {
   @ApiProperty({
@@ -45,6 +51,7 @@ export class CreateDocumentoFisicoDto {
   })
   @IsOptional()
   @IsString()
+  @Matches(DECIMAL_POSITIVO, { message: 'monto debe ser un decimal mayor a 0 (ej "1250.50")' })
   monto?: string | null;
 
   @ApiPropertyOptional({
