@@ -71,3 +71,35 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
         run: npx jest test/ --runInBand --forceExit
+
+  frontend:
+    runs-on: ubuntu-latest
+    # El frontend es un proyecto Vite + React autocontenido dentro del monorepo.
+    # No necesita servicios (Postgres/Redis): los tests son de UI/unidad (Vitest).
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.11.0'
+          cache: 'npm'
+          # El lock vive en frontend/, no en la raíz del monorepo.
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
