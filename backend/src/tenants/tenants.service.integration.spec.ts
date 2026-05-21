@@ -3,6 +3,8 @@ import { PrismaClient, SystemRole } from '@prisma/client';
 import type { PrismaService } from '@/common/prisma.service';
 import { PrismaPlanCuentasSeederAdapter } from '@/cuentas/adapters/prisma-plan-cuentas-seeder.adapter';
 import { PlanCuentasSeederPort } from '@/cuentas/ports/plan-cuentas-seeder.port';
+import { PrismaTiposDocumentoFisicoSeederAdapter } from '@/tipos-documento-fisico/adapters/prisma-tipos-documento-fisico-seeder.adapter';
+import { PrismaTipoDocumentoFisicoRepository } from '@/tipos-documento-fisico/adapters/prisma-tipo-documento-fisico.repository';
 
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 import { ModuloOrganizacion } from './dto/create-tenant.dto';
@@ -34,6 +36,12 @@ describe('TenantsService.create (integration)', () => {
   function buildService(seeder: PlanCuentasSeederPort = new PrismaPlanCuentasSeederAdapter()) {
     const repo = new PrismaTenantRepository(prisma as unknown as PrismaService);
 
+    // Seeder real de tipos de documento físico: usa el repo Prisma real para
+    // que la creación CONTABILIDAD siembre los 8 tipos universales de verdad.
+    const tiposDocSeeder = new PrismaTiposDocumentoFisicoSeederAdapter(
+      new PrismaTipoDocumentoFisicoRepository(prisma as unknown as PrismaService),
+    );
+
     // TenantsService depende de ports que necesitamos mockear para la integración.
     // Usamos un cast mínimo — este test solo ejerce `create`, no los otros métodos.
     const mockGestiones = { existeAlgunaGestion: jest.fn() };
@@ -46,6 +54,7 @@ describe('TenantsService.create (integration)', () => {
       /* GESTIONES_READER_PORT */ mockGestiones as never,
       /* RedisService */ mockRedis as never,
       /* PLAN_CUENTAS_SEEDER_PORT */ seeder,
+      /* TIPO_DOCUMENTO_FISICO_SEEDER_PORT */ tiposDocSeeder,
       /* PrismaService */ prisma as unknown as PrismaService,
     );
   }
@@ -89,6 +98,7 @@ describe('TenantsService.create (integration)', () => {
         where: { organizationId: { in: orgIds } },
       });
       await prisma.cuenta.deleteMany({ where: { organizationId: { in: orgIds } } });
+      await prisma.tipoDocumentoFisico.deleteMany({ where: { organizationId: { in: orgIds } } });
       await prisma.membership.deleteMany({ where: { organizationId: { in: orgIds } } });
       await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
     }
@@ -115,6 +125,12 @@ describe('TenantsService.create (integration)', () => {
       // 111 cuentas sembradas
       const cuentaCount = await prisma.cuenta.count({ where: { organizationId: result.id } });
       expect(cuentaCount).toBe(111);
+
+      // 8 tipos de documento físico universales sembrados (design §D3)
+      const tiposCount = await prisma.tipoDocumentoFisico.count({
+        where: { organizationId: result.id },
+      });
+      expect(tiposCount).toBe(8);
 
       // OrgConfiguracionContable poblada
       const config = await prisma.orgConfiguracionContable.findUnique({
@@ -186,6 +202,12 @@ describe('TenantsService.create (integration)', () => {
 
       const cuentaCount = await prisma.cuenta.count({ where: { organizationId: result.id } });
       expect(cuentaCount).toBe(0);
+
+      // GRANJA no siembra tipos de documento físico (son del módulo contabilidad)
+      const tiposCount = await prisma.tipoDocumentoFisico.count({
+        where: { organizationId: result.id },
+      });
+      expect(tiposCount).toBe(0);
     });
   });
 
@@ -202,6 +224,11 @@ describe('TenantsService.create (integration)', () => {
 
       const cuentaCount = await prisma.cuenta.count({ where: { organizationId: result.id } });
       expect(cuentaCount).toBe(0);
+
+      const tiposCount = await prisma.tipoDocumentoFisico.count({
+        where: { organizationId: result.id },
+      });
+      expect(tiposCount).toBe(0);
     });
   });
 
