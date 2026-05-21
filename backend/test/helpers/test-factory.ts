@@ -75,6 +75,13 @@ export async function cleanupTestData() {
   // cascadea LineaComprobante y ComprobanteAuditoria (schema onDelete: Cascade).
   await prisma.comprobante.deleteMany({});
   await prisma.secuenciaComprobante.deleteMany({});
+  // Documento físico (Fase 1.4 slice 2): la tabla de asociación cascadea al
+  // borrar Comprobante, pero la limpiamos explícita por idempotencia. Luego los
+  // documentos (FK Restrict hacia TipoDocumentoFisico y Contacto) y por último
+  // los tipos. Todo ANTES de Contacto y Organization.
+  await prisma.comprobanteDocumentoFisico.deleteMany({});
+  await prisma.documentoFisico.deleteMany({});
+  await prisma.tipoDocumentoFisico.deleteMany({});
   // Contactos (Fase 1.4): van DESPUÉS de comprobantes (LineaComprobante
   // tiene FK Restrict hacia Contacto) y ANTES de Organization (FK Cascade).
   await prisma.contacto.deleteMany({});
