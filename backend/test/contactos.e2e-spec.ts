@@ -321,6 +321,70 @@ describe('Contactos (e2e)', () => {
   });
 
   // ==========================================================
+  // Filtro activo: true / false / 'all'
+  // ==========================================================
+
+  describe("filtro activo en GET /api/contactos", () => {
+    it("sin param activo → solo activos; activo=true → solo activos; activo=false → solo inactivos; activo=all → todos", async () => {
+      const { token } = await seed();
+
+      // Crear 2 contactos activos
+      const r1 = await request(app.getHttpServer())
+        .post('/api/contactos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ razonSocial: 'Activo Uno', esCliente: true, esProveedor: false });
+      expect(r1.status).toBe(201);
+      const c1 = r1.body.id as string;
+
+      const r2 = await request(app.getHttpServer())
+        .post('/api/contactos')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ razonSocial: 'Inactivo Dos', esCliente: true, esProveedor: false });
+      expect(r2.status).toBe(201);
+      const c2 = r2.body.id as string;
+
+      // Desactivar c2 → 1 activo + 1 inactivo
+      await request(app.getHttpServer())
+        .post(`/api/contactos/${c2}/desactivar`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // sin param activo → solo activos (1)
+      const sinParam = await request(app.getHttpServer())
+        .get('/api/contactos')
+        .set('Authorization', `Bearer ${token}`);
+      expect(sinParam.status).toBe(200);
+      expect(sinParam.body.total).toBe(1);
+      expect(sinParam.body.items[0].id).toBe(c1);
+
+      // activo=true → solo activos (1)
+      const conTrue = await request(app.getHttpServer())
+        .get('/api/contactos?activo=true')
+        .set('Authorization', `Bearer ${token}`);
+      expect(conTrue.status).toBe(200);
+      expect(conTrue.body.total).toBe(1);
+
+      // activo=false → solo inactivos (1)
+      const conFalse = await request(app.getHttpServer())
+        .get('/api/contactos?activo=false')
+        .set('Authorization', `Bearer ${token}`);
+      expect(conFalse.status).toBe(200);
+      expect(conFalse.body.total).toBe(1);
+      expect(conFalse.body.items[0].id).toBe(c2);
+
+      // activo=all → activos + inactivos (2)
+      const conAll = await request(app.getHttpServer())
+        .get('/api/contactos?activo=all')
+        .set('Authorization', `Bearer ${token}`);
+      expect(conAll.status).toBe(200);
+      expect(conAll.body.total).toBe(2);
+      const ids = (conAll.body.items as Array<{ id: string }>).map((i) => i.id);
+      expect(ids).toContain(c1);
+      expect(ids).toContain(c2);
+    });
+  });
+
+  // ==========================================================
   // Integración con comprobantes — contactoId inexistente e inactivo
   // ==========================================================
 
