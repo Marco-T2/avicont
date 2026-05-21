@@ -1,13 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
-import { TipoDocumentoFisicoRepositoryPort } from '../ports/tipo-documento-fisico.repository.port';
+import {
+  TIPO_DOCUMENTO_FISICO_REPOSITORY_PORT,
+  TipoDocumentoFisicoRepositoryPort,
+} from '../ports/tipo-documento-fisico.repository.port';
 import { TipoDocumentoFisicoSeederPort } from '../ports/tipos-documento-fisico-seeder.port';
 import { TIPOS_UNIVERSALES } from '../seed/tipos-universales';
 
 @Injectable()
 export class PrismaTiposDocumentoFisicoSeederAdapter extends TipoDocumentoFisicoSeederPort {
-  constructor(private readonly repo: TipoDocumentoFisicoRepositoryPort) {
+  constructor(
+    @Inject(TIPO_DOCUMENTO_FISICO_REPOSITORY_PORT)
+    private readonly repo: TipoDocumentoFisicoRepositoryPort,
+  ) {
     super();
   }
 

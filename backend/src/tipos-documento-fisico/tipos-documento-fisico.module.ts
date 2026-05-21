@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
+import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import { RbacModule } from '@/rbac/rbac.module';
 
 import { PrismaTipoDocumentoFisicoRepository } from './adapters/prisma-tipo-documento-fisico.repository';
@@ -22,6 +23,7 @@ import { TiposDocumentoFisicoService } from './tipos-documento-fisico.service';
   controllers: [TiposDocumentoFisicoController],
   providers: [
     PrismaService,
+    TenantContextService,
     TiposDocumentoFisicoService,
 
     PrismaTipoDocumentoFisicoRepository,
