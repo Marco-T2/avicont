@@ -339,6 +339,48 @@ export interface CatalogoAgrupado {
 }
 
 // ============================================================
+// Contactos (directorio de clientes y proveedores)
+// ============================================================
+
+// Espejo de ContactoResponseDto en
+// backend/src/modules/contactos/dto/contacto-response.dto.ts.
+// NOTA: no incluye organizationId — el backend lo filtra por tenant activo.
+export interface Contacto {
+  id: string;
+  razonSocial: string;
+  nombreComercial: string | null;
+  documento: string | null;
+  esCliente: boolean;
+  esProveedor: boolean;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  activo: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactoListResponse {
+  items: Contacto[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// Query params para GET /api/contactos.
+// activo: boolean → filtra por estado; 'all' → sin filtro; undefined → sin filtro.
+export interface ListarContactosParams {
+  q?: string;
+  documento?: string;
+  esCliente?: boolean;
+  esProveedor?: boolean;
+  activo?: boolean | 'all';
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
 // Impersonation
 // ============================================================
 
