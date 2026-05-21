@@ -14,7 +14,7 @@ import type { Cuenta, CuentaTreeNode } from '@/types/api';
  *
  * Padding del último segmento: copia la longitud del segmento mayor de las
  * hijas existentes. Si el padre no tiene hijas aún, usa padding 3 por
- * default (convención típica del PUCT boliviano).
+ * default (convención típica del plan de cuentas boliviano).
  */
 export function sugerirCodigoHijo(
   padre: Pick<Cuenta, 'codigoInterno'>,

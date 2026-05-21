@@ -88,9 +88,6 @@ export interface Cuenta {
   id: string;
   organizationId: string;
   codigoInterno: string;
-  codigoPuct: string | null;
-  nombrePuctSnapshot: string | null;
-  versionPuctMapeado: string | null;
   nombre: string;
   descripcion: string | null;
   claseCuenta: ClaseCuenta;
