@@ -674,7 +674,11 @@ los 12 nuevos permisos están presentes en el array.
 
 ## Fase 9 — Seed al crear tenant
 
-### 9.1 ☐ `refactor(tenants): seed default TiposDocumentoFisico on tenant creation`
+### 9.1 ☑ `refactor(tenants): seed default TiposDocumentoFisico on tenant creation` + backfill C-2
+
+> **Nota apply (commits `94ca6b2` core + `7a543bb` backfill)**:
+> - **9.1 core** (`94ca6b2`): `TenantsService.create()` ya estaba en `$transaction` con un `switch(dto.modulo)` que siembra plan de cuentas; el seed de tipos se enchufó en el `case CONTABILIDAD` (los tipos son feature del módulo contabilidad), junto al planCuentasSeeder, mismo `tx`. `tenants.module` importa `TiposDocumentoFisicoModule` (sin forwardRef, sin ciclo). +4 unit specs + integration. NO se rompió la lógica de membership/owner.
+> - **Backfill C-2** (`7a543bb`, scope `db` separado): migración data-only que siembra los 8 tipos en orgs preexistentes **filtrando `WHERE contabilidadEnabled = true`** (coincide con el criterio del runtime — se corrigió de un primer intento que sembraba TODAS las orgs). `INSERT...SELECT...CROSS JOIN VALUES...ON CONFLICT (organizationId,codigo) DO NOTHING`, idempotente, snapshot point-in-time de TIPOS_UNIVERSALES. Tabla orgs = `organizations`; `id`/`updatedAt` sin default → `gen_random_uuid()::text`/`now()`. **§11.6 SE DISPARÓ**: Prisma metió `DROP INDEX` de los 2 índices GIN trigram de contactos (drift de objetos raw SQL legítimos) → se eliminaron del migration.sql por protocolo; verificado post-apply que ambos índices siguen vivos. Aplicada en dev (3 orgs × 8 = 24 tipos), checksum resincronizado.
 
 **Entrega**: `TenantsService.create()` invoca el seed dentro de la TX de creación.
 El tenant nace listo (con 8 tipos) o no nace.
