@@ -1119,7 +1119,7 @@ Commits de Fase 1.3 en `main`: `b9c23d3` (schema) · `50db79f` (domain/errors/va
 
 | Feature | Fase |
 |---|---|
-| Documentos físicos (`DocumentoFisico`, asociación con comprobante) | 1.4 |
+| Documentos físicos (`DocumentoFisico`, asociación con comprobante) | 1.4 (slice 2 — implementado, cabecera-cabecera vía `comprobante_documento_fisico`; ver `docs/disenos/documento-fisico.md`) |
 | Contactos como tabla FK (`Contacto`) | 1.4 |
 | Libro Mayor / Balance de Comprobación | 1.4 |
 | Libro de Compras IVA (LCV) | 1.4 |
@@ -1143,6 +1143,15 @@ con millones de filas.
 | `origenTipo`, `origenId` | `comprobantes` | Auto-entries (Fase 1.5) |
 | `contactoId` | `lineas_comprobante` | Contactos (Fase 1.4) |
 
+> **Documentos físicos — NO es un campo forward-compat aquí.** La asociación
+> comprobante ↔ documento físico (slice 2 de Fase 1.4) NO vive como columna en
+> `lineas_comprobante` ni en `comprobantes`: es una relación **cabecera-cabecera**
+> N:M materializada en la tabla `comprobante_documento_fisico` (proposal Decisión 8
+> / design D1). No existe `LineaComprobante.documentoFisicoId`. El detalle del
+> modelo, los invariantes (UNIQUE PARCIAL de un solo CONTABILIZADO por documento)
+> y el flujo de asociar/contabilizar/anular están en
+> `docs/disenos/documento-fisico.md`.
+
 ---
 
 ## 13. Resumen ejecutivo
@@ -1160,7 +1169,7 @@ con millones de filas.
 | Fecha de la reversión | `hoyEnLaPaz()` y período abierto correspondiente, no la fecha del original. |
 | Bloqueo por cierre | `PrismaComprobantesLockAdapter` reemplaza el Noop de Fase 1.2. Mismo contrato `ComprobantesLockPort`. |
 | Auditoría | Tabla `ComprobanteAuditoria` separada del `AuditLog` genérico. Diff resumen, flag `fueDuranteReapertura`. |
-| Documentos físicos | Fuera de scope. Fase 1.4. |
+| Documentos físicos | Implementado en Fase 1.4 (slice 2): relación cabecera-cabecera N:M `comprobante_documento_fisico`, NO un campo en `LineaComprobante`. Ver `docs/disenos/documento-fisico.md`. |
 | Auto-entries (ventas/compras/pagos) | Fuera de scope. Fase 1.5. Campos `origenTipo/origenId` presentes para evitar migración futura. |
 | Libro Mayor / LCV | Fuera de scope. Fase 1.4. Eventos `comprobante.contabilizado`/`anulado` ya emitidos (sin consumidores). |
 

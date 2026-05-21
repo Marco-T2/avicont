@@ -71,26 +71,3 @@ export class TipoDocumentoFisicoInactivoError extends InvalidStateError {
     );
   }
 }
-
-/**
- * Se levanta al asociar un DocumentoFisico a un Comprobante cuyo `tipo`
- * no está incluido en `TipoDocumentoFisico.tiposComprobanteAplicables`.
- *
- * Reside en este módulo (y no en `documentos-fisicos/` ni en
- * `comprobantes/`, que eran las dos opciones que el design dejaba
- * abiertas) porque el invariante violado pertenece al catálogo: la
- * lista de aplicabilidad es propiedad del tipo. El service de
- * asociación (en `documentos-fisicos`) lo importa desde acá vía port
- * cross-module.
- *
- * Cubre REQ-A-11 / proposal D11.
- */
-export class TipoDocumentoIncompatibleConComprobanteError extends InvalidStateError {
-  constructor(tipoDocumentoNombre: string, tipoComprobante: string, tiposPermitidos: string[]) {
-    super(
-      'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
-      `El tipo de documento '${tipoDocumentoNombre}' no es aplicable a comprobantes de tipo ${tipoComprobante}. Tipos permitidos: ${tiposPermitidos.join(', ')}`,
-      { tipoDocumentoNombre, tipoComprobante, tiposPermitidos },
-    );
-  }
-}

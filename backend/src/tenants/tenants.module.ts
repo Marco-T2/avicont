@@ -8,6 +8,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { PeriodosFiscalesModule } from '../periodos-fiscales/periodos-fiscales.module';
 import { MembershipsModule } from '../memberships/memberships.module';
 import { CuentasModule } from '../cuentas/cuentas.module';
+import { TiposDocumentoFisicoModule } from '../tipos-documento-fisico/tipos-documento-fisico.module';
 import { TENANT_REPOSITORY_PORT } from './ports/tenant.repository.port';
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 
@@ -20,8 +21,18 @@ import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 // TenantsService inyecta al crear una organización (seeding-por-tipo §7).
 // La dependencia es unidireccional: tenants → cuentas. No hay ciclo porque
 // CuentasModule no importa TenantsModule (verificado con grep).
+//
+// TiposDocumentoFisicoModule provee TIPO_DOCUMENTO_FISICO_SEEDER_PORT para
+// sembrar los 8 tipos universales al crear una organización (design §D3, §7.2).
+// Dependencia unidireccional sin forwardRef: tenants → tipos-documento-fisico.
 @Module({
-  imports: [RbacModule, forwardRef(() => PeriodosFiscalesModule), MembershipsModule, CuentasModule],
+  imports: [
+    RbacModule,
+    forwardRef(() => PeriodosFiscalesModule),
+    MembershipsModule,
+    CuentasModule,
+    TiposDocumentoFisicoModule,
+  ],
   controllers: [TenantsController],
   providers: [
     TenantsService,

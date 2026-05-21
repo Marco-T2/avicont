@@ -13,6 +13,10 @@ import {
   PLAN_CUENTAS_SEEDER_PORT,
   PlanCuentasSeederPort,
 } from '../cuentas/ports/plan-cuentas-seeder.port';
+import {
+  TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
+  TipoDocumentoFisicoSeederPort,
+} from '../tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
 import { PrismaService } from '../common/prisma.service';
 
 import { CreateTenantDto, ModuloOrganizacion } from './dto/create-tenant.dto';
@@ -40,6 +44,8 @@ export class TenantsService {
     private readonly redis: RedisService,
     @Inject(PLAN_CUENTAS_SEEDER_PORT)
     private readonly planCuentasSeeder: PlanCuentasSeederPort,
+    @Inject(TIPO_DOCUMENTO_FISICO_SEEDER_PORT)
+    private readonly tiposDocSeeder: TipoDocumentoFisicoSeederPort,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -78,7 +84,10 @@ export class TenantsService {
       switch (dto.modulo) {
         case ModuloOrganizacion.CONTABILIDAD:
           await this.planCuentasSeeder.seedDefaultsForTenant(org.id, tx);
-          // TODO(documento-fisico task 9.1): enchufar aquí tiposDocSeeder.seedDefaultsForTenant(org.id, tx) cuando exista su adapter
+          // Los tipos de documento físico respaldan comprobantes contables, así
+          // que se siembran junto al plan de cuentas. Dentro de la misma TX: el
+          // tenant nace con los 8 tipos universales o no nace (design §D3, §7.2).
+          await this.tiposDocSeeder.seedDefaultsForTenant(org.id, tx);
           break;
         case ModuloOrganizacion.GRANJA:
           // Placeholder: módulo granja sin código de seeding aún. Flags ya seteados arriba.

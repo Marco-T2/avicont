@@ -19,6 +19,8 @@ import { ForbiddenError } from '@/common/errors';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
+import { AsociarDocumentosDto } from '@/documentos-fisicos/dto/asociar-documentos.dto';
+
 import { ComprobantesService } from './comprobantes.service';
 import { AnularComprobanteDto } from './dto/anular-comprobante.dto';
 import { CreateComprobanteDto } from './dto/create-comprobante.dto';
@@ -145,5 +147,59 @@ export class ComprobantesController {
   })
   obtenerAuditoria(@Req() req: AuthenticatedRequest, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.obtenerAuditoria(resolveTenantId(req), id);
+  }
+
+  // ============================================================
+  // Documentos físicos asociados (sub-recurso) — task 6.3
+  // ============================================================
+
+  @Get(':comprobanteId/documentos-fisicos')
+  @RequirePermissions('contabilidad.documentos-fisicos.read')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiOperation({
+    summary: 'Listar los documentos físicos asociados al comprobante (REQ-A-09).',
+  })
+  listarDocumentosFisicos(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+  ) {
+    return this.service.listarDocumentosAsociados(resolveTenantId(req), comprobanteId);
+  }
+
+  @Post(':comprobanteId/documentos-fisicos')
+  @RequirePermissions('contabilidad.documentos-fisicos.update', 'contabilidad.asientos.update')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiBody({ type: AsociarDocumentosDto })
+  @ApiOperation({
+    summary:
+      'Asociar uno o más documentos físicos a un comprobante en BORRADOR. Aditiva e idempotente (REQ-A-01).',
+  })
+  asociarDocumentosFisicos(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @Body() dto: AsociarDocumentosDto,
+  ) {
+    return this.service.asociarDocumentos(
+      resolveTenantId(req),
+      comprobanteId,
+      dto.documentoFisicoIds,
+    );
+  }
+
+  @Delete(':comprobanteId/documentos-fisicos/:documentoFisicoId')
+  @HttpCode(204)
+  @RequirePermissions('contabilidad.documentos-fisicos.update', 'contabilidad.asientos.update')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiParam({ name: 'documentoFisicoId', format: 'uuid' })
+  @ApiOperation({
+    summary:
+      'Desasociar un documento físico de un comprobante en BORRADOR. Rechaza si está CONTABILIZADO (REQ-A-02/03).',
+  })
+  async desasociarDocumentoFisico(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @Param('documentoFisicoId', new ParseUUIDPipe()) documentoFisicoId: string,
+  ): Promise<void> {
+    await this.service.desasociarDocumento(resolveTenantId(req), comprobanteId, documentoFisicoId);
   }
 }

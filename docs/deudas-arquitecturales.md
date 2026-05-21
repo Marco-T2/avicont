@@ -450,6 +450,18 @@ Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
 - **Pendiente relacionado (frontend)**: verificar que la capa de presentación convierte UTC → `America/La_Paz` al mostrar. La corrección de storage NO arregla la presentación — son responsabilidades separadas.
 - **Esfuerzo**: ~30 min (cambiar a `@db.Timestamptz(3)` + 1 migration, sin datos prod) + revisión en frontend.
 
+### 3.6 Documento físico (Fase 1.4 slice 2)
+
+**Cerrado en este slice:**
+- ✅ `contabilidad.contactos.*` agregado a `common/permisos/catalogo.ts` (deuda retroactiva del slice 1 de contactos, cerrada en la task 8.1 junto con los 8 permisos nuevos de tipos/documentos). 12 permisos en total vía helper `CRUD()`.
+- ✅ `monto > 0` del `DocumentoFisico`: el spec REQ-D-01/E-D-07 lo exigía pero la implementación de servicios/DTOs no lo tenía (un documento tributario con `monto: "0.00"` devolvía 201). Cerrado con `@Matches(DECIMAL_POSITIVO)` en los DTOs create/update + unit spec del DTO. Lo destapó la suite E2E (Fase 10).
+
+**Abierto por este slice:**
+- **E-EL-02 (`DOCUMENTO_FISICO_CON_HISTORIAL`)**: hoy un documento cuya única asociación se eliminó al anular el comprobante (la TX de `anular` hace `desasociarTodasDelComprobante`) queda **elegible para DELETE**, porque `countAsociaciones = 0`. Para retener histórico real (que el auditor espera) hace falta una **tabla de auditoría de asociaciones** que registre los vínculos a comprobantes anulados. El test E-EL-02 quedó como `it.todo` y el error `DocumentoFisicoConHistorialError` existe pero no se lanza. Riesgo R6 del design. **Trigger**: requerimiento explícito de un auditor o contador.
+- **Estado derivado `SUELTO|EN_BORRADOR|CONTABILIZADO`**: se calcula en runtime con `where: { asociaciones: { some/none } }` (sub-query EXISTS). Materializarlo como columna denormalizada solo si el listado por estado se vuelve lento (>100k filas). Riesgo R5. **Trigger**: regresión medida con `EXPLAIN`.
+- **Reapertura de período + `refrescarEstadoComprobante`**: cuando `PeriodosFiscalesModule` implemente la reapertura (hoy diferida), debe re-sincronizar el cache `comprobanteEstado` de las asociaciones del comprobante que vuelve de BLOQUEADO a CONTABILIZADO. El enchufe está pendiente. Decisión D8 / Riesgo R1. **Trigger**: implementación de reapertura.
+- **Campo `descripcion` de `TipoDocumentoFisico`**: el spec §7 + REQ-T-01/T-05 lo piden, pero schema, service y DTOs lo omitieron (se difirió en la task 6.1 para no meter una migración en un commit HTTP). Si se quiere, agregar columna nullable `descripcion String?` + inputs del service + repo + response mapper en un commit aparte. **Trigger**: si la UI necesita una descripción larga del tipo.
+
 ---
 
 ## 4. Explícitamente fuera de scope

@@ -1,4 +1,5 @@
 import {
+  type ComprobanteDocumentoFisico,
   EstadoComprobante,
   Moneda,
   PeriodoFiscalStatus,
@@ -10,6 +11,12 @@ import type { ClockPort } from '@/common/clock/clock.port';
 import type { PrismaService } from '@/common/prisma.service';
 import type { ContactosReaderPort } from '@/contactos/ports/contactos-reader.port';
 import type { CuentaParaLinea, CuentasReaderPort } from '@/cuentas/ports/cuentas-reader.port';
+import type { DocumentoFisicoConRelaciones } from '@/documentos-fisicos/ports/documento-fisico.repository.port';
+import type { AsociacionComprobanteRepositoryPort } from '@/documentos-fisicos/ports/asociacion-comprobante.repository.port';
+import type {
+  DocumentoFisicoParaAsociar,
+  DocumentosFisicosReaderPort,
+} from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
 import { ComprobantesService } from './comprobantes.service';
@@ -36,6 +43,8 @@ type MockCuentas = { [K in keyof CuentasReaderPort]: jest.Mock };
 type MockContactos = { [K in keyof ContactosReaderPort]: jest.Mock };
 type MockClock = { [K in keyof ClockPort]: jest.Mock };
 type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
+type MockDocsReader = { [K in keyof DocumentosFisicosReaderPort]: jest.Mock };
+type MockAsociacionRepo = { [K in keyof AsociacionComprobanteRepositoryPort]: jest.Mock };
 
 function makeRepoMock(): MockRepo {
   return {
@@ -54,6 +63,25 @@ function makeRepoMock(): MockRepo {
 
 function makeSecuenciaMock(): MockSecuencia {
   return { siguienteCorrelativo: jest.fn() };
+}
+
+function makeDocsReaderMock(): MockDocsReader {
+  return {
+    obtenerBatchParaAsociar: jest.fn(async () => new Map()),
+    idsYaAsociadosAContabilizado: jest.fn(async () => []),
+    listarAsociadosDeComprobante: jest.fn(async () => []),
+  };
+}
+
+function makeAsociacionRepoMock(): MockAsociacionRepo {
+  return {
+    asociar: jest.fn(),
+    desasociar: jest.fn(async () => 1),
+    desasociarTodasDelComprobante: jest.fn(async () => 0),
+    refrescarEstadoComprobante: jest.fn(async () => 0),
+    listarPorComprobante: jest.fn(async () => []),
+    listarPorDocumento: jest.fn(async () => []),
+  };
 }
 
 function makePeriodosMock(): MockPeriodos {
@@ -169,6 +197,8 @@ function buildService(overrides?: {
   contactos?: Partial<MockContactos>;
   clock?: Partial<MockClock>;
   secuencia?: Partial<MockSecuencia>;
+  docsReader?: Partial<MockDocsReader>;
+  asociacionRepo?: Partial<MockAsociacionRepo>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -176,6 +206,8 @@ function buildService(overrides?: {
   const contactos = { ...makeContactosMock(), ...(overrides?.contactos ?? {}) };
   const clock = { ...makeClockMock(), ...(overrides?.clock ?? {}) };
   const secuencia = { ...makeSecuenciaMock(), ...(overrides?.secuencia ?? {}) };
+  const docsReader = { ...makeDocsReaderMock(), ...(overrides?.docsReader ?? {}) };
+  const asociacionRepo = { ...makeAsociacionRepoMock(), ...(overrides?.asociacionRepo ?? {}) };
   const prisma = makePrismaMock();
 
   const service = new ComprobantesService(
@@ -185,9 +217,22 @@ function buildService(overrides?: {
     contactos as unknown as ContactosReaderPort,
     clock as unknown as ClockPort,
     secuencia as unknown as SecuenciaComprobantePort,
+    docsReader as unknown as DocumentosFisicosReaderPort,
+    asociacionRepo as unknown as AsociacionComprobanteRepositoryPort,
     prisma,
   );
-  return { service, repo, periodos, cuentas, contactos, clock, secuencia, prisma };
+  return {
+    service,
+    repo,
+    periodos,
+    cuentas,
+    contactos,
+    clock,
+    secuencia,
+    docsReader,
+    asociacionRepo,
+    prisma,
+  };
 }
 
 function makeCuentasMap(): Map<string, CuentaParaLinea> {
@@ -916,6 +961,79 @@ describe('ComprobantesService', () => {
         estado: EstadoComprobante.CONTABILIZADO,
       });
     });
+
+    // ----------------------------------------------------------------
+    // Documentos físicos asociados al contabilizar (task 7.1, design §4.3)
+    // ----------------------------------------------------------------
+
+    it('sin docs asociados: no consulta docs ni refresca el cache de estado', async () => {
+      const { service, docsReader, asociacionRepo } = setupHappyPath();
+      // listarPorComprobante default → [] (sin asociaciones).
+
+      await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(asociacionRepo.listarPorComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-b',
+        expect.any(Object),
+      );
+      expect(docsReader.idsYaAsociadosAContabilizado).not.toHaveBeenCalled();
+      expect(asociacionRepo.refrescarEstadoComprobante).not.toHaveBeenCalled();
+    });
+
+    it('con docs válidos: refresca el cache de estado a CONTABILIZADO', async () => {
+      const DOC_1 = '11111111-1111-4111-a111-111111111111';
+      const { service, docsReader, asociacionRepo } = setupHappyPath();
+      asociacionRepo.listarPorComprobante.mockResolvedValue([
+        {
+          id: 'asoc-1',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-b',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.BORRADOR,
+          createdAt: new Date(),
+        },
+      ]);
+      docsReader.idsYaAsociadosAContabilizado.mockResolvedValue([]);
+
+      await service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(docsReader.idsYaAsociadosAContabilizado).toHaveBeenCalledWith(
+        TENANT_ID,
+        [DOC_1],
+        'comp-b',
+        expect.any(Object),
+      );
+      expect(asociacionRepo.refrescarEstadoComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-b',
+        EstadoComprobante.CONTABILIZADO,
+        expect.any(Object),
+      );
+    });
+
+    it('con doc ya contabilizado en otro: lanza error con el id real y NO refresca', async () => {
+      const DOC_1 = '11111111-1111-4111-a111-111111111111';
+      const { service, docsReader, asociacionRepo, repo } = setupHappyPath();
+      asociacionRepo.listarPorComprobante.mockResolvedValue([
+        {
+          id: 'asoc-1',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-b',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.BORRADOR,
+          createdAt: new Date(),
+        },
+      ]);
+      docsReader.idsYaAsociadosAContabilizado.mockResolvedValue([DOC_1]);
+
+      await expect(service.contabilizar(TENANT_ID, USER_ID, 'comp-b')).rejects.toMatchObject({
+        code: 'DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO',
+        details: { documentoFisicoId: DOC_1 },
+      });
+      expect(asociacionRepo.refrescarEstadoComprobante).not.toHaveBeenCalled();
+      expect(repo.contabilizar).not.toHaveBeenCalled();
+    });
   });
 
   describe('anular', () => {
@@ -1174,6 +1292,36 @@ describe('ComprobantesService', () => {
       const metadata = call[2] as Record<string, unknown>;
       expect(metadata).not.toHaveProperty('numero');
     });
+
+    // ----------------------------------------------------------------
+    // Documentos físicos: cleanup al anular (task 7.2, design §4.4)
+    // ----------------------------------------------------------------
+
+    it('desasocia todos los documentos físicos del comprobante anulado', async () => {
+      const { service, asociacionRepo } = setupAnularHappy();
+      asociacionRepo.desasociarTodasDelComprobante.mockResolvedValue(2);
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-orig',
+        expect.any(Object),
+      );
+    });
+
+    it('llama desasociarTodasDelComprobante aun sin docs asociados (no-op idempotente)', async () => {
+      const { service, asociacionRepo } = setupAnularHappy();
+      // default mock → 0 filas borradas.
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-orig',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('listar', () => {
@@ -1210,6 +1358,313 @@ describe('ComprobantesService', () => {
         page: 1,
         limit: 50,
       });
+    });
+  });
+
+  // ============================================================
+  // Documentos físicos asociados (task 6.3)
+  // ============================================================
+
+  describe('asociarDocumentos', () => {
+    const DOC_1 = '11111111-1111-4111-a111-111111111111';
+    const DOC_2 = '22222222-2222-4222-a222-222222222222';
+
+    function docParaAsociarFactory(
+      overrides: Partial<DocumentoFisicoParaAsociar> = {},
+    ): DocumentoFisicoParaAsociar {
+      return {
+        id: DOC_1,
+        numero: 'FAC-001',
+        tipoDocumentoFisicoId: 'tipo-1',
+        tipoDocumentoNombre: 'Factura emitida',
+        esTributario: true,
+        fechaEmision: new Date('2026-04-01'),
+        monto: new Prisma.Decimal('100'),
+        moneda: Moneda.BOB,
+        contactoId: null,
+        tiposComprobanteAplicables: [TipoComprobante.DIARIO, TipoComprobante.INGRESO],
+        ...overrides,
+      };
+    }
+
+    function asociacionRowFactory(documentoFisicoId: string): ComprobanteDocumentoFisico {
+      return {
+        id: `asoc-${documentoFisicoId}`,
+        organizationId: TENANT_ID,
+        comprobanteId: 'comp-borrador',
+        documentoFisicoId,
+        comprobanteEstado: EstadoComprobante.BORRADOR,
+        createdAt: new Date(),
+      };
+    }
+
+    it('ids vacíos → no-op, no consulta nada', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+
+      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', []);
+
+      expect(r).toEqual([]);
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(docsReader.obtenerBatchParaAsociar).not.toHaveBeenCalled();
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('lanza ComprobanteNoEncontradoError si el comprobante no existe', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.asociarDocumentos(TENANT_ID, 'comp-x', [DOC_1])).rejects.toMatchObject({
+        code: 'COMPROBANTE_NO_ENCONTRADO',
+      });
+    });
+
+    it('lanza ComprobanteNoEsBorradorError si el comprobante no está en BORRADOR', async () => {
+      const { service, repo, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', estado: EstadoComprobante.CONTABILIZADO }),
+      );
+
+      await expect(service.asociarDocumentos(TENANT_ID, 'comp-1', [DOC_1])).rejects.toMatchObject({
+        code: 'COMPROBANTE_NO_ES_BORRADOR',
+        details: { comprobanteId: 'comp-1', estadoActual: EstadoComprobante.CONTABILIZADO },
+      });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('lanza DocumentoFisicoReferenciadoNoExisteError si un id falta del Map (cross-tenant) — E-A-07', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-borrador', tipo: TipoComprobante.DIARIO }),
+      );
+      // Map vacío: el doc no existe o es de otro tenant.
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(new Map());
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1]),
+      ).rejects.toMatchObject({
+        code: 'COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE',
+        details: { documentoFisicoId: DOC_1 },
+      });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('lanza TipoDocumentoIncompatibleConComprobanteError si el tipo no aplica — E-A-09', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-ingreso', tipo: TipoComprobante.INGRESO }),
+      );
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([
+          [
+            DOC_1,
+            docParaAsociarFactory({
+              id: DOC_1,
+              numero: 'RE-001',
+              tipoDocumentoNombre: 'Recibo de Egreso',
+              // recibo-egreso: solo EGRESO, DIARIO. INGRESO no aplica.
+              tiposComprobanteAplicables: [TipoComprobante.EGRESO, TipoComprobante.DIARIO],
+            }),
+          ],
+        ]),
+      );
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, 'comp-ingreso', [DOC_1]),
+      ).rejects.toMatchObject({
+        code: 'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
+        details: {
+          // El nombre del tipo (no el número del documento) debe aparecer en details.
+          tipoDocumentoNombre: 'Recibo de Egreso',
+          tipoComprobante: TipoComprobante.INGRESO,
+          tiposPermitidos: [TipoComprobante.EGRESO, TipoComprobante.DIARIO],
+        },
+      });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('asocia un tipo compatible (factura-emitida a INGRESO) — E-A-10', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-ingreso', tipo: TipoComprobante.INGRESO }),
+      );
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([
+          [
+            DOC_1,
+            docParaAsociarFactory({
+              id: DOC_1,
+              tiposComprobanteAplicables: [TipoComprobante.INGRESO, TipoComprobante.DIARIO],
+            }),
+          ],
+        ]),
+      );
+      asociacionRepo.asociar.mockResolvedValue(asociacionRowFactory(DOC_1));
+
+      const r = await service.asociarDocumentos(TENANT_ID, 'comp-ingreso', [DOC_1]);
+
+      expect(r).toHaveLength(1);
+      expect(asociacionRepo.asociar).toHaveBeenCalledWith(
+        TENANT_ID,
+        {
+          comprobanteId: 'comp-ingreso',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.BORRADOR,
+        },
+        expect.any(Object),
+      );
+    });
+
+    it('asocia múltiples documentos en una sola llamada — E-A-08', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-borrador', tipo: TipoComprobante.DIARIO }),
+      );
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([
+          [DOC_1, docParaAsociarFactory({ id: DOC_1 })],
+          [DOC_2, docParaAsociarFactory({ id: DOC_2 })],
+        ]),
+      );
+      asociacionRepo.asociar.mockImplementation(async (_t, input) =>
+        asociacionRowFactory(input.documentoFisicoId),
+      );
+
+      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1, DOC_2]);
+
+      expect(r).toHaveLength(2);
+      expect(asociacionRepo.asociar).toHaveBeenCalledTimes(2);
+    });
+
+    it('es idempotente: no re-inserta un par ya asociado', async () => {
+      const { service, repo, docsReader, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-borrador', tipo: TipoComprobante.DIARIO }),
+      );
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([
+          [DOC_1, docParaAsociarFactory({ id: DOC_1 })],
+          [DOC_2, docParaAsociarFactory({ id: DOC_2 })],
+        ]),
+      );
+      // DOC_1 ya está asociado: solo DOC_2 debe insertarse.
+      asociacionRepo.listarPorComprobante.mockResolvedValue([asociacionRowFactory(DOC_1)]);
+      asociacionRepo.asociar.mockImplementation(async (_t, input) =>
+        asociacionRowFactory(input.documentoFisicoId),
+      );
+
+      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1, DOC_2]);
+
+      expect(r).toHaveLength(1);
+      expect(asociacionRepo.asociar).toHaveBeenCalledTimes(1);
+      expect(asociacionRepo.asociar).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ documentoFisicoId: DOC_2 }),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('desasociarDocumento', () => {
+    const DOC_1 = '11111111-1111-4111-a111-111111111111';
+
+    it('lanza ComprobanteNoEncontradoError si el comprobante no existe', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.desasociarDocumento(TENANT_ID, 'comp-x', DOC_1)).rejects.toMatchObject({
+        code: 'COMPROBANTE_NO_ENCONTRADO',
+      });
+    });
+
+    it('desasocia de un BORRADOR — E-A-04', async () => {
+      const { service, repo, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-borrador', estado: EstadoComprobante.BORRADOR }),
+      );
+
+      await expect(
+        service.desasociarDocumento(TENANT_ID, 'comp-borrador', DOC_1),
+      ).resolves.toBeUndefined();
+      expect(asociacionRepo.desasociar).toHaveBeenCalledWith(TENANT_ID, 'comp-borrador', DOC_1);
+    });
+
+    it('rechaza desasociar de un CONTABILIZADO — E-A-05', async () => {
+      const { service, repo, asociacionRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-c', estado: EstadoComprobante.CONTABILIZADO }),
+      );
+
+      await expect(service.desasociarDocumento(TENANT_ID, 'comp-c', DOC_1)).rejects.toMatchObject({
+        code: 'COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO',
+        details: { comprobanteId: 'comp-c', documentoFisicoId: DOC_1 },
+      });
+      expect(asociacionRepo.desasociar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listarDocumentosAsociados', () => {
+    function docConRelacionesFactory(): DocumentoFisicoConRelaciones {
+      return {
+        id: 'doc-1',
+        organizationId: TENANT_ID,
+        tipoDocumentoFisicoId: 'tipo-1',
+        numero: 'FAC-001',
+        fechaEmision: new Date('2026-04-01'),
+        monto: new Prisma.Decimal('1150.00'),
+        moneda: Moneda.BOB,
+        glosa: null,
+        contactoId: null,
+        createdAt: new Date('2026-04-01T10:00:00Z'),
+        createdByUserId: USER_ID,
+        updatedAt: new Date('2026-04-01T10:00:00Z'),
+        tipoDocumento: {
+          id: 'tipo-1',
+          nombre: 'Factura emitida',
+          codigo: 'factura-emitida',
+          esTributario: true,
+        },
+        contacto: null,
+      } as unknown as DocumentoFisicoConRelaciones;
+    }
+
+    it('lanza ComprobanteNoEncontradoError si el comprobante no existe (REQ-S-04)', async () => {
+      const { service, repo, docsReader } = buildService();
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.listarDocumentosAsociados(TENANT_ID, 'comp-x')).rejects.toMatchObject({
+        code: 'COMPROBANTE_NO_ENCONTRADO',
+      });
+      expect(docsReader.listarAsociadosDeComprobante).not.toHaveBeenCalled();
+    });
+
+    it('devuelve los documentos del comprobante mapeados a DocumentoFisicoAsociadoDto — REQ-A-09', async () => {
+      const { service, repo, docsReader } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      docsReader.listarAsociadosDeComprobante.mockResolvedValue([docConRelacionesFactory()]);
+
+      const r = await service.listarDocumentosAsociados(TENANT_ID, 'comp-1');
+
+      expect(docsReader.listarAsociadosDeComprobante).toHaveBeenCalledWith(TENANT_ID, 'comp-1');
+      expect(r).toEqual([
+        {
+          id: 'doc-1',
+          numero: 'FAC-001',
+          tipoDocumentoFisico: { id: 'tipo-1', nombre: 'Factura emitida' },
+          monto: '1150',
+          moneda: Moneda.BOB,
+          fechaEmision: '2026-04-01',
+        },
+      ]);
+    });
+
+    it('devuelve lista vacía si el comprobante no tiene documentos', async () => {
+      const { service, repo, docsReader } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      docsReader.listarAsociadosDeComprobante.mockResolvedValue([]);
+
+      const r = await service.listarDocumentosAsociados(TENANT_ID, 'comp-1');
+
+      expect(r).toEqual([]);
     });
   });
 });

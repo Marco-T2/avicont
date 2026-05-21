@@ -63,6 +63,21 @@ export class DocumentoFisicoConHistorialError extends ConflictError {
   }
 }
 
+/**
+ * El documento físico ya está asociado a un comprobante CONTABILIZADO.
+ * Viola el UNIQUE PARCIAL `comprobante_documento_fisico_unique_contabilizado`
+ * (cicatriz F-01, R3 del design). HTTP 409.
+ */
+export class DocumentoFisicoYaAsociadoAOtroContabilizadoError extends ConflictError {
+  constructor(documentoFisicoId: string) {
+    super(
+      'DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO',
+      'El documento físico ya está asociado a otro comprobante contabilizado',
+      { documentoFisicoId },
+    );
+  }
+}
+
 // ============================================================
 // 400 — input del cliente mal formado
 // ============================================================

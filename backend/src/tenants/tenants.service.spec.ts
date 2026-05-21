@@ -29,6 +29,10 @@ import {
   PLAN_CUENTAS_SEEDER_PORT,
   type PlanCuentasSeederPort,
 } from '@/cuentas/ports/plan-cuentas-seeder.port';
+import {
+  TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
+  type TipoDocumentoFisicoSeederPort,
+} from '@/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
 import { PrismaService } from '@/common/prisma.service';
 
 /**
@@ -53,6 +57,7 @@ describe('TenantsService (unit)', () => {
   type RedisMock = { del: jest.Mock };
   type PrismaMock = { $transaction: jest.Mock };
   type PlanCuentasSeederMock = jest.Mocked<PlanCuentasSeederPort>;
+  type TiposDocSeederMock = jest.Mocked<TipoDocumentoFisicoSeederPort>;
 
   let service: TenantsService;
   let repo: RepoMock;
@@ -61,6 +66,7 @@ describe('TenantsService (unit)', () => {
   let redis: RedisMock;
   let prismaMock: PrismaMock;
   let planCuentasSeeder: PlanCuentasSeederMock;
+  let tiposDocSeeder: TiposDocSeederMock;
 
   function mkOrg(overrides: Partial<Organization> = {}): Organization {
     return {
@@ -122,6 +128,10 @@ describe('TenantsService (unit)', () => {
       seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
     } as unknown as PlanCuentasSeederMock;
 
+    tiposDocSeeder = {
+      seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
+    } as unknown as TiposDocSeederMock;
+
     // $transaction ejecuta el callback con TX_MOCK y retorna lo que devuelve el callback
     prismaMock = {
       $transaction: jest
@@ -139,6 +149,7 @@ describe('TenantsService (unit)', () => {
         { provide: GESTIONES_READER_PORT, useValue: gestiones },
         { provide: RedisService, useValue: redis },
         { provide: PLAN_CUENTAS_SEEDER_PORT, useValue: planCuentasSeeder },
+        { provide: TIPO_DOCUMENTO_FISICO_SEEDER_PORT, useValue: tiposDocSeeder },
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();
@@ -189,6 +200,54 @@ describe('TenantsService (unit)', () => {
       );
 
       expect(result.memberships[0]?.systemRole).toBe(SystemRole.OWNER);
+    });
+
+    it('CONTABILIDAD: invoca tiposDocSeeder.seedDefaultsForTenant con org.id y el mismo tx', async () => {
+      const created = mkOrgConMemberships({
+        id: TENANT_ID,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(tiposDocSeeder.seedDefaultsForTenant).toHaveBeenCalledTimes(1);
+      // El seed corre DENTRO de la misma TX que crea la org: mismo TX_MOCK.
+      expect(tiposDocSeeder.seedDefaultsForTenant).toHaveBeenCalledWith(TENANT_ID, TX_MOCK);
+    });
+
+    it('CONTABILIDAD: si tiposDocSeeder lanza, el error se propaga (rollback semántico)', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+      tiposDocSeeder.seedDefaultsForTenant.mockRejectedValue(
+        new Error('fallo al sembrar tipos de documento físico'),
+      );
+
+      await expect(
+        service.create({ name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD }, OWNER_ID),
+      ).rejects.toThrow('fallo al sembrar tipos de documento físico');
+    });
+
+    it('GRANJA: NO invoca tiposDocSeeder (los tipos son del módulo contabilidad)', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
+
+      expect(tiposDocSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('OTROS: NO invoca tiposDocSeeder', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Otros SA', modulo: ModuloOrganizacion.OTROS }, OWNER_ID);
+
+      expect(tiposDocSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
     });
 
     it('GRANJA: repo.create recibe contabilidadEnabled=false, granjaEnabled=true', async () => {

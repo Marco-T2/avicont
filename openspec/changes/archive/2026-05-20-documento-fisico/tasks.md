@@ -20,7 +20,7 @@
 
 ## Fase 1 — Schema y migration
 
-### 1.1 ☐ `feat(db): add tipos-documento-fisico, documentos-fisicos and asociacion schema`
+### 1.1 ☑ `feat(db): add tipos-documento-fisico, documentos-fisicos and asociacion schema`
 
 **Entrega**: 3 modelos Prisma nuevos (`TipoDocumentoFisico`, `DocumentoFisico`,
 `ComprobanteDocumentoFisico`) con relaciones inversas en `Organization`, `Contacto`
@@ -62,7 +62,7 @@ generada + edición manual para agregar el UNIQUE PARCIAL raw SQL.
 
 ## Fase 2 — Domain: VOs y errores
 
-### 2.1 ☐ `feat(tipos-documento-fisico): add domain VOs and errors`
+### 2.1 ☑ `feat(tipos-documento-fisico): add domain VOs and errors`
 
 **Entrega**: value objects del catálogo de tipos + errores de dominio.
 Dominio puro, cero dependencias NestJS/Prisma.
@@ -96,7 +96,7 @@ Dominio puro, cero dependencias NestJS/Prisma.
 
 ---
 
-### 2.2 ☐ `feat(documentos-fisicos): add domain VOs and errors`
+### 2.2 ☑ `feat(documentos-fisicos): add domain VOs and errors`
 
 **Entrega**: VO `NumeroDocumento` + errores de dominio del módulo operativo.
 
@@ -135,7 +135,7 @@ REQ-D-13, REQ-D-14, códigos de error §4.2 del spec. Escenario E-D-02 cubierto 
 
 ## Fase 3 — Ports
 
-### 3.1 ☐ `feat(tipos-documento-fisico): add repository and cross-module ports`
+### 3.1 ☑ `feat(tipos-documento-fisico): add repository and cross-module ports`
 
 **Entrega**: contratos (ports) del módulo `tipos-documento-fisico`.
 Superficie mínima por port; `abstract class` + `Symbol` por convención.
@@ -224,7 +224,7 @@ E-T-02, E-T-03, E-T-05 (aislamiento tenant) a nivel integration.
 
 ---
 
-### 4.2 ☐ `feat(tipos-documento-fisico): add PrismaTiposDocumentoFisicoReaderAdapter and SeederAdapter`
+### 4.2 ☑ `feat(tipos-documento-fisico): add PrismaTiposDocumentoFisicoReaderAdapter and SeederAdapter`
 
 **Entrega**: implementaciones de los dos ports cross-module del catálogo.
 
@@ -248,7 +248,7 @@ El reader no tiene spec propio — cubierto por E2E de fase 8 (la integración m
 
 ---
 
-### 4.3 ☐ `feat(documentos-fisicos): add PrismaDocumentoFisicoRepository + integration spec`
+### 4.3 ☑ `feat(documentos-fisicos): add PrismaDocumentoFisicoRepository + integration spec`
 
 **Entrega**: implementación del `DocumentoFisicoRepositoryPort`.
 
@@ -277,7 +277,7 @@ D4 (filtros + paginación offset), D7 (count para mutabilidad).
 
 ---
 
-### 4.4 ☐ `feat(documentos-fisicos): add PrismaAsociacionComprobanteRepository + integration spec`
+### 4.4 ☑ `feat(documentos-fisicos): add PrismaAsociacionComprobanteRepository + integration spec`
 
 **Entrega**: implementación del `AsociacionComprobanteRepositoryPort`. Commit crítico:
 cubre el UNIQUE PARCIAL y el cache `comprobanteEstado`.
@@ -307,7 +307,7 @@ E-A-02, E-A-03, E-A-06 a nivel integration.
 
 ---
 
-### 4.5 ☐ `feat(documentos-fisicos): add PrismaDocumentosFisicosReaderAdapter`
+### 4.5 ☑ `feat(documentos-fisicos): add PrismaDocumentosFisicosReaderAdapter`
 
 **Entrega**: implementación del `DocumentosFisicosReaderPort` (cross-module,
 consumido por `comprobantes`). Método renombrado a `obtenerBatchParaAsociar`
@@ -337,7 +337,7 @@ aquí — el adapter es muy delgado (thin).
 
 ## Fase 5 — Services + unit specs (TDD)
 
-### 5.1 ☐ `feat(tipos-documento-fisico): add TiposDocumentoFisicoService + unit spec`
+### 5.1 ☑ `feat(tipos-documento-fisico): add TiposDocumentoFisicoService + unit spec`
 
 **Entrega**: lógica de negocio del catálogo. Inyecta SOLO el port.
 TDD: spec primero (todos los casos en rojo), luego implementación hasta verde.
@@ -366,7 +366,7 @@ TDD: spec primero (todos los casos en rojo), luego implementación hasta verde.
 
 ---
 
-### 5.2 ☐ `feat(documentos-fisicos): add DocumentosFisicosService + unit spec`
+### 5.2 ☑ `feat(documentos-fisicos): add DocumentosFisicosService + unit spec`
 
 **Entrega**: lógica de negocio del módulo operativo (CRUD + política de mutabilidad).
 TDD strict.
@@ -414,45 +414,35 @@ E-D-01 a E-D-16, E-E-01 a E-E-05, E-EL-01, E-EL-03. D10 (validación monto condi
 
 ---
 
-### 5.3 ☐ `feat(documentos-fisicos): add AsociacionService + unit spec`
+### 5.3 ⊘ ANULADA — reconciliada con design §4.2/§4.5/§4.6
 
-**Entrega**: lógica de negocio de la asociación comprobante ↔ documento.
-Puede vivir como métodos en `DocumentosFisicosService` o en un `AsociacionService`
-separado. **Decisión de implementación**: agregar métodos a `DocumentosFisicosService`
-(no requiere clase extra ya que el servicio tiene los ports necesarios).
+**Por qué se anula**: esta task ubicaba la orquestación asociar/desasociar/listar
+en `DocumentosFisicosService`. El design la asigna a `ComprobantesService` (§4.2:
+`asociarDocumentos` valida el comprobante con su propio repo y consume
+`DocumentosFisicosReaderPort` + `AsociacionComprobanteRepositoryPort`). Implementarla
+en `documentos-fisicos` exigiría leer `comprobantes` → **dependencia inversa que el
+§4.5 prohíbe** ("comprobantes consume documentos-fisicos, no al revés") y reintroduce
+el ciclo de prod (cicatriz `prod-build-crash-ciclos`). El reader cross-module ya
+proyecta `esTributario` + `tiposComprobanteAplicables`, así que `ComprobantesService`
+tiene todo para validar sin tocar `documentos-fisicos`.
 
-**Archivos** (modificados/nuevos):
-- `backend/src/documentos-fisicos/documentos-fisicos.service.spec.ts` (ampliado)
-  — nuevos casos en el mismo spec file:
-  - `asociarAComprobante`: lista de ids vacía → no-op OK, id de otro tenant →
-    `DocumentoFisicoNoEncontradoError` (E-A-07), estado comprobante no BORRADOR →
-    `ComprobanteNoEsBorradorError`, id ya asociado al mismo comprobante → idempotente OK,
-    múltiples ids de una sola llamada OK (E-A-08).
-  - `asociarAComprobante` (validación compatibilidad — REQ-A-11):
-    - `tiposComprobanteAplicables` del tipo no incluye `comprobante.tipo` →
-      `TipoDocumentoIncompatibleConComprobanteError` (E-A-09).
-    - `tiposComprobanteAplicables` incluye `comprobante.tipo` → asociación creada (E-A-10).
-    - `comprobante-interno` (array de 7 tipos, incluye TRASPASO) + comp TRASPASO → OK (E-A-11).
-  - `desasociarDeComprobante`: BORRADOR OK (E-A-04), CONTABILIZADO →
-    `ComprobanteDocumentoNoDesasociableContabilizadoError` (E-A-05).
-  - `listarAsociacionesDeComprobante`: devuelve los docs del comprobante, solo del tenant.
-- `backend/src/documentos-fisicos/documentos-fisicos.service.ts` (ampliado)
-  — nuevos métodos: `asociarAComprobante(tenantId, comprobanteId, ids[])`,
-  `desasociarDeComprobante(tenantId, comprobanteId, docId)`,
-  `listarAsociacionesDeComprobante(tenantId, comprobanteId)`.
-  Inyecta adicionalmente `AsociacionComprobanteRepositoryPort`.
+**Dónde vive ahora**: la lógica + los ≥15 unit specs se **absorben en task 6.3**
+(`ComprobantesService.asociarDocumentos/desasociarDocumento/listarDocumentosAsociados`
++ casos en `comprobantes.service.spec.ts`). Los errores del flujo de asociar se crean
+en 6.3 (`comprobantes/domain`); `TipoDocumentoIncompatibleConComprobanteError` ya se
+reubicó a `comprobantes/domain` (commit `f632bf8`).
 
-**Tests que se agregan**: ≥ 15 unit specs adicionales.
-
-**Verificación**: `npx tsc --noEmit` + `npx jest src/documentos-fisicos/` verde.
-
-**Cubre**: REQ-A-01 a REQ-A-11. E-A-01, E-A-02, E-A-04, E-A-05, E-A-07, E-A-08, E-A-09, E-A-10, E-A-11. D11 (validación compatibilidad tipo).
+**Cubría** (todo migrado a 6.3): REQ-A-01 a REQ-A-11. E-A-01, E-A-02, E-A-04, E-A-05, E-A-07, E-A-08, E-A-09, E-A-10, E-A-11. D11.
 
 ---
 
 ## Fase 6 — Controllers + DTOs
 
-### 6.1 ☐ `feat(tipos-documento-fisico): add DTOs, controller and module wiring`
+### 6.1 ☑ `feat(tipos-documento-fisico): add DTOs, controller and module wiring`
+
+> **Nota apply (commit `6c1db82`)**: dos desvíos respecto del texto original, decididos en la sesión:
+> 1. **`descripcion` DIFERIDO** — el spec §7 + REQ-T-01/T-05 lo piden, pero schema (1.1) y service (5.1) lo omitieron. Para no meter una migración en un commit HTTP se sacó `descripcion` de los DTOs (slice queda consistente). **Deuda**: si se quiere, agregar columna nullable `descripcion String?` + service inputs + repo + response mapper en commit aparte. **E-T (fase 10.1) NO debe asertar round-trip de `descripcion`.**
+> 2. **Catálogo RBAC fuera de este commit** — la edición de `catalogo.ts` (permisos del slice + retroactivos de contactos) es responsabilidad de la **task 8.1** (REQ-P-12). Se revirtió de acá para respetar atomicidad/§9.1. `app.module.ts` SÍ se tocó (registrar el módulo es parte legítima de la capa HTTP).
 
 **Entrega**: capa HTTP del catálogo de tipos.
 
@@ -482,7 +472,9 @@ separado. **Decisión de implementación**: agregar métodos a `DocumentosFisico
 
 ---
 
-### 6.2 ☐ `feat(documentos-fisicos): add DTOs, controller and module wiring`
+### 6.2 ☑ `feat(documentos-fisicos): add DTOs, controller and module wiring`
+
+> **Nota apply (commit `da66e43`)**: el primer intento metió `PrismaService` directo en el controller para enriquecer lecturas (tipo+contacto+comprobantes) — **violación hexagonal §3.2/§3.5**. Se corrigió DENTRO del mismo commit (amend): el enriquecimiento de lectura vive ahora en repo→service. Se agregaron al `DocumentoFisicoRepositoryPort` los read-models `DocumentoFisicoConRelaciones`/`ComprobanteAsociadoView`/`DocumentoFisicoConDetalle` + métodos `findByIdConRelaciones`/`findDetalleById`/`listarConRelaciones`; el service expone `obtenerConRelaciones`/`obtenerDetalle`/`listarConRelaciones`; el controller solo consume el service. +8 integration specs (read enriquecido + comprobantesAsociados) y +5 unit. `monto`/`moneda` quedaron OPCIONALES+nullable en los DTOs (spec §7, validación condicional en service). **Para 6.3**: el read-model `DocumentoFisicoConRelaciones` vive en el port — importarlo de ahí; NO meter Prisma/repo concreto en el controller de comprobantes (misma violación). El `DOCUMENTOS_FISICOS_READER_PORT` puede no exponer estos read-models enriquecidos — verificar su superficie antes de 6.3.
 
 **Entrega**: capa HTTP del módulo operativo de documentos físicos.
 
@@ -517,7 +509,13 @@ separado. **Decisión de implementación**: agregar métodos a `DocumentosFisico
 
 ---
 
-### 6.3 ☐ `feat(comprobante): add asociacion sub-resource endpoints`
+### 6.3 ☑ `feat(comprobante): add asociacion sub-resource endpoints`
+
+> **Nota apply (commit `1ce0ec1`)**: implementada con opus. 3 endpoints sub-recurso bajo `/:comprobanteId/documentos-fisicos` (POST/DELETE/GET) + `ComprobantesService.asociarDocumentos/desasociarDocumento/listarDocumentosAsociados` (asociar dentro de `this.prisma.$transaction`, patrón existente) + 3 errores nuevos en `comprobantes/domain` (`ComprobanteNoEsBorradorError`, `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`) + `asociar-documentos.dto.ts` + `comprobantes.module` importa `DocumentosFisicosModule` (sin forwardRef, §4.5) + 18 unit specs. Dirección comprobantes→documentos-fisicos solo vía ports; cero Prisma en comprobantes (controller y service, salvo `$transaction`). Detalles:
+> - **Permisos**: se siguió el SPEC (REQ-P-09/10/11), no el design §4.1 (que pedía solo `asientos.update`). POST y DELETE requieren `documentos-fisicos.update` **Y** `asientos.update`; GET requiere `documentos-fisicos.read`. El design §4.1 quedó desactualizado en este punto.
+> - **`listarDocumentosAsociados` enriquecido**: el reader port `DocumentosFisicosReaderPort` se extendió con `listarAsociadosDeComprobante` (JOIN a tipo+contacto en el adapter) — NO se metió Prisma en comprobantes. + 3 integration specs.
+> - **Calidad**: `DocumentoFisicoParaAsociar` se extendió con `tipoDocumentoNombre` (denormalizado del tipo, como `esTributario`) para que `TipoDocumentoIncompatibleConComprobanteError` muestre el NOMBRE del tipo y no el número del documento (§1, mensajes claros).
+> - **Riesgos 7.1/7.2**: `refrescarEstadoComprobante` mapea el P2002 del UNIQUE parcial a `DocumentoFisicoYaAsociadoAOtroContabilizadoError` con `documentoFisicoId` vacío (placeholder) — en 7.1 enriquecer el id desde el contexto de la TX. `DocumentoFisicoYaAsociadoAOtroContabilizadoError` se IMPORTA de `documentos-fisicos/domain` (no recrear).
 
 **Entrega**: 3 endpoints de asociación en `comprobantes.controller.ts` +
 métodos delegadores en `ComprobantesService`.
@@ -534,25 +532,45 @@ métodos delegadores en `ComprobantesService`.
     no tiene monto.
   - `DELETE /:documentoFisicoId`: permisos REQ-P-10.
   - `GET`: permiso `contabilidad.documentos-fisicos.read` (REQ-P-11).
-  Los 3 delegan al `DocumentosFisicosService` (inyectado como dependency nueva del controller).
+  Los 3 endpoints viven en el controller de **comprobantes** y delegan a
+  `ComprobantesService` (su propio service, que orquesta el flujo §4.2). El controller
+  NO inyecta `DocumentosFisicosService` — la dependencia es unidireccional
+  (comprobantes → documentos-fisicos vía ports, §4.5).
 - `backend/src/comprobantes/comprobantes.service.ts`
-  — agregar 3 métodos públicos: `asociarDocumentos`, `desasociarDocumento`,
-  `listarDocumentosAsociados`. Lógica según design §4.2. Inyectar `DOCUMENTOS_FISICOS_READER_PORT`
-  y `ASOCIACION_COMPROBANTE_REPOSITORY_PORT`.
+  — agregar 3 métodos públicos con la **lógica completa** (absorbida de la ex-task 5.3):
+  `asociarDocumentos`, `desasociarDocumento`, `listarDocumentosAsociados`, según design §4.2.
+  Inyectar `DOCUMENTOS_FISICOS_READER_PORT` y `ASOCIACION_COMPROBANTE_REPOSITORY_PORT`.
+  Validar comprobante BORRADOR (su propio `repo.findById`), existencia/tenant de los docs
+  y compatibilidad de tipo (`tiposComprobanteAplicables` del reader vs `comprobante.tipo`).
+- `backend/src/comprobantes/domain/comprobante-errors.ts`
+  — crear los errores del flujo de asociar (design §4.6): `ComprobanteNoEsBorradorError`,
+  `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`.
+  `TipoDocumentoIncompatibleConComprobanteError` ya vive acá (commit `f632bf8`).
 - `backend/src/comprobantes/comprobantes.module.ts`
   — importar `DocumentosFisicosModule`.
 
-**Tests que se agregan**: ninguno en este commit — cubiertos por E2E fase 8.3.
+**Tests que se agregan**: ≥ 15 unit specs en `comprobantes.service.spec.ts` (absorbidos
+de la ex-task 5.3), mockeando el comprobante-repo + `DOCUMENTOS_FISICOS_READER_PORT` +
+`ASOCIACION_COMPROBANTE_REPOSITORY_PORT`. Casos: `asociarDocumentos` (ids vacíos no-op;
+doc de otro tenant → `DocumentoFisicoReferenciadoNoExisteError` E-A-07; comprobante no
+BORRADOR → `ComprobanteNoEsBorradorError`; idempotente; multi-id E-A-08; incompatibilidad
+de tipo → `TipoDocumentoIncompatibleConComprobanteError` E-A-09/10/11);
+`desasociarDocumento` (BORRADOR OK E-A-04; CONTABILIZADO →
+`ComprobanteDocumentoNoDesasociableContabilizadoError` E-A-05); `listarDocumentosAsociados`
+(solo del tenant). El flujo completo se valida además por E2E (fase 8.3).
 
 **Verificación**: `npx tsc --noEmit` + `npx jest src/comprobantes/` verde.
 
-**Cubre**: REQ-A-01, REQ-A-02, REQ-A-09. REQ-P-09 a REQ-P-11. D5 (endpoints sub-recurso).
+**Cubre**: REQ-A-01 a REQ-A-11 (lógica de asociar, absorbida de 5.3). REQ-P-09 a REQ-P-11.
+D5 (endpoints sub-recurso), D11 (compatibilidad tipo). E-A-01, E-A-02, E-A-04, E-A-05, E-A-07 a E-A-11.
 
 ---
 
 ## Fase 7 — Wiring con comprobantes (contabilizar + anular)
 
-### 7.1 ☐ `refactor(comprobante): integrate DocumentosFisicos validation in contabilizar`
+### 7.1 ☑ `refactor(comprobante): integrate DocumentosFisicos validation in contabilizar`
+
+> **Nota apply (commit `1c43958`)**: dentro de la TX de `contabilizar()`, paso "3.5" (después de `validarComprobanteParaContabilizar`, ANTES de `secuencia.siguienteCorrelativo` → si la pre-validación falla NO se consume numeración): `listarPorComprobante` → si hay asociaciones, `idsYaAsociadosAContabilizado(tenantId, ids, id, tx)` → si hay conflicto `throw DocumentoFisicoYaAsociadoAOtroContabilizadoError(<primer id real>)` → `refrescarEstadoComprobante(CONTABILIZADO)`. Lógica contable existente intacta. **`DocumentoFisicoYaAsociadoAOtroContabilizadoError` es SINGULAR (`documentoFisicoId: string`)**, no array — el design §4.3/§4.6 decía array; se tomó el primer id de `idsYaAsociadosAContabilizado()` type-safe (cubre el id vacío que dejaba el adapter en el race). Se IMPORTA de `documentos-fisicos/domain`. **GlobalExceptionFilter SIN cambios**: los adapters 4.3/4.4 ya mapean los P2002 a DomainError; importar errores de módulo al common filter invertiría la dependencia (§3.3/§3.5). +3 unit specs.
 
 **Entrega**: `ComprobantesService.contabilizar()` valida los documentos físicos
 asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
@@ -563,14 +581,17 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
   — dentro de `contabilizar()`, dentro del bloque `$transaction`:
   1. `asociaciones = await this.asociacionRepo.listarPorComprobante(tenantId, id, tx)`.
   2. Si `asociaciones.length > 0`: llamar `documentosFisicosReader.idsYaAsociadosAContabilizado(tenantId, ids, comprobanteId, tx)`.
-  _Nota: el método `obtenerBatchParaAsociar` (renombrado desde `obtenerBatchParaValidacion`) se usa en el flujo de ASOCIAR (task 5.3), no en el de contabilizar. El contabilizar usa `idsYaAsociadosAContabilizado` que no cambia de nombre._
+  _Nota: el método `obtenerBatchParaAsociar` (renombrado desde `obtenerBatchParaValidacion`) se usa en el flujo de ASOCIAR (task 6.3, `ComprobantesService.asociarDocumentos`), no en el de contabilizar. El contabilizar usa `idsYaAsociadosAContabilizado` que no cambia de nombre._
   3. Si `yaContab.length > 0`: throw `DocumentoFisicoYaAsociadoAOtroContabilizadoError(yaContab)`.
   4. `await this.asociacionRepo.refrescarEstadoComprobante(tenantId, comprobanteId, 'CONTABILIZADO', tx)`.
   Ver design §4.3 para pseudocódigo exacto.
 - `backend/src/comprobantes/domain/comprobante-errors.ts`
-  — agregar `DocumentoFisicoReferenciadoNoExisteError`,
-  `DocumentoFisicoYaAsociadoAOtroContabilizadoError`,
-  `ComprobanteNoEsBorradorError`. Ver design §4.6.
+  — el contabilizar usa `DocumentoFisicoYaAsociadoAOtroContabilizadoError`, que **ya existe
+  en `documentos-fisicos/domain`** (creado en task 4.4; lo lanza el adapter al chocar el
+  UNIQUE PARCIAL). Importarlo desde ahí (dirección permitida comprobantes → documentos-fisicos,
+  §4.5) — NO recrearlo. Los errores de ASOCIAR (`ComprobanteNoEsBorradorError`,
+  `DocumentoFisicoReferenciadoNoExisteError`, `ComprobanteDocumentoNoDesasociableContabilizadoError`)
+  ya se crearon en 6.3.
 - `backend/src/common/filters/global-exception.filter.ts`
   — agregar mapping de P2002 con `meta.target`:
   `documentos_fisicos_organizationId_tipoDocumentoFisicoId_numero_key` →
@@ -579,6 +600,15 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
   `TipoDocumentoFisicoCodigoDuplicadoError`. P2003 con FK de `TipoDocumentoFisico` →
   `TipoDocumentoFisicoConDocumentosError`. P2003 con FK de `DocumentoFisico` →
   `DocumentoFisicoReferenciadoPorComprobanteError`. Ver design §D6.
+
+  > ⚠️ **Corrección empírica (descubierta en 4.4)**: Prisma NO expone el nombre del
+  > índice raw SQL en `meta.target`. Para el UNIQUE PARCIAL reporta `["documentoFisicoId"]`
+  > (array de 1 campo), y para el UNIQUE normal `(documentoFisicoId, comprobanteId)` reporta
+  > `["documentoFisicoId", "comprobanteId"]` (2 campos). NO mapear por el string
+  > `comprobante_documento_fisico_unique_contabilizado` (eso deja el 500 sin mapear).
+  > El adapter de 4.4 ya distingue por longitud del array; el `GlobalExceptionFilter` es
+  > red de seguridad secundaria — el error ya se mapea en la capa repo/service. Si igual
+  > se agrega al filter, usar el shape normalizado, no el nombre del índice.
 
 **Tests que se agregan**: ampliar `comprobantes.service.spec.ts` con casos:
   - contabilizar sin docs asociados → flujo existente sin cambios.
@@ -591,7 +621,9 @@ asociados antes de la transición BORRADOR → CONTABILIZADO. El cache
 
 ---
 
-### 7.2 ☐ `refactor(comprobante): integrate DocumentosFisicos cleanup in anular`
+### 7.2 ☑ `refactor(comprobante): integrate DocumentosFisicos cleanup in anular`
+
+> **Nota apply (commit `78ed3ce`)**: dentro de la TX de `anular()` (tras validar período de reversión ABIERTO, antes de `siguienteCorrelativo`): `await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx)`. El DocumentoFisico sobrevive y queda re-asociable. Reversión AJUSTE / líneas invertidas / ANULADO / auditoría intactos. +2 unit specs. (Checkbox de 7.1 y 7.2 folded en este commit HEAD.)
 
 **Entrega**: `ComprobantesService.anular()` desasocia todos los documentos físicos
 del comprobante dentro de la misma TX del anulado.
@@ -616,7 +648,9 @@ del comprobante dentro de la misma TX del anulado.
 
 ## Fase 8 — RBAC y permisos
 
-### 8.1 ☐ `feat(rbac): add documentos-fisicos and tipos-documento-fisico permissions`
+### 8.1 ☑ `feat(rbac): add documentos-fisicos and tipos-documento-fisico permissions`
+
+> **Nota apply**: 12 permisos agregados a `CATALOGO_PERMISOS` vía helper `CRUD()` (read/create/update/delete c/u): `contabilidad.contactos.*` (retroactivo slice 1), `contabilidad.tipos-documento-fisico.*`, `contabilidad.documentos-fisicos.*`. (Originalmente el sub-agent de 6.1 los había metido ahí por error; se revirtieron y se hacen acá, su lugar correcto.) `asientos.update` ya existía (lo usa el POST/DELETE de asociación junto con `documentos-fisicos.update`). No hay spec del catálogo; tsc + rbac/common verdes.
 
 **Entrega**: 8 permisos nuevos del slice + 4 permisos retroactivos de `contactos`
 en el catálogo de permisos.
@@ -640,7 +674,11 @@ los 12 nuevos permisos están presentes en el array.
 
 ## Fase 9 — Seed al crear tenant
 
-### 9.1 ☐ `refactor(tenants): seed default TiposDocumentoFisico on tenant creation`
+### 9.1 ☑ `refactor(tenants): seed default TiposDocumentoFisico on tenant creation` + backfill C-2
+
+> **Nota apply (commits `94ca6b2` core + `7a543bb` backfill)**:
+> - **9.1 core** (`94ca6b2`): `TenantsService.create()` ya estaba en `$transaction` con un `switch(dto.modulo)` que siembra plan de cuentas; el seed de tipos se enchufó en el `case CONTABILIDAD` (los tipos son feature del módulo contabilidad), junto al planCuentasSeeder, mismo `tx`. `tenants.module` importa `TiposDocumentoFisicoModule` (sin forwardRef, sin ciclo). +4 unit specs + integration. NO se rompió la lógica de membership/owner.
+> - **Backfill C-2** (`7a543bb`, scope `db` separado): migración data-only que siembra los 8 tipos en orgs preexistentes **filtrando `WHERE contabilidadEnabled = true`** (coincide con el criterio del runtime — se corrigió de un primer intento que sembraba TODAS las orgs). `INSERT...SELECT...CROSS JOIN VALUES...ON CONFLICT (organizationId,codigo) DO NOTHING`, idempotente, snapshot point-in-time de TIPOS_UNIVERSALES. Tabla orgs = `organizations`; `id`/`updatedAt` sin default → `gen_random_uuid()::text`/`now()`. **§11.6 SE DISPARÓ**: Prisma metió `DROP INDEX` de los 2 índices GIN trigram de contactos (drift de objetos raw SQL legítimos) → se eliminaron del migration.sql por protocolo; verificado post-apply que ambos índices siguen vivos. Aplicada en dev (3 orgs × 8 = 24 tipos), checksum resincronizado.
 
 **Entrega**: `TenantsService.create()` invoca el seed dentro de la TX de creación.
 El tenant nace listo (con 8 tipos) o no nace.
@@ -674,7 +712,14 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ## Fase 10 — E2E tests
 
-### 10.1 ☐ `test(tipos-documento-fisico): add e2e for tipos catalog CRUD`
+### 10.1 ☑ `test(tipos-documento-fisico): add e2e for tipos catalog CRUD`
+
+> **Nota apply (commit `f68836d`)**: 12 escenarios verdes. La org de fixtures se crea
+> directo por Prisma (`prisma.organization.create`) → arranca SIN tipos sembrados (control
+> total del catálogo). 403 (E-MT-04): miembro con `CustomRole` de permisos limitados (sin
+> `systemRole` → no es OWNER/ADMIN, entra al chequeo de wildcards). El `cleanupTestData` de
+> `test/helpers/test-factory.ts` se extendió con las 3 tablas nuevas (`comprobanteDocumentoFisico`,
+> `documentoFisico`, `tipoDocumentoFisico`) en orden de FK — incluido en este commit.
 
 **Entrega**: suite E2E completa para el catálogo de tipos.
 
@@ -702,7 +747,23 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ---
 
-### 10.2 ☐ `test(documentos-fisicos): add e2e for documentos CRUD and listado`
+### 10.2 ☑ `test(documentos-fisicos): add e2e for documentos CRUD and listado`
+
+> **Nota apply (commits `40861c9` fix + `5a8508d` e2e)**: 27 escenarios verdes.
+> - **Gap encontrado y corregido (E-D-07)**: el spec REQ-D-01 + E-D-07 exigen `monto > 0`
+>   (400 a nivel DTO), pero Fases 5/6 nunca lo implementaron — un documento tributario con
+>   `monto: "0.00"` devolvía 201. Fix en commit aparte `40861c9`: `@Matches(DECIMAL_POSITIVO)`
+>   en `create`/`update` DTO (`/^(?!0+(\.0+)?$)\d+(\.\d+)?$/`, análogo a `DECIMAL_NO_NEG` de
+>   comprobantes) + unit spec del DTO. Decisión del usuario: implementar ahora (la rama no está
+>   mergeada, completar el invariante es parte del apply).
+> - **E-D-10** (contacto de otro tenant): el service lanza `ContactoNoEncontradoError` →
+>   404 `CONTACTO_NO_ENCONTRADO` (no un error propio del módulo).
+> - **E-D-13** (round-trip de monto): `Decimal.toString()` descarta ceros finales
+>   ("1150.00" → "1150"), igual que en comprobantes. El test usa `"1150.55"` para una aserción
+>   determinística.
+> - Los escenarios de mutabilidad/eliminación (E-E-02/03/04, E-EL-03, E-D-11/12) requieren
+>   maquinaria de comprobantes (gestión + cuentas + asociar/contabilizar), montada con helpers
+>   en la misma suite.
 
 **Entrega**: suite E2E del módulo operativo.
 
@@ -745,7 +806,25 @@ El tenant nace listo (con 8 tipos) o no nace.
 
 ---
 
-### 10.3 ☐ `test(documentos-fisicos): add e2e for asociacion and contabilizar`
+### 10.3 ☑ `test(documentos-fisicos): add e2e for asociacion and contabilizar`
+
+> **Nota apply (commit `9cf9796`)**: 17 escenarios verdes. Desvíos vs el texto original
+> (escrito antes de implementar la capa HTTP):
+> - **Status de asociar**: el POST `/:comprobanteId/documentos-fisicos` NO tiene `@HttpCode`
+>   → devuelve **201** (default), no 200 como decían E-A-01/02/08/10/11. Los tests asertan 201.
+> - **E-A-03 código real**: el conflicto del UNIQUE PARCIAL emite
+>   `DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO` (409), NO
+>   `COMPROBANTE_DOCUMENTO_FISICO_YA_CONTABILIZADO` del texto. Se asertó el código real.
+> - **E-A-07 código**: doc de otro tenant → 404 `COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE`
+>   (de `comprobantes/domain`, no de `documentos-fisicos`).
+> - **E-SEED**: la org se crea por el flujo real `POST /api/tenants {modulo: CONTABILIDAD}`
+>   (siembra 8 tipos + 111 cuentas) + re-login para que el JWT lleve `activeTenantId` de la
+>   nueva org (CLAUDE.md §4.2 — tenantId sale del JWT, no de header). Matriz de
+>   `tiposComprobanteAplicables` comparada importando `TIPOS_UNIVERSALES`.
+> - **E-SEED-02 idempotencia**: no hay endpoint para re-disparar el seed → se obtiene el
+>   `TipoDocumentoFisicoSeederPort` del contenedor DI (`app.get(SYMBOL, { strict: false })`)
+>   y se re-ejecuta `seedDefaultsForTenant`; el upsert mantiene 8 (no 16).
+> - **E-T-11/12**: el `codigo` respeta `@MaxLength(20)` (códigos cortos kebab-case).
 
 **Entrega**: suite E2E del flujo de asociación + contabilizar + anular.
 Cubre el caso crítico del UNIQUE PARCIAL (concurrencia simulada).
@@ -783,7 +862,13 @@ Cubre el caso crítico del UNIQUE PARCIAL (concurrencia simulada).
 
 ## Fase 11 — Cierre y documentación
 
-### 11.1 ☐ `docs(disenos): update comprobantes-asientos.md to remove forward-compat claim`
+### 11.1 ☑ `docs(disenos): clarify documento-fisico association is cabecera-cabecera`
+
+> **Nota apply (commit `27f0e3f`)**: el doc NO contenía ninguna afirmación de
+> `LineaComprobante.documentoFisicoId` (la premisa de "remover" era hipotética — R7 no se
+> materializó en este doc). En su lugar se AGREGÓ una aclaración en §12.3 (la asociación es
+> cabecera-cabecera vía `comprobante_documento_fisico`, no hay columna a nivel línea) +
+> referencias al nuevo `docs/disenos/documento-fisico.md` en §12.2 y §13. Cierra R7.
 
 **Entrega**: actualizar `docs/disenos/comprobantes-asientos.md` §12.3 para
 reflejar la decisión cabecera-cabecera (proposal Decisión 8 / design D1).
@@ -803,7 +888,13 @@ Retirar o aclarar cualquier mención a `LineaComprobante.documentoFisicoId`.
 
 ---
 
-### 11.2 ☐ `docs(disenos): add documento-fisico design doc`
+### 11.2 ☑ `docs(disenos): add documento-fisico design doc`
+
+> **Nota apply (commit `ac897a6`)**: `docs/disenos/documento-fisico.md` creado con el header
+> estándar de versionado. Versión simplificada del design (no las 1570 líneas): schema de los
+> 3 modelos + UNIQUE PARCIAL, módulos/estructura, ports clave, tabla D1-D11, matriz exacta de
+> los 8 tipos universales, flujos (asociar/contabilizar/anular) con códigos de error reales,
+> riesgos R1-R7, forward-compat slice 3 (Factura) y slice 4 (LCV). Fiel al as-built.
 
 **Entrega**: doc de diseño persistido en `docs/disenos/` para referencia futura
 de devs, auditores y próximas fases.
@@ -825,7 +916,13 @@ de devs, auditores y próximas fases.
 
 ---
 
-### 11.3 ☐ `chore(infra): update deudas-arquitecturales.md for slice 2 completion`
+### 11.3 ☑ `docs: update deudas-arquitecturales.md for slice 2 completion`
+
+> **Nota apply (commit `d1fd367`)**: nueva subsección §3.6. Cerradas: `contabilidad.contactos.*`
+> en `catalogo.ts` (8.1) + el `monto > 0` (gap destapado por el E2E, fix en `40861c9`). Abiertas:
+> E-EL-02 (historial de asociaciones / tabla de auditoría), estado derivado materializable (R5),
+> reapertura + `refrescarEstadoComprobante` (R1/D8), y el campo `descripcion` diferido (task 6.1).
+> Scope `docs:` en vez de `chore(infra)` — es cambio de documentación (§9.1).
 
 **Entrega**: actualizar `docs/deudas-arquitecturales.md` con:
 - Deudas cerradas en este slice: `contabilidad.contactos.*` en `catalogo.ts`.
@@ -903,11 +1000,13 @@ de devs, auditores y próximas fases.
 ## Commit de mayor riesgo
 
 **4.4** (`PrismaAsociacionComprobanteRepository`): es el corazón del UNIQUE PARCIAL.
-Si el nombre del índice `comprobante_documento_fisico_unique_contabilizado` no coincide
-exactamente con lo que Prisma reporta en `meta.target` al lanzar P2002, el mapeo de
-error falla y el usuario recibe un 500 en vez del 409 esperado. Mitigación: en el integration
-spec (4.4), provocar el error de race deliberadamente y verificar que el adapter devuelve
-el `DomainError` correcto (no un error genérico).
+✅ **RESUELTO (commit `988698c`)**. El integration spec confirmó empíricamente que Prisma
+NO reporta el nombre del índice en `meta.target`, sino el shape normalizado de campos:
+`["documentoFisicoId"]` (1 campo) para el UNIQUE PARCIAL, `["documentoFisicoId", "comprobanteId"]`
+(2 campos) para el UNIQUE normal. El adapter distingue por longitud del array y mapea el
+parcial a `DocumentoFisicoYaAsociadoAOtroContabilizadoError`. Verificado: el race deliberado
+en el spec devuelve el `DomainError` (no un 500 genérico). Esto invalida la suposición original
+de mapear por nombre de índice — ver corrección en 7.1.
 
 **7.1** (`contabilizar` + integración documentos): modifica código existente y testeado.
 Riesgo de regresión. Mitigación: correr la suite completa de `comprobantes` antes de
