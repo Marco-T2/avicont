@@ -862,7 +862,13 @@ Cubre el caso crítico del UNIQUE PARCIAL (concurrencia simulada).
 
 ## Fase 11 — Cierre y documentación
 
-### 11.1 ☐ `docs(disenos): update comprobantes-asientos.md to remove forward-compat claim`
+### 11.1 ☑ `docs(disenos): clarify documento-fisico association is cabecera-cabecera`
+
+> **Nota apply (commit `27f0e3f`)**: el doc NO contenía ninguna afirmación de
+> `LineaComprobante.documentoFisicoId` (la premisa de "remover" era hipotética — R7 no se
+> materializó en este doc). En su lugar se AGREGÓ una aclaración en §12.3 (la asociación es
+> cabecera-cabecera vía `comprobante_documento_fisico`, no hay columna a nivel línea) +
+> referencias al nuevo `docs/disenos/documento-fisico.md` en §12.2 y §13. Cierra R7.
 
 **Entrega**: actualizar `docs/disenos/comprobantes-asientos.md` §12.3 para
 reflejar la decisión cabecera-cabecera (proposal Decisión 8 / design D1).
@@ -882,7 +888,13 @@ Retirar o aclarar cualquier mención a `LineaComprobante.documentoFisicoId`.
 
 ---
 
-### 11.2 ☐ `docs(disenos): add documento-fisico design doc`
+### 11.2 ☑ `docs(disenos): add documento-fisico design doc`
+
+> **Nota apply (commit `ac897a6`)**: `docs/disenos/documento-fisico.md` creado con el header
+> estándar de versionado. Versión simplificada del design (no las 1570 líneas): schema de los
+> 3 modelos + UNIQUE PARCIAL, módulos/estructura, ports clave, tabla D1-D11, matriz exacta de
+> los 8 tipos universales, flujos (asociar/contabilizar/anular) con códigos de error reales,
+> riesgos R1-R7, forward-compat slice 3 (Factura) y slice 4 (LCV). Fiel al as-built.
 
 **Entrega**: doc de diseño persistido en `docs/disenos/` para referencia futura
 de devs, auditores y próximas fases.
@@ -904,7 +916,13 @@ de devs, auditores y próximas fases.
 
 ---
 
-### 11.3 ☐ `chore(infra): update deudas-arquitecturales.md for slice 2 completion`
+### 11.3 ☑ `docs: update deudas-arquitecturales.md for slice 2 completion`
+
+> **Nota apply (commit `d1fd367`)**: nueva subsección §3.6. Cerradas: `contabilidad.contactos.*`
+> en `catalogo.ts` (8.1) + el `monto > 0` (gap destapado por el E2E, fix en `40861c9`). Abiertas:
+> E-EL-02 (historial de asociaciones / tabla de auditoría), estado derivado materializable (R5),
+> reapertura + `refrescarEstadoComprobante` (R1/D8), y el campo `descripcion` diferido (task 6.1).
+> Scope `docs:` en vez de `chore(infra)` — es cambio de documentación (§9.1).
 
 **Entrega**: actualizar `docs/deudas-arquitecturales.md` con:
 - Deudas cerradas en este slice: `contabilidad.contactos.*` en `catalogo.ts`.
