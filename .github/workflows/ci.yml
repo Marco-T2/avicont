@@ -33,36 +33,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # pnpm/action-setup DEBE ir ANTES de setup-node, o el cache 'pnpm' falla.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24.11.0'
-          cache: 'npm'
+          cache: 'pnpm'
           # El lock vive en backend/, no en la raíz del monorepo.
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: backend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        # En GitHub Actions CI=true → pnpm usa --frozen-lockfile automático.
+        run: pnpm install
+
+      # Gate de seguridad supply-chain (nivel MÁXIMO): rompe el build ante
+      # cualquier vuln high/critical. Bloqueante, fail-fast tras el install.
+      # Excepciones documentadas en backend/pnpm-workspace.yaml (auditConfig).
+      - name: Security audit
+        run: pnpm audit --audit-level high
 
       - name: Copy env
         run: cp .env.example .env
 
       - name: Generate Prisma Client
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Run Prisma migrations
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
-        run: npx prisma migrate deploy
+        run: pnpm exec prisma migrate deploy
 
       - name: Lint
-        run: npm run lint --if-present
+        run: pnpm run lint --if-present
 
       - name: Unit + Integration tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
-        run: npx jest src/ --runInBand
+        run: pnpm exec jest src/ --runInBand
 
       # E2E full-stack a través de HTTP (Supertest + AppModule). Ver CLAUDE.md §11.3.
       # --forceExit porque PrismaClient deja handles que Jest no detecta.
@@ -70,7 +83,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
-        run: npx jest test/ --runInBand --forceExit
+        run: pnpm exec jest test/ --runInBand --forceExit
 
   frontend:
     runs-on: ubuntu-latest
@@ -84,22 +97,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # pnpm/action-setup DEBE ir ANTES de setup-node, o el cache 'pnpm' falla.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24.11.0'
-          cache: 'npm'
+          cache: 'pnpm'
           # El lock vive en frontend/, no en la raíz del monorepo.
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
+
+      # Gate de seguridad supply-chain (nivel MÁXIMO), bloqueante, fail-fast.
+      - name: Security audit
+        run: pnpm audit --audit-level high
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Unit tests
-        run: npx vitest run
+        run: pnpm exec vitest run
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
