@@ -24,18 +24,3 @@ allowBuilds:
 minimumReleaseAge: 4320
 # Strict: el cooldown aplica también a transitivas/peer, no solo a deps directas.
 minimumReleaseAgeStrict: true
-
-# Excepciones DOCUMENTADAS del audit gate (advisories sin fix disponible en npm).
-# El gate `pnpm audit --audit-level high` sigue bloqueando cualquier OTRA vuln
-# high/critical; estas dos son la única excepción justificada.
-auditConfig:
-  ignoreGhsas:
-    # xlsx (SheetJS) <0.19.3 — Prototype Pollution. SheetJS movió las versiones
-    # patcheadas a su registro comercial; en npm la última sigue siendo 0.18.5
-    # (sin fix). `xlsx` está declarado pero NO se importa en src/ ni test/
-    # (verificado) → riesgo de explotación en runtime = 0. Revisar: remover la
-    # dep o migrar a una alternativa libre (p. ej. exceljs).
-    - GHSA-4r6h-8v6p-xvw6
-    # xlsx (SheetJS) <0.20.2 — ReDoS. Mismo paquete, mismo vector, misma
-    # situación: sin fix en npm, sin uso en runtime.
-    - GHSA-5pgg-2g8v-p4x9
