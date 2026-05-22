@@ -12,6 +12,8 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { RequireModule } from '../common/decorators/require-module.decorator';
+import { ModuleEnabledGuard } from '../common/guards/module-enabled.guard';
 import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
@@ -35,7 +37,8 @@ function resolveTenantId(req: AuthenticatedRequest): string {
 
 @ApiTags('Configuración Contable')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(AuthGuard('jwt'), ModuleEnabledGuard, PermissionsGuard)
+@RequireModule('contabilidad')
 @Controller('configuracion-contable')
 export class ConfiguracionContableController {
   constructor(private readonly service: ConfiguracionContableService) {}

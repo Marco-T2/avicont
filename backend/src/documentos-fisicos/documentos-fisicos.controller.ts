@@ -15,7 +15,9 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
+import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
+import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
@@ -68,7 +70,8 @@ function mapEstadoAsociacion(
 
 @ApiTags('Documentos físicos')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(AuthGuard('jwt'), ModuleEnabledGuard, PermissionsGuard)
+@RequireModule('contabilidad')
 @Controller('documentos-fisicos')
 export class DocumentosFisicosController {
   constructor(private readonly service: DocumentosFisicosService) {}

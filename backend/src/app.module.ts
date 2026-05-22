@@ -35,7 +35,6 @@ import { TenantContextService } from './common/tenant-context/tenant-context.ser
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
 import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.interceptor';
-import { ModuleEnabledGuard } from './common/guards/module-enabled.guard';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 @Module({
@@ -87,9 +86,10 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ImpersonationAuditInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    // ModuleEnabledGuard se aplica global: solo activa cuando un endpoint
-    // tiene @RequireModule(...). Otros endpoints pasan transparentemente.
-    { provide: APP_GUARD, useClass: ModuleEnabledGuard },
+    // ModuleEnabledGuard ya NO es global: corría antes del AuthGuard('jwt') de
+    // cada controller, así que no veía req.user (activeTenantId) y preemptaba el
+    // 401. Ahora se aplica a nivel de controller en @UseGuards, después de
+    // AuthGuard y antes de PermissionsGuard (404 de módulo > 403 de permiso).
     // GlobalExceptionFilter mapea DomainError + HttpException + errores Prisma
     // al formato estándar { error: { code, message, details?, traceId?, timestamp } }.
     // Ver CLAUDE.md §6.4 y §6.5.
