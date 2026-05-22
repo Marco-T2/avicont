@@ -170,6 +170,56 @@ describe('POST /api/tenants (e2e)', () => {
   });
 
   // ---------------------------------------------------------------
+  // Aislamiento multi-tenant por módulo (E-MT-03)
+  // ---------------------------------------------------------------
+  describe('aislamiento de módulo (E-MT-03)', () => {
+    // GET base de los 7 controllers gateados con @RequireModule('contabilidad').
+    // El ModuleEnabledGuard (APP_GUARD) responde 404 deliberado cuando el módulo
+    // está deshabilitado para el tenant activo (el endpoint "no existe" para esa org).
+    const endpointsContables = [
+      '/api/cuentas',
+      '/api/comprobantes',
+      '/api/periodos',
+      '/api/gestiones',
+      '/api/documentos-fisicos',
+      '/api/configuracion-contable',
+      '/api/tipos-documento-fisico',
+    ] as const;
+
+    function getConTenant(path: string, tenantId: string): request.Test {
+      return request(app.getHttpServer())
+        .get(path)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('x-tenant-id', tenantId);
+    }
+
+    it.each(endpointsContables)(
+      'E-MT-03: una org GRANJA al consultar GET %s recibe 404 (módulo deshabilitado)',
+      async (path) => {
+        const res = await crearTenant({ name: `Org Granja MT03 ${Date.now()}`, modulo: 'GRANJA' });
+        expect(res.status).toBe(201);
+
+        const blocked = await getConTenant(path, res.body.id as string);
+        expect(blocked.status).toBe(404);
+      },
+    );
+
+    it.each(endpointsContables)(
+      'E-MT-03 (control): una org CONTABILIDAD al consultar GET %s NO recibe 404 — el 404 es del guard, no de ruta inexistente',
+      async (path) => {
+        const res = await crearTenant({
+          name: `Org Cont MT03 ${Date.now()}`,
+          modulo: 'CONTABILIDAD',
+        });
+        expect(res.status).toBe(201);
+
+        const allowed = await getConTenant(path, res.body.id as string);
+        expect(allowed.status).not.toBe(404);
+      },
+    );
+  });
+
+  // ---------------------------------------------------------------
   // Sin autenticación
   // ---------------------------------------------------------------
   it('rechaza POST sin token → 401', async () => {

@@ -3,7 +3,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PeriodoFiscalStatus } from '@prisma/client';
 
+import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
+import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
@@ -32,7 +34,8 @@ function resolveTenantId(req: AuthenticatedRequest): string {
 
 @ApiTags('Periodos Fiscales')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(AuthGuard('jwt'), ModuleEnabledGuard, PermissionsGuard)
+@RequireModule('contabilidad')
 @Controller('periodos')
 export class PeriodosFiscalesController {
   constructor(private readonly service: PeriodosFiscalesService) {}

@@ -15,7 +15,9 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
+import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
+import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
@@ -51,7 +53,8 @@ const LIST_DEFAULT_PAGE = 1;
 
 @ApiTags('Tipos de Documento Físico')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@UseGuards(AuthGuard('jwt'), ModuleEnabledGuard, PermissionsGuard)
+@RequireModule('contabilidad')
 @Controller('tipos-documento-fisico')
 export class TiposDocumentoFisicoController {
   constructor(private readonly service: TiposDocumentoFisicoService) {}

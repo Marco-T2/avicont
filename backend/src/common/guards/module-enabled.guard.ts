@@ -21,8 +21,11 @@ interface CachedFeatures {
 // Guard que rechaza requests a endpoints de un módulo deshabilitado para la
 // organización activa. Decoración requerida: @RequireModule('contabilidad'|'granja').
 //
-// Pensado para registrarse a nivel global. Endpoints sin @RequireModule pasan
-// transparentemente.
+// Se registra a nivel de controller en @UseGuards, DESPUÉS de AuthGuard('jwt')
+// (necesita req.user.activeTenantId, que solo existe tras autenticar) y ANTES de
+// PermissionsGuard (un 404 de módulo deshabilitado debe ganarle al 403 de permiso,
+// para no revelar que el endpoint existe). Si se registrara global correría antes
+// de AuthGuard y preemptaría el 401. Endpoints sin @RequireModule pasan transparentes.
 @Injectable()
 export class ModuleEnabledGuard implements CanActivate {
   private readonly logger = new Logger(ModuleEnabledGuard.name);
