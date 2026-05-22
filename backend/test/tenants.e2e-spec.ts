@@ -3,7 +3,30 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
+import {
+  TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
+  TipoDocumentoFisicoSeederPort,
+} from '../src/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
 import { cleanupTestData, createTestUser, prisma } from './helpers/test-factory';
+
+/**
+ * Configura y levanta una INestApplication desde AppModule con los pipes y
+ * prefijo estándar del proyecto. Extrae el boilerplate repetido entre suites.
+ */
+async function buildApp(
+  overrides?: (builder: import('@nestjs/testing').TestingModuleBuilder) => void,
+): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  if (overrides) overrides(builder);
+  const moduleFixture: TestingModule = await builder.compile();
+  const app = moduleFixture.createNestApplication();
+  app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
+  );
+  await app.init();
+  return app;
+}
 
 /**
  * E2E spec de `POST /api/tenants`.
@@ -17,16 +40,7 @@ describe('POST /api/tenants (e2e)', () => {
   let accessToken: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
-    );
-    await app.init();
+    app = await buildApp();
   });
 
   afterAll(async () => {
@@ -109,6 +123,18 @@ describe('POST /api/tenants (e2e)', () => {
       });
       expect(config).not.toBeNull();
     });
+
+    it('E-CONT-04: después del POST la BD tiene exactamente 8 TipoDocumentoFisico para esa organización', async () => {
+      const name = `Org Cont TipoDoc ${Date.now()}`;
+      const res = await crearTenant({ name, modulo: 'CONTABILIDAD' });
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const tiposCount = await prisma.tipoDocumentoFisico.count({
+        where: { organizationId: orgId },
+      });
+      expect(tiposCount).toBe(8);
+    });
   });
 
   // ---------------------------------------------------------------
@@ -151,5 +177,74 @@ describe('POST /api/tenants (e2e)', () => {
       .post('/api/tenants')
       .send({ name: 'Sin Auth', modulo: 'CONTABILIDAD' });
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------
+// Atomicidad del alta (E-ATOM-01) — app con seeder mockeado
+// ---------------------------------------------------------------
+describe('POST /api/tenants — atomicidad (E-ATOM-01)', () => {
+  let appAtom: INestApplication;
+  let tokenAtom: string;
+
+  beforeAll(async () => {
+    // Override del seeder de tipos de documento físico para forzar fallo
+    // dentro de la TX. El plan-cuentas seeder se ejecuta primero (siembra
+    // 111 cuentas); este seeder falla justo después: toda la TX debe hacer
+    // rollback (org + cuentas + OrgConfiguracionContable deben quedar sin
+    // persistir).
+    const seederFallido: TipoDocumentoFisicoSeederPort = {
+      seedDefaultsForTenant: jest.fn().mockRejectedValue(new Error('seeder-boom-e2e')),
+    } as unknown as TipoDocumentoFisicoSeederPort;
+
+    appAtom = await buildApp((builder) => {
+      builder.overrideProvider(TIPO_DOCUMENTO_FISICO_SEEDER_PORT).useValue(seederFallido);
+    });
+
+    await cleanupTestData();
+    await createTestUser({ email: 'atom-e2e@test.com', password: 'pass12345' });
+    const loginRes = await request(appAtom.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'atom-e2e@test.com', password: 'pass12345' });
+    expect(loginRes.status).toBe(200);
+    tokenAtom = loginRes.body.accessToken as string;
+  });
+
+  afterAll(async () => {
+    await appAtom.close();
+  });
+
+  beforeEach(async () => {
+    await cleanupTestData();
+    await createTestUser({ email: 'atom-e2e@test.com', password: 'pass12345' });
+    const loginRes = await request(appAtom.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'atom-e2e@test.com', password: 'pass12345' });
+    expect(loginRes.status).toBe(200);
+    tokenAtom = loginRes.body.accessToken as string;
+  });
+
+  it('E-ATOM-01: si el seeder falla, la TX hace rollback total — org, cuentas y config no persisten', async () => {
+    const orgCount = await prisma.organization.count();
+
+    const res = await request(appAtom.getHttpServer())
+      .post('/api/tenants')
+      .set('Authorization', `Bearer ${tokenAtom}`)
+      .send({ name: `Org Atom Rollback ${Date.now()}`, modulo: 'CONTABILIDAD' });
+
+    // El seeder lanza dentro de la TX → el endpoint devuelve 5xx
+    expect(res.status).toBeGreaterThanOrEqual(500);
+
+    // La org NO debe haberse persistido (rollback total)
+    const orgCountAfter = await prisma.organization.count();
+    expect(orgCountAfter).toBe(orgCount);
+
+    // Sin cuentas huérfanas (el plan-cuentas seeder corrió antes del fallo)
+    const cuentaCount = await prisma.cuenta.count();
+    expect(cuentaCount).toBe(0);
+
+    // Sin OrgConfiguracionContable huérfana
+    const configCount = await prisma.orgConfiguracionContable.count();
+    expect(configCount).toBe(0);
   });
 });

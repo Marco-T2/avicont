@@ -17,7 +17,10 @@ export class PrismaTiposDocumentoFisicoSeederAdapter extends TipoDocumentoFisico
     super();
   }
 
-  async seedDefaultsForTenant(tenantId: string, tx?: Prisma.TransactionClient): Promise<void> {
+  override async seedDefaultsForTenant(
+    tenantId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
     // Copia mutable: TIPOS_UNIVERSALES es readonly (inmutable hacia afuera),
     // upsertSeed recibe un array mutable.
     await this.repo.upsertSeed(tenantId, [...TIPOS_UNIVERSALES], tx);

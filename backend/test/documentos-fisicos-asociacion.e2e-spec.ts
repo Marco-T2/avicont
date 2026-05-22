@@ -449,7 +449,13 @@ describe('DocumentosFisicos asociación + contabilizar (e2e)', () => {
     const seeder = app.get<TipoDocumentoFisicoSeederPort>(TIPO_DOCUMENTO_FISICO_SEEDER_PORT, {
       strict: false,
     });
-    await seeder.seedDefaultsForTenant(orgId);
+    // tx es ahora obligatorio en el port (design §D3). Para el test de
+    // idempotencia se abre una TX explícita sin cambios de estado: el upsert
+    // no crea duplicados, por lo que hacer commit es equivalente al escenario
+    // real (el seed es idempotente).
+    await prisma.$transaction(async (tx) => {
+      await seeder.seedDefaultsForTenant(orgId, tx);
+    });
 
     const res = await getTipos(token);
     expect(res.status).toBe(200);
@@ -478,7 +484,9 @@ describe('DocumentosFisicos asociación + contabilizar (e2e)', () => {
       ),
     );
     for (const esperado of TIPOS_UNIVERSALES) {
-      expect(porCodigo.get(esperado.codigo)).toEqual([...esperado.tiposComprobanteAplicables].sort());
+      expect(porCodigo.get(esperado.codigo)).toEqual(
+        [...esperado.tiposComprobanteAplicables].sort(),
+      );
     }
   });
 

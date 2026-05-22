@@ -10,11 +10,12 @@ describe('PrismaTiposDocumentoFisicoSeederAdapter', () => {
     const upsertSeed = jest.fn().mockResolvedValue(undefined);
     const repo = { upsertSeed } as unknown as TipoDocumentoFisicoRepositoryPort;
     const seeder = new PrismaTiposDocumentoFisicoSeederAdapter(repo);
+    const tx = {} as Prisma.TransactionClient;
 
-    await seeder.seedDefaultsForTenant('org-1');
+    await seeder.seedDefaultsForTenant('org-1', tx);
 
     expect(upsertSeed).toHaveBeenCalledTimes(1);
-    expect(upsertSeed).toHaveBeenCalledWith('org-1', [...TIPOS_UNIVERSALES], undefined);
+    expect(upsertSeed).toHaveBeenCalledWith('org-1', [...TIPOS_UNIVERSALES], tx);
   });
 
   it('propaga el tx para participar de la transacción que crea el tenant', async () => {
