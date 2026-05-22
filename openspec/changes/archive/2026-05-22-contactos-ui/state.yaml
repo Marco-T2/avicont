@@ -1,10 +1,10 @@
 change: contactos-ui
 project: avicont
 created: "2026-05-21"
-updated: "2026-05-21"  # artefactos enmendados: se incorpora Fase 0 backend (activo='all')
+updated: "2026-05-22"  # archivado tras merge de PR #16 (squash c866c0d)
 
-phase: tasks
-status: planning_completo_pendiente_apply
+phase: archive
+status: archived
 
 artifact_store: openspec
 
@@ -14,11 +14,16 @@ phases_completed:
   - spec
   - design
   - tasks
-
-phases_pending:
   - apply
-  - verify
+  - verify   # CI verde (152 e2e + 86 vitest) + verificación visual aprobada
   - archive
+
+phases_pending: []
+
+merged:
+  pr: 16
+  squash_commit: c866c0d
+  date: "2026-05-22"
 
 artifacts:
   proposal: openspec/changes/contactos-ui/proposal.md
