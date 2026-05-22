@@ -6,7 +6,7 @@ import request from 'supertest';
 import {
   poblarConfiguracionContableRequerida,
   sembrarPlanCuentasComercial,
-} from '../prisma/seeds/prod/planes-cuentas/comercial';
+} from '../src/cuentas/adapters/seed/comercial';
 import { AppModule } from '../src/app.module';
 
 import { cleanupTestData, createTestUserWithTenant, prisma } from './helpers/test-factory';

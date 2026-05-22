@@ -422,7 +422,8 @@ export const MAPEO_CODIGO_A_CONCEPTO = {
   '5.6.1.003': 'difCambioPerdidaId',
 } as const;
 
-export type ConceptoMapeado = (typeof MAPEO_CODIGO_A_CONCEPTO)[keyof typeof MAPEO_CODIGO_A_CONCEPTO];
+export type ConceptoMapeado =
+  (typeof MAPEO_CODIGO_A_CONCEPTO)[keyof typeof MAPEO_CODIGO_A_CONCEPTO];
 
 // Auto-populate de OrgConfiguracionContable a partir del resultado del seed
 // (porCodigoInterno). Fail loud si alguna cuenta requerida no se creó — es
@@ -452,7 +453,7 @@ export async function poblarConfiguracionContableRequerida(
     throw new Error(
       `La plantilla COMERCIAL no sembró todas las cuentas requeridas por el sistema. ` +
         `Faltan ${faltantes.length}: ${faltantes.join(', ')}. ` +
-        `Revisá CUENTAS_HOJA_COMERCIAL en prisma/seeds/prod/planes-cuentas/comercial.ts.`,
+        `Revisá CUENTAS_HOJA_COMERCIAL en src/cuentas/adapters/seed/comercial.ts.`,
     );
   }
 
@@ -464,7 +465,7 @@ export async function poblarConfiguracionContableRequerida(
 }
 
 // Ejecución standalone — siembra el plan en la organización indicada por argv[2].
-// Uso: npx ts-node prisma/seeds/prod/planes-cuentas/comercial.ts <organizationId>
+// Uso: npx ts-node src/cuentas/adapters/seed/comercial.ts <organizationId>
 if (require.main === module) {
   const orgId = process.argv[2];
   if (!orgId) {
