@@ -53,7 +53,7 @@ jobs:
 
       # Gate de seguridad supply-chain (nivel MÁXIMO): rompe el build ante
       # cualquier vuln high/critical. Bloqueante, fail-fast tras el install.
-      # Excepciones documentadas en backend/pnpm-workspace.yaml (auditConfig).
+      # Sin excepciones: el audit gate pasa limpio a nivel high.
       - name: Security audit
         run: pnpm audit --audit-level high
 
