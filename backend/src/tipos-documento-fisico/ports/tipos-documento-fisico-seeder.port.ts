@@ -10,8 +10,9 @@ export const TIPO_DOCUMENTO_FISICO_SEEDER_PORT = Symbol('TIPO_DOCUMENTO_FISICO_S
 export abstract class TipoDocumentoFisicoSeederPort {
   /**
    * Siembra los 8 tipos universales en el tenant. Idempotente (upsert por
-   * `(organizationId, codigo)`). Recibe `tx` para participar de la TX que
-   * crea la organización: el tenant nace listo (con los 8 tipos) o no nace.
+   * `(organizationId, codigo)`). `tx` es OBLIGATORIO: este seeder corre
+   * dentro de la TX que crea la organización — el tenant nace listo (con los
+   * 8 tipos) o no nace (atomicidad, design §D3).
    */
-  abstract seedDefaultsForTenant(tenantId: string, tx?: Prisma.TransactionClient): Promise<void>;
+  abstract seedDefaultsForTenant(tenantId: string, tx: Prisma.TransactionClient): Promise<void>;
 }
