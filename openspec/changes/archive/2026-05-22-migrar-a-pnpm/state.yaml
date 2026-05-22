@@ -1,0 +1,73 @@
+change: migrar-a-pnpm
+project: avicont
+created: "2026-05-22"
+updated: "2026-05-22"  # archivado tras merge de PR #18 (squash 6a67fb7)
+
+phase: archive
+status: archived
+
+artifact_store: openspec
+
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+  - apply
+  - verify   # CI verde (1051 unit/int + 152 e2e backend + 86 vitest frontend) + stack levantado y verificado
+  - archive
+
+phases_pending: []
+
+merged:
+  pr: 18
+  squash_commit: 6a67fb7
+  date: "2026-05-22"
+
+artifacts:
+  proposal: openspec/changes/archive/2026-05-22-migrar-a-pnpm/proposal.md
+  spec: openspec/changes/archive/2026-05-22-migrar-a-pnpm/spec.md
+  design: openspec/changes/archive/2026-05-22-migrar-a-pnpm/design.md
+  tasks: openspec/changes/archive/2026-05-22-migrar-a-pnpm/tasks.md
+
+spec_sync: none  # change de tooling/infra, sin capability de producto → no hay delta a sincronizar en openspec/specs/
+
+notes: |
+  Migración del gestor de paquetes npm → pnpm 11.2.2 en el monorepo (backend
+  NestJS + frontend Vite, dos proyectos Node independientes), nivel de seguridad
+  MÁXIMO. Motivación: seguridad supply-chain. Scope: chore(infra).
+
+  Endurecimiento MÁXIMO (elegido por el usuario, proyecto idle absorbe el costo):
+  - allowBuilds conservador (backend: bcrypt/prisma/@prisma/* permitidos;
+    @scarf/scarf y 3 postinstall bloqueados; frontend allowBuilds vacío).
+  - Cooldown 72h estricto (minimumReleaseAge 4320 + Strict) en ambos proyectos.
+  - Audit gate bloqueante pnpm audit --audit-level high en CI.
+
+  Provisioning 3 vías: pnpm/action-setup@v4 (CI), npm i -g pnpm@11.2.2 (Docker),
+  packageManager field (local). corepack descartado (se remueve en Node 25).
+
+  Cambios que la migración hizo aflorar y se resolvieron en el PR:
+  - 2 phantom deps declaradas: express@^5.2.1 (rompía prod, no lo cazaban e2e,
+    solo el boot smoke test) y @eslint/js@^9.39.4 (eslint config backend).
+  - Bump OTel 0.211→0.218 (elimina protobufjs vulnerable) para que el audit gate
+    sea verde: resolvió 1 critical + 8 high.
+  - xlsx (2 high, sin fix en npm, sin uso en src/) → auditConfig.ignoreGhsas
+    documentado en backend/pnpm-workspace.yaml.
+
+  GOTCHAS descubiertos (en engram):
+  - Lockfile + cooldown estricto: hay que generar el lockfile CON el cooldown
+    activo + estado limpio (rm -rf node_modules + sin package-lock.json). El
+    design.md original tenía el orden invertido; corregido en §4.
+  - --if-present no se mapea 1:1 npm→pnpm (pnpm lo pasa al comando). Lo cazó CI.
+
+  Verificación: CI verde (backend 2m11s, frontend 40s). Stack completo levantado
+  y verificado (backend /api/health ok, frontend :5173, grafana :3001, build
+  Docker pnpm avicont-app:latest 188MB).
+
+  Decisiones pendientes del usuario (NO bloquean): xlsx (remover vs exceljs),
+  nodemailer 7→8 major (low+moderate, no bloquea el gate).
+
+  Deuda pre-existente confirmada (fix(infra) aparte): el Docker app no arranca
+  (CMD node dist/main.js vs build dist/src/main.js). NO de esta migración.
+  Deuda menor: pnpm/action-setup@v4 corre Node 20 (deprecado jun-2026).
