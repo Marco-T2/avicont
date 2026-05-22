@@ -101,9 +101,10 @@ cambio de cuerpo. El uso CLI standalone (que pasa `new PrismaClient()`)
 sigue compilando y corriendo sin modificación.
 
 **Archivos** (modificados):
-- `backend/prisma/seeds/prod/planes-cuentas/comercial.ts`
-  — cambiar firmas de `sembrarPlanCuentasComercial` (línea ~321) y
-  `poblarConfiguracionContableRequerida` (línea ~434) de `prisma: PrismaClient`
+- `backend/src/cuentas/adapters/seed/comercial.ts`
+  (relocado desde `prisma/seeds/prod/planes-cuentas/` vía PR #21 — fix Docker `dist/main.js`)
+  — cambiar firmas de `sembrarPlanCuentasComercial` y
+  `poblarConfiguracionContableRequerida` de `prisma: PrismaClient`
   a `prisma: PrismaClient | Prisma.TransactionClient`.
   Agregar import de `Prisma` desde `@prisma/client` si no está.
 
@@ -195,8 +196,8 @@ spec a VERDE.
     await poblarConfiguracionContableRequerida(tx, tenantId, porCodigoInterno);
   }
   ```
-  El adapter importa directamente de `backend/prisma/seeds/prod/planes-cuentas/comercial.ts`
-  (capa sucia — adapter puede importar infra). Cero lógica de negocio adicional.
+  El adapter importa directamente de `backend/src/cuentas/adapters/seed/comercial.ts`
+  (capa sucia — adapter puede importar infra; archivo relocado desde `prisma/seeds/prod/planes-cuentas/` vía PR #21). Cero lógica de negocio adicional.
 
 **Tests que se agregan**: ninguno (solo se hace pasar la spec de 3.1).
 

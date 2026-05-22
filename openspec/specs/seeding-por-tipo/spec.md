@@ -3,10 +3,13 @@
 > Fecha: 2026-05-20
 > Fase: spec
 > Proyecto: avicont
+> Reconciliado para archive: 2026-05-22
 
 ---
 
-> ⚠️ **Opción 1 (decidida, 2026-05-20)**: el alta CONTABILIDAD siembra SOLO el plan de cuentas (`PlanCuentasSeederPort`). El seeder de tipos-documento-fisico (`TipoDocumentoFisicoSeederPort`) se **difiere a `documento-fisico` task 9.1**, que enchufará en el slot `tenants.service.ts` (case CONTABILIDAD) cuando el adapter `PrismaTiposDocumentoFisicoSeederAdapter` esté disponible. Los requisitos y escenarios marcados con ⚠️ quedan diferidos en consecuencia.
+> ~~⚠️ **Opción 1 (decidida, 2026-05-20)**~~: el alta CONTABILIDAD siembra SOLO el plan de cuentas (`PlanCuentasSeederPort`). El seeder de tipos-documento-fisico (`TipoDocumentoFisicoSeederPort`) se **difiere a `documento-fisico` task 9.1**, que enchufará en el slot `tenants.service.ts` (case CONTABILIDAD) cuando el adapter `PrismaTiposDocumentoFisicoSeederAdapter` esté disponible. Los requisitos y escenarios marcados con ⚠️ quedan diferidos en consecuencia.
+>
+> **(implementado — la Opción 1 de deferral fue superada; ver archive-report)**: la implementación final siembra AMBOS seeders (plan de cuentas + 8 tipos de documento físico) dentro de la misma TX al crear una org CONTABILIDAD. El adapter `PrismaTiposDocumentoFisicoSeederAdapter` fue entregado por el change `documento-fisico` (PR #12, squash `3002f26`) y quedó wired en `tenants.service.ts` junto al `PlanCuentasSeederPort`. El spec se reconcilió a esa realidad.
 
 ## 1. Glosario
 
@@ -51,7 +54,7 @@
 
 - **REQ-SEED-01**: `TenantsService.create` DEBE ejecutar la creación de organización, la derivación de flags, y la siembra de datos por defecto dentro de una única `prisma.$transaction`. Ninguna de esas operaciones PUEDE ocurrir fuera de esa TX.
 
-- **REQ-SEED-02** ⚠️ DIFERIDO (Opción 1): Para `modulo=CONTABILIDAD`, el spec original requería invocar en la misma TX: (1) `PlanCuentasSeederPort.seedDefaultsForTenant` y (2) `TipoDocumentoFisicoSeederPort.seedDefaultsForTenant`. Por Opción 1 confirmada, **solo se implementa (1)**; el paso (2) queda diferido a `documento-fisico` task 9.1, que enchufará en el slot del switch cuando su adapter esté listo. Esta siembra subsume parcialmente la task 9.1 del change `documento-fisico`.
+- **REQ-SEED-02** ~~⚠️ DIFERIDO (Opción 1)~~ **(implementado — la Opción 1 de deferral fue superada; ver archive-report)**: Para `modulo=CONTABILIDAD`, el sistema DEBE invocar en la misma TX: (1) `PlanCuentasSeederPort.seedDefaultsForTenant` y (2) `TipoDocumentoFisicoSeederPort.seedDefaultsForTenant`. La implementación final siembra ambos atómicamente (design §D3, §7.2).
 
 - **REQ-SEED-03**: Para `modulo=GRANJA`, el sistema NO DEBE invocar ningún seeder contable. La rama es un placeholder explícito — solo setea `granjaEnabled=true`. Cero cuentas contables, cero tipos de documento físico.
 
@@ -131,7 +134,7 @@
 
 ### 3.2 Alta con `modulo=CONTABILIDAD`
 
-**E-CONT-01: Alta exitosa siembra 111 cuentas + configuración** ⚠️ DIFERIDO parcialmente (Opción 1)
+**E-CONT-01: Alta exitosa siembra 111 cuentas + configuración + 8 tipos de documento físico** *(implementado — la Opción 1 de deferral fue superada; ver archive-report)*
 - **Given** un usuario autenticado con los permisos para crear una organización
 - **When** envía `POST /api/tenants` con `{ name: "Empresa Contable S.A.", modulo: "CONTABILIDAD" }`
 - **Then** respuesta **201 Created** con la organización creada
@@ -139,7 +142,7 @@
 - **And** `granjaEnabled = false` en la organización
 - **And** existen exactamente 111 cuentas con `organizationId` de la nueva org en la tabla `cuentas`
 - **And** existe una `OrgConfiguracionContable` para la nueva org con las cuentas requeridas mapeadas
-- **And** ~~existen exactamente 8 `TipoDocumentoFisico` con `organizationId` de la nueva org~~ ⚠️ DIFERIDO a `documento-fisico` task 9.1
+- **And** existen exactamente 8 `TipoDocumentoFisico` con `organizationId` de la nueva org *(implementado — la Opción 1 de deferral fue superada; ver archive-report)*
 - **And** existe una membresía OWNER del usuario creador asociada a la nueva org
 - **And** todo lo anterior fue creado dentro de una única transacción de BD
 
@@ -155,12 +158,12 @@
 - **Then** las 8 cuentas requeridas por el sistema (`esRequeridaSistema = true`) tienen sus correspondientes cuentas de la org asignadas en la configuración
 - **And** la configuración contable tiene `organizationId` de la nueva org
 
-**E-CONT-04: Alta CONTABILIDAD siembra los 8 tipos de documento físico universales** ⚠️ DIFERIDO (Opción 1)
-- _Este escenario completo queda diferido a `documento-fisico` task 9.1. Con Opción 1, el seeder `TipoDocumentoFisicoSeederPort` no se invoca al crear un tenant CONTABILIDAD. La verificación de los 8 tipos se activará cuando el adapter `PrismaTiposDocumentoFisicoSeederAdapter` enchufé en el slot del switch._
+**E-CONT-04: Alta CONTABILIDAD siembra los 8 tipos de documento físico universales** *(implementado — la Opción 1 de deferral fue superada; ver archive-report)*
 - **Given** una organización recién creada con `modulo: "CONTABILIDAD"`
 - **When** se consulta `TipoDocumentoFisico` para esa org
-- **Then** ~~existen exactamente 8 tipos con `organizationId` de la nueva org~~ ⚠️ DIFERIDO
-- **And** ~~los códigos presentes son: `factura-emitida`, `factura-recibida`, `nota-credito-emitida`, `nota-debito-emitida`, `recibo-ingreso`, `recibo-egreso`, `comprobante-interno`, `vale-caja-chica`~~ ⚠️ DIFERIDO
+- **Then** existen exactamente 8 tipos con `organizationId` de la nueva org
+- **And** los 8 tipos tienen los códigos universales esperados (`factura-emitida`, `factura-recibida`, `nota-credito-emitida`, `nota-debito-emitida`, `recibo-ingreso`, `recibo-egreso`, `comprobante-interno`, `vale-caja-chica`)
+- _Nota: verificado en integration spec (`tenants.service.integration.spec.ts`) — el escenario E2E correspondiente no verifica el conteo de tipos-doc explícitamente (gap de cobertura menor — ver archive-report)._
 
 ### 3.3 Alta con `modulo=GRANJA`
 
@@ -179,7 +182,7 @@
 - **Given** un `PlanCuentasSeederPort` mock registrado en el contenedor de prueba
 - **When** se crea una organización con `modulo: "GRANJA"`
 - **Then** el método `seedDefaultsForTenant` del `PlanCuentasSeederPort` NO fue llamado (0 invocaciones)
-- **And** ~~el método `seedDefaultsForTenant` del `TipoDocumentoFisicoSeederPort` NO fue llamado (0 invocaciones)~~ ⚠️ DIFERIDO (Opción 1) — el port no se inyecta aún; esta verificación aplica cuando se active la task 9.1 de `documento-fisico`
+- **And** el método `seedDefaultsForTenant` del `TipoDocumentoFisicoSeederPort` NO fue llamado (0 invocaciones) *(implementado junto con la activación del seeder de tipos-doc en CONTABILIDAD)*
 
 ### 3.4 Alta con `modulo=OTROS`
 
@@ -196,7 +199,7 @@
 - **Given** seeders mock registrados en el contenedor de prueba
 - **When** se crea una organización con `modulo: "OTROS"`
 - **Then** `PlanCuentasSeederPort` no fue invocado (0 invocaciones)
-- **And** ~~`TipoDocumentoFisicoSeederPort` no fue invocado (0 invocaciones)~~ ⚠️ DIFERIDO (Opción 1) — aplica cuando se active la task 9.1 de `documento-fisico`
+- **And** `TipoDocumentoFisicoSeederPort` no fue invocado (0 invocaciones) *(implementado junto con la activación del seeder de tipos-doc en CONTABILIDAD)*
 
 ### 3.5 Atomicidad y rollback
 
@@ -208,15 +211,15 @@
 - **And** no existe ninguna membresía asociada a una org que no se creó
 - **And** no existe ninguna cuenta con el `organizationId` que habría tenido la nueva org
 
-**E-ATOM-02: Fallo del seeder de tipos de documento físico → rollback que incluye las cuentas sembradas** ⚠️ DIFERIDO (Opción 1)
-- _Este escenario queda diferido a `documento-fisico` task 9.1 ya que `TipoDocumentoFisicoSeederPort` no se inyecta en el apply actual._
+**E-ATOM-02: Fallo del seeder de tipos de documento físico → rollback que incluye las cuentas sembradas** *(implementado — la Opción 1 de deferral fue superada; ver archive-report)*
 - **Given** un `PlanCuentasSeederPort` mock que funciona correctamente
-- **And** ~~un `TipoDocumentoFisicoSeederPort` mock que lanza `new Error('Tipos no disponibles')`~~ ⚠️ DIFERIDO
+- **And** un `TipoDocumentoFisicoSeederPort` mock que lanza `new Error('Tipos no disponibles')`
 - **When** se intenta crear una organización con `modulo: "CONTABILIDAD"`
-- **Then** ~~respuesta **500 Internal Server Error**~~ ⚠️ DIFERIDO
-- **And** ~~no existe ninguna organización creada en BD~~ ⚠️ DIFERIDO
-- **And** ~~no existen cuentas para el `organizationId` de la org fallida~~ ⚠️ DIFERIDO
-- **And** ~~no existen tipos de documento físico para esa org~~ ⚠️ DIFERIDO
+- **Then** respuesta **500 Internal Server Error**
+- **And** no existe ninguna organización creada en BD
+- **And** no existen cuentas para el `organizationId` de la org fallida
+- **And** no existen tipos de documento físico para esa org
+- _Nota: verificado a nivel de unit spec (mock TX) — el escenario E2E equivalente no existe explícitamente (gap de cobertura menor)._
 
 **E-ATOM-03: Colisión de slug dentro de la TX → rollback + 409**
 - **Given** ya existe una organización con el mismo slug derivado del nombre (race condition: otro request la creó en paralelo)
@@ -252,13 +255,12 @@
 - **And** el primer argumento es el `id` de la organización recién creada (no el `ownerId`, no `undefined`)
 - **And** el segundo argumento es el cliente transaccional (`tx`) de la TX de creación
 
-**E-PORT-02: El `TipoDocumentoFisicoSeederPort` también se invoca con los argumentos correctos** ⚠️ DIFERIDO (Opción 1)
-- _Este escenario completo queda diferido a `documento-fisico` task 9.1. Con Opción 1, `TipoDocumentoFisicoSeederPort` no se inyecta ni se invoca en el apply actual._
+**E-PORT-02: El `TipoDocumentoFisicoSeederPort` también se invoca con los argumentos correctos** *(implementado — la Opción 1 de deferral fue superada; ver archive-report)*
 - **Given** un `TipoDocumentoFisicoSeederPort` mock con spy
 - **When** se crea una organización con `modulo: "CONTABILIDAD"`
-- **Then** ~~el spy registra exactamente 1 llamada a `seedDefaultsForTenant`~~ ⚠️ DIFERIDO
-- **And** ~~el primer argumento es el `id` de la nueva org~~ ⚠️ DIFERIDO
-- **And** ~~el segundo argumento es la misma TX que recibió el `PlanCuentasSeederPort`~~ ⚠️ DIFERIDO
+- **Then** el spy registra exactamente 1 llamada a `seedDefaultsForTenant`
+- **And** el primer argumento es el `id` de la nueva org
+- **And** el segundo argumento es la misma TX que recibió el `PlanCuentasSeederPort`
 
 **E-PORT-03: El adapter `PrismaPlanCuentasSeederAdapter` encadena las dos funciones de siembra**
 - **Given** un `Prisma.TransactionClient` mock y un `tenantId`
@@ -341,10 +343,10 @@ No se crean endpoints nuevos. No se modifica la forma de la respuesta (sigue dev
 
 | Tipo | Target | Descripción |
 |------|--------|-------------|
-| Unit — `tenants.service` | ≥ 90% | Mocks de `PlanCuentasSeederPort` + `repo.create` + `prisma.$transaction`. ⚠️ DIFERIDO (Opción 1): el mock de `TipoDocumentoFisicoSeederPort` no aplica en el apply actual. Cubre: `modulo=CONTABILIDAD` invoca `PlanCuentasSeederPort` con `org.id` y `tx`; `modulo=GRANJA` no invoca ningún seeder, setea solo `granjaEnabled`; `modulo=OTROS` no-op; seeder lanza → error propagado (simula rollback); slug duplicado pre-TX → 409 sin abrir TX; flags derivados correctos para cada vertical. |
+| Unit — `tenants.service` | ≥ 90% | Mocks de `PlanCuentasSeederPort` + `TipoDocumentoFisicoSeederPort` + `repo.create` + `prisma.$transaction`. Cubre: `modulo=CONTABILIDAD` invoca ambos seeders con `org.id` y `tx`; `modulo=GRANJA` no invoca ningún seeder, setea solo `granjaEnabled`; `modulo=OTROS` no-op; seeder lanza → error propagado (simula rollback); slug duplicado pre-TX → 409 sin abrir TX; flags derivados correctos para cada vertical. |
 | Unit — `PrismaPlanCuentasSeederAdapter` | ≥ 85% | Mock de `sembrarPlanCuentasComercial` y `poblarConfiguracionContableRequerida`; verifica encadenamiento del `porCodigoInterno`; verifica que `tx` se pasa a ambas funciones. |
 | Integration — adapter contra Postgres real | ≥ 80% | `PrismaPlanCuentasSeederAdapter` contra Postgres real: siembra 111 cuentas + `OrgConfiguracionContable` en una TX; re-ejecutar no duplica (idempotencia); plantilla falla → rollback (0 cuentas). |
-| Integration — `TenantsService.create` contra Postgres real | ≥ 80% | Alta CONTABILIDAD → 111 cuentas + config en 1 TX (⚠️ DIFERIDO Opción 1: los 8 tipos-doc se verifican en `documento-fisico` task 9.1); alta GRANJA → 0 cuentas; fallo de seeder → org no creada. |
+| Integration — `TenantsService.create` contra Postgres real | ≥ 80% | Alta CONTABILIDAD → 111 cuentas + config + 8 tipos-doc en 1 TX; alta GRANJA → 0 cuentas; fallo de seeder → org no creada. |
 | E2E — `POST /api/tenants` | Golden paths + errores clave | `modulo=CONTABILIDAD` → 201 + 111 cuentas verificadas; `modulo=GRANJA` → 201 + 0 cuentas + `granjaEnabled=true`; `modulo=OTROS` → 201 + ambos flags false; sin `modulo` → 400; valor inválido → 400. |
 | **Global** | **≥ 80%** | Línea base CLAUDE.md §10.6 |
 

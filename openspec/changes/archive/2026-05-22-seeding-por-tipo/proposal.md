@@ -18,7 +18,7 @@ Las funciones de siembra **ya existen y son idempotentes** (upsert por
 `organizationId_codigoInterno` / `organizationId`):
 `sembrarPlanCuentasComercial(prisma, organizationId)` (111 cuentas) y
 `poblarConfiguracionContableRequerida(prisma, organizationId, porCodigoInterno)`
-en `backend/prisma/seeds/prod/planes-cuentas/comercial.ts`. El GAP es puro
+en `backend/src/cuentas/adapters/seed/comercial.ts` (relocado desde `prisma/seeds/prod/planes-cuentas/` vía PR #21). El GAP es puro
 **cableado**: hoy solo se invocan desde seeds de dev o por CLI standalone, nunca
 desde el flujo HTTP de creación.
 
@@ -232,7 +232,7 @@ es el primero del producto).
 |---|---|---|
 | `tenants` | Modificación | `CreateTenantDto` (+campo `modulo`); `TenantsService.create` envuelto en TX + orquestación de seeders + set de flags; `TenantRepositoryPort.create` acepta `tx?`; `TenantsModule` importa `CuentasModule` (y documento-fisico). Unit/E2E nuevos. |
 | `cuentas` | Adición | Nuevo `PlanCuentasSeederPort` + `PrismaPlanCuentasSeederAdapter` (envuelve `comercial.ts`); export del port. Integration spec. |
-| `prisma/seeds/prod/planes-cuentas/comercial.ts` | Modificación | Las funciones aceptan `Prisma.TransactionClient` además de `PrismaClient` (tipo unión o `Prisma.TransactionClient` — ver R1). |
+| `backend/src/cuentas/adapters/seed/comercial.ts` | Modificación | Las funciones aceptan `Prisma.TransactionClient` además de `PrismaClient` (tipo unión — ver R1). Archivo relocado desde `prisma/seeds/prod/planes-cuentas/` vía PR #21. |
 | `documento-fisico` (change en curso) | Coordinación | Su task 9.1 se **subsume** acá; no se cablea el seeder por separado. |
 | `prisma/schema.prisma` | Sin cambios | `tipoEmpresaPrincipal`, flags y enum `TipoEmpresa` ya existen. Cero migration. |
 | `granja` (no existe) | Placeholder | Rama del switch sin seeder real; lista para enchufar. |

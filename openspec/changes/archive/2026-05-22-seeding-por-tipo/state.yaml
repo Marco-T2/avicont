@@ -1,0 +1,71 @@
+change: seeding-por-tipo
+project: avicont
+created: "2026-05-20"
+updated: "2026-05-22"
+
+phase: archive
+status: archived
+
+artifact_store: openspec
+
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+  - apply
+  - verify
+  - archive
+
+phases_pending: []
+
+artifacts:
+  proposal: openspec/changes/archive/2026-05-22-seeding-por-tipo/proposal.md
+  spec: openspec/changes/archive/2026-05-22-seeding-por-tipo/spec.md
+  design: openspec/changes/archive/2026-05-22-seeding-por-tipo/design.md
+  tasks: openspec/changes/archive/2026-05-22-seeding-por-tipo/tasks.md
+  archive_report: openspec/changes/archive/2026-05-22-seeding-por-tipo/archive-report.md
+  canonical_spec: openspec/specs/seeding-por-tipo/spec.md
+
+implementacion: |
+  El código aterrizó distribuido en dos PRs y un change compañero:
+
+  1. PlanCuentasSeederPort + adapter + wiring en TenantsService
+     PR #6, squash commit 2d8234a ("feat(tenants): seed plan de cuentas al
+     crear organización según módulo"). Entregó: CreateTenantDto con campo
+     modulo, TenantsService.create en TX con switch, PlanCuentasSeederPort en
+     cuentas/ports/, PrismaPlanCuentasSeederAdapter en cuentas/adapters/,
+     firma de comercial.ts ampliada a PrismaClient | Prisma.TransactionClient.
+     En este PR la rama CONTABILIDAD llamaba solo al plan de cuentas (Opción 1
+     de deferral confirmada al aplicar).
+
+  2. TipoDocumentoFisicoSeederPort + adapter (change documento-fisico)
+     PR #12, squash commit 3002f26 ("feat(documento-fisico): catálogo de tipos,
+     documentos físicos y asociación con comprobantes"). Entregó el
+     PrismaTiposDocumentoFisicoSeederAdapter y su wiring en TenantsModule; al
+     aplicarse, el case CONTABILIDAD de tenants.service.ts pasó a invocar AMBOS
+     seeders (planCuentasSeeder + tiposDocSeeder) en la misma TX, superando la
+     Opción 1 de deferral. Verificado en tenants.service.integration.spec.ts:
+     tipoDocumentoFisico.count === 8 para org CONTABILIDAD (además de 111 cuentas).
+
+  3. Relocate de comercial.ts a src/ (fix Docker)
+     Branch fix/infra-build-output-dist-main (PR #21 pendiente de merge al momento
+     del archive). Commit 13db4c9: mueve el archivo de
+     prisma/seeds/prod/planes-cuentas/comercial.ts a
+     src/cuentas/adapters/seed/comercial.ts para que nest build emita dist/main.js
+     en lugar de dist/src/main.js. El adapter prisma-plan-cuentas-seeder.adapter.ts
+     actualiza su import en consecuencia.
+
+verify:
+  resultado: PASS_WITH_WARNINGS
+  criticos: []
+  warnings:
+    - "E-MT-03 (org GRANJA -> 403 en /api/plan-cuentas): cubierto en integration spec pero no existe escenario E2E explícito."
+    - "E-ATOM-01 (fallo seeder -> rollback): cubierto en unit spec con mock TX pero no en E2E."
+    - "E-CONT-04 (8 tipos-doc sembrados al alta CONTABILIDAD): cubierto en integration spec de tenants.service; el E2E de POST /tenants no verifica el conteo de tipoDocumentoFisico explícitamente."
+    - "TipoDocumentoFisicoSeederPort.seedDefaultsForTenant declara tx? opcional; PlanCuentasSeederPort lo declara tx obligatorio. Deuda de alineación menor (design D3 nota final)."
+  nota: |
+    La verificación confirmó que la implementación matchea el spec reconciliado.
+    Los gaps de cobertura E2E son deuda menor abierta — los escenarios críticos
+    están cubiertos en integration specs contra Postgres real.
