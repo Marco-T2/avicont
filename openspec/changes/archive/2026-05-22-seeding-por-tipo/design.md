@@ -163,7 +163,7 @@ export class PrismaPlanCuentasSeederAdapter extends PlanCuentasSeederPort {
 ```
 
 Encadena el `porCodigoInterno` que devuelve la primera función hacia la segunda.
-El adapter es thin; vive en la capa sucia (puede importar el seed de `prisma/`).
+El adapter es thin; vive en la capa sucia (puede importar el seed de `src/cuentas/adapters/seed/`). El archivo `comercial.ts` fue relocado de `prisma/seeds/prod/planes-cuentas/` a `src/cuentas/adapters/seed/` vía PR #21 (fix Docker `dist/main.js`).
 
 ### D4: R1 (bloqueante) — firma de las funciones de siembra acepta `Prisma.TransactionClient`
 
@@ -374,7 +374,7 @@ TenantsService.create ── existsBySlug? ──(409)
 | `backend/src/cuentas/adapters/prisma-plan-cuentas-seeder.adapter.ts` | Create | envuelve `comercial.ts` |
 | `backend/src/cuentas/adapters/*.integration.spec.ts` | Create | integration spec del seeder |
 | `backend/src/cuentas/cuentas.module.ts` | Modify | provee + exporta `PLAN_CUENTAS_SEEDER_PORT` |
-| `backend/prisma/seeds/prod/planes-cuentas/comercial.ts` | Modify | firmas → `PrismaClient \| Prisma.TransactionClient` (R1) |
+| `backend/src/cuentas/adapters/seed/comercial.ts` | Modify | firmas → `PrismaClient \| Prisma.TransactionClient` (R1); relocado desde `prisma/seeds/prod/planes-cuentas/` por PR #21 (fix Docker `dist/main.js`) |
 | `backend/prisma/schema.prisma` | **Sin cambios** | flags + enum ya existen — **NO migration** |
 
 ---
