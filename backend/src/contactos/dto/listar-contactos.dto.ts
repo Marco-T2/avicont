@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 // Query params llegan como strings. Convertimos a boolean/number con
 // @Transform/@Type antes de validar. Patrón ya usado en ListarCuentasQueryDto.
@@ -10,6 +10,12 @@ const toBool = ({ value }: { value: unknown }): boolean | undefined => {
   if (value === 'true' || value === '1') return true;
   if (value === 'false' || value === '0') return false;
   return undefined;
+};
+
+// Variante que acepta además el literal 'all' para traer activos e inactivos.
+const toBoolOrAll = ({ value }: { value: unknown }): boolean | 'all' | undefined => {
+  if (value === 'all') return 'all';
+  return toBool({ value });
 };
 
 export const LIST_DEFAULT_PAGE_SIZE = 50;
@@ -43,12 +49,12 @@ export class ListarContactosQueryDto {
 
   @ApiPropertyOptional({
     description:
-      'true (default) → solo activos; false → solo inactivos. Si no viene, default true.',
+      'true (default) → solo activos; false → solo inactivos; all → activos + inactivos.',
   })
   @IsOptional()
-  @Transform(toBool)
-  @IsBoolean()
-  activo?: boolean;
+  @Transform(toBoolOrAll)
+  @IsIn([true, false, 'all'])
+  activo?: boolean | 'all';
 
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()

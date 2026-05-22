@@ -1,0 +1,58 @@
+change: contactos-ui
+project: avicont
+created: "2026-05-21"
+updated: "2026-05-21"  # artefactos enmendados: se incorpora Fase 0 backend (activo='all')
+
+phase: tasks
+status: planning_completo_pendiente_apply
+
+artifact_store: openspec
+
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+
+phases_pending:
+  - apply
+  - verify
+  - archive
+
+artifacts:
+  proposal: openspec/changes/contactos-ui/proposal.md
+  spec: openspec/changes/contactos-ui/spec.md
+  design: openspec/changes/contactos-ui/design.md
+  tasks: openspec/changes/contactos-ui/tasks.md
+
+notes: |
+  Slice FRONTEND (React/Vite) + un cambio menor de BACKEND. Espejo 1:1 de la
+  feature plan-cuentas del frontend con 5 adaptaciones: (1) sin tabs lista/árbol
+  (contacto es plano), (2) filtros segmentado Todos|Clientes|Proveedores + toggle
+  "Incluir inactivos" + buscador q debounce, (3) botón Reactivar en el drawer
+  cuando activo=false (UI nueva, sin precedente), (4) ContactoForm más simple
+  (checkboxes esCliente/esProveedor, sin selects estructurales), (5) schema zod
+  con refine cross-field esCliente||esProveedor y documento ''→null.
+
+  CAMBIO DE SCOPE (2026-05-21): se agrega Fase 0 (backend) antes del frontend.
+  El service y el repo ya soportan activo='all' internamente; solo el DTO HTTP
+  (ListarContactosQueryDto) necesita exponer el tercer valor. El toggle "Incluir
+  inactivos" manda activo='all' (unión), NO activo=false (solo inactivos).
+  Commit backend scope: 'contactos'. Commit frontend scope: 'contactos-ui'.
+
+  Testing: backend e2e = Jest + Supertest (backend/test/contactos.e2e-spec.ts,
+  extender el existente). Frontend = vitest + @testing-library/react.
+  Strict TDD: tests antes de impl, reflejado en el orden de tasks.
+
+  Decisiones de producto cerradas: Q1 (DELETE físico diferido a slice 2), Q2
+  (filtros confirmados), Q3 (activo='all' expuesto en DTO, 2026-05-21).
+
+  Riesgos clave: R1 drift tipos (response sin organizationId, con createdByUserId),
+  R2 contrato 3-state activo (true/false/'all'), R3 documento ''→null, R4 flags
+  default false, R5 Reactivar UI nueva.
+
+  Próximo paso: apply, arrancar por Fase 0 (backend: e2e + DTO).
+
+  Recordatorio CI: correr `npm run lint` desde frontend/ ANTES de pushear (el
+  job frontend del CI falla por prettier sin formatear — gotcha recurrente).
