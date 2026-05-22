@@ -1,0 +1,41 @@
+# backend/pnpm-workspace.yaml
+# Configuración single-project de pnpm 11 (NO hay campo `packages`: este repo no
+# usa workspaces reales; cada proyecto Node es independiente).
+
+# Bloqueo de lifecycle scripts (vector #1 de supply-chain). pnpm NO corre el
+# build/postinstall de una dependencia salvo que esté en `true` aquí.
+# Conservador: solo los paquetes que GENUINAMENTE necesitan compilar/generar.
+allowBuilds:
+  # --- true: necesitan correr su build/postinstall para funcionar ---
+  bcrypt: true            # binding nativo (node-gyp); sin build no hashea passwords
+  prisma: true            # CLI: descarga/posiciona los query engines
+  '@prisma/client': true  # postinstall genera el client tipado contra el schema
+  '@prisma/engines': true # posiciona los binarios de engine de Prisma
+  # --- false: postinstall de telemetría/innecesario; bloquear es seguro ---
+  '@nestjs/core': false   # postinstall solo emite telemetría de instalación
+  '@scarf/scarf': false   # paquete de analytics de terceros; cero valor funcional
+  protobufjs: false       # postinstall innecesario para nuestro uso (OTel)
+  unrs-resolver: false    # postinstall de binarios no requeridos en runtime
+
+# Cooldown de versiones nuevas (nivel de seguridad MÁXIMO). En MINUTOS.
+# 4320 = 72h. Una versión publicada hace < 72h NO se instala (la mayoría de los
+# ataques de supply-chain se detectan/yankean en las primeras horas).
+# Default de pnpm 11 es 1440 (24h); lo subimos a 72h.
+minimumReleaseAge: 4320
+# Strict: el cooldown aplica también a transitivas/peer, no solo a deps directas.
+minimumReleaseAgeStrict: true
+
+# Excepciones DOCUMENTADAS del audit gate (advisories sin fix disponible en npm).
+# El gate `pnpm audit --audit-level high` sigue bloqueando cualquier OTRA vuln
+# high/critical; estas dos son la única excepción justificada.
+auditConfig:
+  ignoreGhsas:
+    # xlsx (SheetJS) <0.19.3 — Prototype Pollution. SheetJS movió las versiones
+    # patcheadas a su registro comercial; en npm la última sigue siendo 0.18.5
+    # (sin fix). `xlsx` está declarado pero NO se importa en src/ ni test/
+    # (verificado) → riesgo de explotación en runtime = 0. Revisar: remover la
+    # dep o migrar a una alternativa libre (p. ej. exceljs).
+    - GHSA-4r6h-8v6p-xvw6
+    # xlsx (SheetJS) <0.20.2 — ReDoS. Mismo paquete, mismo vector, misma
+    # situación: sin fix en npm, sin uso en runtime.
+    - GHSA-5pgg-2g8v-p4x9
