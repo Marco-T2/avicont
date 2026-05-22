@@ -362,7 +362,7 @@ model ImpersonationAction {
 // =====================================================================
 //
 // Cuenta es el plan de cuentas DEL TENANT. El plan se siembra de forma
-// autocontenida desde prisma/seeds/prod/planes-cuentas/. Ver CLAUDE.md §4.1.
+// autocontenida desde src/cuentas/adapters/seed/. Ver CLAUDE.md §4.1.
 
 model Cuenta {
   id             String @id @default(uuid())

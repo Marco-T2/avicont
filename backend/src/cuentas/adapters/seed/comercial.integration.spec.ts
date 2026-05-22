@@ -4,7 +4,7 @@ import {
   MAPEO_CODIGO_A_CONCEPTO,
   poblarConfiguracionContableRequerida,
   sembrarPlanCuentasComercial,
-} from '../comercial';
+} from './comercial';
 
 /**
  * Guarda de regresión del seed comercial autocontenido.

@@ -25,7 +25,7 @@ import * as bcrypt from 'bcrypt';
 import {
   poblarConfiguracionContableRequerida,
   sembrarPlanCuentasComercial,
-} from '../prod/planes-cuentas/comercial';
+} from '../../../src/cuentas/adapters/seed/comercial';
 
 const DEMO_EMAIL = 'cookie-test@e2e.bo';
 const DEMO_PASSWORD = 'pass12345';

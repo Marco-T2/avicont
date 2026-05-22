@@ -4,7 +4,7 @@ import type { Prisma } from '@prisma/client';
 import {
   poblarConfiguracionContableRequerida,
   sembrarPlanCuentasComercial,
-} from '../../../prisma/seeds/prod/planes-cuentas/comercial';
+} from './seed/comercial';
 
 import { PlanCuentasSeederPort } from '../ports/plan-cuentas-seeder.port';
 

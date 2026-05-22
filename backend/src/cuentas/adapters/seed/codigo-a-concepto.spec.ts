@@ -11,7 +11,7 @@
 //   - Agregaste un mapeo sin su cuenta en la plantilla → agregar la cuenta
 //     a CUENTAS_HOJA_COMERCIAL con esRequeridaSistema: true.
 
-import { CUENTAS_HOJA_COMERCIAL, MAPEO_CODIGO_A_CONCEPTO } from '../comercial';
+import { CUENTAS_HOJA_COMERCIAL, MAPEO_CODIGO_A_CONCEPTO } from './comercial';
 
 describe('plantilla COMERCIAL: coherencia esRequeridaSistema ↔ MAPEO_CODIGO_A_CONCEPTO', () => {
   const requeridas = CUENTAS_HOJA_COMERCIAL.filter((c) => c.esRequeridaSistema === true);
