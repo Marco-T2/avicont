@@ -20,9 +20,9 @@ testing:
   test_runner:
     framework: jest
     version: "^30.2.0"
-    command: "npm test"
-    integration_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas npx jest src/"
-    e2e_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh npx jest test/ --runInBand --forceExit"
+    command: "pnpm test"
+    integration_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas pnpm exec jest src/"
+    e2e_command: "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit"
   layers:
     unit:
       available: true
@@ -38,20 +38,20 @@ testing:
       tool: supertest+nestjs-app
   coverage:
     available: true
-    command: "npx jest --coverage"
+    command: "pnpm exec jest --coverage"
     targets:
       global: 80
       domain_contable: 95
   quality:
     linter:
       tool: eslint@9
-      command: "npm run lint"
+      command: "pnpm run lint"
     type_checker:
       tool: tsc@5.9
-      command: "npx tsc --noEmit -p tsconfig.json"
+      command: "pnpm exec tsc --noEmit -p tsconfig.json"
     formatter:
       tool: prettier@3
-      command: "npm run format"
+      command: "pnpm run format"
 
 conventions:
   commit_style: conventional-commits-en

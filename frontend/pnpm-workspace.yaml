@@ -1,0 +1,14 @@
+# frontend/pnpm-workspace.yaml
+# Configuración single-project de pnpm 11 (sin campo `packages`: este repo no usa
+# workspaces reales; cada proyecto Node es independiente).
+
+# Cero install scripts en el árbol del frontend (verificado): allowBuilds vacío
+# bloquea TODO build de dependencia. Si pnpm reporta un build ignorado en
+# `pnpm install` (exit 1, ERR_PNPM_IGNORED_BUILDS), NO agregar a ciegas:
+# investigar el paquete primero.
+allowBuilds: {}
+
+# Cooldown de versiones nuevas (nivel de seguridad MÁXIMO). En MINUTOS.
+# 4320 = 72h. Igual que backend. Una versión publicada hace < 72h no se instala.
+minimumReleaseAge: 4320
+minimumReleaseAgeStrict: true

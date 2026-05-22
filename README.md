@@ -33,10 +33,10 @@ docker compose up -d postgres redis
 
 # 2. Instalar deps y arrancar el backend
 cd backend
-npm install
+pnpm install
 cp .env.example .env    # ajustar si hace falta
-npm run prisma:migrate
-npm run start:dev
+pnpm run prisma:migrate
+pnpm run start:dev
 ```
 
 El backend queda en `http://localhost:3000`, con Swagger en `/docs` y health en `/api/health`.
@@ -44,8 +44,8 @@ El backend queda en `http://localhost:3000`, con Swagger en `/docs` y health en 
 ```bash
 # 3. En otra terminal: arrancar el frontend
 cd frontend
-npm install
-npm run dev             # http://localhost:5173 (proxy /api → backend)
+pnpm install
+pnpm run dev            # http://localhost:5173 (proxy /api → backend)
 ```
 
 Para el stack completo con observabilidad (Grafana, Loki, Prometheus, Tempo, dbgate):

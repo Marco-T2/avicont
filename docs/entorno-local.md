@@ -22,7 +22,7 @@ Este documento responde tres cosas:
 ## 1. Arquitectura del stack local
 
 El sistema corre como **8 contenedores Docker** + el **frontend en local** (Vite).
-El frontend NO está dockerizado: se corre con `npm run dev` y proxea `/api` al backend.
+El frontend NO está dockerizado: se corre con `pnpm run dev` y proxea `/api` al backend.
 
 ### 1.1 Servicios y puertos
 
@@ -124,8 +124,8 @@ docker compose ps --format "table {{.Service}}\t{{.Status}}\t{{.Ports}}"
 
 # 3. En otra terminal: frontend local
 cd frontend
-npm install            # solo la primera vez
-npm run dev            # http://localhost:5173
+pnpm install           # solo la primera vez
+pnpm run dev           # http://localhost:5173
 ```
 
 Listo:
@@ -142,7 +142,7 @@ hay que sembrarlo a mano una vez:
 ```bash
 cd backend
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
-  npx ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts
+  pnpm exec ts-node prisma/seeds/prod/puct/catalogo-puct.seed.ts
 ```
 
 ### 2.2 Variante mínima: infra en Docker + backend local con hot-reload
@@ -159,13 +159,13 @@ docker compose up -d postgres redis
 
 # 2. Backend local en watch mode
 cd backend
-npm install
+pnpm install
 cp .env.example .env          # ajustar si hace falta
-npm run prisma:migrate
-npm run start:dev             # http://localhost:3000, recarga al guardar
+pnpm run prisma:migrate
+pnpm run start:dev            # http://localhost:3000, recarga al guardar
 
 # 3. Frontend local (otra terminal)
-cd frontend && npm run dev
+cd frontend && pnpm run dev
 ```
 
 ### 2.3 Bajar el stack
@@ -262,7 +262,7 @@ docker compose up -d --force-recreate grafana loki prometheus tempo
 | Componente            | ¿Hot-reload? | Para tomar cambios |
 |-----------------------|--------------|--------------------|
 | **Frontend** (Vite)   | ✅ Sí         | Automático al guardar |
-| **Backend local** (`npm run start:dev`) | ✅ Sí | Automático (`nest --watch`) |
+| **Backend local** (`pnpm run start:dev`) | ✅ Sí | Automático (`nest --watch`) |
 | **Backend en Docker** (`app`) | ❌ **No** | `docker compose up -d --build app` |
 
 ⚠️ **El contenedor `app` NO tiene hot-reload**, aunque el `docker-compose.yml`
@@ -295,7 +295,7 @@ Si vas a iterar mucho sobre el backend, usá la variante local (§2.2) en vez de
 | Arreglar Grafana sin dashboards | `docker compose up -d --force-recreate grafana` |
 | Bajar (conserva datos) | `docker compose down` |
 | Bajar y borrar datos | `docker compose down -v` ⚠️ |
-| Frontend | `cd frontend && npm run dev` |
+| Frontend | `cd frontend && pnpm run dev` |
 
 Para **Prisma (migraciones/seeds), tests (unit/integration/E2E), lint y typecheck**
 → ver **`CLAUDE.md §11`**, que es la fuente de verdad de esos comandos.
