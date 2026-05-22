@@ -151,6 +151,28 @@ minimumReleaseAgeStrict: true
 
 ## 4. Procedimiento de generación de lockfile (GOTCHA crítico — orden obligatorio)
 
+> ⚠️ **CORRECCIÓN (verificada empíricamente durante apply, 2026-05-22).** El
+> procedimiento de 3 pasos que describía esta sección estaba INVERTIDO. Generar
+> el lockfile SIN cooldown y agregarlo después produce un lockfile con versiones
+> publicadas hace <72h que `minimumReleaseAgeStrict: true` luego RECHAZA en cada
+> install ("The lockfile contains entries that the active policies reject").
+>
+> **Orden CORRECTO:**
+> 1. Escribir `pnpm-workspace.yaml` CON `minimumReleaseAge: 4320` +
+>    `minimumReleaseAgeStrict: true` desde el inicio (junto a `allowBuilds`).
+> 2. Estado TOTALMENTE limpio: `rm -rf node_modules pnpm-lock.yaml` **y** borrar
+>    `package-lock.json` (si existe, pnpm IMPORTA sus versiones, reintroduciendo
+>    las demasiado-nuevas).
+> 3. `pnpm install` → con estado limpio, el cooldown actúa como **filtro de
+>    resolución**: pnpm elige la última versión ≥72h que satisface cada rango
+>    (ej. bajó `ts-jest` 29.4.11→29.4.10). El lockfile nace consistente.
+> 4. Verificar: `pnpm install --frozen-lockfile` NO debe imprimir "reject"/"cutoff".
+>
+> El cooldown SOLO filtra en estado limpio; con `node_modules` viejo presente,
+> pnpm reusa la resolución vieja y solo advierte (exit 0 engañoso) — en CI limpio
+> el frozen install rompería. Los pasos numerados de abajo quedan como registro
+> histórico del razonamiento original.
+
 > **R4 / H7 — el gotcha más peligroso del change.** Con `minimumReleaseAge: 4320`
 > ya activo, **generar el lockfile desde cero FALLA** si alguna dependencia
 > resuelve a una versión publicada hace menos de 72h: pnpm se niega a instalarla

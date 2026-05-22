@@ -908,26 +908,26 @@ docker compose down -v
 
 ### 11.2 Prisma: migraciones y seeds
 
-> Todos los comandos Prisma se corren **desde `backend/`** (o con `-p backend/` en el caso de npm scripts). La raíz del repo es el monorepo; cada carpeta de stack es un proyecto Node independiente.
+> Todos los comandos Prisma se corren **desde `backend/`** (o con `-p backend/` en el caso de pnpm scripts). La raíz del repo es el monorepo; cada carpeta de stack es un proyecto Node independiente.
 
-`DATABASE_URL` vive en `backend/.env` (gitignored). Los scripts npm (`prisma:migrate`, `seed`) lo leen de ahí automáticamente.
+`DATABASE_URL` vive en `backend/.env` (gitignored). Los scripts pnpm (`prisma:migrate`, `seed`) lo leen de ahí automáticamente.
 
 **Cuando Claude Code corre los comandos**, NO tiene acceso al `.env` por restricciones de permisos del entorno sandboxed. Debe pasarlo **inline** en la invocación, y correr desde `backend/`:
 
 ```bash
 cd backend
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate dev --name <nombre>
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate deploy
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma migrate status
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" npx prisma generate
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" pnpm exec prisma migrate dev --name <nombre>
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" pnpm exec prisma migrate deploy
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" pnpm exec prisma migrate status
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" pnpm exec prisma generate
 ```
 
-Para el caller humano, los scripts npm funcionan sin exportar variables porque leen del `.env`:
+Para el caller humano, los scripts pnpm funcionan sin exportar variables porque leen del `.env`:
 ```bash
 cd backend
-npm run prisma:migrate          # equivale a: prisma migrate dev
-npm run prisma:generate         # genera el cliente Prisma
-npm run prisma:studio           # UI web de Prisma en localhost:5555
+pnpm run prisma:migrate          # equivale a: prisma migrate dev
+pnpm run prisma:generate         # genera el cliente Prisma
+pnpm run prisma:studio           # UI web de Prisma en localhost:5555
 ```
 
 ### 11.3 Tests
@@ -937,14 +937,14 @@ Correr **desde `backend/`**:
 **Unitarios + integración**:
 ```bash
 cd backend
-npx jest src/                                                           # solo unit (.spec.ts sin DB)
+pnpm exec jest src/                                                           # solo unit (.spec.ts sin DB)
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
-  npx jest src/                                                         # unit + integración (.integration.spec.ts vs Postgres real)
-npm test                                                                # equivalente al primero
+  pnpm exec jest src/                                                         # unit + integración (.integration.spec.ts vs Postgres real)
+pnpm test                                                                     # equivalente al primero
 ```
 
 **Convención de sufijos** (CLAUDE.md §7.3):
-- `*.spec.ts` — unit puro, sin DB ni NestJS. Corre con `npx jest src/` sin env.
+- `*.spec.ts` — unit puro, sin DB ni NestJS. Corre con `pnpm exec jest src/` sin env.
 - `*.integration.spec.ts` — integración contra infra real (Postgres). Requiere `DATABASE_URL` en el ambiente. Vive al lado del adapter que testea.
 - `*.e2e-spec.ts` — E2E full stack a través de HTTP (Supertest + AppModule). Vive en `test/`.
 
@@ -954,7 +954,7 @@ cd backend
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
 JWT_ACCESS_SECRET="test-secret" \
 JWT_REFRESH_SECRET="test-refresh" \
-npx jest test/ --runInBand --forceExit
+pnpm exec jest test/ --runInBand --forceExit
 ```
 
 `--runInBand` es necesario para que los tests E2E de distintos módulos no pisen el mismo Postgres en paralelo. `--forceExit` porque PrismaClient deja handles que Jest no detecta (patrón consistente con el resto de los E2E del proyecto).
@@ -965,18 +965,18 @@ Correr **desde `backend/`**:
 
 ```bash
 cd backend
-npx tsc --noEmit -p tsconfig.json    # typecheck
-npm run lint                         # eslint src/
-npx eslint <path> --fix              # auto-fix
-npm run format                       # prettier sobre src/ y test/
+pnpm exec tsc --noEmit -p tsconfig.json    # typecheck
+pnpm run lint                              # eslint src/
+pnpm exec eslint <path> --fix              # auto-fix
+pnpm run format                            # prettier sobre src/ y test/
 ```
 
 ### 11.5 Checklist antes de arrancar a codear desde cero
 
 1. Desde la raíz del repo: `docker compose up -d postgres redis` (mínimo viable)
 2. Si es la primera vez, desde `backend/`:
-   `DATABASE_URL=... npx prisma migrate deploy`
-3. Desde `backend/`: `npm run start:dev` para el backend en watch mode
+   `DATABASE_URL=... pnpm exec prisma migrate deploy`
+3. Desde `backend/`: `pnpm run start:dev` para el backend en watch mode
 4. Abrir http://localhost:3000/api/docs para el Swagger
 
 Para agregar observabilidad al dev, desde la raíz: `docker compose up -d` (todo el stack), entrar a Grafana http://localhost:3001.
@@ -998,7 +998,7 @@ Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
 2. `grep -E "^DROP (INDEX|EXTENSION|TYPE)" migration.sql`.
 3. Para cada match, verificar si el objeto está en la lista de objetos raw SQL legítimos (abajo). Si lo está, **borrar la línea `DROP …`** y dejar un comentario corto explicando por qué (referenciar la migration de origen).
 4. Si el match es legítimo (un objeto que de verdad debe borrarse), dejarlo.
-5. Aplicar con `DATABASE_URL=... npx prisma migrate dev` (o `migrate deploy` si la migration ya fue editada y solo querés aplicar pending sin re-detección de drift).
+5. Aplicar con `DATABASE_URL=... pnpm exec prisma migrate dev` (o `migrate deploy` si la migration ya fue editada y solo querés aplicar pending sin re-detección de drift).
 6. Verificar post-apply que los objetos siguen presentes:
    `docker compose exec postgres psql -U postgres -d saas -c "\d <tabla>"`
    o
