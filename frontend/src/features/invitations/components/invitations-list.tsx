@@ -21,10 +21,12 @@ interface InvitationsListProps {
 }
 
 function formatFecha(iso: string): string {
+  // CLAUDE.md §4.6: timestamps storage en UTC, presentación en America/La_Paz.
   return new Date(iso).toLocaleDateString('es-BO', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'America/La_Paz',
   });
 }
 
