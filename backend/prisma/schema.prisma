@@ -119,8 +119,8 @@ model User {
   displayName     String?
   isEmailVerified Boolean   @default(false)
   isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   memberships             Membership[]
   refreshTokens           RefreshToken[]
@@ -155,8 +155,8 @@ model Organization {
   // del PUCT). Editable. Invariante: tipoEmpresaPrincipal ∈ tiposEmpresaActivos.
   tiposEmpresaActivos TipoEmpresa[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   memberships         Membership[]
   customRoles         CustomRole[]
@@ -190,9 +190,9 @@ model Membership {
   systemRole   SystemRole?
   customRoleId String?
 
-  deactivatedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  deactivatedAt DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -221,8 +221,8 @@ model CustomRole {
   isSystemDefault Boolean @default(false)
   isEditable      Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
   createdById String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -248,10 +248,10 @@ model Invitation {
   // se entrega una vez en la respuesta del POST /invitations y nunca más.
   tokenHash String           @unique
   status    InvitationStatus @default(PENDING)
-  expiresAt DateTime
+  expiresAt DateTime         @db.Timestamptz(3)
 
-  createdAt        DateTime  @default(now())
-  acceptedAt       DateTime?
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  acceptedAt       DateTime? @db.Timestamptz(3)
   acceptedByUserId String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -283,11 +283,11 @@ model RefreshToken {
   familyId     String
   replacedById String?
 
-  expiresAt     DateTime
-  revokedAt     DateTime?
+  expiresAt     DateTime  @db.Timestamptz(3)
+  revokedAt     DateTime? @db.Timestamptz(3)
   revokedReason String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -308,7 +308,7 @@ model AuditLog {
   metadata       Json?
   organizationId String
   userId         String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -329,8 +329,8 @@ model ImpersonationLog {
   targetUserId   String
   organizationId String?
   reason         String
-  startedAt      DateTime  @default(now())
-  endedAt        DateTime?
+  startedAt      DateTime  @default(now()) @db.Timestamptz(3)
+  endedAt        DateTime? @db.Timestamptz(3)
 
   admin        User          @relation("ImpersonationAdmin",  fields: [adminUserId],  references: [id])
   target       User          @relation("ImpersonationTarget", fields: [targetUserId], references: [id])
@@ -349,7 +349,7 @@ model ImpersonationAction {
   action             String   // ej: "POST /api/asientos"
   resource           String?  // ej: "asiento:abc123"
   metadata           Json?
-  timestamp          DateTime @default(now())
+  timestamp          DateTime @default(now()) @db.Timestamptz(3)
 
   impersonationLog ImpersonationLog @relation(fields: [impersonationLogId], references: [id], onDelete: Cascade)
 
@@ -413,8 +413,8 @@ model Cuenta {
   // No se puede eliminar/desactivar; solo re-mapear vía OrgConfiguracionContable.
   esRequeridaSistema Boolean @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   parent       Cuenta?      @relation("CuentaJerarquia", fields: [parentId], references: [id])
@@ -477,8 +477,8 @@ model OrgConfiguracionContable {
   cajaChicaDefaultId   String? // Cuenta default para movimientos de caja chica sin especificar
   ajustePorInflacionId String? // AITB — Ajuste Integral por Inflación (poco usado hoy, algunos sectores)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -514,8 +514,8 @@ model FeatureFlag {
   enabled        Boolean  @default(false)
   organizationId String?
   metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -539,11 +539,11 @@ model GestionFiscal {
   year            Int                  // año fiscal (no necesariamente calendario)
   mesInicio       Int                  // derivado de tipoEmpresaPrincipal al crear
   status          GestionFiscalStatus @default(ABIERTA)
-  closedAt        DateTime?
+  closedAt        DateTime?            @db.Timestamptz(3)
   closedByUserId  String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   periodos        PeriodoFiscal[]
@@ -572,11 +572,11 @@ model PeriodoFiscal {
   status           PeriodoFiscalStatus @default(ABIERTO)
   esDefinitivo     Boolean             @default(false)
 
-  closedAt         DateTime?
+  closedAt         DateTime?           @db.Timestamptz(3)
   closedByUserId   String?
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
 
   organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   gestion          GestionFiscal            @relation(fields: [gestionId], references: [id], onDelete: Cascade)
@@ -600,10 +600,10 @@ enum PeriodoFiscalStatus {
 model PeriodoFiscalReopening {
   id                 String   @id @default(uuid())
   periodoId          String
-  reopenedAt         DateTime @default(now())
+  reopenedAt         DateTime @default(now()) @db.Timestamptz(3)
   reopenedByUserId   String
   motivo             String   // mínimo 20 caracteres, validado en el servicio
-  reclosedAt         DateTime?
+  reclosedAt         DateTime? @db.Timestamptz(3)
   reclosedByUserId   String?
 
   periodo                PeriodoFiscal          @relation(fields: [periodoId], references: [id], onDelete: Cascade)
@@ -684,13 +684,13 @@ model Comprobante {
   // implícita (`reversion`) gracias a @unique([anulaAId]).
   // Metadatos de la anulación viven en el original.
   anulaAId         String?          // solo en la reversión; NULL en el original
-  anuladoEn        DateTime?        // timestamptz UTC, solo en el original
+  anuladoEn        DateTime?        @db.Timestamptz(3) // solo en el original
   anuladoPorUserId String?          // solo en el original
   motivoAnulacion  String?          // solo en el original
 
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   createdByUserId String
-  updatedAt       DateTime  @updatedAt
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
   organization   Organization           @relation(fields: [organizationId], references: [id],  onDelete: Cascade)
   periodoFiscal  PeriodoFiscal          @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
@@ -745,8 +745,8 @@ model LineaComprobante {
 
   glosaLinea      String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   comprobante     Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
   cuenta          Cuenta      @relation(fields: [cuentaId],      references: [id], onDelete: Restrict)
@@ -770,7 +770,7 @@ model SecuenciaComprobante {
   month          Int              // 1-12
   ultimoNumero   Int              @default(0)
 
-  updatedAt      DateTime         @updatedAt
+  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
 
   @@id([organizationId, tipo, year, month])
   @@map("secuencias_comprobante")
@@ -788,7 +788,7 @@ model ComprobanteAuditoria {
   diff                 Json                       // {antes, despues, campos: []}
   fueDuranteReapertura Boolean                    @default(false)
   reaperturaId         String?                    // FK a PeriodoFiscalReopening
-  timestamp            DateTime                   @default(now())  // timestamptz UTC
+  timestamp            DateTime                   @default(now()) @db.Timestamptz(3)
 
   comprobante  Comprobante             @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
   reapertura   PeriodoFiscalReopening? @relation(fields: [reaperturaId],  references: [id], onDelete: SetNull)
@@ -829,9 +829,9 @@ model Contacto {
 
   activo          Boolean  @default(true)
 
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
   createdByUserId String
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lineasComprobante LineaComprobante[]
@@ -878,10 +878,10 @@ model TipoDocumentoFisico {
   // aplica (no wildcard). El service valida al asociar.
   tiposComprobanteAplicables TipoComprobante[]
 
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
   // Nullable porque el seed corre sin user context (lo crea el sistema).
   createdByUserId String?
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   documentos   DocumentoFisico[]
@@ -923,9 +923,9 @@ model DocumentoFisico {
   // recibos sin contacto puedan registrarse.
   contactoId     String?
 
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
   createdByUserId String
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   organization  Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Restrict: no se puede eliminar un TipoDocumentoFisico si tiene
@@ -969,7 +969,7 @@ model ComprobanteDocumentoFisico {
   // índice. Riesgo R1 documentado en design.md.
   comprobanteEstado EstadoComprobante
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // CASCADE desde Comprobante: si el comprobante se elimina (BORRADOR

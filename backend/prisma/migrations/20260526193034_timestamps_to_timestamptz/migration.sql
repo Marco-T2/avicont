@@ -1,0 +1,96 @@
+-- NOTA: Prisma regeneró DROP INDEX para los GIN trigram de contactos por el drift
+-- documentado en CLAUDE.md §11.6 (índices raw SQL no expresables en schema.prisma).
+-- Los DROP se removieron a mano. Objetos creados en 20260424020927_fase_1_4_contactos.
+
+-- AlterTable
+ALTER TABLE "RefreshToken" ALTER COLUMN "expiresAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "revokedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "audit_logs" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "comprobante_documento_fisico" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "comprobantes" ALTER COLUMN "anuladoEn" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "comprobantes_auditoria" ALTER COLUMN "timestamp" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "contactos" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "cuentas" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "custom_roles" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "documentos_fisicos" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "feature_flags" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "gestiones_fiscales" ALTER COLUMN "closedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "impersonation_actions" ALTER COLUMN "timestamp" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "impersonation_logs" ALTER COLUMN "startedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "endedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "invitations" ALTER COLUMN "expiresAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "acceptedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "lineas_comprobante" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "memberships" ALTER COLUMN "deactivatedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "org_configuracion_contable" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "organizations" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "periodo_fiscal_reopenings" ALTER COLUMN "reopenedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "reclosedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "periodos_fiscales" ALTER COLUMN "closedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "secuencias_comprobante" ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "tipos_documento_fisico" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "updatedAt" SET DATA TYPE TIMESTAMPTZ(3);
