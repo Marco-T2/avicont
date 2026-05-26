@@ -431,3 +431,126 @@ export interface UpdateFeatureFlagOverrideRequest {
   enabled?: boolean;
   metadata?: Record<string, unknown>;
 }
+
+// ============================================================
+// Gestiones y períodos fiscales (Fase 1.2 backend)
+// Espejo de backend/src/periodos-fiscales/dto/*.ts.
+// ============================================================
+
+// Determina el mes de inicio del año fiscal (Ley 843 art. 46).
+// Inmutable una vez que existe ≥1 GestionFiscal para el tenant.
+export const TipoEmpresa = {
+  COMERCIAL: 'COMERCIAL',
+  SERVICIOS: 'SERVICIOS',
+  TRANSPORTE: 'TRANSPORTE',
+  INDUSTRIAL: 'INDUSTRIAL',
+  CONSTRUCCION: 'CONSTRUCCION',
+  PETROLERA: 'PETROLERA',
+  AGROPECUARIA: 'AGROPECUARIA',
+  MINERA: 'MINERA',
+} as const;
+export type TipoEmpresa = (typeof TipoEmpresa)[keyof typeof TipoEmpresa];
+
+export const GestionFiscalStatus = {
+  ABIERTA: 'ABIERTA',
+  CERRADA: 'CERRADA',
+} as const;
+export type GestionFiscalStatus =
+  (typeof GestionFiscalStatus)[keyof typeof GestionFiscalStatus];
+
+export const PeriodoFiscalStatus = {
+  ABIERTO: 'ABIERTO',
+  CERRADO: 'CERRADO',
+} as const;
+export type PeriodoFiscalStatus =
+  (typeof PeriodoFiscalStatus)[keyof typeof PeriodoFiscalStatus];
+
+// Gestión sin períodos incluidos (GET /api/gestiones devuelve este shape).
+export interface Gestion {
+  id: string;
+  year: number;
+  mesInicio: number;
+  status: GestionFiscalStatus;
+  closedAt: string | null;
+  closedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Periodo {
+  id: string;
+  gestionId: string;
+  year: number;
+  month: number;
+  ordenEnGestion: number;
+  status: PeriodoFiscalStatus;
+  esDefinitivo: boolean;
+  closedAt: string | null;
+  closedByUserId: string | null;
+  // Derivados puros del (year, month) — el backend los proyecta en la response.
+  fechaInicio: string; // YYYY-MM-DD
+  fechaFin: string; // YYYY-MM-DD
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Response de POST /api/gestiones y GET /api/gestiones/:id (incluye los 12).
+export interface GestionConPeriodos extends Gestion {
+  fechaInicio: string; // YYYY-MM-DD (primer día de mesInicio)
+  fechaFin: string; // YYYY-MM-DD (último día del mesCierre)
+  tipoEmpresaPrincipal: TipoEmpresa;
+  mesCierre: number;
+  periodos: Periodo[];
+}
+
+// GET /api/periodos/:id/resumen-precierre.
+export interface ComprobantesCounters {
+  contabilizados: number;
+  borradores: number;
+  anulados: number;
+}
+
+export interface BorradorPendiente {
+  id: string;
+  numero: string | null;
+  fechaContable: string; // YYYY-MM-DD
+  glosa: string;
+  total: string; // Decimal serializado como string (CLAUDE.md §4.5)
+}
+
+export interface ResumenPrecierre {
+  periodo: Pick<
+    Periodo,
+    'id' | 'year' | 'month' | 'ordenEnGestion' | 'fechaInicio' | 'fechaFin'
+  >;
+  comprobantes: ComprobantesCounters;
+  totalesBob: {
+    totalDebe: string;
+    totalHaber: string;
+    balanceado: boolean;
+  };
+  borradoresPendientes: BorradorPendiente[];
+  puedeCerrar: boolean;
+  razonNoPuedeCerrar?: string;
+}
+
+// Query params de GET /api/gestiones.
+export interface ListarGestionesParams {
+  status?: GestionFiscalStatus;
+}
+
+// Query params de GET /api/periodos.
+export interface ListarPeriodosParams {
+  gestionId?: string;
+  status?: PeriodoFiscalStatus;
+}
+
+// Body de POST /api/gestiones — el mesInicio se deriva del tenant.
+export interface CrearGestionRequest {
+  year: number;
+}
+
+// Body de POST /api/periodos/:id/reabrir.
+export interface ReabrirPeriodoRequest {
+  motivo: string;
+}

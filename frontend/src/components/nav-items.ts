@@ -1,4 +1,13 @@
-import { BookOpen, Contact, Home, Settings, Shield, ToggleRight, Users } from 'lucide-react';
+import {
+  BookOpen,
+  CalendarRange,
+  Contact,
+  Home,
+  Settings,
+  Shield,
+  ToggleRight,
+  Users,
+} from 'lucide-react';
 
 export interface NavItem {
   to: string;
@@ -14,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Panel', icon: Home },
   { to: '/plan-cuentas', label: 'Plan de cuentas', icon: BookOpen },
   { to: '/contactos', label: 'Contactos', icon: Contact },
+  { to: '/periodos-fiscales', label: 'Períodos fiscales', icon: CalendarRange },
   { to: '/settings/members', label: 'Miembros', icon: Users },
   { to: '/settings/roles', label: 'Roles', icon: Shield },
   { to: '/settings/features', label: 'Módulos activos', icon: ToggleRight },

@@ -8,6 +8,7 @@ import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
+import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <DashboardPage /> },
           { path: '/plan-cuentas', element: <PlanCuentasPage /> },
           { path: '/contactos', element: <ContactosPage /> },
+          { path: '/periodos-fiscales', element: <PeriodosFiscalesPage /> },
           { path: '/settings/members', element: <MembersPage /> },
           { path: '/settings/roles', element: <RolesPage /> },
           { path: '/settings/features', element: <FeaturesPage /> },
