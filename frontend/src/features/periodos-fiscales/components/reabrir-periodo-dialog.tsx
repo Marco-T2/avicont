@@ -91,7 +91,11 @@ export function ReabrirPeriodoDialog({
             <Textarea
               id="reabrir-motivo"
               placeholder="Describí el motivo de la reapertura (mínimo 20 caracteres)"
-              className="text-base md:text-sm min-h-[80px]"
+              // `[field-sizing:fixed]` corta el auto-grow horizontal del primitivo
+              // shadcn (default field-sizing-content) — sin esto, una línea
+              // larga sin espacios empuja el textarea fuera del dialog.
+              // `resize-y` deja al user agrandar verticalmente pero no horizontalmente.
+              className="text-base md:text-sm min-h-[80px] w-full max-w-full resize-y [field-sizing:fixed]"
               aria-invalid={errors.motivo !== undefined}
               {...register('motivo')}
             />
