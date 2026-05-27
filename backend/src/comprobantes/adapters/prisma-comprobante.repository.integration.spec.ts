@@ -59,7 +59,7 @@ type AuditEntry = {
 };
 
 // ============================================================
-// Describe: anular() — task 6.1 (RED until task 6.2 GREEN)
+// Describe: anular() — task 6.1 / 6.2 GREEN
 // ============================================================
 describe('PrismaComprobanteRepository — anular() (integration vs Postgres)', () => {
   const SLUG = 'org-test-repo-anular';
@@ -133,8 +133,7 @@ describe('PrismaComprobanteRepository — anular() (integration vs Postgres)', (
     const original = await crearContabilizado('D2604-000001');
     const fechaAnulacion = new Date(Date.UTC(2026, 3, 22, 14, 30, 0));
 
-    // repo.anular no existe aún — este test está intencionalmente RED (task 6.1).
-    const result = await (repo as any).anular(tenantId, original.id, {
+    const result = await repo.anular(tenantId, original.id, {
       fechaAnulacion,
       motivoAnulacion: 'Error en imputación al cliente original',
       anuladoPorUserId: 'user-auditor',
@@ -150,7 +149,7 @@ describe('PrismaComprobanteRepository — anular() (integration vs Postgres)', (
   it('UPDATE: preserva estado=CONTABILIZADO y numero (REQ-COMP-ANULAR-05, §4.9)', async () => {
     const original = await crearContabilizado('D2604-000002');
 
-    const result = await (repo as any).anular(tenantId, original.id, {
+    const result = await repo.anular(tenantId, original.id, {
       fechaAnulacion: new Date(),
       motivoAnulacion: 'Preservación de número correlativo',
       anuladoPorUserId: 'user-test',
@@ -166,7 +165,7 @@ describe('PrismaComprobanteRepository — anular() (integration vs Postgres)', (
     const original = await crearContabilizado('D2604-000003');
 
     // Sin AuditedTransactionRunner, usuario_id queda NULL — aceptable (REQ-COMP-AUDIT-03).
-    await (repo as any).anular(tenantId, original.id, {
+    await repo.anular(tenantId, original.id, {
       fechaAnulacion: new Date(),
       motivoAnulacion: 'Prueba de audit entry en comprobantes_audit',
       anuladoPorUserId: 'user-test',
@@ -201,7 +200,7 @@ describe('PrismaComprobanteRepository — anular() (integration vs Postgres)', (
 });
 
 // ============================================================
-// Describe: listarAuditoria() — task 6.3 (RED until 6.3 GREEN)
+// Describe: listarAuditoria() — task 6.3 GREEN
 // ============================================================
 describe('PrismaComprobanteRepository — listarAuditoria() (integration vs Postgres)', () => {
   const SLUG = 'org-test-repo-audit';
