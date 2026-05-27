@@ -11,6 +11,10 @@ import { AuditedTransactionRunner } from './audited-transaction.runner';
  *   - invoca fn(tx) con el cliente transaccional.
  *
  * Sin DB — PrismaService.$transaction y tx.$executeRaw están mockeados.
+ *
+ * Nota de implementación: $executeRaw se invoca como tagged template literal.
+ * Jest captura los argumentos como (TemplateStringsArray, ...values).
+ * El mock verifica el contenido del TemplateStringsArray[0] y los valores interpolados.
  */
 describe('AuditedTransactionRunner', () => {
   let mockTx: {
@@ -36,6 +40,18 @@ describe('AuditedTransactionRunner', () => {
     runner = new AuditedTransactionRunner(mockPrismaService as never);
   });
 
+  /**
+   * Helper: extrae los calls de $executeRaw en forma usable.
+   * Cada call es (TemplateStringsArray, ...interpolatedValues).
+   * TemplateStringsArray es el array de partes fijas del template.
+   */
+  function parsedCalls() {
+    return mockTx.$executeRaw.mock.calls.map((args: [TemplateStringsArray, ...unknown[]]) => ({
+      sqlParts: Array.from(args[0]).join('') as string,
+      values: args.slice(1) as unknown[],
+    }));
+  }
+
   describe('validación de userId', () => {
     it('lanza error si userId es un string vacío', async () => {
       await expect(runner.run({ userId: '' }, async () => 'ok')).rejects.toThrow(
@@ -50,9 +66,14 @@ describe('AuditedTransactionRunner', () => {
     });
 
     it('no lanza error con userId válido', async () => {
-      await expect(
-        runner.run({ userId: 'user-123' }, async () => 'resultado'),
-      ).resolves.toBe('resultado');
+      await expect(runner.run({ userId: 'user-123' }, async () => 'resultado')).resolves.toBe(
+        'resultado',
+      );
+    });
+
+    it('no abre la transacción si userId es vacío', async () => {
+      await runner.run({ userId: '' }, async () => 'ok').catch(() => undefined);
+      expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -64,56 +85,49 @@ describe('AuditedTransactionRunner', () => {
   });
 
   describe('set_config de session vars', () => {
+    it('llama a $executeRaw exactamente 4 veces (una por session var)', async () => {
+      await runner.run({ userId: 'user-xyz' }, async () => undefined);
+      expect(mockTx.$executeRaw).toHaveBeenCalledTimes(4);
+    });
+
     it('setea app.audit_user_id con el userId provisto como primer call', async () => {
       await runner.run({ userId: 'user-xyz' }, async () => undefined);
 
-      // Primer llamado a $executeRaw debe ser set_config('app.audit_user_id', userId, true)
-      const firstCall = mockTx.$executeRaw.mock.calls[0];
-      // $executeRaw recibe el tagged template como Prisma.Sql — verificar strings y values
-      const sql = firstCall[0] as Prisma.Sql;
-      expect(sql.strings.join('?')).toContain('set_config');
-      expect(sql.strings.join('?')).toContain('app.audit_user_id');
-      expect(sql.values).toContain('user-xyz');
+      // Primer call corresponde a audit_user_id
+      const calls = parsedCalls();
+      const firstCall = calls[0];
+      expect(firstCall).toBeDefined();
+      expect(firstCall!.sqlParts).toContain('set_config');
+      expect(firstCall!.sqlParts).toContain('app.audit_user_id');
+      expect(firstCall!.values).toContain('user-xyz');
     });
 
     it('setea app.audit_motivo como string vacío si no se pasa motivo', async () => {
       await runner.run({ userId: 'user-xyz' }, async () => undefined);
 
-      const calls = mockTx.$executeRaw.mock.calls.map(([sql]: [Prisma.Sql]) => ({
-        sql: sql.strings.join(''),
-        values: sql.values,
-      }));
-
-      const motivoCall = calls.find((c) => c.sql.includes('app.audit_motivo'));
+      const calls = parsedCalls();
+      const motivoCall = calls.find((c) => c.sqlParts.includes('app.audit_motivo'));
       expect(motivoCall).toBeDefined();
       expect(motivoCall!.values).toContain('');
     });
 
     it('setea app.audit_motivo con el motivo provisto si se pasa', async () => {
-      await runner.run({ userId: 'user-xyz', motivo: 'Corrección de glosa' }, async () => undefined);
+      await runner.run(
+        { userId: 'user-xyz', motivo: 'Corrección de glosa' },
+        async () => undefined,
+      );
 
-      const calls = mockTx.$executeRaw.mock.calls.map(([sql]: [Prisma.Sql]) => ({
-        sql: sql.strings.join(''),
-        values: sql.values,
-      }));
-
-      const motivoCall = calls.find((c) => c.sql.includes('app.audit_motivo'));
+      const calls = parsedCalls();
+      const motivoCall = calls.find((c) => c.sqlParts.includes('app.audit_motivo'));
       expect(motivoCall).toBeDefined();
       expect(motivoCall!.values).toContain('Corrección de glosa');
     });
 
     it('setea app.audit_during_reopening a "true" si se pasa reaperturaId', async () => {
-      await runner.run(
-        { userId: 'user-xyz', reaperturaId: 'reap-001' },
-        async () => undefined,
-      );
+      await runner.run({ userId: 'user-xyz', reaperturaId: 'reap-001' }, async () => undefined);
 
-      const calls = mockTx.$executeRaw.mock.calls.map(([sql]: [Prisma.Sql]) => ({
-        sql: sql.strings.join(''),
-        values: sql.values,
-      }));
-
-      const reopeningCall = calls.find((c) => c.sql.includes('app.audit_during_reopening'));
+      const calls = parsedCalls();
+      const reopeningCall = calls.find((c) => c.sqlParts.includes('app.audit_during_reopening'));
       expect(reopeningCall).toBeDefined();
       expect(reopeningCall!.values).toContain('true');
     });
@@ -121,19 +135,28 @@ describe('AuditedTransactionRunner', () => {
     it('setea app.audit_during_reopening a "false" si no se pasa reaperturaId', async () => {
       await runner.run({ userId: 'user-xyz' }, async () => undefined);
 
-      const calls = mockTx.$executeRaw.mock.calls.map(([sql]: [Prisma.Sql]) => ({
-        sql: sql.strings.join(''),
-        values: sql.values,
-      }));
-
-      const reopeningCall = calls.find((c) => c.sql.includes('app.audit_during_reopening'));
+      const calls = parsedCalls();
+      const reopeningCall = calls.find((c) => c.sqlParts.includes('app.audit_during_reopening'));
       expect(reopeningCall).toBeDefined();
       expect(reopeningCall!.values).toContain('false');
     });
 
-    it('llama a $executeRaw exactamente 4 veces (una por session var)', async () => {
+    it('setea app.audit_reapertura_id con el reaperturaId cuando se pasa', async () => {
+      await runner.run({ userId: 'user-xyz', reaperturaId: 'reap-abc' }, async () => undefined);
+
+      const calls = parsedCalls();
+      const reapCall = calls.find((c) => c.sqlParts.includes('app.audit_reapertura_id'));
+      expect(reapCall).toBeDefined();
+      expect(reapCall!.values).toContain('reap-abc');
+    });
+
+    it('setea app.audit_reapertura_id vacío si no se pasa reaperturaId', async () => {
       await runner.run({ userId: 'user-xyz' }, async () => undefined);
-      expect(mockTx.$executeRaw).toHaveBeenCalledTimes(4);
+
+      const calls = parsedCalls();
+      const reapCall = calls.find((c) => c.sqlParts.includes('app.audit_reapertura_id'));
+      expect(reapCall).toBeDefined();
+      expect(reapCall!.values).toContain('');
     });
   });
 
@@ -141,7 +164,10 @@ describe('AuditedTransactionRunner', () => {
     it('invoca fn con el cliente de transacción Prisma', async () => {
       const fn = jest.fn().mockResolvedValue('resultado');
 
-      await runner.run({ userId: 'user-abc' }, fn);
+      await runner.run(
+        { userId: 'user-abc' },
+        fn as (tx: Prisma.TransactionClient) => Promise<string>,
+      );
 
       expect(fn).toHaveBeenCalledTimes(1);
       // fn recibe el tx client (mockTx en este contexto)
@@ -159,6 +185,23 @@ describe('AuditedTransactionRunner', () => {
           throw new Error('error desde fn');
         }),
       ).rejects.toThrow('error desde fn');
+    });
+
+    it('invoca fn después de setear las 4 session vars', async () => {
+      const order: string[] = [];
+
+      mockTx.$executeRaw.mockImplementation(() => {
+        order.push('executeRaw');
+        return Promise.resolve(1);
+      });
+
+      await runner.run({ userId: 'user-abc' }, async () => {
+        order.push('fn');
+        return 'done';
+      });
+
+      // Las 4 invocaciones de executeRaw deben preceder a fn
+      expect(order).toEqual(['executeRaw', 'executeRaw', 'executeRaw', 'executeRaw', 'fn']);
     });
   });
 });
