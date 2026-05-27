@@ -1,10 +1,6 @@
 // Puerto del repositorio del módulo `comprobantes`. Expone la superficie
 // de persistencia (write + read) para que el servicio nunca toque Prisma
 // directamente (Anti-31 CLAUDE.md §8.1).
-//
-// TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar métodos
-// crearReversion, marcarAnulado, registrarAuditoria (reemplazados por triggers
-// Postgres en comprobantes_audit) y agregar anular() / reemplazarComprobante().
 
 import type {
   Comprobante,
@@ -15,7 +11,7 @@ import type {
   TipoComprobante,
 } from '@prisma/client';
 
-import type { ComprobantesAuditRow } from '../dto/auditoria-response.dto';
+import type { ComprobanteAuditEntry } from './comprobante-audit.types';
 
 export const COMPROBANTE_REPOSITORY_PORT = Symbol('COMPROBANTE_REPOSITORY_PORT');
 
@@ -46,7 +42,7 @@ export interface ComprobanteCreateBorradorData {
   lineas: LineaPersistData[];
 }
 
-export interface ComprobanteReemplazarBorradorData {
+export interface ComprobanteReemplazarComprobanteData {
   tipo: TipoComprobante;
   fechaContable: Date;
   periodoFiscalId: string;
@@ -55,24 +51,14 @@ export interface ComprobanteReemplazarBorradorData {
   lineas: LineaPersistData[];
 }
 
-export interface ReversionCreateData {
-  tipo: TipoComprobante; // siempre AJUSTE por ahora
-  numero: string; // asignado por el caller vía SecuenciaComprobantePort
-  fechaContable: Date;
-  periodoFiscalId: string;
-  glosa: string;
-  monedaPrincipal: Moneda;
-  totalDebitoBob: Prisma.Decimal; // igual al totalCreditoBob del original
-  totalCreditoBob: Prisma.Decimal; // igual al totalDebitoBob del original
-  createdByUserId: string;
-  anulaAId: string; // FK 1:1 al comprobante que se anula
-  lineas: LineaPersistData[]; // débitos y créditos invertidos vs el original
-}
-
-export interface AnulacionMetadata {
-  anuladoEn: Date;
-  anuladoPorUserId: string;
+/**
+ * Datos de anulación in-place (flag-based, §4.7 CLAUDE.md).
+ * El UPDATE activa el flag anulado=true y persiste los 3 metadatos.
+ */
+export interface AnularData {
+  fechaAnulacion: Date;
   motivoAnulacion: string;
+  anuladoPorUserId: string;
 }
 
 export interface ListarFiltros {
@@ -84,18 +70,6 @@ export interface ListarFiltros {
   q?: string;
   /** Cuando false (default), el repo filtra WHERE anulado = false. REQ-COMP-REPORTES-01. */
   incluirAnulados?: boolean;
-}
-
-export interface AuditoriaCreateData {
-  comprobanteId: string;
-  userId: string;
-  // TODO sdd:comprobantes-anulacion-refactor task 6.x — se elimina este campo cuando
-  // se elimine registrarAuditoria del port; por ahora usa string libre en lugar de
-  // AccionAuditoriaComprobante (enum que se eliminará con la migration 2.5).
-  accion: string;
-  diff: Prisma.InputJsonValue;
-  fueDuranteReapertura?: boolean;
-  reaperturaId?: string | null;
 }
 
 export type ComprobanteConLineas = Comprobante & { lineas: LineaComprobante[] };
@@ -123,16 +97,16 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<ComprobanteConLineas | null>;
 
   /**
-   * Reemplaza completamente los campos editables y las líneas de un comprobante
-   * en BORRADOR. El caller debe haber validado que el estado sea BORRADOR; el
-   * repo no vuelve a chequearlo. Elimina todas las líneas existentes y crea
-   * las nuevas en la misma operación (deleteMany + create dentro de
-   * `lineas` nested). Postgres preserva atomicidad por TX de Prisma.
+   * Reemplaza completamente los campos editables y las líneas de un comprobante.
+   * Sirve tanto para borradores como para edición de contabilizados (ambos usan
+   * el mismo patrón deleteMany + create atómico).
+   * El caller debe haber validado el estado antes de invocar; el repo solo persiste.
+   * Elimina todas las líneas existentes y crea las nuevas dentro de la misma TX.
    */
-  abstract reemplazarBorrador(
+  abstract reemplazarComprobante(
     tenantId: string,
     id: string,
-    data: ComprobanteReemplazarBorradorData,
+    data: ComprobanteReemplazarComprobanteData,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas>;
 
@@ -154,26 +128,16 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<ComprobanteConLineas>;
 
   /**
-   * Crea un comprobante directamente en estado CONTABILIZADO con anulaAId
-   * apuntando al original. El caller ya asignó el número y calculó los
-   * totales invertidos. Se usa SOLO para el flujo de anulación con
-   * reversión — no es una ruta de contabilización manual.
+   * Marca un comprobante CONTABILIZADO como anulado via flag in-place (§4.7 CLAUDE.md).
+   * Setea anulado=true, fechaAnulacion, motivoAnulacion, anuladoPorUserId.
+   * El estado permanece CONTABILIZADO — el flag es ortogonal al estado.
+   * NO genera contra-asiento ni consume número correlativo.
+   * La auditoría la captura el trigger trg_comprobantes_audit.
    */
-  abstract crearReversion(
-    tenantId: string,
-    data: ReversionCreateData,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ComprobanteConLineas>;
-
-  /**
-   * Marca un comprobante CONTABILIZADO como ANULADO y persiste los metadatos
-   * de la anulación. El caller ya debe haber creado la reversión y validado
-   * que el estado actual es CONTABILIZADO.
-   */
-  abstract marcarAnulado(
+  abstract anular(
     tenantId: string,
     id: string,
-    metadata: AnulacionMetadata,
+    data: AnularData,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas>;
 
@@ -201,26 +165,14 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<{ items: ComprobanteConLineas[]; total: number }>;
 
   /**
-   * Registra una fila en ComprobanteAuditoria. Debe correr en la misma TX
-   * que el write del comprobante que audita.
-   */
-  abstract registrarAuditoria(
-    tenantId: string,
-    data: AuditoriaCreateData,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void>;
-
-  /**
    * Lista el historial de auditoría de un comprobante desde la tabla raw
    * comprobantes_audit (Postgres triggers). Scopeado al tenant. Orden
-   * cronológico ascendente. No pagina — volumen esperado bajo.
-   *
-   * TODO sdd:comprobantes-anulacion-refactor task 7.x — reescribir usando
-   * prisma.$queryRaw sobre comprobantes_audit en lugar de comprobanteAuditoria.
+   * cronológico ascendente (ts ASC, id ASC). No pagina — volumen esperado bajo.
+   * Incluye entries de comprobantes y de sus lineas_comprobante.
    */
   abstract listarAuditoria(
     tenantId: string,
     comprobanteId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<ComprobantesAuditRow[]>;
+  ): Promise<ComprobanteAuditEntry[]>;
 }

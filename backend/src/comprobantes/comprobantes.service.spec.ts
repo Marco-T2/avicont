@@ -53,13 +53,11 @@ function makeRepoMock(): MockRepo {
   return {
     crearBorrador: jest.fn(),
     findById: jest.fn(),
-    reemplazarBorrador: jest.fn(),
+    reemplazarComprobante: jest.fn(),
     contabilizar: jest.fn(),
-    crearReversion: jest.fn(),
-    marcarAnulado: jest.fn(),
+    anular: jest.fn(),
     eliminarBorrador: jest.fn(),
     listar: jest.fn(),
-    registrarAuditoria: jest.fn(),
     listarAuditoria: jest.fn(),
   };
 }
@@ -338,8 +336,7 @@ describe('ComprobantesService', () => {
         expect.any(Object),
       );
       expect(repo.crearBorrador).toHaveBeenCalledTimes(1);
-      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
-      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
     });
 
     it('rechaza fechaContable futura con FechaFuturaNoPermitidaError', async () => {
@@ -678,16 +675,17 @@ describe('ComprobantesService', () => {
         status: PeriodoFiscalStatus.ABIERTO,
       });
       cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
-      repo.reemplazarBorrador.mockResolvedValue(comprobanteFactory({ glosa: 'Glosa actualizada' }));
+      repo.reemplazarComprobante.mockResolvedValue(
+        comprobanteFactory({ glosa: 'Glosa actualizada' }),
+      );
 
       const r = await service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', {
         glosa: 'Glosa actualizada',
       });
 
       expect(r.glosa).toBe('Glosa actualizada');
-      expect(repo.reemplazarBorrador).toHaveBeenCalledTimes(1);
-      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
-      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
+      expect(repo.reemplazarComprobante).toHaveBeenCalledTimes(1);
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
     });
 
     it('rechaza actualizar un CONTABILIZADO', async () => {
@@ -699,7 +697,7 @@ describe('ComprobantesService', () => {
       await expect(
         service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', { glosa: 'x' }),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
-      expect(repo.reemplazarBorrador).not.toHaveBeenCalled();
+      expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
     });
   });
 
@@ -790,8 +788,7 @@ describe('ComprobantesService', () => {
         }),
         expect.any(Object),
       );
-      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
-      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
       expect(r.numero).toBe('D2604-000042');
       expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
     });
@@ -1104,7 +1101,7 @@ describe('ComprobantesService', () => {
         motivoAnulacion: 'Error en imputación al cliente',
         anuladoPorUserId: USER_ID,
       };
-      repo.marcarAnulado.mockResolvedValue(anulado);
+      repo.anular.mockResolvedValue(anulado);
 
       return { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia, anulado };
     }
@@ -1171,7 +1168,7 @@ describe('ComprobantesService', () => {
         id: 'reap-001',
         reopenedAt: new Date(),
       });
-      repo.marcarAnulado.mockResolvedValue({
+      repo.anular.mockResolvedValue({
         ...comp,
         anulado: true,
         fechaAnulacion: new Date(),
@@ -1248,7 +1245,7 @@ describe('ComprobantesService', () => {
         id: 'reap-001',
         reopenedAt: new Date(),
       });
-      repo.marcarAnulado.mockResolvedValue({
+      repo.anular.mockResolvedValue({
         ...comp,
         anulado: true,
         fechaAnulacion: new Date(),
@@ -1444,7 +1441,7 @@ describe('ComprobantesService', () => {
         totalDebitoBob: new Prisma.Decimal('1000.00'),
         totalCreditoBob: new Prisma.Decimal('1000.00'),
       };
-      repo.reemplazarBorrador.mockResolvedValue(editado);
+      repo.reemplazarComprobante.mockResolvedValue(editado);
 
       return { service, repo, periodos, cuentas, auditedRunner, rbac, comp, editado };
     }
@@ -1467,7 +1464,7 @@ describe('ComprobantesService', () => {
       await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dtoEditar());
 
       // El repo recibe las líneas nuevas
-      expect(repo.reemplazarBorrador).toHaveBeenCalledWith(
+      expect(repo.reemplazarComprobante).toHaveBeenCalledWith(
         TENANT_ID,
         'comp-c',
         expect.objectContaining({
@@ -1580,7 +1577,7 @@ describe('ComprobantesService', () => {
           ],
         ]),
       );
-      repo.reemplazarBorrador.mockResolvedValue({
+      repo.reemplazarComprobante.mockResolvedValue({
         ...comp,
         glosa: 'Nueva glosa',
         totalDebitoBob: new Prisma.Decimal('1000.00'),

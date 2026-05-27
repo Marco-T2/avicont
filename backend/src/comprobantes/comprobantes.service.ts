@@ -85,6 +85,7 @@ import {
 import { NumeroComprobante } from './domain/numero-comprobante';
 import {
   COMPROBANTE_REPOSITORY_PORT,
+  AnularData,
   ComprobanteConLineas,
   ComprobanteRepositoryPort,
   LineaPersistData,
@@ -231,7 +232,7 @@ export class ComprobantesService {
       const fusionado = this.fusionarConActual(actual, dto);
       const resolved = await this.resolverYValidarBorrador(tenantId, fusionado, tx);
 
-      const persist = await this.repo.reemplazarBorrador(tenantId, id, resolved, tx);
+      const persist = await this.repo.reemplazarComprobante(tenantId, id, resolved, tx);
 
       return toComprobanteResponse(persist);
     });
@@ -594,9 +595,9 @@ export class ComprobantesService {
 
         const totales = calcularTotalesBob(lineasParaValidar);
 
-        // 13) Persistir. reemplazarBorrador reemplaza campos y lineas atómicamente.
+        // 13) Persistir. reemplazarComprobante reemplaza campos y lineas atómicamente.
         // El caller ya validó estado; el repo aplica sin re-chequearlo.
-        const editado = await this.repo.reemplazarBorrador(
+        const editado = await this.repo.reemplazarComprobante(
           tenantId,
           id,
           {
@@ -701,18 +702,14 @@ export class ComprobantesService {
         // 5) CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
         await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
 
-        // 6) Persistir el flag de anulación. Usa repo.marcarAnulado cuando esté
-        // disponible (task 6.2); por ahora delega al repo existente.
-        const anulado = await this.repo.marcarAnulado(
-          tenantId,
-          id,
-          {
-            anuladoEn: this.clock.now(),
-            anuladoPorUserId: userId,
-            motivoAnulacion: motivoTrim,
-          },
-          tx,
-        );
+        // 6) Persistir el flag de anulación in-place (§4.7 CLAUDE.md).
+        // El trigger trg_comprobantes_audit captura el UPDATE en comprobantes_audit.
+        const anularData: AnularData = {
+          fechaAnulacion: this.clock.now(),
+          anuladoPorUserId: userId,
+          motivoAnulacion: motivoTrim,
+        };
+        const anulado = await this.repo.anular(tenantId, id, anularData, tx);
 
         return toComprobanteResponse(anulado);
       },

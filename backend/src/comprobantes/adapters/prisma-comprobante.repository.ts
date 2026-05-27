@@ -4,16 +4,18 @@ import { EstadoComprobante, Prisma } from '@prisma/client';
 import { PrismaService } from '@/common/prisma.service';
 
 import {
-  AnulacionMetadata,
-  AuditoriaCreateData,
+  type ComprobanteAuditEntry,
+  type ComprobanteAuditRow,
+  toComprobanteAuditEntry,
+} from '../ports/comprobante-audit.types';
+import {
+  AnularData,
   ComprobanteConLineas,
   ComprobanteCreateBorradorData,
-  ComprobanteReemplazarBorradorData,
+  ComprobanteReemplazarComprobanteData,
   ComprobanteRepositoryPort,
   ListarFiltros,
-  ReversionCreateData,
 } from '../ports/comprobante.repository.port';
-import type { ComprobantesAuditRow } from '../dto/auditoria-response.dto';
 
 const LINEAS_INCLUDE = { lineas: { orderBy: { orden: 'asc' as const } } };
 
@@ -71,17 +73,18 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     });
   }
 
-  async reemplazarBorrador(
+  /**
+   * Reemplaza completamente los campos editables y las líneas del comprobante.
+   * Sirve tanto para edición de borradores como para `editarContabilizado`:
+   * el patrón deleteMany + create es el mismo; el caller validó el estado.
+   */
+  async reemplazarComprobante(
     tenantId: string,
     id: string,
-    data: ComprobanteReemplazarBorradorData,
+    data: ComprobanteReemplazarComprobanteData,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas> {
     const client = tx ?? this.prisma;
-    // updateMany con where scopeado al tenant + estado BORRADOR: defense in
-    // depth. Si por algún motivo el servicio llamó sin chequear estado, el
-    // update afecta 0 filas y Prisma no lanza — pero la validación prior ya
-    // debería haber rechazado. Acá solo ejecutamos.
     return client.comprobante.update({
       where: { id, organizationId: tenantId },
       data: {
@@ -134,65 +137,27 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     });
   }
 
-  async crearReversion(
-    tenantId: string,
-    data: ReversionCreateData,
-    tx?: Prisma.TransactionClient,
-  ): Promise<ComprobanteConLineas> {
-    // TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar crearReversion del port.
-    // El modelo de reversión fue reemplazado por flag anulado=true (§4.7 CLAUDE.md).
-    // Este método nunca debería llamarse en producción con el nuevo flujo; queda como
-    // stub para no romper el tipo del port hasta el cleanup en task 6.x.
-    const client = tx ?? this.prisma;
-    return client.comprobante.create({
-      data: {
-        organizationId: tenantId,
-        tipo: data.tipo,
-        numero: data.numero,
-        estado: EstadoComprobante.CONTABILIZADO,
-        fechaContable: data.fechaContable,
-        periodoFiscalId: data.periodoFiscalId,
-        glosa: data.glosa,
-        monedaPrincipal: data.monedaPrincipal,
-        totalDebitoBob: data.totalDebitoBob,
-        totalCreditoBob: data.totalCreditoBob,
-        createdByUserId: data.createdByUserId,
-        lineas: {
-          create: data.lineas.map((l) => ({
-            organizationId: tenantId,
-            orden: l.orden,
-            cuentaId: l.cuentaId,
-            contactoId: l.contactoId,
-            moneda: l.moneda,
-            debito: l.debito,
-            credito: l.credito,
-            tipoCambio: l.tipoCambio,
-            debitoBob: l.debitoBob,
-            creditoBob: l.creditoBob,
-            glosaLinea: l.glosaLinea,
-          })),
-        },
-      },
-      include: LINEAS_INCLUDE,
-    });
-  }
-
-  async marcarAnulado(
+  /**
+   * UPDATE in-place del flag de anulación (§4.7 CLAUDE.md).
+   * Setea anulado=true y los 3 metadatos: fechaAnulacion, motivoAnulacion,
+   * anuladoPorUserId. El estado permanece CONTABILIZADO — el flag es
+   * ortogonal al estado. El trigger trg_comprobantes_audit captura el
+   * UPDATE y genera la entry de auditoría en comprobantes_audit.
+   */
+  async anular(
     tenantId: string,
     id: string,
-    metadata: AnulacionMetadata,
+    data: AnularData,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas> {
-    // TODO sdd:comprobantes-anulacion-refactor task 6.2 — replace with anular() that sets
-    // anulado=true flag. marcarAnulado will be removed from port and adapter.
     const client = tx ?? this.prisma;
     return client.comprobante.update({
       where: { id, organizationId: tenantId },
       data: {
         anulado: true,
-        fechaAnulacion: metadata.anuladoEn,
-        anuladoPorUserId: metadata.anuladoPorUserId,
-        motivoAnulacion: metadata.motivoAnulacion,
+        fechaAnulacion: data.fechaAnulacion,
+        motivoAnulacion: data.motivoAnulacion,
+        anuladoPorUserId: data.anuladoPorUserId,
       },
       include: LINEAS_INCLUDE,
     });
@@ -260,26 +225,37 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     return { items, total };
   }
 
-  async registrarAuditoria(
-    _tenantId: string,
-    _data: AuditoriaCreateData,
-    _tx?: Prisma.TransactionClient,
-  ): Promise<void> {
-    // TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar este método del port.
-    // La auditoría la captura el trigger trg_comprobantes_audit en la tabla raw
-    // comprobantes_audit. Ya no hay tabla comprobanteAuditoria en Prisma.
-    // El servicio todavía llama a registrarAuditoria en algunos flujos (task 5.5 los eliminará).
-  }
-
+  /**
+   * Lee el historial de auditoría de un comprobante desde la tabla raw
+   * `comprobantes_audit` (populada exclusivamente por triggers Postgres).
+   * Incluye entries de las tablas 'comprobantes' y 'lineas_comprobante',
+   * filtra por organizationId (defense in depth), ordena por ts ASC, id ASC.
+   * Mapea las columnas snake_case de Postgres → camelCase del dominio.
+   */
   async listarAuditoria(
     tenantId: string,
     comprobanteId: string,
-    _tx?: Prisma.TransactionClient,
-  ): Promise<ComprobantesAuditRow[]> {
-    // TODO sdd:comprobantes-anulacion-refactor task 7.x — reescribir con prisma.$queryRaw
-    // sobre la tabla comprobantes_audit. Por ahora devuelve vacío.
-    void tenantId;
-    void comprobanteId;
-    return [];
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteAuditEntry[]> {
+    const client = tx ?? this.prisma;
+    const rows = await client.$queryRaw<ComprobanteAuditRow[]>`
+      SELECT id::text,
+             tabla,
+             operacion,
+             comprobante_id::text,
+             organization_id::text,
+             usuario_id,
+             motivo,
+             durante_reapertura,
+             reapertura_id::text,
+             datos_antes,
+             datos_despues,
+             ts
+      FROM comprobantes_audit
+      WHERE organization_id = ${tenantId}::uuid
+        AND comprobante_id = ${comprobanteId}::uuid
+      ORDER BY ts ASC, id ASC
+    `;
+    return rows.map(toComprobanteAuditEntry);
   }
 }

@@ -12,14 +12,10 @@ import { PrismaComprobanteRepository } from './prisma-comprobante.repository';
 
 /**
  * Integration spec del flag de anulación (task 2.1 — comprobantes-anulacion-refactor).
- *
- * Este spec es intencionalmente RED antes de la migration 2.5 porque los campos
- * `anulado`, `fechaAnulacion`, `motivoAnulacion` y `anuladoPorUserId` no existen
- * aún en el schema. El spec se vuelve verde automáticamente cuando Prisma se
- * regenera tras la migración.
+ * Migrado a task 6.2: marcarAnulado() renombrado a anular() con shape AnularData.
  *
  * Valida el contrato del adapter:
- *   - marcarAnulado() persiste anulado=true, fechaAnulacion, anuladoPorUserId, motivoAnulacion.
+ *   - anular() persiste anulado=true, fechaAnulacion, anuladoPorUserId, motivoAnulacion.
  *   - El estado permanece CONTABILIZADO (el flag es ortogonal al estado).
  *   - findById() devuelve el flag anulado=true para verificación posterior al servicio.
  *   - Solo afecta el comprobante indicado; un comprobante hermano queda sin tocar.
@@ -27,7 +23,7 @@ import { PrismaComprobanteRepository } from './prisma-comprobante.repository';
  * Requiere Postgres corriendo en DATABASE_URL. Corre con:
  *   DATABASE_URL=... pnpm exec jest src/comprobantes/adapters/prisma-comprobante-anulacion
  */
-describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgres)', () => {
+describe('PrismaComprobanteRepository — anular() / flag anulado (integration vs Postgres)', () => {
   const SLUG = 'org-test-anulacion-flag';
 
   let prisma: PrismaClient;
@@ -98,10 +94,10 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
 
   it('persiste anulado=true con metadatos y preserva estado CONTABILIZADO', async () => {
     const original = await crearContabilizado('D2604-000001');
-    const anuladoEn = new Date(Date.UTC(2026, 3, 22, 14, 30, 0));
+    const fechaAnulacion = new Date(Date.UTC(2026, 3, 22, 14, 30, 0));
 
-    const result = await repo.marcarAnulado(tenantId, original.id, {
-      anuladoEn,
+    const result = await repo.anular(tenantId, original.id, {
+      fechaAnulacion,
       anuladoPorUserId: 'user-auditor',
       motivoAnulacion: 'Error en la glosa del comprobante original',
     });
@@ -109,7 +105,7 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
     // El flag anulado debe estar activado.
     expect(result.anulado).toBe(true);
     // Los metadatos de anulación deben persistirse.
-    expect(result.fechaAnulacion).toEqual(anuladoEn);
+    expect(result.fechaAnulacion).toEqual(fechaAnulacion);
     expect(result.anuladoPorUserId).toBe('user-auditor');
     expect(result.motivoAnulacion).toBe('Error en la glosa del comprobante original');
     // El estado es ortogonal al flag: permanece CONTABILIZADO (§4.7 CLAUDE.md).
@@ -121,8 +117,8 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
   it('findById() devuelve el flag anulado=true tras la anulación', async () => {
     const original = await crearContabilizado('D2604-000002');
 
-    await repo.marcarAnulado(tenantId, original.id, {
-      anuladoEn: new Date(),
+    await repo.anular(tenantId, original.id, {
+      fechaAnulacion: new Date(),
       anuladoPorUserId: 'user-test',
       motivoAnulacion: 'Motivo de prueba suficientemente largo',
     });
@@ -136,8 +132,8 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
     const target = await crearContabilizado('D2604-000003');
     const hermano = await crearContabilizado('D2604-000004');
 
-    await repo.marcarAnulado(tenantId, target.id, {
-      anuladoEn: new Date(),
+    await repo.anular(tenantId, target.id, {
+      fechaAnulacion: new Date(),
       anuladoPorUserId: 'user-test',
       motivoAnulacion: 'Anulación selectiva del target únicamente',
     });
