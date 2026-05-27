@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-05-21
-Última revisión contra core: 2026-05-21
+Última edición: 2026-05-27
+Última revisión contra core: 2026-05-27
 Owner: backend-lead
 -->
 
@@ -41,19 +41,20 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 - Un comprobante en **BORRADOR** no tiene número ni consume correlativo.
 - El número se asigna **atómicamente** al pasar a **CONTABILIZADO**, con formato `{prefijo}{YY}{MM}-{correlativo:6}`.
 - Correlativo consecutivo dentro de `(tenantId, tipo, year, month)`, sin saltos, reinicia cada mes.
-- Número asignado es **inmutable**. No cambia con ediciones ni anulaciones.
-- Comprobantes anulados conservan número — no se reutiliza.
-- Un **CONTABILIZADO** es editable si y solo si su período está **ABIERTO**.
-- `fechaContable` y `periodoFiscalId` son inmutables desde el primer CONTABILIZADO. Corrección de período se hace con **anulación + re-creación**.
-- Toda edición de un CONTABILIZADO registra auditoría con timestamp actual, usuario, diff de campos, razón opcional.
-- **Transiciones válidas**: `BORRADOR → CONTABILIZADO`, `BORRADOR → (eliminar)`, `CONTABILIZADO → ANULADO`, `CONTABILIZADO → BLOQUEADO` (automático al cerrar período).
-- **Transiciones prohibidas**: `BLOQUEADO → CONTABILIZADO`, `ANULADO → *`, `CONTABILIZADO → BORRADOR`.
+- Número asignado es **inmutable** (§4.9 CLAUDE.md). No cambia con ediciones ni anulaciones. El campo `numero` es identificador interno del sistema — no presentar al usuario como campo editable.
+- **Anulación via flag** (no via estado): `anulado BOOLEAN @default(false)` + `fechaAnulacion`, `motivoAnulacion`, `anuladoPorUserId` (§4.7 CLAUDE.md). El estado del comprobante anulado permanece **CONTABILIZADO** — el flag es ortogonal. Comprobantes anulados conservan número — no se reutiliza.
+- Un **CONTABILIZADO** es editable (cabecera + líneas) si su período está **ABIERTO** o hay una `PeriodoFiscalReopening` activa (§4.3 CLAUDE.md).
+- `fechaContable` es editable post-CONTABILIZADO siempre que el período destino también esté ABIERTO. El número correlativo permanece inmutable en todo caso.
+- Toda edición de un CONTABILIZADO registra auditoría via triggers Postgres en `comprobantes_audit` (no en código — ver §4.3 CLAUDE.md).
+- **Transiciones válidas**: `BORRADOR → CONTABILIZADO`, `BORRADOR → (eliminar)`, `CONTABILIZADO → BLOQUEADO` (automático al cerrar período).
+- **Transiciones prohibidas**: `BLOQUEADO → CONTABILIZADO`, `CONTABILIZADO → BORRADOR`, `anulado=true → editable` (un comprobante anulado no puede editarse ni anularse de nuevo).
+- **Nota**: `ANULADO` fue **eliminado** del enum `EstadoComprobante` en el refactor `comprobantes-anulacion-refactor` (2026-05-27). La anulación ahora es el flag `anulado=true`, no un estado. Cualquier referencia a `EstadoComprobante.ANULADO` en código heredado es un bug.
 
 #### Períodos y cierre
 
 - Un período es único por `(tenantId, year, month)`.
 - No se permiten comprobantes con `fechaContable` en períodos **CERRADO** o **BLOQUEADO**.
-- Para cerrar el período N, todos los comprobantes de ese período deben estar en CONTABILIZADO o ANULADO. **No se cierra con borradores pendientes.**
+- Para cerrar el período N, todos los comprobantes de ese período deben estar en CONTABILIZADO (incluidos los que tienen `anulado=true`). **No se cierra con borradores pendientes.**
 - Para cerrar el período N, el período N-1 debe estar CERRADO. **No se saltean períodos.**
 - Al cerrar, todos los CONTABILIZADO del período pasan atómicamente a BLOQUEADO.
 - Reapertura requiere permiso específico, motivo escrito y auditoría completa hasta el re-cierre.
