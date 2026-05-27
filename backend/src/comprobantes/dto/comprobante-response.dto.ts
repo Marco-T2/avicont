@@ -32,14 +32,11 @@ export class ComprobanteResponseDto {
   @ApiProperty({ example: '1000.00' }) totalDebitoBob!: string;
   @ApiProperty({ example: '1000.00' }) totalCreditoBob!: string;
 
-  @ApiPropertyOptional({ nullable: true }) anuladoEn!: string | null;
+  @ApiProperty({ description: 'true si el comprobante fue anulado (§4.7 CLAUDE.md)' })
+  anulado!: boolean;
+  @ApiPropertyOptional({ nullable: true }) fechaAnulacion!: string | null;
   @ApiPropertyOptional({ nullable: true }) anuladoPorUserId!: string | null;
   @ApiPropertyOptional({ nullable: true }) motivoAnulacion!: string | null;
-  @ApiPropertyOptional({
-    nullable: true,
-    description: 'Si este comprobante ES una reversión, el id del original que anula',
-  })
-  anulaAId!: string | null;
 
   @ApiProperty() createdByUserId!: string;
   @ApiProperty() createdAt!: string;
@@ -67,10 +64,10 @@ export function toComprobanteResponse(c: ComprobanteConLineas): ComprobanteRespo
     monedaPrincipal: c.monedaPrincipal,
     totalDebitoBob: c.totalDebitoBob.toFixed(2),
     totalCreditoBob: c.totalCreditoBob.toFixed(2),
-    anuladoEn: c.anuladoEn ? c.anuladoEn.toISOString() : null,
+    anulado: c.anulado,
+    fechaAnulacion: c.fechaAnulacion ? c.fechaAnulacion.toISOString() : null,
     anuladoPorUserId: c.anuladoPorUserId,
     motivoAnulacion: c.motivoAnulacion,
-    anulaAId: c.anulaAId,
     createdByUserId: c.createdByUserId,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),

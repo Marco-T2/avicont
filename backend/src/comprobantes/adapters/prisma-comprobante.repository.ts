@@ -13,6 +13,7 @@ import {
   ListarFiltros,
   ReversionCreateData,
 } from '../ports/comprobante.repository.port';
+import type { ComprobantesAuditRow } from '../dto/auditoria-response.dto';
 
 const LINEAS_INCLUDE = { lineas: { orderBy: { orden: 'asc' as const } } };
 
@@ -138,6 +139,10 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     data: ReversionCreateData,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas> {
+    // TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar crearReversion del port.
+    // El modelo de reversión fue reemplazado por flag anulado=true (§4.7 CLAUDE.md).
+    // Este método nunca debería llamarse en producción con el nuevo flujo; queda como
+    // stub para no romper el tipo del port hasta el cleanup en task 6.x.
     const client = tx ?? this.prisma;
     return client.comprobante.create({
       data: {
@@ -152,7 +157,6 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         totalDebitoBob: data.totalDebitoBob,
         totalCreditoBob: data.totalCreditoBob,
         createdByUserId: data.createdByUserId,
-        anulaAId: data.anulaAId,
         lineas: {
           create: data.lineas.map((l) => ({
             organizationId: tenantId,
@@ -255,29 +259,25 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
   }
 
   async registrarAuditoria(
-    tenantId: string,
-    data: AuditoriaCreateData,
-    tx?: Prisma.TransactionClient,
+    _tenantId: string,
+    _data: AuditoriaCreateData,
+    _tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    const client = tx ?? this.prisma;
-    await client.comprobanteAuditoria.create({
-      data: {
-        organizationId: tenantId,
-        comprobanteId: data.comprobanteId,
-        userId: data.userId,
-        accion: data.accion,
-        diff: data.diff,
-        fueDuranteReapertura: data.fueDuranteReapertura ?? false,
-        reaperturaId: data.reaperturaId ?? null,
-      },
-    });
+    // TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar este método del port.
+    // La auditoría la captura el trigger trg_comprobantes_audit en la tabla raw
+    // comprobantes_audit. Ya no hay tabla comprobanteAuditoria en Prisma.
+    // El servicio todavía llama a registrarAuditoria en algunos flujos (task 5.5 los eliminará).
   }
 
-  async listarAuditoria(tenantId: string, comprobanteId: string, tx?: Prisma.TransactionClient) {
-    const client = tx ?? this.prisma;
-    return client.comprobanteAuditoria.findMany({
-      where: { organizationId: tenantId, comprobanteId },
-      orderBy: { timestamp: 'asc' },
-    });
+  async listarAuditoria(
+    tenantId: string,
+    comprobanteId: string,
+    _tx?: Prisma.TransactionClient,
+  ): Promise<ComprobantesAuditRow[]> {
+    // TODO sdd:comprobantes-anulacion-refactor task 7.x — reescribir con prisma.$queryRaw
+    // sobre la tabla comprobantes_audit. Por ahora devuelve vacío.
+    void tenantId;
+    void comprobanteId;
+    return [];
   }
 }

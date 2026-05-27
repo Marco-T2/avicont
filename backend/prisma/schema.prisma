@@ -608,8 +608,7 @@ model PeriodoFiscalReopening {
   reclosedAt         DateTime? @db.Timestamptz(3)
   reclosedByUserId   String?
 
-  periodo                PeriodoFiscal          @relation(fields: [periodoId], references: [id], onDelete: Cascade)
-  auditoriasComprobante  ComprobanteAuditoria[]
+  periodo  PeriodoFiscal @relation(fields: [periodoId], references: [id], onDelete: Cascade)
 
   @@index([periodoId])
   @@map("periodo_fiscal_reopenings")
@@ -633,24 +632,13 @@ enum TipoComprobante {
 }
 
 // Estado del comprobante.
-// Transiciones válidas: BORRADOR → CONTABILIZADO → {BLOQUEADO | ANULADO}.
+// Transiciones válidas: BORRADOR → CONTABILIZADO → BLOQUEADO.
 // BLOQUEADO vuelve a CONTABILIZADO únicamente vía reapertura del período.
-// ANULADO es terminal; la anulación crea un comprobante AJUSTE de reversión.
+// La anulación NO cambia estado; se marca con anulado=true (CLAUDE.md §4.7).
 enum EstadoComprobante {
   BORRADOR
   CONTABILIZADO
   BLOQUEADO
-  ANULADO
-}
-
-// Acción registrada en ComprobanteAuditoria.
-enum AccionAuditoriaComprobante {
-  CREADO
-  EDITADO
-  CONTABILIZADO
-  ANULADO
-  CREADO_POR_REVERSION
-  EDIT_EN_REAPERTURA
 }
 
 // Comprobante = cabecera del asiento contable (Ley 843 art. 46, Código
@@ -681,14 +669,12 @@ model Comprobante {
   origenTipo      String?           // "VENTA" | "COMPRA" | "PAGO" | NULL
   origenId        String?           // id del documento origen
 
-  // Anulación / reversión — una sola FK (1:1). La reversión tiene anulaAId
-  // apuntando al original; el original accede a su reversión vía la back-ref
-  // implícita (`reversion`) gracias a @unique([anulaAId]).
-  // Metadatos de la anulación viven en el original.
-  anulaAId         String?          // solo en la reversión; NULL en el original
-  anuladoEn        DateTime?        @db.Timestamptz(3) // solo en el original
-  anuladoPorUserId String?          // solo en el original
-  motivoAnulacion  String?          // solo en el original
+  // Anulación por flag (CLAUDE.md §4.7). El comprobante CONTABILIZADO se
+  // preserva intacto; se marca con anulado=true. No se generan contra-asientos.
+  anulado          Boolean           @default(false)
+  fechaAnulacion   DateTime?         @db.Timestamptz(3)
+  anuladoPorUserId String?
+  motivoAnulacion  String?
 
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   createdByUserId String
@@ -697,12 +683,6 @@ model Comprobante {
   organization   Organization           @relation(fields: [organizationId], references: [id],  onDelete: Cascade)
   periodoFiscal  PeriodoFiscal          @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
   lineas         LineaComprobante[]
-  auditorias     ComprobanteAuditoria[]
-  // Lado con FK: este comprobante es una reversión y apunta al original.
-  anulaA         Comprobante?           @relation("ComprobanteReversion", fields: [anulaAId], references: [id])
-  // Back-ref 1:1 (gracias a @unique([anulaAId])): si este comprobante está
-  // ANULADO, su reversión es el único Comprobante cuyo anulaAId = this.id.
-  reversion      Comprobante?           @relation("ComprobanteReversion")
   documentosFisicosAsociados ComprobanteDocumentoFisico[]
 
   // Unicidad del número por (tenant, tipo). numero es NULL en BORRADOR y
@@ -713,12 +693,11 @@ model Comprobante {
   // en 1.3 → no colisiona. Campo presente para no migrar en Fase 1.5.
   @@unique([organizationId, origenTipo, origenId])
 
-  // Reversión 1:1 — una anulación genera exactamente una reversión.
-  @@unique([anulaAId])
-
   @@index([organizationId, periodoFiscalId, estado])
   @@index([organizationId, fechaContable])
   @@index([organizationId, tipo, fechaContable])
+  // Índice para consultas de comprobantes anulados por período.
+  @@index([organizationId, periodoFiscalId, anulado])
   @@map("comprobantes")
 }
 
@@ -778,27 +757,12 @@ model SecuenciaComprobante {
   @@map("secuencias_comprobante")
 }
 
-// Auditoría de comprobantes. Tabla separada del AuditLog genérico porque
-// volumen y queries de negocio son específicas (drill-down por comprobante,
-// filtros por reapertura). Diff es resumen (counts + totales), no snapshot.
-model ComprobanteAuditoria {
-  id                   String                     @id @default(uuid())
-  organizationId       String
-  comprobanteId        String
-  userId               String
-  accion               AccionAuditoriaComprobante
-  diff                 Json                       // {antes, despues, campos: []}
-  fueDuranteReapertura Boolean                    @default(false)
-  reaperturaId         String?                    // FK a PeriodoFiscalReopening
-  timestamp            DateTime                   @default(now()) @db.Timestamptz(3)
-
-  comprobante  Comprobante             @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
-  reapertura   PeriodoFiscalReopening? @relation(fields: [reaperturaId],  references: [id], onDelete: SetNull)
-
-  @@index([organizationId, comprobanteId, timestamp])
-  @@index([organizationId, userId, timestamp])
-  @@map("comprobantes_auditoria")
-}
+// comprobantes_audit (raw Postgres table — NOT in Prisma schema)
+// La auditoría de comprobantes y líneas la gestiona un trigger AFTER INSERT/UPDATE/DELETE
+// en la tabla `comprobantes` y `lineas_comprobante`. El trigger escribe en la tabla raw
+// `comprobantes_audit` (fuera del schema Prisma). Ver migration 2.5.
+// La tabla anterior `comprobantes_auditoria` + enum `AccionAuditoriaComprobante` fueron
+// eliminados en esa migración.
 
 // Contacto: persona natural o jurídica con quien la asociación tiene
 // vínculo contable (cliente y/o proveedor). Ver docs/disenos/contactos.md

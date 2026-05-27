@@ -100,15 +100,11 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
     const original = await crearContabilizado('D2604-000001');
     const anuladoEn = new Date(Date.UTC(2026, 3, 22, 14, 30, 0));
 
-    const result = await repo.marcarAnulado(
-      tenantId,
-      original.id,
-      {
-        anuladoEn,
-        anuladoPorUserId: 'user-auditor',
-        motivoAnulacion: 'Error en la glosa del comprobante original',
-      },
-    );
+    const result = await repo.marcarAnulado(tenantId, original.id, {
+      anuladoEn,
+      anuladoPorUserId: 'user-auditor',
+      motivoAnulacion: 'Error en la glosa del comprobante original',
+    });
 
     // El flag anulado debe estar activado.
     expect(result.anulado).toBe(true);
@@ -125,15 +121,11 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
   it('findById() devuelve el flag anulado=true tras la anulación', async () => {
     const original = await crearContabilizado('D2604-000002');
 
-    await repo.marcarAnulado(
-      tenantId,
-      original.id,
-      {
-        anuladoEn: new Date(),
-        anuladoPorUserId: 'user-test',
-        motivoAnulacion: 'Motivo de prueba suficientemente largo',
-      },
-    );
+    await repo.marcarAnulado(tenantId, original.id, {
+      anuladoEn: new Date(),
+      anuladoPorUserId: 'user-test',
+      motivoAnulacion: 'Motivo de prueba suficientemente largo',
+    });
 
     const found = await repo.findById(tenantId, original.id);
     expect(found).not.toBeNull();
@@ -144,15 +136,11 @@ describe('PrismaComprobanteRepository — marcarAnulado() (integration vs Postgr
     const target = await crearContabilizado('D2604-000003');
     const hermano = await crearContabilizado('D2604-000004');
 
-    await repo.marcarAnulado(
-      tenantId,
-      target.id,
-      {
-        anuladoEn: new Date(),
-        anuladoPorUserId: 'user-test',
-        motivoAnulacion: 'Anulación selectiva del target únicamente',
-      },
-    );
+    await repo.marcarAnulado(tenantId, target.id, {
+      anuladoEn: new Date(),
+      anuladoPorUserId: 'user-test',
+      motivoAnulacion: 'Anulación selectiva del target únicamente',
+    });
 
     const hermanoPostAnulacion = await repo.findById(tenantId, hermano.id);
     expect(hermanoPostAnulacion!.anulado).toBe(false);

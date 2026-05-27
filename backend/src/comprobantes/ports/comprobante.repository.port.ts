@@ -8,13 +8,14 @@
 
 import type {
   Comprobante,
-  ComprobanteAuditoria,
   EstadoComprobante,
   LineaComprobante,
   Moneda,
   Prisma,
   TipoComprobante,
 } from '@prisma/client';
+
+import type { ComprobantesAuditRow } from '../dto/auditoria-response.dto';
 
 export const COMPROBANTE_REPOSITORY_PORT = Symbol('COMPROBANTE_REPOSITORY_PORT');
 
@@ -208,13 +209,16 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<void>;
 
   /**
-   * Lista el historial de auditoría de un comprobante en orden cronológico
-   * ascendente. Scopeado al tenant. No pagina — el volumen esperado es bajo
-   * (una decena de entries por comprobante en uso normal).
+   * Lista el historial de auditoría de un comprobante desde la tabla raw
+   * comprobantes_audit (Postgres triggers). Scopeado al tenant. Orden
+   * cronológico ascendente. No pagina — volumen esperado bajo.
+   *
+   * TODO sdd:comprobantes-anulacion-refactor task 7.x — reescribir usando
+   * prisma.$queryRaw sobre comprobantes_audit en lugar de comprobanteAuditoria.
    */
   abstract listarAuditoria(
     tenantId: string,
     comprobanteId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<ComprobanteAuditoria[]>;
+  ): Promise<ComprobantesAuditRow[]>;
 }
