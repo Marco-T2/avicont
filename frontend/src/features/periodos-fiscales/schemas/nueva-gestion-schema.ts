@@ -6,10 +6,7 @@ import { z } from 'zod';
 // para feedback inmediato; la autoridad sigue siendo el servidor.
 export const nuevaGestionSchema = z.object({
   year: z
-    .number({
-      required_error: 'El año es obligatorio',
-      invalid_type_error: 'El año es obligatorio',
-    })
+    .number({ error: 'El año es obligatorio' })
     .int('El año debe ser entero')
     .min(2000, 'El año debe ser 2000 o posterior')
     .refine(
