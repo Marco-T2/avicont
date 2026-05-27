@@ -1363,6 +1363,41 @@ describe('ComprobantesService', () => {
       };
     }
 
+    // Lineas reales (con Decimal) para simular un CONTABILIZADO válido.
+    // Sin ellas el fallback de editarContabilizado tendría 0 lineas → falla validación.
+    function makeLineasContabilizadas() {
+      return [
+        {
+          id: 'linea-1',
+          comprobanteId: 'comp-c',
+          orden: 1,
+          cuentaId: CUENTA_CAJA_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal('1000.00'),
+          credito: new Prisma.Decimal('0'),
+          tipoCambio: new Prisma.Decimal('1'),
+          debitoBob: new Prisma.Decimal('1000.00'),
+          creditoBob: new Prisma.Decimal('0'),
+          glosaLinea: null,
+        },
+        {
+          id: 'linea-2',
+          comprobanteId: 'comp-c',
+          orden: 2,
+          cuentaId: CUENTA_VENTAS_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal('0'),
+          credito: new Prisma.Decimal('1000.00'),
+          tipoCambio: new Prisma.Decimal('1'),
+          debitoBob: new Prisma.Decimal('0'),
+          creditoBob: new Prisma.Decimal('1000.00'),
+          glosaLinea: null,
+        },
+      ];
+    }
+
     // Comprobante contabilizado estándar listo para editar
     function setupEditarHappyPath() {
       const { service, repo, periodos, cuentas, auditedRunner, rbac } = buildService();
@@ -1375,6 +1410,9 @@ describe('ComprobantesService', () => {
         periodoFiscalId: PERIODO_ID,
         totalDebitoBob: new Prisma.Decimal('1000.00'),
         totalCreditoBob: new Prisma.Decimal('1000.00'),
+        // Lineas válidas para que editarContabilizado pueda validar partida doble
+        // si el DTO no trae lineas propias.
+        lineas: makeLineasContabilizadas() as unknown as ComprobanteConLineas['lineas'],
       });
 
       repo.findById.mockResolvedValue(comp);
