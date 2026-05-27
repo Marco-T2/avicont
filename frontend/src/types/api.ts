@@ -554,3 +554,97 @@ export interface CrearGestionRequest {
 export interface ReabrirPeriodoRequest {
   motivo: string;
 }
+
+// ============================================================
+// Comprobantes (asientos contables — Fase 1 slice 1)
+// Espejo de backend/src/comprobantes/dto/*.ts.
+// ============================================================
+
+export const TipoComprobante = {
+  APERTURA: 'APERTURA',
+  DIARIO: 'DIARIO',
+  INGRESO: 'INGRESO',
+  EGRESO: 'EGRESO',
+  AJUSTE: 'AJUSTE',
+  TRASPASO: 'TRASPASO',
+  CIERRE: 'CIERRE',
+} as const;
+export type TipoComprobante = (typeof TipoComprobante)[keyof typeof TipoComprobante];
+
+export const EstadoComprobante = {
+  BORRADOR: 'BORRADOR',
+  CONTABILIZADO: 'CONTABILIZADO',
+  BLOQUEADO: 'BLOQUEADO',
+} as const;
+export type EstadoComprobante = (typeof EstadoComprobante)[keyof typeof EstadoComprobante];
+
+// Espejo de LineaResponseDto en backend/src/comprobantes/dto/comprobante-response.dto.ts.
+export interface LineaComprobante {
+  id: string;
+  orden: number;
+  cuentaId: string;
+  contactoId: string | null;
+  moneda: Moneda;
+  debito: string;
+  credito: string;
+  tipoCambio: string;
+  debitoBob: string;
+  creditoBob: string;
+  glosaLinea: string | null;
+}
+
+// Espejo de ComprobanteResponseDto en backend/src/comprobantes/dto/comprobante-response.dto.ts.
+export interface Comprobante {
+  id: string;
+  tipo: TipoComprobante;
+  numero: string | null;
+  estado: EstadoComprobante;
+  fechaContable: string; // YYYY-MM-DD
+  periodoFiscalId: string;
+  glosa: string;
+  monedaPrincipal: Moneda;
+  totalDebitoBob: string;
+  totalCreditoBob: string;
+  anulado: boolean;
+  fechaAnulacion: string | null;
+  anuladoPorUserId: string | null;
+  motivoAnulacion: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  lineas: LineaComprobante[];
+}
+
+// Item de la lista paginada (puede omitir lineas para eficiencia).
+export type ComprobanteListItem = Omit<Comprobante, 'lineas'>;
+
+export interface ListarComprobantesResponse {
+  items: ComprobanteListItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// Query params para GET /api/comprobantes.
+export interface ListarComprobantesParams {
+  page?: number;
+  limit?: number;
+  tipo?: TipoComprobante;
+  estado?: EstadoComprobante;
+  incluirAnulados?: boolean;
+}
+
+// Espejo de AuditoriaEntryDto en backend/src/comprobantes/dto/auditoria-response.dto.ts.
+export interface AuditoriaEntry {
+  id: string;
+  comprobanteId: string;
+  tableName: string;
+  operation: 'INSERT' | 'UPDATE' | 'DELETE';
+  rowOld: Record<string, unknown> | null;
+  rowNew: Record<string, unknown> | null;
+  userId: string | null;
+  motivo: string | null;
+  fueDuranteReapertura: boolean;
+  reaperturaId: string | null;
+  ts: string; // ISO timestamp
+}
