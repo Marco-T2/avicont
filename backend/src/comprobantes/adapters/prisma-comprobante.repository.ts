@@ -224,6 +224,8 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
 
     const where: Prisma.ComprobanteWhereInput = {
       organizationId: tenantId,
+      // REQ-COMP-REPORTES-01: por default excluye anulados; toggle los incluye.
+      ...(!filtros.incluirAnulados ? { anulado: false } : {}),
       ...(filtros.periodoFiscalId ? { periodoFiscalId: filtros.periodoFiscalId } : {}),
       ...(filtros.tipo ? { tipo: filtros.tipo } : {}),
       ...(filtros.estado ? { estado: filtros.estado } : {}),
