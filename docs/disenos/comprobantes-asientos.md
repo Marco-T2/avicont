@@ -1,9 +1,24 @@
 # Comprobantes y Asientos Contables — Fase 1.3
 
-> **Estado: CERRADA** — toda la superficie descrita en este doc está
-> implementada, con tests unit + integration vs Postgres real + E2E. Ver
-> §12.1. Los campos forward-compat (`origenTipo/origenId/contactoId`) nacieron
-> con el schema y se activan en Fases 1.4+ sin migración.
+> **⚠️ AVISO HISTÓRICO (2026-05-27)**: Las secciones de este documento
+> relativas a **anulación con reversión**, **estados de comprobante** (incluyendo
+> `EstadoComprobante.ANULADO`), **contra-asientos AJUSTE**, y **auditoría via
+> servicio** son **históricas y no reflejan la implementación actual**.
+>
+> El refactor `comprobantes-anulacion-refactor` (branch `refactor/comprobante-anulacion-as-flag`,
+> 2026-05-27) cambió el modelo de anulación a **flag `anulado BOOLEAN`** (§4.7 CLAUDE.md),
+> eliminó `EstadoComprobante.ANULADO` del enum, e implementó auditoría via triggers
+> Postgres en `comprobantes_audit` en vez de la tabla `ComprobanteAuditoria`.
+> Además implementó `editarContabilizado` (§4.3 CLAUDE.md) para edición post-contabilización.
+>
+> **Fuente de verdad actual**: `CLAUDE.md §4.3, §4.7, §4.9` + `docs/claude/dominio-contable.md §4.1`.
+>
+> La **sección §1 (Conceptos y glosario)** de este documento sigue siendo
+> canónica para terminología `Comprobante` vs "Asiento" (vocabulario de dominio).
+
+> **Estado: CERRADA** — la implementación original (Fase 1.3) está completa.
+> La política de anulación y edición fue actualizada en el refactor de 2026-05-27.
+> Ver aviso histórico arriba.
 
 Documento de referencia para la implementación del módulo `comprobantes`.
 Fuente de verdad para el agregado comprobante + líneas, numeración, transiciones
