@@ -76,16 +76,8 @@ export class ComprobanteBloqueadoError extends ConflictError {
 /**
  * El comprobante ya fue anulado previamente (flag anulado=true).
  * CLAUDE.md §4.7: la anulación es terminal sobre el ciclo de edición.
- * Renombrado de ComprobanteYaAnuladoError para reflejar el nuevo modelo flag.
  */
 export class ComprobanteAnuladoNoAnulableError extends ConflictError {
-  constructor(id: string) {
-    super('COMPROBANTE_ANULAR_YA_ANULADO', 'El comprobante ya está anulado', { id });
-  }
-}
-
-/** @deprecated Usar ComprobanteAnuladoNoAnulableError. Mantenido para compatibilidad de código legacy. */
-export class ComprobanteYaAnuladoError extends ConflictError {
   constructor(id: string) {
     super('COMPROBANTE_ANULAR_YA_ANULADO', 'El comprobante ya está anulado', { id });
   }
@@ -217,16 +209,6 @@ export class PeriodoNoAbiertoError extends ConflictError {
       'COMPROBANTE_PERIODO_NO_ABIERTO',
       `El período fiscal está en estado ${estado}; no admite nuevos comprobantes ni ediciones`,
       { periodoFiscalId, estado },
-    );
-  }
-}
-
-export class PeriodoReversionNoAbiertoError extends ConflictError {
-  constructor(fecha: string) {
-    super(
-      'COMPROBANTE_PERIODO_REVERSION_NO_ABIERTO',
-      'La fecha de hoy cae en un período cerrado; no se puede contabilizar la reversión',
-      { fecha },
     );
   }
 }

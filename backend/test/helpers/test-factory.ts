@@ -72,7 +72,9 @@ export async function cleanupTestData() {
   await prisma.featureFlag.deleteMany({});
   // Comprobantes (Fase 1.3): deben borrarse ANTES de cuentas porque
   // LineaComprobante tiene FK Restrict hacia Cuenta. Borrar Comprobante
-  // cascadea LineaComprobante y ComprobanteAuditoria (schema onDelete: Cascade).
+  // cascadea LineaComprobante (schema onDelete: Cascade). La auditoría
+  // vive en `comprobantes_audit` (tabla raw, no relacional) y se limpia
+  // aparte si los tests la inspeccionan.
   await prisma.comprobante.deleteMany({});
   await prisma.secuenciaComprobante.deleteMany({});
   // Documento físico (Fase 1.4 slice 2): la tabla de asociación cascadea al
