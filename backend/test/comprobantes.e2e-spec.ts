@@ -772,4 +772,105 @@ describe('Comprobantes (e2e)', () => {
       expect(res.body.glosa).toBe('Glosa actualizada en borrador');
     });
   });
+
+  // ==========================================================
+  // Tarea 8.3 — GET /comprobantes?incluirAnulados + /auditoria
+  // Escenarios 16-18, 21 del spec
+  // ==========================================================
+
+  describe('GET /comprobantes — toggle incluirAnulados y GET /:id/auditoria', () => {
+    async function setupConAnulado(slug: string) {
+      const { token, cajaId, ventasId } = await seed(slug);
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Comprobante para toggle test',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Motivo para el toggle de incluirAnulados' });
+      return { token, comprobanteId: borrador.id as string };
+    }
+
+    it('escenario 16: GET /comprobantes default oculta anulados (REQ-COMP-REPORTES-01)', async () => {
+      const { token } = await setupConAnulado('org-t16');
+
+      const res = await request(app.getHttpServer())
+        .get('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(0);
+      expect(res.body.items).toEqual([]);
+    });
+
+    it('escenario 17: GET /comprobantes?incluirAnulados=true los muestra', async () => {
+      const { token } = await setupConAnulado('org-t17');
+
+      const res = await request(app.getHttpServer())
+        .get('/api/comprobantes?incluirAnulados=true')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].anulado).toBe(true);
+      // Los 3 metadatos deben estar presentes en la respuesta del listado.
+      expect(res.body.items[0].fechaAnulacion).toBeTruthy();
+      expect(res.body.items[0].motivoAnulacion).toBe('Motivo para el toggle de incluirAnulados');
+    });
+
+    it('escenario 21: GET /:id/auditoria retorna lista cronológica con shape correcto', async () => {
+      const { token, comprobanteId } = await setupConAnulado('org-t21');
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/comprobantes/${comprobanteId}/auditoria`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      // Al menos dos entries: INSERT (contabilizar) + UPDATE (anular).
+      expect(res.body.length).toBeGreaterThanOrEqual(2);
+
+      const entry = res.body[0] as Record<string, unknown>;
+      // Shape del ComprobanteAuditEntry (REQ-COMP-AUDIT-05).
+      expect(entry).toHaveProperty('id');
+      expect(entry).toHaveProperty('tableName');
+      expect(entry).toHaveProperty('operation');
+      expect(entry).toHaveProperty('comprobanteId', comprobanteId);
+      expect(entry).toHaveProperty('fueDuranteReapertura');
+      expect(entry).toHaveProperty('ts');
+
+      // Orden cronológico ascendente.
+      const timestamps = (res.body as Array<{ ts: string }>).map((e) => new Date(e.ts).getTime());
+      const sorted = [...timestamps].sort((a, b) => a - b);
+      expect(timestamps).toEqual(sorted);
+
+      // El último entry debe ser el UPDATE de anulación con rowNew.anulado=true.
+      const ultimaEntry = res.body[res.body.length - 1] as {
+        operation: string;
+        rowNew: { anulado: boolean } | null;
+      };
+      expect(ultimaEntry.operation).toBe('UPDATE');
+      expect(ultimaEntry.rowNew).toBeTruthy();
+    });
+
+    it('GET /:id/auditoria de comprobante de otro tenant → 404', async () => {
+      const { comprobanteId } = await setupConAnulado('org-tiso1');
+      const { token: tokenOtroTenant } = await seed('org-tiso2');
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/comprobantes/${comprobanteId}/auditoria`)
+        .set('Authorization', `Bearer ${tokenOtroTenant}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
 });
