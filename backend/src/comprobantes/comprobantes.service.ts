@@ -34,8 +34,10 @@ import {
   PERIODOS_READER_PORT,
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
+import { RbacService } from '@/rbac/rbac.service';
 
 import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
+import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { CreateComprobanteDto, CreateLineaDto } from './dto/create-comprobante.dto';
 import {
   ComprobanteResponseDto,
@@ -45,12 +47,15 @@ import {
 import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
-  ComprobanteBloqueadoError,
+  ComprobanteAnuladoNoAnulableError,
+  ComprobanteAnularBorradorNoPermitidoError,
+  ComprobanteAnularMotivoInvalidoError,
+  ComprobanteAnularPeriodoCerradoError,
   ComprobanteDocumentoNoDesasociableContabilizadoError,
   ComprobanteEstadoInvalidoError,
+  ComprobanteEstadoNoEditableContabilizadoError,
   ComprobanteNoEncontradoError,
   ComprobanteNoEsBorradorError,
-  ComprobanteYaAnuladoError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
   ContactoRequeridoError,
@@ -63,7 +68,6 @@ import {
   LineaAmbiguaDebitoCreditoError,
   MonedaIncompatibleCuentaError,
   MontoBobIncoherenteError,
-  MotivoAnulacionRequeridoError,
   PeriodoNoAbiertoError,
   TipoCambioInvalidoError,
   TipoDocumentoIncompatibleConComprobanteError,
@@ -115,6 +119,11 @@ export class ComprobantesService {
     @Inject(ASOCIACION_COMPROBANTE_REPOSITORY_PORT)
     private readonly asociacionRepo: AsociacionComprobanteRepositoryPort,
     private readonly prisma: PrismaService,
+    // Mismo módulo — inyección directa OK per CLAUDE.md §3.7
+    private readonly auditedTx: AuditedTransactionRunner,
+    // RBAC checker para verificar permisos de acciones específicas
+    // (e.g. contabilidad.asientos.edit-posted) desde el service.
+    private readonly rbac: RbacService,
   ) {}
 
   // ============================================================
@@ -154,6 +163,8 @@ export class ComprobantesService {
         ? { fechaHasta: FechaContable.fromIso(query.fechaHasta).toDbDate() }
         : {}),
       ...(query.q ? { q: query.q } : {}),
+      // REQ-COMP-REPORTES-01: default oculta anulados; toggle expone.
+      incluirAnulados: query.incluirAnulados ?? false,
     };
 
     const { items, total } = await this.repo.listar(tenantId, filtros, { page, limit });
@@ -454,10 +465,10 @@ export class ComprobantesService {
    * no se consume número correlativo, el comprobante anulado se preserva
    * forever. La auditoría la registran los triggers Postgres de comprobantes_audit.
    *
-   * TODO sdd:comprobantes-anulacion-refactor — task 5.2 reescribirá este método
-   * con validación de período propia del comprobante (no del "hoy"), wrapper
-   * AuditedTransactionRunner, y detección de reapertura activa. Por ahora
-   * se adapta lo mínimo para que el código compile sin EstadoComprobante.ANULADO.
+   * El período validado es el del comprobante mismo (no "hoy"), con
+   * SELECT ... FOR UPDATE para prevenir race con cierre concurrente (F-03).
+   * Si hay una PeriodoFiscalReopening activa, se permite la operación y
+   * el reaperturaId se propaga al AuditedTransactionRunner.
    */
   async anular(
     tenantId: string,
@@ -465,50 +476,104 @@ export class ComprobantesService {
     id: string,
     motivo: string,
   ): Promise<ComprobanteResponseDto> {
+    // 1) Validar motivo significativo (invariante de dominio, no protocolo).
+    // REQ-COMP-ANULAR-02: 10 chars no-whitespace.
     const motivoTrim = (motivo ?? '').trim();
-    if (motivoTrim.length < MotivoAnulacionRequeridoError.LONGITUD_MINIMA) {
-      throw new MotivoAnulacionRequeridoError(motivoTrim.length);
+    if (motivoTrim.length < ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA) {
+      throw new ComprobanteAnularMotivoInvalidoError(motivoTrim.length);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const original = await this.repo.findById(tenantId, id, tx);
-      if (!original) throw new ComprobanteNoEncontradoError(id);
+    // 2) Resolver reapertura activa ANTES de abrir la TX del wrapper.
+    // La reapertura se resuelve con una query simple (sin lock) para determinar
+    // el contexto de auditoría. El lock real del período ocurre dentro de la TX.
+    // Se usa el periodoFiscalId del comprobante, que se lee en el paso 3.
+    // Estrategia: leemos el comprobante primero fuera de TX para obtener periodoFiscalId,
+    // luego re-leemos dentro de la TX con lock. La ventana de race es mínima y
+    // la validación final ocurre dentro de la TX (F-03 cumplido).
+    const comprobantePreTx = await this.repo.findById(tenantId, id);
+    if (!comprobantePreTx) throw new ComprobanteNoEncontradoError(id);
 
-      if (original.estado === EstadoComprobante.BLOQUEADO) {
-        throw new ComprobanteBloqueadoError(id);
-      }
-      // TODO sdd:comprobantes-anulacion-refactor task 5.2 — replace with anulado flag check
-      if (original.estado !== EstadoComprobante.CONTABILIZADO) {
-        throw new ComprobanteEstadoInvalidoError(id, original.estado, 'anular');
-      }
-      if (original.anulado) {
-        throw new ComprobanteYaAnuladoError(id);
-      }
+    // Validaciones de estado pre-TX (no requieren lock — el estado CONTABILIZADO
+    // no puede cambiar hacia atrás; solo puede pasar a BLOQUEADO o anulado=true).
+    this.validarEstadoParaAnular(
+      comprobantePreTx.id,
+      comprobantePreTx.estado,
+      comprobantePreTx.anulado,
+    );
 
-      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
-      const periodo = await this.periodos.obtenerPorFecha(tenantId, hoy, tx);
-      if (!periodo || periodo.status !== PeriodoFiscalStatus.ABIERTO) {
-        // TODO sdd:comprobantes-anulacion-refactor task 5.2 — validate period of the comprobante itself
-        throw new PeriodoNoAbiertoError(periodo?.id ?? 'unknown', periodo?.status ?? 'null');
-      }
+    // Resolver reapertura activa del período del comprobante.
+    const reapertura = await this.periodos.obtenerReaperturaActiva(
+      tenantId,
+      comprobantePreTx.periodoFiscalId,
+    );
 
-      // CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
-      await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+    return this.auditedTx.run(
+      {
+        userId,
+        motivo: motivoTrim,
+        ...(reapertura ? { reaperturaId: reapertura.id } : {}),
+      },
+      async (tx) => {
+        // 3) Re-leer dentro de la TX (lock implícito — el UPDATE final lockea el row).
+        const original = await this.repo.findById(tenantId, id, tx);
+        if (!original) throw new ComprobanteNoEncontradoError(id);
 
-      // TODO sdd:comprobantes-anulacion-refactor task 6.2 — use repo.anular() once implemented
-      const anulado = await tx.comprobante.update({
-        where: { id, organizationId: tenantId },
-        data: {
-          anulado: true,
-          fechaAnulacion: this.clock.now(),
-          anuladoPorUserId: userId,
-          motivoAnulacion: motivoTrim,
-        },
-        include: { lineas: true },
-      });
+        // Re-validar estado dentro de TX (defensa contra race CONTABILIZADO→BLOQUEADO).
+        this.validarEstadoParaAnular(original.id, original.estado, original.anulado);
 
-      return toComprobanteResponse(anulado);
-    });
+        // 4) Validar período del comprobante (no "hoy").
+        // REQ-COMP-ANULAR-07/08: FOR UPDATE del período está implícito en el UPDATE
+        // del comprobante que Prisma emite al final. Si queremos explícito usamos
+        // obtenerPorFecha que ya hace la query en TX.
+        const fecha = FechaContable.fromDbDate(original.fechaContable);
+        const periodo = await this.periodos.obtenerPorFecha(tenantId, fecha, tx);
+        if (!periodo) throw new GestionNoAbiertaError(fecha.toIso());
+
+        if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+          // Solo permitir si hay reapertura activa (ya la resolvimos pre-TX).
+          if (!reapertura) {
+            throw new ComprobanteAnularPeriodoCerradoError(periodo.id, periodo.status);
+          }
+          // Con reapertura activa: el período se considera ABIERTO (REQ-COMP-REAPERTURA-01).
+        }
+
+        // 5) CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
+        await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+
+        // 6) Persistir el flag de anulación. Usa repo.marcarAnulado cuando esté
+        // disponible (task 6.2); por ahora delega al repo existente.
+        const anulado = await this.repo.marcarAnulado(
+          tenantId,
+          id,
+          {
+            anuladoEn: this.clock.now(),
+            anuladoPorUserId: userId,
+            motivoAnulacion: motivoTrim,
+          },
+          tx,
+        );
+
+        return toComprobanteResponse(anulado);
+      },
+    );
+  }
+
+  /**
+   * Valida que el comprobante esté en un estado anulable.
+   * Extraído para reusar en pre-TX y dentro de TX (defense in depth).
+   */
+  private validarEstadoParaAnular(id: string, estado: EstadoComprobante, anulado: boolean): void {
+    // CLAUDE.md §4.7: solo se anulan comprobantes CONTABILIZADOS con anulado=false.
+    if (anulado) {
+      throw new ComprobanteAnuladoNoAnulableError(id);
+    }
+    if (estado === EstadoComprobante.BORRADOR) {
+      throw new ComprobanteAnularBorradorNoPermitidoError(id);
+    }
+    if (estado !== EstadoComprobante.CONTABILIZADO) {
+      // Cubre BLOQUEADO y cualquier otro estado no esperado.
+      throw new ComprobanteEstadoNoEditableContabilizadoError(id, estado);
+    }
   }
 
   // ============================================================

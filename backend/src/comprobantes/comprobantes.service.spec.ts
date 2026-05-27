@@ -1090,7 +1090,8 @@ describe('ComprobantesService', () => {
   describe('anular', () => {
     // Helper: comprobante listo para anular (CONTABILIZADO, anulado=false, período ABIERTO)
     function setupAnularHappyPath() {
-      const { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia } = buildService();
+      const { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia } =
+        buildService();
 
       const comp = comprobanteFactory({
         id: 'comp-c',
@@ -1121,9 +1122,14 @@ describe('ComprobantesService', () => {
     }
 
     it('happy path: marca anulado=true en el propio comprobante (REQ-COMP-ANULAR-01)', async () => {
-      const { service, repo, anulado } = setupAnularHappyPath();
+      const { service, repo: _repo, anulado } = setupAnularHappyPath();
 
-      const result = await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+      const result = await service.anular(
+        TENANT_ID,
+        USER_ID,
+        'comp-c',
+        'Error en imputación al cliente',
+      );
 
       // Resultado: el comprobante con anulado=true y los 3 metadatos
       expect(result.anulado).toBe(true);
@@ -1138,7 +1144,12 @@ describe('ComprobantesService', () => {
     it('preserva el numero correlativo (REQ-COMP-CORRELATIVO-03, escenario 24)', async () => {
       const { service } = setupAnularHappyPath();
 
-      const result = await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+      const result = await service.anular(
+        TENANT_ID,
+        USER_ID,
+        'comp-c',
+        'Error en imputación al cliente',
+      );
 
       expect(result.numero).toBe('D2604-000042');
     });
@@ -1163,10 +1174,22 @@ describe('ComprobantesService', () => {
         periodoFiscalId: PERIODO_ID,
       });
       repo.findById.mockResolvedValue(comp);
-      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
       // Reapertura activa sobre el período
-      periodos.obtenerReaperturaActiva.mockResolvedValue({ id: 'reap-001', reopenedAt: new Date() });
-      repo.marcarAnulado.mockResolvedValue({ ...comp, anulado: true, fechaAnulacion: new Date(), motivoAnulacion: 'Motivo válido OK', anuladoPorUserId: USER_ID });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reap-001',
+        reopenedAt: new Date(),
+      });
+      repo.marcarAnulado.mockResolvedValue({
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date(),
+        motivoAnulacion: 'Motivo válido OK',
+        anuladoPorUserId: USER_ID,
+      });
 
       await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo válido OK');
 
@@ -1210,7 +1233,10 @@ describe('ComprobantesService', () => {
       repo.findById.mockResolvedValue(
         comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
       );
-      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
       periodos.obtenerReaperturaActiva.mockResolvedValue(null);
 
       await expect(
@@ -1220,11 +1246,27 @@ describe('ComprobantesService', () => {
 
     it('permite anular si período cerrado pero hay reapertura activa (REQ-COMP-REAPERTURA-01, escenario 15)', async () => {
       const { service, repo, periodos } = buildService();
-      const comp = comprobanteFactory({ id: 'comp-c', estado: EstadoComprobante.CONTABILIZADO, anulado: false });
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+      });
       repo.findById.mockResolvedValue(comp);
-      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
-      periodos.obtenerReaperturaActiva.mockResolvedValue({ id: 'reap-001', reopenedAt: new Date() });
-      repo.marcarAnulado.mockResolvedValue({ ...comp, anulado: true, fechaAnulacion: new Date(), motivoAnulacion: 'Corrección post-cierre X', anuladoPorUserId: USER_ID });
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reap-001',
+        reopenedAt: new Date(),
+      });
+      repo.marcarAnulado.mockResolvedValue({
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date(),
+        motivoAnulacion: 'Corrección post-cierre X',
+        anuladoPorUserId: USER_ID,
+      });
 
       await expect(
         service.anular(TENANT_ID, USER_ID, 'comp-c', 'Corrección post-cierre X'),
@@ -1238,9 +1280,9 @@ describe('ComprobantesService', () => {
       );
 
       // 9 caracteres no-whitespace
-      await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-c', '123456789'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' });
+      await expect(service.anular(TENANT_ID, USER_ID, 'comp-c', '123456789')).rejects.toMatchObject(
+        { code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' },
+      );
     });
 
     it('rechaza si motivo es solo whitespace (COMPROBANTE_ANULAR_MOTIVO_INVALIDO, 422) — escenario 12', async () => {

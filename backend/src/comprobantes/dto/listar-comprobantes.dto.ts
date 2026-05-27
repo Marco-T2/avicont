@@ -1,7 +1,17 @@
 import { EstadoComprobante, TipoComprobante } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -55,4 +65,17 @@ export class ListarComprobantesQueryDto {
   @Min(1)
   @Max(LIST_MAX_LIMIT)
   limit?: number = LIST_DEFAULT_LIMIT;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Incluir comprobantes anulados en el listado (default: false)',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return value;
+  })
+  @IsBoolean()
+  incluirAnulados?: boolean;
 }

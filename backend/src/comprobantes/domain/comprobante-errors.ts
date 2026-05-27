@@ -12,7 +12,13 @@
  *     numeración, anulación)
  */
 
-import { ConflictError, InvalidStateError, NotFoundError, ValidationError } from '@/common/errors';
+import {
+  ConflictError,
+  ForbiddenError,
+  InvalidStateError,
+  NotFoundError,
+  ValidationError,
+} from '@/common/errors';
 
 // ============================================================
 // 404 — recursos no existentes (o visibles para el tenant actual)
@@ -67,9 +73,100 @@ export class ComprobanteBloqueadoError extends ConflictError {
   }
 }
 
+/**
+ * El comprobante ya fue anulado previamente (flag anulado=true).
+ * CLAUDE.md §4.7: la anulación es terminal sobre el ciclo de edición.
+ * Renombrado de ComprobanteYaAnuladoError para reflejar el nuevo modelo flag.
+ */
+export class ComprobanteAnuladoNoAnulableError extends ConflictError {
+  constructor(id: string) {
+    super('COMPROBANTE_ANULAR_YA_ANULADO', 'El comprobante ya está anulado', { id });
+  }
+}
+
+/** @deprecated Usar ComprobanteAnuladoNoAnulableError. Mantenido para compatibilidad de código legacy. */
 export class ComprobanteYaAnuladoError extends ConflictError {
   constructor(id: string) {
-    super('COMPROBANTE_YA_ANULADO', 'El comprobante ya está anulado', { id });
+    super('COMPROBANTE_ANULAR_YA_ANULADO', 'El comprobante ya está anulado', { id });
+  }
+}
+
+/**
+ * Se intenta anular un comprobante en estado BORRADOR.
+ * CLAUDE.md §4.7: anular un BORRADOR no tiene sentido — la operación
+ * correcta es eliminarlo (DELETE /comprobantes/:id).
+ * Code: COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO — 409.
+ */
+export class ComprobanteAnularBorradorNoPermitidoError extends ConflictError {
+  constructor(id: string) {
+    super(
+      'COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO',
+      'No se puede anular un borrador: eliminalo directamente (DELETE /comprobantes/:id)',
+      { id },
+    );
+  }
+}
+
+/**
+ * Se intenta editar o anular un comprobante en estado BLOQUEADO o en un
+ * estado que no es CONTABILIZADO. Aplica a editarContabilizado y a anular.
+ * Code: COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO — 409.
+ */
+export class ComprobanteEstadoNoEditableContabilizadoError extends ConflictError {
+  constructor(id: string, estadoActual: string) {
+    super(
+      'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO',
+      `El comprobante no admite esta operación en estado ${estadoActual}`,
+      { id, estadoActual },
+    );
+  }
+}
+
+/**
+ * El período fiscal del comprobante está cerrado al intentar anularlo.
+ * Sin reapertura activa, la anulación se rechaza (CLAUDE.md §4.4 — sin bypass).
+ * Code: COMPROBANTE_ANULAR_PERIODO_CERRADO — 409.
+ */
+export class ComprobanteAnularPeriodoCerradoError extends ConflictError {
+  constructor(periodoFiscalId: string, estadoPeriodo: string) {
+    super(
+      'COMPROBANTE_ANULAR_PERIODO_CERRADO',
+      'No se puede anular este comprobante: su período está cerrado. Reabrí el período para continuar',
+      { periodoFiscalId, estadoPeriodo },
+    );
+  }
+}
+
+/**
+ * El motivo de anulación no tiene la longitud mínima de 10 caracteres
+ * significativos (no-whitespace). Invariante de dominio (no DTO validation).
+ * Code: COMPROBANTE_ANULAR_MOTIVO_INVALIDO — 422.
+ */
+export class ComprobanteAnularMotivoInvalidoError extends InvalidStateError {
+  static readonly LONGITUD_MINIMA = 10;
+
+  constructor(longitudSignificativa: number) {
+    super(
+      'COMPROBANTE_ANULAR_MOTIVO_INVALIDO',
+      `El motivo de anulación es obligatorio y debe tener al menos ${ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA} caracteres significativos (no-whitespace)`,
+      {
+        longitudSignificativa,
+        longitudMinima: ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA,
+      },
+    );
+  }
+}
+
+/**
+ * Se intenta editar un comprobante anulado (anulado=true).
+ * CLAUDE.md §4.7: la anulación es terminal sobre el ciclo de edición.
+ * Code: COMPROBANTE_ANULADO_NO_EDITABLE — 409.
+ */
+export class ComprobanteAnuladoNoEditableError extends ConflictError {
+  constructor(id: string) {
+    super('COMPROBANTE_ANULADO_NO_EDITABLE', 'El comprobante está anulado y no puede editarse', {
+      id,
+    });
   }
 }
 
@@ -321,6 +418,68 @@ export class TipoDocumentoIncompatibleConComprobanteError extends InvalidStateEr
       'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
       `El tipo de documento '${tipoDocumentoNombre}' no es aplicable a comprobantes de tipo ${tipoComprobante}. Tipos permitidos: ${tiposPermitidos.join(', ')}`,
       { tipoDocumentoNombre, tipoComprobante, tiposPermitidos },
+    );
+  }
+}
+
+/**
+ * El período fiscal origen del comprobante CONTABILIZADO está cerrado
+ * al intentar editarlo. Sin reapertura activa, la edición se rechaza.
+ * Code: COMPROBANTE_EDIT_PERIODO_CERRADO — 409.
+ */
+export class ComprobanteEditarContabilizadoEnPeriodoCerradoError extends ConflictError {
+  constructor(periodoFiscalId: string, estadoPeriodo: string) {
+    super(
+      'COMPROBANTE_EDIT_PERIODO_CERRADO',
+      'No se puede editar este comprobante: su período está cerrado. Reabrí el período para continuar',
+      { periodoFiscalId, estadoPeriodo },
+    );
+  }
+}
+
+/**
+ * La nueva fechaContable apunta a un período destino que está cerrado.
+ * Mover un comprobante a un período cerrado está prohibido.
+ * Code: COMPROBANTE_EDIT_PERIODO_DESTINO_CERRADO — 409.
+ */
+export class ComprobanteEditarFechaPeriodoDestinoCerradoError extends ConflictError {
+  constructor(periodoFiscalId: string, estadoPeriodo: string) {
+    super(
+      'COMPROBANTE_EDIT_PERIODO_DESTINO_CERRADO',
+      'No se puede mover el comprobante: el período destino está cerrado',
+      { periodoFiscalId, estadoPeriodo },
+    );
+  }
+}
+
+/**
+ * El payload de edición incluye el campo `numero` con un valor distinto
+ * al actual. El número correlativo es inmutable desde la primera contabilización
+ * (CLAUDE.md §4.9 — REQ-COMP-CORRELATIVO-02).
+ *
+ * Extiende ConflictError → HTTP 409. Es invariante de dominio (no protocolo),
+ * per alineación de tasks-tail §6: 409 NOT 400.
+ */
+export class NumeroCorrelativoInmutableError extends ConflictError {
+  constructor(id: string, numeroActual: string, numeroRecibido: string) {
+    super(
+      'COMPROBANTE_EDIT_NUMERO_INMUTABLE',
+      'El número del comprobante es inmutable y no puede modificarse',
+      { id, numeroActual, numeroRecibido },
+    );
+  }
+}
+
+/**
+ * Se intenta usar `editarContabilizado` sin tener el permiso RBAC
+ * `contabilidad.asientos.edit-posted` (REQ-COMP-EDIT-10).
+ */
+export class SinPermisoEditarContabilizadoError extends ForbiddenError {
+  constructor(userId: string) {
+    super(
+      'MISSING_PERMISSION_EDIT_POSTED',
+      'No tenés permiso para editar comprobantes contabilizados',
+      { userId, permiso: 'contabilidad.asientos.edit-posted' },
     );
   }
 }

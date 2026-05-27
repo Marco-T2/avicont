@@ -82,6 +82,8 @@ export interface ListarFiltros {
   fechaDesde?: Date;
   fechaHasta?: Date;
   q?: string;
+  /** Cuando false (default), el repo filtra WHERE anulado = false. REQ-COMP-REPORTES-01. */
+  incluirAnulados?: boolean;
 }
 
 export interface AuditoriaCreateData {
