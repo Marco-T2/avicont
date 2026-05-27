@@ -85,7 +85,10 @@ function makeAsociacionRepoMock(): MockAsociacionRepo {
 }
 
 function makePeriodosMock(): MockPeriodos {
-  return { obtenerPorFecha: jest.fn() };
+  return {
+    obtenerPorFecha: jest.fn(),
+    obtenerReaperturaActiva: jest.fn().mockResolvedValue(null),
+  };
 }
 
 function makeCuentasMock(): MockCuentas {
