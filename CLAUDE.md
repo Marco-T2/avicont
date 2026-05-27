@@ -1014,7 +1014,7 @@ Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
    o
    `SELECT indexname FROM pg_indexes WHERE tablename = '<tabla>' ORDER BY indexname;`.
 
-**Lista de objetos raw SQL vivos (al 2026-04-25):**
+**Lista de objetos raw SQL vivos (al 2026-05-27):**
 
 | Objeto | Tipo | Migration de origen |
 |--------|------|---------------------|
@@ -1024,6 +1024,17 @@ Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
 | `contactos_organizationId_documento_partial_key` | UNIQUE PARCIAL `WHERE documento IS NOT NULL` | `20260424020927_fase_1_4_contactos` |
 | CHECK `("esCliente" = true OR "esProveedor" = true)` en `contactos` | CHECK constraint | `20260424020927_fase_1_4_contactos` |
 | `comprobante_documento_fisico_unique_contabilizado` | UNIQUE PARCIAL `WHERE comprobanteEstado = 'CONTABILIZADO'` | `20260425163325_add_documento_fisico_and_tipo_and_asociacion` |
+| `comprobantes_audit` | TABLE (audit raw) | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `comprobantes_audit_comprobante_id_ts_idx` | INDEX | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `comprobantes_audit_organization_id_ts_idx` | INDEX | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `trg_comprobantes_audit` | FUNCTION (plpgsql) | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `trg_audit_comprobantes` | TRIGGER en `comprobantes` | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `trg_audit_lineas_comprobante` | TRIGGER en `lineas_comprobante` | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+
+**Nota especial sobre `comprobante_documento_fisico_unique_contabilizado`:** Este índice
+parcial usa `WHERE comprobanteEstado = 'CONTABILIZADO'::"EstadoComprobante"` — cuando se
+regenera una migration que altera `EstadoComprobante`, el índice DEBE ser dropeado antes
+del rename de tipo y recreado después. Ver migration `20260527190718_*` como precedente.
 
 Mantener esta tabla actualizada cuando se agregue un objeto nuevo en raw SQL.
 
