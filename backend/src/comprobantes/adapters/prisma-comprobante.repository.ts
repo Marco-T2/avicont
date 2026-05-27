@@ -179,12 +179,14 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     metadata: AnulacionMetadata,
     tx?: Prisma.TransactionClient,
   ): Promise<ComprobanteConLineas> {
+    // TODO sdd:comprobantes-anulacion-refactor task 6.2 — replace with anular() that sets
+    // anulado=true flag. marcarAnulado will be removed from port and adapter.
     const client = tx ?? this.prisma;
     return client.comprobante.update({
       where: { id, organizationId: tenantId },
       data: {
-        estado: EstadoComprobante.ANULADO,
-        anuladoEn: metadata.anuladoEn,
+        anulado: true,
+        fechaAnulacion: metadata.anuladoEn,
         anuladoPorUserId: metadata.anuladoPorUserId,
         motivoAnulacion: metadata.motivoAnulacion,
       },

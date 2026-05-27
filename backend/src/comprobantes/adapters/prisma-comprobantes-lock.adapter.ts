@@ -99,7 +99,11 @@ export class PrismaComprobantesLockAdapter extends ComprobantesLockPort {
     return {
       contabilizados: countPor(EstadoComprobante.CONTABILIZADO),
       borradores: countPor(EstadoComprobante.BORRADOR),
-      anulados: countPor(EstadoComprobante.ANULADO),
+      // TODO sdd:comprobantes-anulacion-refactor task 1.1 — anulados was previously
+      // counted as EstadoComprobante.ANULADO (state). Post-refactor anulados are
+      // determined by the flag anulado=true, not a state. This field will be
+      // recalculated in task 5.5/6.3 when the adapter is rewritten. Returns 0 now.
+      anulados: 0,
       totalDebeBob: (totales._sum.totalDebitoBob ?? new Prisma.Decimal(0)).toFixed(2),
       totalHaberBob: (totales._sum.totalCreditoBob ?? new Prisma.Decimal(0)).toFixed(2),
       borradoresList: borradoresList.map((b) => ({

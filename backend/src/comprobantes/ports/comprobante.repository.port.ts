@@ -2,12 +2,11 @@
 // de persistencia (write + read) para que el servicio nunca toque Prisma
 // directamente (Anti-31 CLAUDE.md §8.1).
 //
-// También incluye el write de `ComprobanteAuditoria`: misma transacción que
-// el comprobante siempre (defense in depth — un write sin su auditoría sería
-// invariante roto).
+// TODO sdd:comprobantes-anulacion-refactor task 6.x — eliminar métodos
+// crearReversion, marcarAnulado, registrarAuditoria (reemplazados por triggers
+// Postgres en comprobantes_audit) y agregar anular() / reemplazarComprobante().
 
 import type {
-  AccionAuditoriaComprobante,
   Comprobante,
   ComprobanteAuditoria,
   EstadoComprobante,
@@ -87,7 +86,10 @@ export interface ListarFiltros {
 export interface AuditoriaCreateData {
   comprobanteId: string;
   userId: string;
-  accion: AccionAuditoriaComprobante;
+  // TODO sdd:comprobantes-anulacion-refactor task 6.x — se elimina este campo cuando
+  // se elimine registrarAuditoria del port; por ahora usa string libre en lugar de
+  // AccionAuditoriaComprobante (enum que se eliminará con la migration 2.5).
+  accion: string;
   diff: Prisma.InputJsonValue;
   fueDuranteReapertura?: boolean;
   reaperturaId?: string | null;

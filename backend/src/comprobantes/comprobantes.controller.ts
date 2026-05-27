@@ -89,7 +89,7 @@ export class ComprobantesController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Actualizar un BORRADOR. El PATCH es parcial; si `lineas` se envía se reemplazan todas. Rechaza CONTABILIZADO/BLOQUEADO/ANULADO.',
+      'Actualizar un BORRADOR. El PATCH es parcial; si `lineas` se envía se reemplazan todas. Rechaza CONTABILIZADO/BLOQUEADO/anulados.',
   })
   actualizar(
     @Req() req: AuthenticatedRequest,
@@ -105,7 +105,7 @@ export class ComprobantesController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO/ANULADO no se borra: se anula con /anular.',
+      'Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular.',
   })
   async eliminar(
     @Req() req: AuthenticatedRequest,
@@ -131,7 +131,7 @@ export class ComprobantesController {
   @ApiBody({ type: AnularComprobanteDto })
   @ApiOperation({
     summary:
-      'Anular un CONTABILIZADO generando un comprobante AJUSTE con líneas invertidas (FK anulaAId). El número del original se preserva.',
+      'Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva.',
   })
   anular(
     @Req() req: AuthenticatedRequest,
@@ -145,8 +145,7 @@ export class ComprobantesController {
   @RequirePermissions('contabilidad.asientos.read')
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
-    summary:
-      'Historial de auditoría del comprobante: cada acción (CREADO, EDITADO, CONTABILIZADO, ANULADO, …) con usuario, timestamp y diff.',
+    summary: 'Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff.',
   })
   obtenerAuditoria(@Req() req: AuthenticatedRequest, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.obtenerAuditoria(resolveTenantId(req), id);

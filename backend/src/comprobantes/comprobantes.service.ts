@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AccionAuditoriaComprobante,
   type ComprobanteDocumentoFisico,
   EstadoComprobante,
   Moneda,
@@ -66,7 +65,6 @@ import {
   MontoBobIncoherenteError,
   MotivoAnulacionRequeridoError,
   PeriodoNoAbiertoError,
-  PeriodoReversionNoAbiertoError,
   TipoCambioInvalidoError,
   TipoDocumentoIncompatibleConComprobanteError,
 } from './domain/comprobante-errors';
@@ -195,12 +193,14 @@ export class ComprobantesService {
         tx,
       );
 
+      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove registrarAuditoria calls;
+      // triggers on comprobantes_audit will capture INSERT/UPDATE/DELETE automatically.
       await this.repo.registrarAuditoria(
         tenantId,
         {
           comprobanteId: persist.id,
           userId,
-          accion: AccionAuditoriaComprobante.CREADO,
+          accion: 'CREADO',
           diff: {
             tipo: dto.tipo,
             fechaContable: dto.fechaContable,
@@ -234,12 +234,13 @@ export class ComprobantesService {
       const persist = await this.repo.reemplazarBorrador(tenantId, id, resolved, tx);
 
       const camposCambiados = Object.keys(dto);
+      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove; triggers capture this.
       await this.repo.registrarAuditoria(
         tenantId,
         {
           comprobanteId: id,
           userId,
-          accion: AccionAuditoriaComprobante.EDITADO,
+          accion: 'EDITADO',
           diff: {
             campos: camposCambiados,
             lineasCount: resolved.lineas.length,
@@ -421,12 +422,13 @@ export class ComprobantesService {
         },
         tx,
       );
+      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove; triggers capture this.
       await this.repo.registrarAuditoria(
         tenantId,
         {
           comprobanteId: id,
           userId,
-          accion: AccionAuditoriaComprobante.CONTABILIZADO,
+          accion: 'CONTABILIZADO',
           diff: {
             numero,
             totales: {
@@ -443,36 +445,26 @@ export class ComprobantesService {
   }
 
   // ============================================================
-  // Escritura — ANULAR (CONTABILIZADO → ANULADO + reversión AJUSTE)
+  // Escritura — ANULAR (flag anulado = true, sin contra-asiento)
   // ============================================================
 
   /**
-   * Anula un comprobante CONTABILIZADO creando un comprobante AJUSTE de
-   * reversión con las líneas invertidas (DEBE ↔ HABER, incluyendo
-   * debitoBob ↔ creditoBob). Flujo (todo en una sola TX):
+   * Anula un comprobante CONTABILIZADO mediante un UPDATE in-place que setea
+   * el flag `anulado = true`. CLAUDE.md §4.7: no se genera contra-asiento,
+   * no se consume número correlativo, el comprobante anulado se preserva
+   * forever. La auditoría la registran los triggers Postgres de comprobantes_audit.
    *
-   *   1) Valida estado = CONTABILIZADO. Rechaza BLOQUEADO (hay que reabrir
-   *      el período primero), ANULADO (idempotencia) y BORRADOR.
-   *   2) Obtiene el período ABIERTO de HOY (no la fecha del original — la
-   *      anulación es un evento posterior). Rechaza si el período actual
-   *      está cerrado.
-   *   3) Asigna correlativo AJUSTE del mes de hoy vía SecuenciaComprobante
-   *      (prefijo J). El correlativo se revierte si la TX falla.
-   *   4) Crea el comprobante de reversión CONTABILIZADO con anulaAId al
-   *      original, líneas invertidas, totales invertidos y glosa prefijada
-   *      "Reversión de {numeroOriginal}: {motivo}".
-   *   5) Marca el original como ANULADO con metadata (anuladoEn, usuario,
-   *      motivo). La back-ref `original.reversion` queda resuelta por el
-   *      @unique([anulaAId]) del schema.
-   *   6) Audita ambos comprobantes (ANULADO en el original,
-   *      CREADO_POR_REVERSION en la reversión).
+   * TODO sdd:comprobantes-anulacion-refactor — task 5.2 reescribirá este método
+   * con validación de período propia del comprobante (no del "hoy"), wrapper
+   * AuditedTransactionRunner, y detección de reapertura activa. Por ahora
+   * se adapta lo mínimo para que el código compile sin EstadoComprobante.ANULADO.
    */
   async anular(
     tenantId: string,
     userId: string,
     id: string,
     motivo: string,
-  ): Promise<{ original: ComprobanteResponseDto; reversion: ComprobanteResponseDto }> {
+  ): Promise<ComprobanteResponseDto> {
     const motivoTrim = (motivo ?? '').trim();
     if (motivoTrim.length < MotivoAnulacionRequeridoError.LONGITUD_MINIMA) {
       throw new MotivoAnulacionRequeridoError(motivoTrim.length);
@@ -485,115 +477,37 @@ export class ComprobantesService {
       if (original.estado === EstadoComprobante.BLOQUEADO) {
         throw new ComprobanteBloqueadoError(id);
       }
-      if (original.estado === EstadoComprobante.ANULADO) {
-        throw new ComprobanteYaAnuladoError(id);
-      }
+      // TODO sdd:comprobantes-anulacion-refactor task 5.2 — replace with anulado flag check
       if (original.estado !== EstadoComprobante.CONTABILIZADO) {
         throw new ComprobanteEstadoInvalidoError(id, original.estado, 'anular');
       }
-
-      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
-      const periodoReversion = await this.periodos.obtenerPorFecha(tenantId, hoy, tx);
-      if (!periodoReversion || periodoReversion.status !== PeriodoFiscalStatus.ABIERTO) {
-        throw new PeriodoReversionNoAbiertoError(hoy.toIso());
+      if (original.anulado) {
+        throw new ComprobanteYaAnuladoError(id);
       }
 
-      // Documentos físicos: borrado inmediato de las asociaciones (design §4.4).
-      // El DocumentoFisico sobrevive y queda re-asociable (típicamente al
-      // comprobante AJUSTE de reversión). Idempotente: no-op si no hay docs.
+      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
+      const periodo = await this.periodos.obtenerPorFecha(tenantId, hoy, tx);
+      if (!periodo || periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+        // TODO sdd:comprobantes-anulacion-refactor task 5.2 — validate period of the comprobante itself
+        throw new PeriodoNoAbiertoError(periodo?.id ?? 'unknown', periodo?.status ?? 'null');
+      }
+
+      // CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
       await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
 
-      const correlativo = await this.secuencia.siguienteCorrelativo(
-        tenantId,
-        TipoComprobante.AJUSTE,
-        hoy.year,
-        hoy.month,
-        tx,
-      );
-      const numeroReversion = NumeroComprobante.of(
-        TipoComprobante.AJUSTE,
-        hoy.year,
-        hoy.month,
-        correlativo,
-      ).toString();
-
-      // Líneas invertidas: lo que era DEBE pasa a HABER y viceversa. Misma
-      // moneda, mismo tipoCambio, mismo contactoId, mismos montos — el único
-      // swap es la columna debito/credito y la de BOB.
-      const lineasInvertidas: LineaPersistData[] = original.lineas.map((l) => ({
-        orden: l.orden,
-        cuentaId: l.cuentaId,
-        contactoId: l.contactoId,
-        moneda: l.moneda,
-        debito: l.credito,
-        credito: l.debito,
-        tipoCambio: l.tipoCambio,
-        debitoBob: l.creditoBob,
-        creditoBob: l.debitoBob,
-        glosaLinea: l.glosaLinea,
-      }));
-
-      const reversion = await this.repo.crearReversion(
-        tenantId,
-        {
-          tipo: TipoComprobante.AJUSTE,
-          numero: numeroReversion,
-          fechaContable: hoy.toDbDate(),
-          periodoFiscalId: periodoReversion.id,
-          glosa: `Reversión de ${original.numero ?? id}: ${motivoTrim}`,
-          monedaPrincipal: original.monedaPrincipal,
-          totalDebitoBob: original.totalCreditoBob,
-          totalCreditoBob: original.totalDebitoBob,
-          createdByUserId: userId,
-          anulaAId: original.id,
-          lineas: lineasInvertidas,
-        },
-        tx,
-      );
-
-      const originalAnulado = await this.repo.marcarAnulado(
-        tenantId,
-        id,
-        {
-          anuladoEn: this.clock.now(),
+      // TODO sdd:comprobantes-anulacion-refactor task 6.2 — use repo.anular() once implemented
+      const anulado = await tx.comprobante.update({
+        where: { id, organizationId: tenantId },
+        data: {
+          anulado: true,
+          fechaAnulacion: this.clock.now(),
           anuladoPorUserId: userId,
           motivoAnulacion: motivoTrim,
         },
-        tx,
-      );
+        include: { lineas: true },
+      });
 
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: AccionAuditoriaComprobante.ANULADO,
-          diff: {
-            motivo: motivoTrim,
-            reversionId: reversion.id,
-            reversionNumero: numeroReversion,
-          },
-        },
-        tx,
-      );
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: reversion.id,
-          userId,
-          accion: AccionAuditoriaComprobante.CREADO_POR_REVERSION,
-          diff: {
-            anulaAId: original.id,
-            anulaANumero: original.numero,
-          },
-        },
-        tx,
-      );
-
-      return {
-        original: toComprobanteResponse(originalAnulado),
-        reversion: toComprobanteResponse(reversion),
-      };
+      return toComprobanteResponse(anulado);
     });
   }
 
