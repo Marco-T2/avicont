@@ -26,8 +26,8 @@ import { AsociarDocumentosDto } from '@/documentos-fisicos/dto/asociar-documento
 import { ComprobantesService } from './comprobantes.service';
 import { AnularComprobanteDto } from './dto/anular-comprobante.dto';
 import { CreateComprobanteDto } from './dto/create-comprobante.dto';
+import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
 import { ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
-import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 
 // ---- Resolución de tenantId desde JWT + header opcional ----------------
 // Mismo patrón que los otros controllers (ver gestiones/cuentas). El header
@@ -89,14 +89,17 @@ export class ComprobantesController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Actualizar un BORRADOR. El PATCH es parcial; si `lineas` se envía se reemplazan todas. Rechaza CONTABILIZADO/BLOQUEADO/anulados.',
+      'Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). ' +
+      'Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional ' +
+      '`contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. ' +
+      'Rechaza BLOQUEADO o anulados.',
   })
   actualizar(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateComprobanteDto,
+    @Body() dto: EditarContabilizadoDto,
   ) {
-    return this.service.actualizarBorrador(resolveTenantId(req), req.user.sub, id, dto);
+    return this.service.patch(resolveTenantId(req), req.user.sub, id, dto);
   }
 
   @Delete(':id')

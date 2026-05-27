@@ -44,6 +44,7 @@ import {
   ListarComprobantesResponseDto,
   toComprobanteResponse,
 } from './dto/comprobante-response.dto';
+import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
 import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
@@ -236,6 +237,32 @@ export class ComprobantesService {
 
       return toComprobanteResponse(persist);
     });
+  }
+
+  /**
+   * Dispatcher unificado del endpoint PATCH /:id. Enruta al método correcto
+   * según el estado actual del comprobante:
+   *   - BORRADOR → actualizarBorrador (permiso contabilidad.asientos.update)
+   *   - CONTABILIZADO → editarContabilizado (permiso contabilidad.asientos.edit-posted — verificado internamente)
+   *
+   * El controller no necesita leer el estado: esta lectura pre-TX es solo para
+   * enrutamiento; la TX del método destino re-lee con lock si aplica.
+   */
+  async patch(
+    tenantId: string,
+    userId: string,
+    id: string,
+    dto: EditarContabilizadoDto,
+  ): Promise<ComprobanteResponseDto> {
+    const actual = await this.repo.findById(tenantId, id);
+    if (!actual) throw new ComprobanteNoEncontradoError(id);
+
+    if (actual.estado === EstadoComprobante.BORRADOR) {
+      // Descartar campos extra que no aplican a borrador (motivo).
+      const { motivo: _motivo, ...updateDto } = dto;
+      return this.actualizarBorrador(tenantId, userId, id, updateDto);
+    }
+    return this.editarContabilizado(tenantId, userId, id, dto);
   }
 
   async eliminarBorrador(tenantId: string, userId: string, id: string): Promise<void> {
@@ -437,7 +464,7 @@ export class ComprobantesService {
     tenantId: string,
     userId: string,
     id: string,
-    dto: UpdateComprobanteDto & { numero?: string },
+    dto: EditarContabilizadoDto,
   ): Promise<ComprobanteResponseDto> {
     // 1) Verificar permiso RBAC (CLAUDE.md §3.7 — desde servicio, no controller).
     // REQ-COMP-EDIT-10.
@@ -479,6 +506,7 @@ export class ComprobantesService {
     return this.auditedTx.run(
       {
         userId,
+        ...(dto.motivo ? { motivo: dto.motivo } : {}),
         ...(reapertura ? { reaperturaId: reapertura.id } : {}),
       },
       async (tx) => {
