@@ -583,4 +583,193 @@ describe('Comprobantes (e2e)', () => {
       expect(res.body.anulado).toBe(true);
     });
   });
+
+  // ==========================================================
+  // Tarea 8.2 — PATCH /:id sobre CONTABILIZADO (editarContabilizado)
+  // Escenarios 1-8 + permisos + idempotencia del spec
+  // ==========================================================
+
+  describe('PATCH /:id — editarContabilizado (periodo abierto)', () => {
+    /** Helper: crea, contabiliza y devuelve { id, numero, token }. */
+    async function crearYContabilizar(slugSuffix = 'e') {
+      const { token, cajaId, ventasId } = await seed(`org-${slugSuffix}`);
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Original para edición',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      const { body: contabilizado } = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      return { id: contabilizado.id as string, numero: contabilizado.numero as string, token, cajaId, ventasId };
+    }
+
+    it('escenario 1: happy path solo cabecera — glosa cambia, número preservado', async () => {
+      const { id, numero, token } = await crearYContabilizar('e1');
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ glosa: 'Glosa corregida post-contabilización' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.glosa).toBe('Glosa corregida post-contabilización');
+      // El número no cambia (§4.9 CLAUDE.md — REQ-COMP-CORRELATIVO-04).
+      expect(res.body.numero).toBe(numero);
+      expect(res.body.estado).toBe(EstadoComprobante.CONTABILIZADO);
+    });
+
+    it('escenario 2: happy path reemplazo de líneas — partida doble re-validada', async () => {
+      const { id, token, cajaId, ventasId } = await crearYContabilizar('e2');
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          glosa: 'Glosa actualizada con nuevas líneas',
+          lineas: [
+            {
+              cuentaId: cajaId,
+              moneda: 'BOB',
+              debito: '2000.00',
+              credito: '0',
+              tipoCambio: '1',
+              debitoBob: '2000.00',
+              creditoBob: '0',
+            },
+            {
+              cuentaId: ventasId,
+              moneda: 'BOB',
+              debito: '0',
+              credito: '2000.00',
+              tipoCambio: '1',
+              debitoBob: '0',
+              creditoBob: '2000.00',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.totalDebitoBob).toBe('2000.00');
+      expect(res.body.totalCreditoBob).toBe('2000.00');
+      expect(res.body.lineas).toHaveLength(2);
+    });
+
+    it('escenario 3: reemplazo con líneas desbalanceadas → 422 COMPROBANTE_DESBALANCEADO', async () => {
+      const { id, token, cajaId, ventasId } = await crearYContabilizar('e3');
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          glosa: 'Intento con desbalance',
+          lineas: [
+            {
+              cuentaId: cajaId,
+              moneda: 'BOB',
+              debito: '500.00',
+              credito: '0',
+              tipoCambio: '1',
+              debitoBob: '500.00',
+              creditoBob: '0',
+            },
+            {
+              cuentaId: ventasId,
+              moneda: 'BOB',
+              debito: '0',
+              credito: '999.00',
+              tipoCambio: '1',
+              debitoBob: '0',
+              creditoBob: '999.00',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error?.code).toBe('COMPROBANTE_DESBALANCEADO');
+    });
+
+    it('escenario 8: enviar número distinto al actual → 409 COMPROBANTE_EDIT_NUMERO_INMUTABLE', async () => {
+      const { id, token } = await crearYContabilizar('e8');
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ numero: 'D2604-999999', glosa: 'Intentar cambiar el número' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error?.code).toBe('COMPROBANTE_EDIT_NUMERO_INMUTABLE');
+    });
+
+    it('enviar número igual al actual → se ignora silenciosamente', async () => {
+      const { id, numero, token } = await crearYContabilizar('eig');
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ numero, glosa: 'Con el mismo número — no debe rechazar' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.numero).toBe(numero);
+    });
+
+    it('editarContabilizado anulado → 409 COMPROBANTE_ANULADO_NO_EDITABLE', async () => {
+      const { id, token } = await crearYContabilizar('ean');
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Anulación previa para bloquear la edición posterior' });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ glosa: 'Intentar editar un comprobante anulado' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error?.code).toBe('COMPROBANTE_ANULADO_NO_EDITABLE');
+    });
+
+    it('idempotencia: dos PATCH iguales consecutivos → mismo resultado', async () => {
+      const { id, token } = await crearYContabilizar('eid');
+
+      const p1 = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ glosa: 'Glosa idempotente' });
+      const p2 = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ glosa: 'Glosa idempotente' });
+
+      expect(p1.status).toBe(200);
+      expect(p2.status).toBe(200);
+      expect(p1.body.glosa).toBe(p2.body.glosa);
+    });
+
+    it('PATCH sobre BORRADOR sigue usando el path actualizarBorrador (dispatcher)', async () => {
+      const { token, cajaId, ventasId } = await seed('org-bor');
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'BORRADOR para parche',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${borrador.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ glosa: 'Glosa actualizada en borrador' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.estado).toBe(EstadoComprobante.BORRADOR);
+      expect(res.body.glosa).toBe('Glosa actualizada en borrador');
+    });
+  });
 });

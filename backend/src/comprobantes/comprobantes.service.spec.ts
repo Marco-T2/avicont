@@ -1463,12 +1463,14 @@ describe('ComprobantesService', () => {
 
       await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dtoEditar());
 
-      // El repo recibe las líneas nuevas
+      // El repo recibe las líneas nuevas Y los totales recalculados.
       expect(repo.reemplazarComprobante).toHaveBeenCalledWith(
         TENANT_ID,
         'comp-c',
         expect.objectContaining({
           lineas: expect.arrayContaining([expect.objectContaining({ cuentaId: CUENTA_CAJA_ID })]),
+          totalDebitoBob: expect.anything(),
+          totalCreditoBob: expect.anything(),
         }),
         expect.anything(),
       );

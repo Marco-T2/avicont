@@ -635,10 +635,12 @@ export class ComprobantesService {
             glosa: glosaEfectiva,
             monedaPrincipal: monedaEfectiva,
             lineas: lineasPersist,
+            // Totales recalculados para mantener la cabecera sincronizada con las líneas.
+            totalDebitoBob: totales.debito.amount,
+            totalCreditoBob: totales.credito.amount,
           },
           tx,
         );
-        void totales; // totales usados en cache si repo lo requiere en el futuro
 
         return toComprobanteResponse(editado);
       },

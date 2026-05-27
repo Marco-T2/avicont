@@ -49,6 +49,11 @@ export interface ComprobanteReemplazarComprobanteData {
   glosa: string;
   monedaPrincipal: Moneda;
   lineas: LineaPersistData[];
+  // Totales recalculados a partir de las lineas (Código Tributario art. 47 — partida doble).
+  // Se persisten en la cabecera para que los reportes no tengan que sumar lineas en tiempo real.
+  // Opcional para borradores (donde los totales no son significativos hasta contabilizar).
+  totalDebitoBob?: Prisma.Decimal;
+  totalCreditoBob?: Prisma.Decimal;
 }
 
 /**

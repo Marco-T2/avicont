@@ -93,6 +93,8 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         periodoFiscalId: data.periodoFiscalId,
         glosa: data.glosa,
         monedaPrincipal: data.monedaPrincipal,
+        ...(data.totalDebitoBob !== undefined ? { totalDebitoBob: data.totalDebitoBob } : {}),
+        ...(data.totalCreditoBob !== undefined ? { totalCreditoBob: data.totalCreditoBob } : {}),
         lineas: {
           deleteMany: {},
           create: data.lineas.map((l) => ({
