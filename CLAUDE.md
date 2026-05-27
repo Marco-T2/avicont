@@ -586,18 +586,21 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 - Fuente de `tenantId`: `JWT.activeTenantId`. Header `X-Tenant-ID` solo para super-admin, siempre auditado.
 - Excepción: catálogos compartidos (`CotizacionUfv`, `TipoCambio` BCB) no tienen `tenantId` — solo lectura desde cualquier tenant.
 
-### 4.3 Inmutabilidad post-CONTABILIZADO
+### 4.3 Edición post-CONTABILIZADO (mientras el período esté abierto)
 
-- Número de comprobante, `fechaContable` y `periodoFiscalId` son **inmutables** desde el primer `CONTABILIZADO`.
-- Corrección de período, fecha, o NIT de cliente/proveedor = anular + re-crear (no `UPDATE`).
-- Transiciones prohibidas: `BLOQUEADO → CONTABILIZADO`, `ANULADO → *`, `CONTABILIZADO → BORRADOR`.
-- `UPDATE` directo en BD para corregir datos → **prohibido**. Siempre vía sistema, con auditoría.
+- Comprobantes en estado `CONTABILIZADO` son **editables** si el `PeriodoFiscal` está abierto. Aplica a cabecera (glosa, tipo, `fechaContable`, etc.) y a líneas (que se borran físicamente y se re-insertan en bloque — la cabecera con su `id` se preserva).
+- **Excepción inviolable**: el número correlativo (`D2605-000042`) es **inmutable desde la primera contabilización**. Es código interno del sistema; NO se presenta al usuario como referencia editable. Para referencias humanas usar `documentoFisico` o `numeroReferencia`.
+- Mover `fechaContable` a otro período exige que el período destino también esté abierto (ver §4.4).
+- Toda modificación queda auditada vía triggers Postgres en tabla `comprobantes_audit` (capturan `OLD` y `NEW` row completos, usuario, timestamp, motivo opcional). Triggers, no audit en código, para que un `UPDATE` directo en BD también quede trazado.
+- `UPDATE` directo en BD bypasseando triggers → **prohibido**. Siempre vía sistema.
+- Transiciones prohibidas: `BLOQUEADO → CONTABILIZADO`, `CONTABILIZADO → BORRADOR`.
 
 ### 4.4 Period lock
 
-- Prohibido crear o editar comprobante con `fechaContable` en período `CERRADO` o `BLOQUEADO`.
+- Prohibido crear, editar o anular comprobante con `fechaContable` en período `CERRADO` o `BLOQUEADO`.
 - Cerrar período N requiere N-1 cerrado y cero borradores en N. No se saltean períodos.
 - Validación del cierre debe estar **dentro de la transacción** con `FOR UPDATE` sobre el período — no sólo pre-TX. Cicatriz F-03.
+- **Sin bypass de admin**: para tocar algo de un período cerrado, el admin pasa por el flujo de reapertura (`PeriodoFiscalReopening`) → el período vuelve a estado abierto → los usuarios con permisos editan/anulan → admin cierra de nuevo. El flag `fueDuranteReapertura` en `comprobantes_audit` distingue cambios normales de los hechos durante una reapertura excepcional.
 
 ### 4.5 Dinero = Decimal, nunca Float
 
@@ -613,10 +616,15 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 - `new Date()` **prohibido** en `src/modules/**/domain/` y `src/modules/**/*.service.ts`. Usar `ClockPort.hoyEnLaPaz()` inyectable.
 - Contenedor Docker `TZ=UTC`. `America/La_Paz` solo en capa de presentación.
 
-### 4.7 No soft-delete en contabilidad
+### 4.7 Anulación de comprobantes vía flag (no reversa automática)
 
-- Prohibido `deletedAt` en `Comprobante`, `Asiento`, `Factura`, `LineaComprobante`.
-- Contabilidad no elimina: anula con estado `ANULADO` + reversión de balances. El número se conserva, no se reutiliza.
+- Anulación de comprobantes mediante flag `anulado BOOLEAN` + `fechaAnulacion`, `motivoAnulacion` (mínimo 10 caracteres significativos), `anuladoPorUserId`.
+- El comprobante anulado **se preserva en BD para siempre**. No se elimina, no se actualiza su contenido. Su número correlativo se conserva y no se reutiliza.
+- **Excluido de estados financieros y reportes oficiales por default**. Toggle "incluir anulados" disponible en reportes para auditoría interna; en reportes oficiales aparece con marca visual (línea diagonal + nota "Anulado el dd/mm/yyyy — motivo: …").
+- **No se generan contra-asientos automáticos**. El tipo `AJUSTE` queda reservado para su semántica contable real (depreciaciones, diferenciales de cambio, devengamientos, regulaciones de inventario).
+- Auditoría de anulación vía triggers Postgres en `comprobantes_audit` (mismo mecanismo que edit — ver §4.3).
+- `Factura` sigue sin `deletedAt`. `LineaComprobante` se borra físicamente solo como parte del re-insert atómico durante edit del comprobante padre (ver §4.3); fuera de ese flujo, no se borra.
+- Posicionamiento: este modelo se eligió conscientemente para PyMEs bolivianas con control interno (estilo QuickBooks/Sage default). NO aplica a empresas con auditoría externa rígida (ver §10.9).
 
 ### 4.8 Unicidad de documentos tributarios (defense in depth)
 
@@ -630,6 +638,7 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 - Asignación bajo `FOR UPDATE` en tabla `SecuenciaComprobante`. Atómica.
 - **Prohibido** `SELECT MAX(numero) + 1` o equivalentes — cicatriz `VOUCHER_NUMBER_CONTENTION`.
 - Auto-entries (asientos generados por venta/compra/pago) exigen `UNIQUE(origenTipo, origenId)` + `upsert`, nunca `create` ciego.
+- El número correlativo es **inmutable**: una vez asignado, no se edita ni siquiera por admin en período abierto. Es identificador interno del sistema (ver §4.3). Para referencias humanas usar `documentoFisico` o `numeroReferencia`.
 
 ---
 
@@ -771,7 +780,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Decisión | Resumen | Sección |
 |----------|---------|---------|
 | Partida doble | Validada en `montoBob`, tolerancia ±Bs 0.01 | §4.1 |
-| Estados de comprobante | BORRADOR → CONTABILIZADO → BLOQUEADO / ANULADO | §4.1 |
+| Estados de comprobante | BORRADOR → CONTABILIZADO → BLOQUEADO. Flag `anulado` ortogonal al estado | §4.1 / §4.7 |
 | Cierre mensual | Manual, bloquea al ejecutar, requiere período N-1 cerrado | §4.1 |
 | Fecha contable | `FechaContable` value object calendario puro, nunca UTC | §4.3 |
 | Timestamps de auditoría | UTC en BD, renderizados en America/La_Paz en presentación | §4.3 |
@@ -845,6 +854,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Módulo `Factura` (desglose IVA/IT, NIT emisor/receptor, código de autorización) | Su único destino era alimentar el LCV/RCV, ahora externo. `documentos-fisicos` ya cubre el control interno del papel. Descartado/diferido junto con el RCV |
 | Validación online de NIT con padrón SIN | Solo formato (7-12 dígitos), sin consulta externa |
 | Alertas por período abierto demasiado tiempo | Descartado — no lo piden los contadores |
+| Auditoría externa rígida (IFRS full, SOX, reproducibilidad bitemporal estricta de reportes) | Avicont está diseñado para PyMEs bolivianas con control contable interno (estilo QuickBooks/Sage default). El modelo de anulación (§4.7), edición post-CONTABILIZADO (§4.3) y trazabilidad vía triggers prioriza velocidad operativa sobre reproducibilidad bitemporal estricta. Empresas que requieran ese nivel de rigor deben evaluar productos enterprise (SAP, Oracle, Sage Compliance Mode). Decidido 2026-05-26 |
 
 ### 10.10 Decisiones diferidas (a re-evaluar en el futuro)
 
