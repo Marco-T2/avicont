@@ -169,21 +169,34 @@ describe('Comprobantes (e2e)', () => {
     expect(listRes.body.items[0].id).toBe(id);
 
     // 5) Anular — flag-based model (CLAUDE.md §4.7).
-    // NOTE: comprobantes-anulacion-refactor task 1.2 — assertions for { original, reversion }
-    // shape removed. Full e2e suite for flag-based anulacion will be written in task 8.1 once
-    // the schema migration lands. For now we just verify the endpoint still returns 200/201
-    // and that the comprobante has anulado=true.
     const anularRes = await request(app.getHttpServer())
       .post(`/api/comprobantes/${id}/anular`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ motivo: 'Error en la imputación al cliente' });
-    expect([200, 201]).toContain(anularRes.status);
-    // After migration: anulado=true, fechaAnulacion populated, motivoAnulacion populated.
-    // For now, just verify the response body has an id (comprobante returned).
-    expect(anularRes.body).toHaveProperty('id', id);
+      .send({ motivo: 'Error en la imputación al cliente detallada' });
+    expect(anularRes.status).toBe(201);
+    // El comprobante anulado se preserva en BD con sus datos originales (§4.7).
+    expect(anularRes.body.id).toBe(id);
+    expect(anularRes.body.anulado).toBe(true);
+    expect(anularRes.body.fechaAnulacion).toBeTruthy();
+    expect(anularRes.body.motivoAnulacion).toBe('Error en la imputación al cliente detallada');
+    expect(anularRes.body.anuladoPorUserId).toBeTruthy();
+    // El estado permanece CONTABILIZADO — el flag es ortogonal (§4.7 CLAUDE.md).
+    expect(anularRes.body.estado).toBe(EstadoComprobante.CONTABILIZADO);
+    // El número correlativo se preserva (§4.9 CLAUDE.md).
+    expect(anularRes.body.numero).toMatch(/^I2604-\d{6}$/);
 
-    // 6) Auditoría — shape will change in task 8.3 (comprobantes_audit based).
-    // Removed assertions on specific accion values; they will be re-added in task 8.3.
+    // 6) El comprobante anulado NO aparece en el listado por default.
+    const listTrasAnulRes = await request(app.getHttpServer())
+      .get('/api/comprobantes')
+      .set('Authorization', `Bearer ${token}`);
+    expect(listTrasAnulRes.body.total).toBe(0);
+
+    // 7) Con ?incluirAnulados=true sí aparece.
+    const listConAnuladosRes = await request(app.getHttpServer())
+      .get('/api/comprobantes?incluirAnulados=true')
+      .set('Authorization', `Bearer ${token}`);
+    expect(listConAnuladosRes.body.total).toBe(1);
+    expect(listConAnuladosRes.body.items[0].anulado).toBe(true);
   });
 
   // ==========================================================
@@ -371,5 +384,203 @@ describe('Comprobantes (e2e)', () => {
   it('sin auth token → 401', async () => {
     const res = await request(app.getHttpServer()).get('/api/comprobantes');
     expect(res.status).toBe(401);
+  });
+
+  // ==========================================================
+  // Tarea 8.1 — POST /:id/anular (flag-based model §4.7)
+  // Escenarios 9-15, 24 del spec comprobantes-anulacion-refactor
+  // ==========================================================
+
+  describe('POST /:id/anular — flag-based anulación', () => {
+    it('escenario 9: anular CONTABILIZADO → anulado=true + 3 metadatos + numero preservado', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 9 — anulación flag',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Motivo de anulación suficientemente largo' });
+
+      expect(res.status).toBe(201);
+      // El flag se activa (REQ-COMP-ANULAR-01).
+      expect(res.body.anulado).toBe(true);
+      // Los 3 metadatos se persisten (REQ-COMP-ANULAR-05).
+      expect(res.body.fechaAnulacion).toBeTruthy();
+      expect(res.body.motivoAnulacion).toBe('Motivo de anulación suficientemente largo');
+      expect(res.body.anuladoPorUserId).toBeTruthy();
+      // El estado es ortogonal al flag — permanece CONTABILIZADO (§4.7 CLAUDE.md).
+      expect(res.body.estado).toBe(EstadoComprobante.CONTABILIZADO);
+      // El número correlativo se preserva y no se reutiliza (§4.9 CLAUDE.md, escenario 24).
+      expect(res.body.numero).toMatch(/^D2604-\d{6}$/);
+      // La respuesta es el comprobante con `lineas` (shape ComprobanteResponseDto — REQ-COMP-ANULAR-11).
+      expect(Array.isArray(res.body.lineas)).toBe(true);
+    });
+
+    it('escenario 10: anular dos veces → 409 COMPROBANTE_ANULAR_YA_ANULADO', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 10 — doble anulación',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Primera anulación de prueba' });
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Segunda anulación que debe rechazarse' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error?.code).toBe('COMPROBANTE_ANULAR_YA_ANULADO');
+    });
+
+    it('escenario 11: motivo con solo 5 chars → 400 (DTO ValidationPipe)', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 11 — motivo corto',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'corto' });
+
+      // ValidationPipe rechaza antes de llegar al service (min 10 chars en el DTO).
+      expect(res.status).toBe(400);
+    });
+
+    it('escenario 12: motivo con 10+ chars de solo spaces → 422 COMPROBANTE_ANULAR_MOTIVO_INVALIDO', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 12 — whitespace motivo',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: '          ' }); // 10 espacios — pasa el DTO pero falla el trim del service
+
+      expect(res.status).toBe(422);
+      expect(res.body.error?.code).toBe('COMPROBANTE_ANULAR_MOTIVO_INVALIDO');
+    });
+
+    it('escenario 13: anular BORRADOR → 409 COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 13 — anular borrador',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Intentar anular un borrador no debe funcionar' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error?.code).toBe('COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO');
+    });
+
+    it('escenario 24: número correlativo se preserva tras anular', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 24 — número preservado',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      const { body: contabilizado } = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      const numeroOriginal: string = contabilizado.numero;
+
+      const { body: anulado } = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Verificar que el número no cambia tras anulación' });
+
+      // El número es inmutable (§4.9 CLAUDE.md).
+      expect(anulado.numero).toBe(numeroOriginal);
+    });
+
+    it('GET /:id devuelve comprobante anulado aunque no aparezca en el listado default', async () => {
+      const { token, cajaId, ventasId } = await seed();
+
+      const { body: borrador } = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-22',
+          glosa: 'Escenario 18 — obtener individualmente',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      await request(app.getHttpServer())
+        .post(`/api/comprobantes/${borrador.id}/anular`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ motivo: 'Motivo para la prueba de obtener individual' });
+
+      // GET /:id siempre devuelve el comprobante, incluso anulado (REQ-COMP-REPORTES-02).
+      const res = await request(app.getHttpServer())
+        .get(`/api/comprobantes/${borrador.id}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      expect(res.body.anulado).toBe(true);
+    });
   });
 });
