@@ -3,9 +3,9 @@
 // es `comprobantes` (resolver periodoFiscalId desde fechaContable al crear y
 // editar comprobantes; encontrar el período abierto corriente al anular).
 //
-// Expone la superficie MÍNIMA: un sólo método de lookup por fecha. No se
-// filtran listados, estado cruzado, ni métodos de escritura — para eso está
-// PeriodoFiscalRepositoryPort, interno al módulo.
+// Expone la superficie MÍNIMA: métodos de lookup por fecha y por reapertura
+// activa. No se filtran listados, estado cruzado, ni métodos de escritura —
+// para eso está PeriodoFiscalRepositoryPort, interno al módulo.
 
 import type { PeriodoFiscalStatus, Prisma } from '@prisma/client';
 
@@ -16,6 +16,17 @@ export const PERIODOS_READER_PORT = Symbol('PERIODOS_READER_PORT');
 export interface PeriodoLite {
   id: string;
   status: PeriodoFiscalStatus;
+}
+
+/**
+ * Reapertura activa de un período fiscal: la ventana de tiempo durante la
+ * cual se permite editar/anular comprobantes en un período cerrado.
+ * Solo contiene los campos que el módulo `comprobantes` necesita para
+ * propagar el contexto de auditoría (`reaperturaId`, `reopenedAt`).
+ */
+export interface ReaperturaActiva {
+  id: string;
+  reopenedAt: Date;
 }
 
 export abstract class PeriodosReaderPort {
@@ -39,4 +50,28 @@ export abstract class PeriodosReaderPort {
     fecha: FechaContable,
     tx?: Prisma.TransactionClient,
   ): Promise<PeriodoLite | null>;
+
+  /**
+   * Devuelve la reapertura activa (sin `reclosedAt`) del período indicado,
+   * scoped al tenant por defense in depth (§4.2 CLAUDE.md).
+   *
+   * Retorna `null` si:
+   *   - No existe ninguna reapertura para el período.
+   *   - Todas las reaperturas están cerradas (`reclosedAt != null`).
+   *
+   * Si existen múltiples reaperturas activas (caso patológico), devuelve
+   * la más reciente ordenando por `reopenedAt DESC`.
+   *
+   * El consumidor `comprobantes` usa este método para detectar si una
+   * operación ocurre durante una reapertura activa y propagar el
+   * `reaperturaId` al wrapper `AuditedTransactionRunner` (REQ-COMP-REAPERTURA-01/02).
+   *
+   * Acepta opcionalmente un `tx` de Prisma para ejecutarse dentro de la
+   * transacción del caller.
+   */
+  abstract obtenerReaperturaActiva(
+    tenantId: string,
+    periodoId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ReaperturaActiva | null>;
 }
