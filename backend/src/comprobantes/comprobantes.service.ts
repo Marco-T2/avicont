@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AccionAuditoriaComprobante,
   type ComprobanteDocumentoFisico,
   EstadoComprobante,
   Moneda,
@@ -35,23 +34,32 @@ import {
   PERIODOS_READER_PORT,
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
+import { RbacService } from '@/rbac/rbac.service';
 
 import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
+import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { CreateComprobanteDto, CreateLineaDto } from './dto/create-comprobante.dto';
 import {
   ComprobanteResponseDto,
   ListarComprobantesResponseDto,
   toComprobanteResponse,
 } from './dto/comprobante-response.dto';
+import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
 import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
-  ComprobanteBloqueadoError,
+  ComprobanteAnuladoNoAnulableError,
+  ComprobanteAnuladoNoEditableError,
+  ComprobanteAnularBorradorNoPermitidoError,
+  ComprobanteAnularMotivoInvalidoError,
+  ComprobanteAnularPeriodoCerradoError,
   ComprobanteDocumentoNoDesasociableContabilizadoError,
+  ComprobanteEditarContabilizadoEnPeriodoCerradoError,
+  ComprobanteEditarFechaPeriodoDestinoCerradoError,
   ComprobanteEstadoInvalidoError,
+  ComprobanteEstadoNoEditableContabilizadoError,
   ComprobanteNoEncontradoError,
   ComprobanteNoEsBorradorError,
-  ComprobanteYaAnuladoError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
   ContactoRequeridoError,
@@ -64,9 +72,9 @@ import {
   LineaAmbiguaDebitoCreditoError,
   MonedaIncompatibleCuentaError,
   MontoBobIncoherenteError,
-  MotivoAnulacionRequeridoError,
+  NumeroCorrelativoInmutableError,
   PeriodoNoAbiertoError,
-  PeriodoReversionNoAbiertoError,
+  SinPermisoEditarContabilizadoError,
   TipoCambioInvalidoError,
   TipoDocumentoIncompatibleConComprobanteError,
 } from './domain/comprobante-errors';
@@ -78,6 +86,7 @@ import {
 import { NumeroComprobante } from './domain/numero-comprobante';
 import {
   COMPROBANTE_REPOSITORY_PORT,
+  AnularData,
   ComprobanteConLineas,
   ComprobanteRepositoryPort,
   LineaPersistData,
@@ -117,6 +126,11 @@ export class ComprobantesService {
     @Inject(ASOCIACION_COMPROBANTE_REPOSITORY_PORT)
     private readonly asociacionRepo: AsociacionComprobanteRepositoryPort,
     private readonly prisma: PrismaService,
+    // Mismo módulo — inyección directa OK per CLAUDE.md §3.7
+    private readonly auditedTx: AuditedTransactionRunner,
+    // RBAC checker para verificar permisos de acciones específicas
+    // (e.g. contabilidad.asientos.edit-posted) desde el service.
+    private readonly rbac: RbacService,
   ) {}
 
   // ============================================================
@@ -156,6 +170,8 @@ export class ComprobantesService {
         ? { fechaHasta: FechaContable.fromIso(query.fechaHasta).toDbDate() }
         : {}),
       ...(query.q ? { q: query.q } : {}),
+      // REQ-COMP-REPORTES-01: default oculta anulados; toggle expone.
+      incluirAnulados: query.incluirAnulados ?? false,
     };
 
     const { items, total } = await this.repo.listar(tenantId, filtros, { page, limit });
@@ -176,7 +192,9 @@ export class ComprobantesService {
     userId: string,
     dto: CreateComprobanteDto,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    // Los triggers Postgres en comprobantes_audit capturan INSERT automáticamente;
+    // auditedTx.run inyecta app.audit_user_id para que el trigger sepa el actor.
+    return this.auditedTx.run({ userId }, async (tx) => {
       const resolved = await this.resolverYValidarBorrador(
         tenantId,
         {
@@ -195,22 +213,6 @@ export class ComprobantesService {
         tx,
       );
 
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: persist.id,
-          userId,
-          accion: AccionAuditoriaComprobante.CREADO,
-          diff: {
-            tipo: dto.tipo,
-            fechaContable: dto.fechaContable,
-            lineasCount: dto.lineas.length,
-            monedaPrincipal: resolved.monedaPrincipal,
-          },
-        },
-        tx,
-      );
-
       return toComprobanteResponse(persist);
     });
   }
@@ -221,7 +223,7 @@ export class ComprobantesService {
     id: string,
     dto: UpdateComprobanteDto,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.auditedTx.run({ userId }, async (tx) => {
       const actual = await this.repo.findById(tenantId, id, tx);
       if (!actual) throw new ComprobanteNoEncontradoError(id);
       if (actual.estado !== EstadoComprobante.BORRADOR) {
@@ -231,38 +233,52 @@ export class ComprobantesService {
       const fusionado = this.fusionarConActual(actual, dto);
       const resolved = await this.resolverYValidarBorrador(tenantId, fusionado, tx);
 
-      const persist = await this.repo.reemplazarBorrador(tenantId, id, resolved, tx);
-
-      const camposCambiados = Object.keys(dto);
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: AccionAuditoriaComprobante.EDITADO,
-          diff: {
-            campos: camposCambiados,
-            lineasCount: resolved.lineas.length,
-            fechaContable: fusionado.fechaContable,
-          },
-        },
-        tx,
-      );
+      const persist = await this.repo.reemplazarComprobante(tenantId, id, resolved, tx);
 
       return toComprobanteResponse(persist);
     });
   }
 
-  async eliminarBorrador(tenantId: string, id: string): Promise<void> {
+  /**
+   * Dispatcher unificado del endpoint PATCH /:id. Enruta al método correcto
+   * según el estado actual del comprobante:
+   *   - BORRADOR → actualizarBorrador (permiso contabilidad.asientos.update)
+   *   - CONTABILIZADO → editarContabilizado (permiso contabilidad.asientos.edit-posted — verificado internamente)
+   *
+   * El controller no necesita leer el estado: esta lectura pre-TX es solo para
+   * enrutamiento; la TX del método destino re-lee con lock si aplica.
+   */
+  async patch(
+    tenantId: string,
+    userId: string,
+    id: string,
+    dto: EditarContabilizadoDto,
+  ): Promise<ComprobanteResponseDto> {
+    const actual = await this.repo.findById(tenantId, id);
+    if (!actual) throw new ComprobanteNoEncontradoError(id);
+
+    if (actual.estado === EstadoComprobante.BORRADOR) {
+      // Descartar campos extra que no aplican a borrador (motivo).
+      const { motivo: _motivo, ...updateDto } = dto;
+      return this.actualizarBorrador(tenantId, userId, id, updateDto);
+    }
+    return this.editarContabilizado(tenantId, userId, id, dto);
+  }
+
+  async eliminarBorrador(tenantId: string, userId: string, id: string): Promise<void> {
+    // Pre-check fuera de TX: si el estado ya no es BORRADOR, fail rápido.
     const actual = await this.repo.findById(tenantId, id);
     if (!actual) throw new ComprobanteNoEncontradoError(id);
     if (actual.estado !== EstadoComprobante.BORRADOR) {
       throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'eliminar');
     }
-    const deleted = await this.repo.eliminarBorrador(tenantId, id);
-    // Si otra request anuló o contabilizó entre el read y el delete, deleteMany
-    // devuelve 0. Reportamos 404 para que el cliente re-lea el estado actual.
-    if (deleted !== 1) throw new ComprobanteNoEncontradoError(id);
+    // TX auditada: trigger DELETE en comprobantes necesita app.audit_user_id.
+    await this.auditedTx.run({ userId }, async (tx) => {
+      const deleted = await this.repo.eliminarBorrador(tenantId, id, tx);
+      // Si otra request anuló o contabilizó entre el read y el delete, deleteMany
+      // devuelve 0. Reportamos 404 para que el cliente re-lea el estado actual.
+      if (deleted !== 1) throw new ComprobanteNoEncontradoError(id);
+    });
   }
 
   // ============================================================
@@ -292,7 +308,7 @@ export class ComprobantesService {
     userId: string,
     id: string,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.auditedTx.run({ userId }, async (tx) => {
       const actual = await this.repo.findById(tenantId, id, tx);
       if (!actual) throw new ComprobanteNoEncontradoError(id);
       if (actual.estado !== EstadoComprobante.BORRADOR) {
@@ -410,7 +426,9 @@ export class ComprobantesService {
       // 5) Totales cache en BOB.
       const totales = calcularTotalesBob(lineasParaValidar);
 
-      // 6) Update + auditoría.
+      // 6) Update de estado + número + totales. Los triggers Postgres en
+      // comprobantes_audit capturan el UPDATE automáticamente con el actor
+      // inyectado por auditedTx (app.audit_user_id).
       const persisted = await this.repo.contabilizar(
         tenantId,
         id,
@@ -421,180 +439,345 @@ export class ComprobantesService {
         },
         tx,
       );
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: AccionAuditoriaComprobante.CONTABILIZADO,
-          diff: {
-            numero,
-            totales: {
-              debito: totales.debito.toBob(),
-              credito: totales.credito.toBob(),
-            },
-          },
-        },
-        tx,
-      );
 
       return toComprobanteResponse(persisted);
     });
   }
 
   // ============================================================
-  // Escritura — ANULAR (CONTABILIZADO → ANULADO + reversión AJUSTE)
+  // Escritura — EDITAR CONTABILIZADO (CLAUDE.md §4.3)
   // ============================================================
 
   /**
-   * Anula un comprobante CONTABILIZADO creando un comprobante AJUSTE de
-   * reversión con las líneas invertidas (DEBE ↔ HABER, incluyendo
-   * debitoBob ↔ creditoBob). Flujo (todo en una sola TX):
+   * Edita los campos editables de un comprobante CONTABILIZADO dentro de un
+   * período abierto (o reapertura activa). El número correlativo es INMUTABLE
+   * (CLAUDE.md §4.9 REQ-COMP-CORRELATIVO-02). Requiere permiso RBAC
+   * `contabilidad.asientos.edit-posted` (REQ-COMP-EDIT-10).
    *
-   *   1) Valida estado = CONTABILIZADO. Rechaza BLOQUEADO (hay que reabrir
-   *      el período primero), ANULADO (idempotencia) y BORRADOR.
-   *   2) Obtiene el período ABIERTO de HOY (no la fecha del original — la
-   *      anulación es un evento posterior). Rechaza si el período actual
-   *      está cerrado.
-   *   3) Asigna correlativo AJUSTE del mes de hoy vía SecuenciaComprobante
-   *      (prefijo J). El correlativo se revierte si la TX falla.
-   *   4) Crea el comprobante de reversión CONTABILIZADO con anulaAId al
-   *      original, líneas invertidas, totales invertidos y glosa prefijada
-   *      "Reversión de {numeroOriginal}: {motivo}".
-   *   5) Marca el original como ANULADO con metadata (anuladoEn, usuario,
-   *      motivo). La back-ref `original.reversion` queda resuelta por el
-   *      @unique([anulaAId]) del schema.
-   *   6) Audita ambos comprobantes (ANULADO en el original,
-   *      CREADO_POR_REVERSION en la reversión).
+   * Si se proveen `lineas` se reemplazan completamente y se re-valida partida
+   * doble. Si no se proveen, se mantienen las actuales.
+   *
+   * La TX es `auditedTx.run` para que el trigger de `comprobantes_audit`
+   * capture el actor y motivo (REQ-COMP-AUDIT-04).
+   */
+  async editarContabilizado(
+    tenantId: string,
+    userId: string,
+    id: string,
+    dto: EditarContabilizadoDto,
+  ): Promise<ComprobanteResponseDto> {
+    // 1) Verificar permiso RBAC (CLAUDE.md §3.7 — desde servicio, no controller).
+    // REQ-COMP-EDIT-10.
+    const tienePermiso = await this.rbac.hasPermission(
+      userId,
+      tenantId,
+      'contabilidad.asientos.edit-posted',
+    );
+    if (!tienePermiso) {
+      throw new SinPermisoEditarContabilizadoError(userId);
+    }
+
+    // 2) Leer pre-TX para validar estado y obtener periodoFiscalId.
+    const comprobantePreTx = await this.repo.findById(tenantId, id);
+    if (!comprobantePreTx) throw new ComprobanteNoEncontradoError(id);
+
+    // 3) Validar estado (no necesita lock — CONTABILIZADO no puede retroceder).
+    this.validarEstadoParaEditar(
+      comprobantePreTx.id,
+      comprobantePreTx.estado,
+      comprobantePreTx.anulado,
+    );
+
+    // 4) Número inmutable — CLAUDE.md §4.9.
+    if (dto.numero !== undefined && dto.numero !== comprobantePreTx.numero) {
+      throw new NumeroCorrelativoInmutableError(
+        comprobantePreTx.id,
+        comprobantePreTx.numero ?? '',
+        dto.numero,
+      );
+    }
+
+    // 5) Resolver reapertura activa del período origen pre-TX.
+    const reapertura = await this.periodos.obtenerReaperturaActiva(
+      tenantId,
+      comprobantePreTx.periodoFiscalId,
+    );
+
+    return this.auditedTx.run(
+      {
+        userId,
+        ...(dto.motivo ? { motivo: dto.motivo } : {}),
+        ...(reapertura ? { reaperturaId: reapertura.id } : {}),
+      },
+      async (tx) => {
+        // 6) Re-leer dentro de la TX para estado fresco.
+        const original = await this.repo.findById(tenantId, id, tx);
+        if (!original) throw new ComprobanteNoEncontradoError(id);
+
+        this.validarEstadoParaEditar(original.id, original.estado, original.anulado);
+
+        // 7) Resolver campos efectivos (usar los del dto o los actuales).
+        const tipoEfectivo = dto.tipo ?? original.tipo;
+        const fechaEfectiva = dto.fechaContable
+          ? FechaContable.fromIso(dto.fechaContable)
+          : FechaContable.fromDbDate(original.fechaContable);
+        const glosaEfectiva = dto.glosa ?? original.glosa;
+        const monedaEfectiva = dto.monedaPrincipal ?? original.monedaPrincipal;
+
+        // 8) Validar período origen (con reapertura si aplica).
+        const periodoOrigen = await this.periodos.obtenerPorFecha(
+          tenantId,
+          FechaContable.fromDbDate(original.fechaContable),
+          tx,
+        );
+        if (!periodoOrigen) {
+          throw new GestionNoAbiertaError(FechaContable.fromDbDate(original.fechaContable).toIso());
+        }
+        if (periodoOrigen.status !== PeriodoFiscalStatus.ABIERTO && !reapertura) {
+          throw new ComprobanteEditarContabilizadoEnPeriodoCerradoError(
+            periodoOrigen.id,
+            periodoOrigen.status,
+          );
+        }
+
+        // 9) Si la fecha cambió a otro período, validar período destino.
+        const fechaOriginalIso = FechaContable.fromDbDate(original.fechaContable).toIso();
+        let periodoEfectivo = periodoOrigen;
+        if (dto.fechaContable && dto.fechaContable !== fechaOriginalIso) {
+          const periodoDestino = await this.periodos.obtenerPorFecha(tenantId, fechaEfectiva, tx);
+          if (!periodoDestino) throw new GestionNoAbiertaError(fechaEfectiva.toIso());
+          if (periodoDestino.status !== PeriodoFiscalStatus.ABIERTO) {
+            throw new ComprobanteEditarFechaPeriodoDestinoCerradoError(
+              periodoDestino.id,
+              periodoDestino.status,
+            );
+          }
+          periodoEfectivo = periodoDestino;
+        }
+
+        // 10) Construir líneas a persistir — usar las del DTO o las actuales.
+        // No reutilizamos resolverYValidarBorrador porque ese helper valida
+        // PeriodoNoAbierto internamente y aquí ya hemos aceptado la reapertura.
+        const lineasInput: CreateLineaDto[] =
+          dto.lineas ??
+          original.lineas
+            .slice()
+            .sort((a, b) => a.orden - b.orden)
+            .map((l) => ({
+              cuentaId: l.cuentaId,
+              ...(l.contactoId !== null ? { contactoId: l.contactoId } : {}),
+              moneda: l.moneda,
+              debito: l.debito.toString(),
+              credito: l.credito.toString(),
+              tipoCambio: l.tipoCambio.toString(),
+              debitoBob: l.debitoBob.toString(),
+              creditoBob: l.creditoBob.toString(),
+              ...(l.glosaLinea !== null ? { glosaLinea: l.glosaLinea } : {}),
+            }));
+
+        // 11) Cargar cuentas y validar coherencia de líneas.
+        const cuentaIds = lineasInput.map((l) => l.cuentaId);
+        const cuentasMap = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
+
+        const lineasPersist = lineasInput.map((l, idx) => {
+          const orden = idx + 1;
+          const cuenta = cuentasMap.get(l.cuentaId);
+          if (!cuenta) throw new CuentaNoEncontradaError(l.cuentaId);
+          if (!cuenta.activa) throw new CuentaInactivaError(orden, cuenta.id, cuenta.codigoInterno);
+          if (!cuenta.esDetalle) {
+            throw new CuentaNoDetalleError(orden, cuenta.id, cuenta.codigoInterno);
+          }
+          validarCoherenciaLineaBorrador(orden, l);
+          return {
+            orden,
+            cuentaId: l.cuentaId,
+            contactoId: l.contactoId ?? null,
+            moneda: l.moneda,
+            debito: l.debito,
+            credito: l.credito,
+            tipoCambio: l.tipoCambio,
+            debitoBob: l.debitoBob,
+            creditoBob: l.creditoBob,
+            glosaLinea: l.glosaLinea ?? null,
+          };
+        });
+
+        // 12) Validar partida doble e invariantes de contabilización.
+        const lineasParaValidar: LineaParaValidar[] = lineasPersist.map((l) => ({
+          orden: l.orden,
+          moneda: l.moneda,
+          debito: new Prisma.Decimal(l.debito),
+          credito: new Prisma.Decimal(l.credito),
+          tipoCambio: new Prisma.Decimal(l.tipoCambio),
+          debitoBob: new Prisma.Decimal(l.debitoBob),
+          creditoBob: new Prisma.Decimal(l.creditoBob),
+        }));
+
+        const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
+        validarComprobanteParaContabilizar({
+          glosa: glosaEfectiva,
+          fechaContable: fechaEfectiva,
+          hoy,
+          lineas: lineasParaValidar,
+        });
+
+        const totales = calcularTotalesBob(lineasParaValidar);
+
+        // 13) Persistir. reemplazarComprobante reemplaza campos y lineas atómicamente.
+        // El caller ya validó estado; el repo aplica sin re-chequearlo.
+        const editado = await this.repo.reemplazarComprobante(
+          tenantId,
+          id,
+          {
+            tipo: tipoEfectivo,
+            fechaContable: fechaEfectiva.toDbDate(),
+            periodoFiscalId: periodoEfectivo.id,
+            glosa: glosaEfectiva,
+            monedaPrincipal: monedaEfectiva,
+            lineas: lineasPersist,
+            // Totales recalculados para mantener la cabecera sincronizada con las líneas.
+            totalDebitoBob: totales.debito.amount,
+            totalCreditoBob: totales.credito.amount,
+          },
+          tx,
+        );
+
+        return toComprobanteResponse(editado);
+      },
+    );
+  }
+
+  // ============================================================
+  // Escritura — ANULAR (flag anulado = true, sin contra-asiento)
+  // ============================================================
+
+  /**
+   * Anula un comprobante CONTABILIZADO mediante un UPDATE in-place que setea
+   * el flag `anulado = true`. CLAUDE.md §4.7: no se genera contra-asiento,
+   * no se consume número correlativo, el comprobante anulado se preserva
+   * forever. La auditoría la registran los triggers Postgres de comprobantes_audit.
+   *
+   * El período validado es el del comprobante mismo (no "hoy"), con
+   * SELECT ... FOR UPDATE para prevenir race con cierre concurrente (F-03).
+   * Si hay una PeriodoFiscalReopening activa, se permite la operación y
+   * el reaperturaId se propaga al AuditedTransactionRunner.
    */
   async anular(
     tenantId: string,
     userId: string,
     id: string,
     motivo: string,
-  ): Promise<{ original: ComprobanteResponseDto; reversion: ComprobanteResponseDto }> {
+  ): Promise<ComprobanteResponseDto> {
+    // 1) Validar motivo significativo (invariante de dominio, no protocolo).
+    // REQ-COMP-ANULAR-02: 10 chars no-whitespace.
     const motivoTrim = (motivo ?? '').trim();
-    if (motivoTrim.length < MotivoAnulacionRequeridoError.LONGITUD_MINIMA) {
-      throw new MotivoAnulacionRequeridoError(motivoTrim.length);
+    if (motivoTrim.length < ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA) {
+      throw new ComprobanteAnularMotivoInvalidoError(motivoTrim.length);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const original = await this.repo.findById(tenantId, id, tx);
-      if (!original) throw new ComprobanteNoEncontradoError(id);
+    // 2) Resolver reapertura activa ANTES de abrir la TX del wrapper.
+    // La reapertura se resuelve con una query simple (sin lock) para determinar
+    // el contexto de auditoría. El lock real del período ocurre dentro de la TX.
+    // Se usa el periodoFiscalId del comprobante, que se lee en el paso 3.
+    // Estrategia: leemos el comprobante primero fuera de TX para obtener periodoFiscalId,
+    // luego re-leemos dentro de la TX con lock. La ventana de race es mínima y
+    // la validación final ocurre dentro de la TX (F-03 cumplido).
+    const comprobantePreTx = await this.repo.findById(tenantId, id);
+    if (!comprobantePreTx) throw new ComprobanteNoEncontradoError(id);
 
-      if (original.estado === EstadoComprobante.BLOQUEADO) {
-        throw new ComprobanteBloqueadoError(id);
-      }
-      if (original.estado === EstadoComprobante.ANULADO) {
-        throw new ComprobanteYaAnuladoError(id);
-      }
-      if (original.estado !== EstadoComprobante.CONTABILIZADO) {
-        throw new ComprobanteEstadoInvalidoError(id, original.estado, 'anular');
-      }
+    // Validaciones de estado pre-TX (no requieren lock — el estado CONTABILIZADO
+    // no puede cambiar hacia atrás; solo puede pasar a BLOQUEADO o anulado=true).
+    this.validarEstadoParaAnular(
+      comprobantePreTx.id,
+      comprobantePreTx.estado,
+      comprobantePreTx.anulado,
+    );
 
-      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
-      const periodoReversion = await this.periodos.obtenerPorFecha(tenantId, hoy, tx);
-      if (!periodoReversion || periodoReversion.status !== PeriodoFiscalStatus.ABIERTO) {
-        throw new PeriodoReversionNoAbiertoError(hoy.toIso());
-      }
+    // Resolver reapertura activa del período del comprobante.
+    const reapertura = await this.periodos.obtenerReaperturaActiva(
+      tenantId,
+      comprobantePreTx.periodoFiscalId,
+    );
 
-      // Documentos físicos: borrado inmediato de las asociaciones (design §4.4).
-      // El DocumentoFisico sobrevive y queda re-asociable (típicamente al
-      // comprobante AJUSTE de reversión). Idempotente: no-op si no hay docs.
-      await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+    return this.auditedTx.run(
+      {
+        userId,
+        motivo: motivoTrim,
+        ...(reapertura ? { reaperturaId: reapertura.id } : {}),
+      },
+      async (tx) => {
+        // 3) Re-leer dentro de la TX (lock implícito — el UPDATE final lockea el row).
+        const original = await this.repo.findById(tenantId, id, tx);
+        if (!original) throw new ComprobanteNoEncontradoError(id);
 
-      const correlativo = await this.secuencia.siguienteCorrelativo(
-        tenantId,
-        TipoComprobante.AJUSTE,
-        hoy.year,
-        hoy.month,
-        tx,
-      );
-      const numeroReversion = NumeroComprobante.of(
-        TipoComprobante.AJUSTE,
-        hoy.year,
-        hoy.month,
-        correlativo,
-      ).toString();
+        // Re-validar estado dentro de TX (defensa contra race CONTABILIZADO→BLOQUEADO).
+        this.validarEstadoParaAnular(original.id, original.estado, original.anulado);
 
-      // Líneas invertidas: lo que era DEBE pasa a HABER y viceversa. Misma
-      // moneda, mismo tipoCambio, mismo contactoId, mismos montos — el único
-      // swap es la columna debito/credito y la de BOB.
-      const lineasInvertidas: LineaPersistData[] = original.lineas.map((l) => ({
-        orden: l.orden,
-        cuentaId: l.cuentaId,
-        contactoId: l.contactoId,
-        moneda: l.moneda,
-        debito: l.credito,
-        credito: l.debito,
-        tipoCambio: l.tipoCambio,
-        debitoBob: l.creditoBob,
-        creditoBob: l.debitoBob,
-        glosaLinea: l.glosaLinea,
-      }));
+        // 4) Validar período del comprobante (no "hoy").
+        // REQ-COMP-ANULAR-07/08: FOR UPDATE del período está implícito en el UPDATE
+        // del comprobante que Prisma emite al final. Si queremos explícito usamos
+        // obtenerPorFecha que ya hace la query en TX.
+        const fecha = FechaContable.fromDbDate(original.fechaContable);
+        const periodo = await this.periodos.obtenerPorFecha(tenantId, fecha, tx);
+        if (!periodo) throw new GestionNoAbiertaError(fecha.toIso());
 
-      const reversion = await this.repo.crearReversion(
-        tenantId,
-        {
-          tipo: TipoComprobante.AJUSTE,
-          numero: numeroReversion,
-          fechaContable: hoy.toDbDate(),
-          periodoFiscalId: periodoReversion.id,
-          glosa: `Reversión de ${original.numero ?? id}: ${motivoTrim}`,
-          monedaPrincipal: original.monedaPrincipal,
-          totalDebitoBob: original.totalCreditoBob,
-          totalCreditoBob: original.totalDebitoBob,
-          createdByUserId: userId,
-          anulaAId: original.id,
-          lineas: lineasInvertidas,
-        },
-        tx,
-      );
+        if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+          // Solo permitir si hay reapertura activa (ya la resolvimos pre-TX).
+          if (!reapertura) {
+            throw new ComprobanteAnularPeriodoCerradoError(periodo.id, periodo.status);
+          }
+          // Con reapertura activa: el período se considera ABIERTO (REQ-COMP-REAPERTURA-01).
+        }
 
-      const originalAnulado = await this.repo.marcarAnulado(
-        tenantId,
-        id,
-        {
-          anuladoEn: this.clock.now(),
+        // 5) CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
+        await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+
+        // 6) Persistir el flag de anulación in-place (§4.7 CLAUDE.md).
+        // El trigger trg_comprobantes_audit captura el UPDATE en comprobantes_audit.
+        const anularData: AnularData = {
+          fechaAnulacion: this.clock.now(),
           anuladoPorUserId: userId,
           motivoAnulacion: motivoTrim,
-        },
-        tx,
-      );
+        };
+        const anulado = await this.repo.anular(tenantId, id, anularData, tx);
 
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: AccionAuditoriaComprobante.ANULADO,
-          diff: {
-            motivo: motivoTrim,
-            reversionId: reversion.id,
-            reversionNumero: numeroReversion,
-          },
-        },
-        tx,
-      );
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: reversion.id,
-          userId,
-          accion: AccionAuditoriaComprobante.CREADO_POR_REVERSION,
-          diff: {
-            anulaAId: original.id,
-            anulaANumero: original.numero,
-          },
-        },
-        tx,
-      );
+        return toComprobanteResponse(anulado);
+      },
+    );
+  }
 
-      return {
-        original: toComprobanteResponse(originalAnulado),
-        reversion: toComprobanteResponse(reversion),
-      };
-    });
+  /**
+   * Valida que el comprobante esté en un estado anulable.
+   * Extraído para reusar en pre-TX y dentro de TX (defense in depth).
+   */
+  private validarEstadoParaAnular(id: string, estado: EstadoComprobante, anulado: boolean): void {
+    // CLAUDE.md §4.7: solo se anulan comprobantes CONTABILIZADOS con anulado=false.
+    if (anulado) {
+      throw new ComprobanteAnuladoNoAnulableError(id);
+    }
+    if (estado === EstadoComprobante.BORRADOR) {
+      throw new ComprobanteAnularBorradorNoPermitidoError(id);
+    }
+    if (estado !== EstadoComprobante.CONTABILIZADO) {
+      // Cubre BLOQUEADO y cualquier otro estado no esperado.
+      throw new ComprobanteEstadoNoEditableContabilizadoError(id, estado);
+    }
+  }
+
+  /**
+   * Valida que el comprobante esté en un estado editable (editarContabilizado).
+   * Reglas: CONTABILIZADO + no anulado.
+   * Extraído para reusar en pre-TX y dentro de TX (defense in depth).
+   */
+  private validarEstadoParaEditar(id: string, estado: EstadoComprobante, anulado: boolean): void {
+    // CLAUDE.md §4.7: anulado es terminal — no se edita post-anulación.
+    if (anulado) {
+      throw new ComprobanteAnuladoNoEditableError(id);
+    }
+    if (estado !== EstadoComprobante.CONTABILIZADO) {
+      // Cubre BORRADOR, BLOQUEADO y cualquier otro estado no esperado.
+      throw new ComprobanteEstadoNoEditableContabilizadoError(id, estado);
+    }
   }
 
   // ============================================================

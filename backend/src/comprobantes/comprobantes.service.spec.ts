@@ -18,7 +18,9 @@ import type {
   DocumentosFisicosReaderPort,
 } from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
+import type { RbacService } from '@/rbac/rbac.service';
 
+import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { ComprobantesService } from './comprobantes.service';
 import type {
   ComprobanteConLineas,
@@ -45,19 +47,40 @@ type MockClock = { [K in keyof ClockPort]: jest.Mock };
 type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
 type MockDocsReader = { [K in keyof DocumentosFisicosReaderPort]: jest.Mock };
 type MockAsociacionRepo = { [K in keyof AsociacionComprobanteRepositoryPort]: jest.Mock };
+type MockRbac = { hasPermission: jest.Mock };
 
 function makeRepoMock(): MockRepo {
   return {
     crearBorrador: jest.fn(),
     findById: jest.fn(),
-    reemplazarBorrador: jest.fn(),
+    reemplazarComprobante: jest.fn(),
     contabilizar: jest.fn(),
-    crearReversion: jest.fn(),
-    marcarAnulado: jest.fn(),
+    anular: jest.fn(),
     eliminarBorrador: jest.fn(),
     listar: jest.fn(),
-    registrarAuditoria: jest.fn(),
     listarAuditoria: jest.fn(),
+  };
+}
+
+function makeRbacMock(): { hasPermission: jest.Mock } {
+  return {
+    // Por default: usuario tiene todos los permisos. Los tests que verifican
+    // rechazo por falta de permiso sobrescriben con mockResolvedValue(false).
+    hasPermission: jest.fn().mockResolvedValue(true),
+  };
+}
+
+function makeAuditedRunnerMock() {
+  // El runner llama a fn(tx) y devuelve su resultado. Mockeamos la TX como
+  // objeto vacío — el servicio no hace calls raw sobre ella en unit tests.
+  const mockTx = {} as Prisma.TransactionClient;
+  return {
+    run: jest
+      .fn()
+      .mockImplementation(
+        async (_opts: unknown, fn: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+          fn(mockTx),
+      ),
   };
 }
 
@@ -85,7 +108,10 @@ function makeAsociacionRepoMock(): MockAsociacionRepo {
 }
 
 function makePeriodosMock(): MockPeriodos {
-  return { obtenerPorFecha: jest.fn() };
+  return {
+    obtenerPorFecha: jest.fn(),
+    obtenerReaperturaActiva: jest.fn().mockResolvedValue(null),
+  };
 }
 
 function makeCuentasMock(): MockCuentas {
@@ -145,8 +171,9 @@ function comprobanteFactory(overrides: Partial<ComprobanteConLineas> = {}): Comp
     totalCreditoBob: new Prisma.Decimal(0),
     origenTipo: null,
     origenId: null,
-    anulaAId: null,
-    anuladoEn: null,
+    // Post-schema (comprobantes-anulacion-refactor): flag-based anulacion
+    anulado: false,
+    fechaAnulacion: null,
     anuladoPorUserId: null,
     motivoAnulacion: null,
     createdAt: new Date('2026-04-22T10:00:00Z'),
@@ -199,6 +226,8 @@ function buildService(overrides?: {
   secuencia?: Partial<MockSecuencia>;
   docsReader?: Partial<MockDocsReader>;
   asociacionRepo?: Partial<MockAsociacionRepo>;
+  rbac?: Partial<MockRbac>;
+  auditedRunner?: ReturnType<typeof makeAuditedRunnerMock>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -208,6 +237,12 @@ function buildService(overrides?: {
   const secuencia = { ...makeSecuenciaMock(), ...(overrides?.secuencia ?? {}) };
   const docsReader = { ...makeDocsReaderMock(), ...(overrides?.docsReader ?? {}) };
   const asociacionRepo = { ...makeAsociacionRepoMock(), ...(overrides?.asociacionRepo ?? {}) };
+  const rbac = { ...makeRbacMock(), ...(overrides?.rbac ?? {}) };
+  const auditedRunner = overrides?.auditedRunner ?? makeAuditedRunnerMock();
+  // prisma ya no se usa directamente en el servicio — todas las TX pasan por
+  // auditedRunner. Lo mantenemos para los métodos legacy que aún llaman
+  // this.prisma.$transaction (crearBorrador, actualizarBorrador, etc.) antes
+  // de que task 5.5 los migre.
   const prisma = makePrismaMock();
 
   const service = new ComprobantesService(
@@ -220,6 +255,8 @@ function buildService(overrides?: {
     docsReader as unknown as DocumentosFisicosReaderPort,
     asociacionRepo as unknown as AsociacionComprobanteRepositoryPort,
     prisma,
+    auditedRunner as unknown as AuditedTransactionRunner,
+    rbac as unknown as RbacService,
   );
   return {
     service,
@@ -231,6 +268,8 @@ function buildService(overrides?: {
     secuencia,
     docsReader,
     asociacionRepo,
+    rbac,
+    auditedRunner,
     prisma,
   };
 }
@@ -297,14 +336,7 @@ describe('ComprobantesService', () => {
         expect.any(Object),
       );
       expect(repo.crearBorrador).toHaveBeenCalledTimes(1);
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({
-          accion: 'CREADO',
-          userId: USER_ID,
-        }),
-        expect.any(Object),
-      );
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
     });
 
     it('rechaza fechaContable futura con FechaFuturaNoPermitidaError', async () => {
@@ -568,8 +600,8 @@ describe('ComprobantesService', () => {
       repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
       repo.eliminarBorrador.mockResolvedValue(1);
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-1')).resolves.toBeUndefined();
-      expect(repo.eliminarBorrador).toHaveBeenCalledWith(TENANT_ID, 'comp-1');
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).resolves.toBeUndefined();
+      expect(repo.eliminarBorrador).toHaveBeenCalledWith(TENANT_ID, 'comp-1', expect.anything());
     });
 
     it('rechaza eliminar un CONTABILIZADO', async () => {
@@ -578,7 +610,7 @@ describe('ComprobantesService', () => {
         comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO }),
       );
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-1')).rejects.toMatchObject({
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).rejects.toMatchObject({
         code: 'COMPROBANTE_ESTADO_INVALIDO',
       });
       expect(repo.eliminarBorrador).not.toHaveBeenCalled();
@@ -588,7 +620,7 @@ describe('ComprobantesService', () => {
       const { service, repo } = buildService();
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-x')).rejects.toMatchObject({
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-x')).rejects.toMatchObject({
         code: 'COMPROBANTE_NO_ENCONTRADO',
       });
     });
@@ -643,19 +675,17 @@ describe('ComprobantesService', () => {
         status: PeriodoFiscalStatus.ABIERTO,
       });
       cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
-      repo.reemplazarBorrador.mockResolvedValue(comprobanteFactory({ glosa: 'Glosa actualizada' }));
+      repo.reemplazarComprobante.mockResolvedValue(
+        comprobanteFactory({ glosa: 'Glosa actualizada' }),
+      );
 
       const r = await service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', {
         glosa: 'Glosa actualizada',
       });
 
       expect(r.glosa).toBe('Glosa actualizada');
-      expect(repo.reemplazarBorrador).toHaveBeenCalledTimes(1);
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({ accion: 'EDITADO' }),
-        expect.any(Object),
-      );
+      expect(repo.reemplazarComprobante).toHaveBeenCalledTimes(1);
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
     });
 
     it('rechaza actualizar un CONTABILIZADO', async () => {
@@ -667,7 +697,7 @@ describe('ComprobantesService', () => {
       await expect(
         service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', { glosa: 'x' }),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
-      expect(repo.reemplazarBorrador).not.toHaveBeenCalled();
+      expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
     });
   });
 
@@ -758,11 +788,7 @@ describe('ComprobantesService', () => {
         }),
         expect.any(Object),
       );
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({ accion: 'CONTABILIZADO' }),
-        expect.any(Object),
-      );
+      // Auditoría via triggers Postgres — no hay llamada explícita al repo.
       expect(r.numero).toBe('D2604-000042');
       expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
     });
@@ -1036,186 +1062,243 @@ describe('ComprobantesService', () => {
     });
   });
 
-  describe('anular', () => {
-    function originalContabilizadoFactory(): ComprobanteConLineas {
-      return comprobanteFactory({
-        id: 'comp-orig',
-        tipo: TipoComprobante.DIARIO,
-        numero: 'D2604-000042',
-        estado: EstadoComprobante.CONTABILIZADO,
-        totalDebitoBob: new Prisma.Decimal('1000'),
-        totalCreditoBob: new Prisma.Decimal('1000'),
-        lineas: [
-          {
-            id: 'l-1',
-            organizationId: TENANT_ID,
-            comprobanteId: 'comp-orig',
-            orden: 1,
-            cuentaId: CUENTA_CAJA_ID,
-            contactoId: null,
-            moneda: Moneda.BOB,
-            debito: new Prisma.Decimal('1000'),
-            credito: new Prisma.Decimal(0),
-            tipoCambio: new Prisma.Decimal(1),
-            debitoBob: new Prisma.Decimal('1000'),
-            creditoBob: new Prisma.Decimal(0),
-            glosaLinea: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: 'l-2',
-            organizationId: TENANT_ID,
-            comprobanteId: 'comp-orig',
-            orden: 2,
-            cuentaId: CUENTA_VENTAS_ID,
-            contactoId: null,
-            moneda: Moneda.BOB,
-            debito: new Prisma.Decimal(0),
-            credito: new Prisma.Decimal('1000'),
-            tipoCambio: new Prisma.Decimal(1),
-            debitoBob: new Prisma.Decimal(0),
-            creditoBob: new Prisma.Decimal('1000'),
-            glosaLinea: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ],
-      });
-    }
+  // ============================================================
+  // anular — modelo flag (task 5.1 / comprobantes-anulacion-refactor)
+  // Cubre spec §2.2 + catálogo de errors §3:
+  //   COMPROBANTE_ANULAR_YA_ANULADO        — 409
+  //   COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO — 409
+  //   COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO  — 409 (BLOQUEADO)
+  //   COMPROBANTE_ANULAR_PERIODO_CERRADO   — 409
+  //   COMPROBANTE_ANULAR_MOTIVO_INVALIDO   — 422
+  // ============================================================
 
-    function setupAnularHappy() {
-      const ctx = buildService();
-      ctx.repo.findById.mockResolvedValue(originalContabilizadoFactory());
-      ctx.periodos.obtenerPorFecha.mockResolvedValue({
-        id: 'periodo-actual',
+  describe('anular', () => {
+    // Helper: comprobante listo para anular (CONTABILIZADO, anulado=false, período ABIERTO)
+    function setupAnularHappyPath() {
+      const { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia } =
+        buildService();
+
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: 'D2604-000042',
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
+      });
+
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
         status: PeriodoFiscalStatus.ABIERTO,
       });
-      ctx.secuencia.siguienteCorrelativo.mockResolvedValue(7);
-      ctx.repo.crearReversion.mockImplementation(async (_t, data) =>
-        comprobanteFactory({
-          id: 'comp-rev',
-          tipo: data.tipo,
-          numero: data.numero,
-          estado: EstadoComprobante.CONTABILIZADO,
-          glosa: data.glosa,
-          anulaAId: data.anulaAId,
-          totalDebitoBob: data.totalDebitoBob,
-          totalCreditoBob: data.totalCreditoBob,
-        }),
-      );
-      ctx.repo.marcarAnulado.mockImplementation(async (_t, id, metadata) =>
-        comprobanteFactory({
-          id,
-          estado: EstadoComprobante.ANULADO,
-          anuladoEn: metadata.anuladoEn,
-          anuladoPorUserId: metadata.anuladoPorUserId,
-          motivoAnulacion: metadata.motivoAnulacion,
-        }),
-      );
-      return ctx;
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+
+      // El repositorio devuelve el comprobante con anulado=true tras el UPDATE
+      const anulado = {
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date('2026-04-22T12:00:00Z'),
+        motivoAnulacion: 'Error en imputación al cliente',
+        anuladoPorUserId: USER_ID,
+      };
+      repo.anular.mockResolvedValue(anulado);
+
+      return { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia, anulado };
     }
 
-    it('crea reversión AJUSTE con líneas invertidas + marca original ANULADO', async () => {
-      const { service, repo, secuencia } = setupAnularHappy();
+    it('happy path: marca anulado=true en el propio comprobante (REQ-COMP-ANULAR-01)', async () => {
+      const { service, repo: _repo, anulado } = setupAnularHappyPath();
 
-      const r = await service.anular(
+      const result = await service.anular(
         TENANT_ID,
         USER_ID,
-        'comp-orig',
-        'Error en la imputación al cliente',
+        'comp-c',
+        'Error en imputación al cliente',
       );
 
-      // Reversión: tipo AJUSTE, prefijo J, totales invertidos, FK al original.
-      expect(secuencia.siguienteCorrelativo).toHaveBeenCalledWith(
-        TENANT_ID,
-        TipoComprobante.AJUSTE,
-        2026,
-        4,
-        expect.any(Object),
-      );
-      expect(repo.crearReversion).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({
-          tipo: TipoComprobante.AJUSTE,
-          numero: 'J2604-000007',
-          anulaAId: 'comp-orig',
-          glosa: expect.stringContaining('Reversión de D2604-000042'),
-          lineas: expect.arrayContaining([
-            expect.objectContaining({
-              orden: 1,
-              // La línea 1 del original era débito 1000 → en reversión, crédito 1000.
-              debito: expect.anything(),
-              credito: expect.anything(),
-            }),
-          ]),
-        }),
-        expect.any(Object),
-      );
-
-      // Las líneas invertidas: debito/credito y BOB se cambian de lado.
-      const call = repo.crearReversion.mock.calls[0]!;
-      const data = call[1] as {
-        lineas: Array<{
-          debito: Prisma.Decimal | string;
-          credito: Prisma.Decimal | string;
-          debitoBob: Prisma.Decimal | string;
-          creditoBob: Prisma.Decimal | string;
-        }>;
-      };
-      const linea1 = data.lineas[0]!;
-      const linea2 = data.lineas[1]!;
-      expect(linea1.debito).toEqual(new Prisma.Decimal(0));
-      expect(linea1.credito).toEqual(new Prisma.Decimal('1000'));
-      expect(linea1.creditoBob).toEqual(new Prisma.Decimal('1000'));
-      expect(linea2.debito).toEqual(new Prisma.Decimal('1000'));
-      expect(linea2.credito).toEqual(new Prisma.Decimal(0));
-      expect(linea2.debitoBob).toEqual(new Prisma.Decimal('1000'));
-
-      // Original marcado ANULADO con metadata.
-      expect(repo.marcarAnulado).toHaveBeenCalledWith(
-        TENANT_ID,
-        'comp-orig',
-        expect.objectContaining({
-          anuladoPorUserId: USER_ID,
-          motivoAnulacion: 'Error en la imputación al cliente',
-        }),
-        expect.any(Object),
-      );
-
-      expect(r.reversion.numero).toBe('J2604-000007');
-      expect(r.original.estado).toBe(EstadoComprobante.ANULADO);
+      // Resultado: el comprobante con anulado=true y los 3 metadatos
+      expect(result.anulado).toBe(true);
+      expect(result.fechaAnulacion).toBeDefined();
+      expect(result.motivoAnulacion).toBe('Error en imputación al cliente');
+      expect(result.anuladoPorUserId).toBe(USER_ID);
+      // Preserva numero y estado CONTABILIZADO (REQ-COMP-ANULAR-05, REQ-COMP-ANULAR-06)
+      expect(result.numero).toBe(anulado.numero);
+      expect(result.estado).toBe(EstadoComprobante.CONTABILIZADO);
     });
 
-    it('audita ambos comprobantes (ANULADO + CREADO_POR_REVERSION)', async () => {
-      const { service, repo } = setupAnularHappy();
+    it('preserva el numero correlativo (REQ-COMP-CORRELATIVO-03, escenario 24)', async () => {
+      const { service } = setupAnularHappyPath();
 
-      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
+      const result = await service.anular(
+        TENANT_ID,
+        USER_ID,
+        'comp-c',
+        'Error en imputación al cliente',
+      );
 
-      const acciones = repo.registrarAuditoria.mock.calls.map((c) => {
-        const data = c[1] as { accion: string };
-        return data.accion;
+      expect(result.numero).toBe('D2604-000042');
+    });
+
+    it('llama a auditedTx.run con userId y motivo (REQ-COMP-AUDIT-03)', async () => {
+      const { service, auditedRunner } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID, motivo: 'Error en imputación al cliente' }),
+        expect.any(Function),
+      );
+    });
+
+    it('propaga reaperturaId al wrapper cuando hay reapertura activa (REQ-COMP-REAPERTURA-02, escenario 15)', async () => {
+      const { service, periodos, auditedRunner, repo } = buildService();
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
       });
-      expect(acciones).toEqual(expect.arrayContaining(['ANULADO', 'CREADO_POR_REVERSION']));
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      // Reapertura activa sobre el período
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reap-001',
+        reopenedAt: new Date(),
+      });
+      repo.anular.mockResolvedValue({
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date(),
+        motivoAnulacion: 'Motivo válido OK',
+        anuladoPorUserId: USER_ID,
+      });
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo válido OK');
+
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ reaperturaId: 'reap-001' }),
+        expect.any(Function),
+      );
     });
 
-    it('rechaza motivo vacío', async () => {
+    it('rechaza si anulado=true ya (COMPROBANTE_ANULAR_YA_ANULADO, 409) — REQ-COMP-ANULAR-03', async () => {
       const { service, repo } = buildService();
-
-      await expect(service.anular(TENANT_ID, USER_ID, 'comp-orig', '')).rejects.toMatchObject({
-        code: 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO',
-      });
-      expect(repo.findById).not.toHaveBeenCalled();
-    });
-
-    it('rechaza motivo con menos de 10 caracteres (incluye trim)', async () => {
-      const { service } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: true }),
+      );
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-orig', '  corto  '),
-      ).rejects.toMatchObject({
-        code: 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO',
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_YA_ANULADO' });
+    });
+
+    it('rechaza si estado=BORRADOR (COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO, 409) — REQ-COMP-ANULAR-04', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO' });
+    });
+
+    it('rechaza si estado=BLOQUEADO (COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO, 409)', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BLOQUEADO }));
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO' });
+    });
+
+    it('rechaza si período cerrado y sin reapertura activa (COMPROBANTE_ANULAR_PERIODO_CERRADO, 409) — escenario 14', async () => {
+      const { service, repo, periodos } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
       });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_PERIODO_CERRADO' });
+    });
+
+    it('permite anular si período cerrado pero hay reapertura activa (REQ-COMP-REAPERTURA-01, escenario 15)', async () => {
+      const { service, repo, periodos } = buildService();
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+      });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reap-001',
+        reopenedAt: new Date(),
+      });
+      repo.anular.mockResolvedValue({
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date(),
+        motivoAnulacion: 'Corrección post-cierre X',
+        anuladoPorUserId: USER_ID,
+      });
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Corrección post-cierre X'),
+      ).resolves.toMatchObject({ anulado: true });
+    });
+
+    it('rechaza si motivo.trim().length < 10 (COMPROBANTE_ANULAR_MOTIVO_INVALIDO, 422) — REQ-COMP-ANULAR-02', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+
+      // 9 caracteres no-whitespace
+      await expect(service.anular(TENANT_ID, USER_ID, 'comp-c', '123456789')).rejects.toMatchObject(
+        { code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' },
+      );
+    });
+
+    it('rechaza si motivo es solo whitespace (COMPROBANTE_ANULAR_MOTIVO_INVALIDO, 422) — escenario 12', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', '               '),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' });
+    });
+
+    it('NO consume SecuenciaComprobantePort (REQ-COMP-ANULAR-06)', async () => {
+      const { service, secuencia } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+    });
+
+    it('desasocia documentos físicos del comprobante anulado (CLAUDE.md §4.7)', async () => {
+      const { service, asociacionRepo } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-c',
+        expect.anything(),
+      );
     });
 
     it('lanza 404 si el comprobante no existe', async () => {
@@ -1223,104 +1306,407 @@ describe('ComprobantesService', () => {
       repo.findById.mockResolvedValue(null);
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-x', 'Motivo suficiente'),
+        service.anular(TENANT_ID, USER_ID, 'comp-x', 'Motivo suficiente largo'),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_ENCONTRADO' });
     });
+  });
 
-    it('rechaza anular un BLOQUEADO con ComprobanteBloqueadoError', async () => {
+  // ============================================================
+  // editarContabilizado (task 5.3 RED / task 5.4 GREEN)
+  // REQ-COMP-EDIT-CONTABILIZADO-* — edición post-CONTABILIZADO dentro de
+  // período abierto o reapertura activa (CLAUDE.md §4.3).
+  // ============================================================
+  describe('editarContabilizado', () => {
+    // DTO mínimo que pasa validación de partida doble
+    function dtoEditar(overrides: Record<string, unknown> = {}) {
+      return {
+        glosa: 'Glosa corregida post-contabilizado',
+        tipo: TipoComprobante.DIARIO,
+        fechaContable: '2026-04-22',
+        monedaPrincipal: Moneda.BOB,
+        lineas: [
+          {
+            cuentaId: CUENTA_CAJA_ID,
+            moneda: Moneda.BOB,
+            debito: '1000.00',
+            credito: '0',
+            tipoCambio: '1',
+            debitoBob: '1000.00',
+            creditoBob: '0',
+          },
+          {
+            cuentaId: CUENTA_VENTAS_ID,
+            moneda: Moneda.BOB,
+            debito: '0',
+            credito: '1000.00',
+            tipoCambio: '1',
+            debitoBob: '0',
+            creditoBob: '1000.00',
+          },
+        ],
+        ...overrides,
+      };
+    }
+
+    // Lineas reales (con Decimal) para simular un CONTABILIZADO válido.
+    // Sin ellas el fallback de editarContabilizado tendría 0 lineas → falla validación.
+    function makeLineasContabilizadas() {
+      return [
+        {
+          id: 'linea-1',
+          comprobanteId: 'comp-c',
+          orden: 1,
+          cuentaId: CUENTA_CAJA_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal('1000.00'),
+          credito: new Prisma.Decimal('0'),
+          tipoCambio: new Prisma.Decimal('1'),
+          debitoBob: new Prisma.Decimal('1000.00'),
+          creditoBob: new Prisma.Decimal('0'),
+          glosaLinea: null,
+        },
+        {
+          id: 'linea-2',
+          comprobanteId: 'comp-c',
+          orden: 2,
+          cuentaId: CUENTA_VENTAS_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal('0'),
+          credito: new Prisma.Decimal('1000.00'),
+          tipoCambio: new Prisma.Decimal('1'),
+          debitoBob: new Prisma.Decimal('0'),
+          creditoBob: new Prisma.Decimal('1000.00'),
+          glosaLinea: null,
+        },
+      ];
+    }
+
+    // Comprobante contabilizado estándar listo para editar
+    function setupEditarHappyPath() {
+      const { service, repo, periodos, cuentas, auditedRunner, rbac } = buildService();
+
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: 'D2604-000042',
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
+        totalDebitoBob: new Prisma.Decimal('1000.00'),
+        totalCreditoBob: new Prisma.Decimal('1000.00'),
+        // Lineas válidas para que editarContabilizado pueda validar partida doble
+        // si el DTO no trae lineas propias.
+        lineas: makeLineasContabilizadas() as unknown as ComprobanteConLineas['lineas'],
+      });
+
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+
+      const cuentaMap = new Map([
+        [
+          CUENTA_CAJA_ID,
+          {
+            id: CUENTA_CAJA_ID,
+            codigoInterno: '1.1.1.001',
+            activa: true,
+            esDetalle: true,
+            requiereContacto: false,
+            permiteMultiMoneda: true,
+            monedaFuncional: Moneda.BOB,
+          },
+        ],
+        [
+          CUENTA_VENTAS_ID,
+          {
+            id: CUENTA_VENTAS_ID,
+            codigoInterno: '4.1.1.001',
+            activa: true,
+            esDetalle: true,
+            requiereContacto: false,
+            permiteMultiMoneda: true,
+            monedaFuncional: Moneda.BOB,
+          },
+        ],
+      ]);
+      cuentas.obtenerBatch.mockResolvedValue(cuentaMap);
+
+      const editado = {
+        ...comp,
+        glosa: 'Glosa corregida post-contabilizado',
+        totalDebitoBob: new Prisma.Decimal('1000.00'),
+        totalCreditoBob: new Prisma.Decimal('1000.00'),
+      };
+      repo.reemplazarComprobante.mockResolvedValue(editado);
+
+      return { service, repo, periodos, cuentas, auditedRunner, rbac, comp, editado };
+    }
+
+    it('happy path: edita glosa sin cambiar lineas, preserva numero (REQ-COMP-EDIT-CONTABILIZADO-01)', async () => {
+      const { service, comp } = setupEditarHappyPath();
+
+      const result = await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', {
+        glosa: 'Glosa corregida post-contabilizado',
+      });
+
+      // El numero correlativo es inmutable — debe preservarse
+      expect(result.numero).toBe(comp.numero);
+      expect(result.glosa).toBe('Glosa corregida post-contabilizado');
+    });
+
+    it('happy path: reemplaza lineas y recalcula totales (REQ-COMP-EDIT-CONTABILIZADO-02)', async () => {
+      const { service, repo } = setupEditarHappyPath();
+
+      await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dtoEditar());
+
+      // El repo recibe las líneas nuevas Y los totales recalculados.
+      expect(repo.reemplazarComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-c',
+        expect.objectContaining({
+          lineas: expect.arrayContaining([expect.objectContaining({ cuentaId: CUENTA_CAJA_ID })]),
+          totalDebitoBob: expect.anything(),
+          totalCreditoBob: expect.anything(),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('rechaza si el payload incluye numero distinto al actual (COMPROBANTE_EDIT_NUMERO_INMUTABLE, 409) — REQ-COMP-CORRELATIVO-02', async () => {
+      const { service } = setupEditarHappyPath();
+
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', { numero: 'D2604-000099' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_EDIT_NUMERO_INMUTABLE' });
+    });
+
+    it('rechaza si estado=BORRADOR (COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO, 409)', async () => {
+      const { service, repo, periodos, cuentas, auditedRunner } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(new Map());
+      void auditedRunner;
+
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-b', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO' });
+    });
+
+    it('rechaza si estado=BLOQUEADO (COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO, 409)', async () => {
       const { service, repo } = buildService();
       repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BLOQUEADO }));
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_BLOQUEADO' });
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-b', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO' });
     });
 
-    it('rechaza anular uno YA_ANULADO', async () => {
+    it('rechaza si el comprobante está anulado (COMPROBANTE_ANULADO_NO_EDITABLE, 409)', async () => {
       const { service, repo } = buildService();
-      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.ANULADO }));
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: true }),
+      );
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-a', 'Motivo suficiente'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_YA_ANULADO' });
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULADO_NO_EDITABLE' });
     });
 
-    it('rechaza anular un BORRADOR', async () => {
-      const { service, repo } = buildService();
-      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
-
-      await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
-    });
-
-    it('rechaza si hoy cae en período cerrado', async () => {
-      const { service, repo, periodos, secuencia } = buildService();
-      repo.findById.mockResolvedValue(originalContabilizadoFactory());
+    it('rechaza si el período está cerrado y no hay reapertura (COMPROBANTE_EDIT_PERIODO_CERRADO, 409)', async () => {
+      const { service, repo, periodos } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
       periodos.obtenerPorFecha.mockResolvedValue({
-        id: 'periodo-cerrado',
+        id: PERIODO_ID,
         status: PeriodoFiscalStatus.CERRADO,
       });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente'),
-      ).rejects.toMatchObject({
-        code: 'COMPROBANTE_PERIODO_REVERSION_NO_ABIERTO',
-      });
-      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_EDIT_PERIODO_CERRADO' });
     });
 
-    it('rechaza si hoy no tiene período (gestión no creada para el año)', async () => {
+    it('permite editar si período cerrado pero hay reapertura activa (REQ-COMP-REAPERTURA-03)', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+      });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reap-001',
+        reopenedAt: new Date(),
+      });
+      cuentas.obtenerBatch.mockResolvedValue(
+        new Map([
+          [
+            CUENTA_CAJA_ID,
+            {
+              id: CUENTA_CAJA_ID,
+              codigoInterno: '1.1.1.001',
+              activa: true,
+              esDetalle: true,
+              requiereContacto: false,
+              permiteMultiMoneda: true,
+              monedaFuncional: Moneda.BOB,
+            },
+          ],
+          [
+            CUENTA_VENTAS_ID,
+            {
+              id: CUENTA_VENTAS_ID,
+              codigoInterno: '4.1.1.001',
+              activa: true,
+              esDetalle: true,
+              requiereContacto: false,
+              permiteMultiMoneda: true,
+              monedaFuncional: Moneda.BOB,
+            },
+          ],
+        ]),
+      );
+      repo.reemplazarComprobante.mockResolvedValue({
+        ...comp,
+        glosa: 'Nueva glosa',
+        totalDebitoBob: new Prisma.Decimal('1000.00'),
+        totalCreditoBob: new Prisma.Decimal('1000.00'),
+      });
+
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dtoEditar()),
+      ).resolves.toBeDefined();
+    });
+
+    it('rechaza si la nueva fechaContable cae en período destino cerrado (COMPROBANTE_EDIT_PERIODO_DESTINO_CERRADO, 409)', async () => {
+      const OTRO_PERIODO_ID = 'periodo-otro';
       const { service, repo, periodos } = buildService();
-      repo.findById.mockResolvedValue(originalContabilizadoFactory());
-      periodos.obtenerPorFecha.mockResolvedValue(null);
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
+      });
+      repo.findById.mockResolvedValue(comp);
+
+      // Primera llamada: período origen ABIERTO
+      // Segunda llamada: período destino CERRADO (nueva fecha)
+      periodos.obtenerPorFecha
+        .mockResolvedValueOnce({ id: PERIODO_ID, status: PeriodoFiscalStatus.ABIERTO })
+        .mockResolvedValueOnce({ id: OTRO_PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente'),
-      ).rejects.toMatchObject({
-        code: 'COMPROBANTE_PERIODO_REVERSION_NO_ABIERTO',
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', {
+          ...dtoEditar(),
+          fechaContable: '2026-03-15', // fecha en período diferente
+        }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_EDIT_PERIODO_DESTINO_CERRADO' });
+    });
+
+    it('rechaza lineas desbalanceadas (COMPROBANTE_DESBALANCEADO, 422)', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
       });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+      cuentas.obtenerBatch.mockResolvedValue(
+        new Map([
+          [
+            CUENTA_CAJA_ID,
+            {
+              id: CUENTA_CAJA_ID,
+              codigoInterno: '1.1.1.001',
+              activa: true,
+              esDetalle: true,
+              requiereContacto: false,
+              permiteMultiMoneda: true,
+              monedaFuncional: Moneda.BOB,
+            },
+          ],
+        ]),
+      );
+
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', {
+          ...dtoEditar(),
+          lineas: [
+            {
+              cuentaId: CUENTA_CAJA_ID,
+              moneda: Moneda.BOB,
+              debito: '1000.00',
+              credito: '0',
+              tipoCambio: '1',
+              debitoBob: '1000.00',
+              creditoBob: '0',
+            },
+            // Crédito de 900 — desbalanceado
+            {
+              cuentaId: CUENTA_CAJA_ID,
+              moneda: Moneda.BOB,
+              debito: '0',
+              credito: '900.00',
+              tipoCambio: '1',
+              debitoBob: '0',
+              creditoBob: '900.00',
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_DESBALANCEADO' });
     });
 
-    it('preserva el número del original (no lo reasigna)', async () => {
-      const { service, repo } = setupAnularHappy();
+    it('rechaza si no tiene permiso contabilidad.asientos.edit-posted (MISSING_PERMISSION_EDIT_POSTED, 403)', async () => {
+      const { service, repo, rbac } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+      rbac.hasPermission.mockResolvedValue(false);
 
-      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
-
-      // marcarAnulado NO recibe ningún cambio de número; el original mantiene el suyo.
-      const call = repo.marcarAnulado.mock.calls[0]!;
-      const metadata = call[2] as Record<string, unknown>;
-      expect(metadata).not.toHaveProperty('numero');
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'MISSING_PERMISSION_EDIT_POSTED' });
     });
 
-    // ----------------------------------------------------------------
-    // Documentos físicos: cleanup al anular (task 7.2, design §4.4)
-    // ----------------------------------------------------------------
+    it('llama a auditedTx.run con userId y propaga reaperturaId si hay reapertura (REQ-COMP-AUDIT-04)', async () => {
+      const { service, auditedRunner } = setupEditarHappyPath();
 
-    it('desasocia todos los documentos físicos del comprobante anulado', async () => {
-      const { service, asociacionRepo } = setupAnularHappy();
-      asociacionRepo.desasociarTodasDelComprobante.mockResolvedValue(2);
+      await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', {
+        glosa: 'Glosa corregida post-contabilizado',
+      });
 
-      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
-
-      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
-        TENANT_ID,
-        'comp-orig',
-        expect.any(Object),
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID }),
+        expect.any(Function),
       );
     });
 
-    it('llama desasociarTodasDelComprobante aun sin docs asociados (no-op idempotente)', async () => {
-      const { service, asociacionRepo } = setupAnularHappy();
-      // default mock → 0 filas borradas.
+    it('lanza 404 si el comprobante no existe', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(null);
 
-      await service.anular(TENANT_ID, USER_ID, 'comp-orig', 'Motivo suficiente');
-
-      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
-        TENANT_ID,
-        'comp-orig',
-        expect.any(Object),
-      );
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-x', { glosa: 'Nueva glosa' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_ENCONTRADO' });
     });
   });
 
@@ -1358,6 +1744,35 @@ describe('ComprobantesService', () => {
         page: 1,
         limit: 50,
       });
+    });
+
+    // ——— incluirAnulados toggle (task 5.6 / REQ-COMP-REPORTES-01) ———
+
+    it('default oculta anulados (incluirAnulados=false implícito) — REQ-COMP-REPORTES-01', async () => {
+      const { service, repo } = buildService();
+      repo.listar.mockResolvedValue({ items: [], total: 0 });
+
+      await service.listar(TENANT_ID, {});
+
+      // El filtro debe ir con incluirAnulados: false (o ausente + default false en repo)
+      expect(repo.listar).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ incluirAnulados: false }),
+        expect.any(Object),
+      );
+    });
+
+    it('incluirAnulados=true los incluye — REQ-COMP-REPORTES-01', async () => {
+      const { service, repo } = buildService();
+      repo.listar.mockResolvedValue({ items: [], total: 0 });
+
+      await service.listar(TENANT_ID, { incluirAnulados: true });
+
+      expect(repo.listar).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ incluirAnulados: true }),
+        expect.any(Object),
+      );
     });
   });
 

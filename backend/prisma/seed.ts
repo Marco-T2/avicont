@@ -19,6 +19,10 @@ const CONTADOR_PERMISSIONS = [
   'contabilidad.asientos.delete',
   'contabilidad.asientos.post',
   'contabilidad.asientos.void',
+  // Editar un comprobante CONTABILIZADO mientras el período esté abierto.
+  // Verificado desde el servicio (no el guard) — ver ComprobantesService.editarContabilizado.
+  // Asignado por defecto a Contador (puede retirarse al crear roles personalizados).
+  'contabilidad.asientos.edit-posted',
   'contabilidad.contactos.read',
   'contabilidad.contactos.create',
   'contabilidad.contactos.update',

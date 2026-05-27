@@ -12,6 +12,7 @@ import { PrismaComprobanteRepository } from './adapters/prisma-comprobante.repos
 import { PrismaSecuenciaComprobanteAdapter } from './adapters/prisma-secuencia-comprobante';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
+import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { COMPROBANTE_REPOSITORY_PORT } from './ports/comprobante.repository.port';
 import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
 
@@ -41,6 +42,10 @@ import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
     PrismaService,
     TenantContextService,
     ComprobantesService,
+
+    // Wrapper transaccional de auditoría — mismo módulo, inyección directa OK
+    // (CLAUDE.md §3.7). Toda TX que emita comprobantes_audit DEBE pasar por acá.
+    AuditedTransactionRunner,
 
     PrismaComprobanteRepository,
     { provide: COMPROBANTE_REPOSITORY_PORT, useExisting: PrismaComprobanteRepository },

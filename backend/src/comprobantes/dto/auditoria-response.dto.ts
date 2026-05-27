@@ -1,32 +1,39 @@
-import { AccionAuditoriaComprobante, ComprobanteAuditoria } from '@prisma/client';
+// sdd:comprobantes-anulacion-refactor — La tabla comprobantes_audit es raw SQL
+// (no modelada por Prisma) y se puebla exclusivamente por triggers Postgres.
+// El adapter lee de ella via $queryRaw y devuelve ComprobanteAuditEntry[].
+// Este DTO mapea esas entries al shape de respuesta HTTP.
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+import type { ComprobanteAuditEntry } from '../ports/comprobante-audit.types';
 
 export class AuditoriaEntryDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ description: "Tabla auditada: 'comprobantes' | 'lineas_comprobante'" })
+  tableName!: string;
+  @ApiProperty({ description: "Operación: 'INSERT' | 'UPDATE' | 'DELETE'" })
+  operation!: string;
   @ApiProperty() comprobanteId!: string;
-  @ApiProperty() userId!: string;
-  @ApiProperty({ enum: AccionAuditoriaComprobante })
-  accion!: AccionAuditoriaComprobante;
-  @ApiProperty({
-    description: 'Diff libre del write. Shape depende de la acción (ver service).',
-  })
-  diff!: unknown;
+  @ApiPropertyOptional({ nullable: true }) userId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) motivo!: string | null;
   @ApiProperty() fueDuranteReapertura!: boolean;
-  @ApiPropertyOptional({ nullable: true })
-  reaperturaId!: string | null;
-  @ApiProperty({ example: '2026-04-22T14:30:00.000Z' })
-  timestamp!: string;
+  @ApiPropertyOptional({ nullable: true }) reaperturaId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) rowOld!: unknown;
+  @ApiPropertyOptional({ nullable: true }) rowNew!: unknown;
+  @ApiProperty({ example: '2026-04-22T14:30:00.000Z' }) ts!: string;
 }
 
-export function toAuditoriaEntry(row: ComprobanteAuditoria): AuditoriaEntryDto {
+export function toAuditoriaEntry(entry: ComprobanteAuditEntry): AuditoriaEntryDto {
   return {
-    id: row.id,
-    comprobanteId: row.comprobanteId,
-    userId: row.userId,
-    accion: row.accion,
-    diff: row.diff,
-    fueDuranteReapertura: row.fueDuranteReapertura,
-    reaperturaId: row.reaperturaId,
-    timestamp: row.timestamp.toISOString(),
+    id: entry.id,
+    tableName: entry.tableName,
+    operation: entry.operation,
+    comprobanteId: entry.comprobanteId,
+    userId: entry.userId,
+    motivo: entry.motivo,
+    fueDuranteReapertura: entry.fueDuranteReapertura,
+    reaperturaId: entry.reaperturaId,
+    rowOld: entry.rowOld,
+    rowNew: entry.rowNew,
+    ts: entry.ts,
   };
 }

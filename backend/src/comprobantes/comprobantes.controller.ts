@@ -26,8 +26,8 @@ import { AsociarDocumentosDto } from '@/documentos-fisicos/dto/asociar-documento
 import { ComprobantesService } from './comprobantes.service';
 import { AnularComprobanteDto } from './dto/anular-comprobante.dto';
 import { CreateComprobanteDto } from './dto/create-comprobante.dto';
+import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
 import { ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
-import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 
 // ---- Resolución de tenantId desde JWT + header opcional ----------------
 // Mismo patrón que los otros controllers (ver gestiones/cuentas). El header
@@ -89,14 +89,17 @@ export class ComprobantesController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Actualizar un BORRADOR. El PATCH es parcial; si `lineas` se envía se reemplazan todas. Rechaza CONTABILIZADO/BLOQUEADO/ANULADO.',
+      'Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). ' +
+      'Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional ' +
+      '`contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. ' +
+      'Rechaza BLOQUEADO o anulados.',
   })
   actualizar(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateComprobanteDto,
+    @Body() dto: EditarContabilizadoDto,
   ) {
-    return this.service.actualizarBorrador(resolveTenantId(req), req.user.sub, id, dto);
+    return this.service.patch(resolveTenantId(req), req.user.sub, id, dto);
   }
 
   @Delete(':id')
@@ -105,13 +108,13 @@ export class ComprobantesController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO/ANULADO no se borra: se anula con /anular.',
+      'Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular.',
   })
   async eliminar(
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<void> {
-    await this.service.eliminarBorrador(resolveTenantId(req), id);
+    await this.service.eliminarBorrador(resolveTenantId(req), req.user.sub, id);
   }
 
   @Post(':id/contabilizar')
@@ -131,7 +134,7 @@ export class ComprobantesController {
   @ApiBody({ type: AnularComprobanteDto })
   @ApiOperation({
     summary:
-      'Anular un CONTABILIZADO generando un comprobante AJUSTE con líneas invertidas (FK anulaAId). El número del original se preserva.',
+      'Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva.',
   })
   anular(
     @Req() req: AuthenticatedRequest,
@@ -145,8 +148,7 @@ export class ComprobantesController {
   @RequirePermissions('contabilidad.asientos.read')
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOperation({
-    summary:
-      'Historial de auditoría del comprobante: cada acción (CREADO, EDITADO, CONTABILIZADO, ANULADO, …) con usuario, timestamp y diff.',
+    summary: 'Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff.',
   })
   obtenerAuditoria(@Req() req: AuthenticatedRequest, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.obtenerAuditoria(resolveTenantId(req), id);
