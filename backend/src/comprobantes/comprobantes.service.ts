@@ -190,7 +190,9 @@ export class ComprobantesService {
     userId: string,
     dto: CreateComprobanteDto,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    // Los triggers Postgres en comprobantes_audit capturan INSERT automáticamente;
+    // auditedTx.run inyecta app.audit_user_id para que el trigger sepa el actor.
+    return this.auditedTx.run({ userId }, async (tx) => {
       const resolved = await this.resolverYValidarBorrador(
         tenantId,
         {
@@ -209,24 +211,6 @@ export class ComprobantesService {
         tx,
       );
 
-      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove registrarAuditoria calls;
-      // triggers on comprobantes_audit will capture INSERT/UPDATE/DELETE automatically.
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: persist.id,
-          userId,
-          accion: 'CREADO',
-          diff: {
-            tipo: dto.tipo,
-            fechaContable: dto.fechaContable,
-            lineasCount: dto.lineas.length,
-            monedaPrincipal: resolved.monedaPrincipal,
-          },
-        },
-        tx,
-      );
-
       return toComprobanteResponse(persist);
     });
   }
@@ -237,7 +221,7 @@ export class ComprobantesService {
     id: string,
     dto: UpdateComprobanteDto,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.auditedTx.run({ userId }, async (tx) => {
       const actual = await this.repo.findById(tenantId, id, tx);
       if (!actual) throw new ComprobanteNoEncontradoError(id);
       if (actual.estado !== EstadoComprobante.BORRADOR) {
@@ -249,37 +233,24 @@ export class ComprobantesService {
 
       const persist = await this.repo.reemplazarBorrador(tenantId, id, resolved, tx);
 
-      const camposCambiados = Object.keys(dto);
-      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove; triggers capture this.
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: 'EDITADO',
-          diff: {
-            campos: camposCambiados,
-            lineasCount: resolved.lineas.length,
-            fechaContable: fusionado.fechaContable,
-          },
-        },
-        tx,
-      );
-
       return toComprobanteResponse(persist);
     });
   }
 
-  async eliminarBorrador(tenantId: string, id: string): Promise<void> {
+  async eliminarBorrador(tenantId: string, userId: string, id: string): Promise<void> {
+    // Pre-check fuera de TX: si el estado ya no es BORRADOR, fail rápido.
     const actual = await this.repo.findById(tenantId, id);
     if (!actual) throw new ComprobanteNoEncontradoError(id);
     if (actual.estado !== EstadoComprobante.BORRADOR) {
       throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'eliminar');
     }
-    const deleted = await this.repo.eliminarBorrador(tenantId, id);
-    // Si otra request anuló o contabilizó entre el read y el delete, deleteMany
-    // devuelve 0. Reportamos 404 para que el cliente re-lea el estado actual.
-    if (deleted !== 1) throw new ComprobanteNoEncontradoError(id);
+    // TX auditada: trigger DELETE en comprobantes necesita app.audit_user_id.
+    await this.auditedTx.run({ userId }, async (tx) => {
+      const deleted = await this.repo.eliminarBorrador(tenantId, id, tx);
+      // Si otra request anuló o contabilizó entre el read y el delete, deleteMany
+      // devuelve 0. Reportamos 404 para que el cliente re-lea el estado actual.
+      if (deleted !== 1) throw new ComprobanteNoEncontradoError(id);
+    });
   }
 
   // ============================================================
@@ -309,7 +280,7 @@ export class ComprobantesService {
     userId: string,
     id: string,
   ): Promise<ComprobanteResponseDto> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.auditedTx.run({ userId }, async (tx) => {
       const actual = await this.repo.findById(tenantId, id, tx);
       if (!actual) throw new ComprobanteNoEncontradoError(id);
       if (actual.estado !== EstadoComprobante.BORRADOR) {
@@ -427,7 +398,9 @@ export class ComprobantesService {
       // 5) Totales cache en BOB.
       const totales = calcularTotalesBob(lineasParaValidar);
 
-      // 6) Update + auditoría.
+      // 6) Update de estado + número + totales. Los triggers Postgres en
+      // comprobantes_audit capturan el UPDATE automáticamente con el actor
+      // inyectado por auditedTx (app.audit_user_id).
       const persisted = await this.repo.contabilizar(
         tenantId,
         id,
@@ -435,23 +408,6 @@ export class ComprobantesService {
           numero,
           totalDebitoBob: totales.debito.toPrismaDecimal(),
           totalCreditoBob: totales.credito.toPrismaDecimal(),
-        },
-        tx,
-      );
-      // TODO sdd:comprobantes-anulacion-refactor task 5.5 — remove; triggers capture this.
-      await this.repo.registrarAuditoria(
-        tenantId,
-        {
-          comprobanteId: id,
-          userId,
-          accion: 'CONTABILIZADO',
-          diff: {
-            numero,
-            totales: {
-              debito: totales.debito.toBob(),
-              credito: totales.credito.toBob(),
-            },
-          },
         },
         tx,
       );

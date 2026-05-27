@@ -111,7 +111,7 @@ export class ComprobantesController {
     @Req() req: AuthenticatedRequest,
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<void> {
-    await this.service.eliminarBorrador(resolveTenantId(req), id);
+    await this.service.eliminarBorrador(resolveTenantId(req), req.user.sub, id);
   }
 
   @Post(':id/contabilizar')

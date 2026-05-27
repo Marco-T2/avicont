@@ -338,14 +338,8 @@ describe('ComprobantesService', () => {
         expect.any(Object),
       );
       expect(repo.crearBorrador).toHaveBeenCalledTimes(1);
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({
-          accion: 'CREADO',
-          userId: USER_ID,
-        }),
-        expect.any(Object),
-      );
+      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
+      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
     });
 
     it('rechaza fechaContable futura con FechaFuturaNoPermitidaError', async () => {
@@ -609,8 +603,8 @@ describe('ComprobantesService', () => {
       repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
       repo.eliminarBorrador.mockResolvedValue(1);
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-1')).resolves.toBeUndefined();
-      expect(repo.eliminarBorrador).toHaveBeenCalledWith(TENANT_ID, 'comp-1');
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).resolves.toBeUndefined();
+      expect(repo.eliminarBorrador).toHaveBeenCalledWith(TENANT_ID, 'comp-1', expect.anything());
     });
 
     it('rechaza eliminar un CONTABILIZADO', async () => {
@@ -619,7 +613,7 @@ describe('ComprobantesService', () => {
         comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO }),
       );
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-1')).rejects.toMatchObject({
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).rejects.toMatchObject({
         code: 'COMPROBANTE_ESTADO_INVALIDO',
       });
       expect(repo.eliminarBorrador).not.toHaveBeenCalled();
@@ -629,7 +623,7 @@ describe('ComprobantesService', () => {
       const { service, repo } = buildService();
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.eliminarBorrador(TENANT_ID, 'comp-x')).rejects.toMatchObject({
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-x')).rejects.toMatchObject({
         code: 'COMPROBANTE_NO_ENCONTRADO',
       });
     });
@@ -692,11 +686,8 @@ describe('ComprobantesService', () => {
 
       expect(r.glosa).toBe('Glosa actualizada');
       expect(repo.reemplazarBorrador).toHaveBeenCalledTimes(1);
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({ accion: 'EDITADO' }),
-        expect.any(Object),
-      );
+      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
+      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
     });
 
     it('rechaza actualizar un CONTABILIZADO', async () => {
@@ -799,11 +790,8 @@ describe('ComprobantesService', () => {
         }),
         expect.any(Object),
       );
-      expect(repo.registrarAuditoria).toHaveBeenCalledWith(
-        TENANT_ID,
-        expect.objectContaining({ accion: 'CONTABILIZADO' }),
-        expect.any(Object),
-      );
+      // task 5.5: auditoria via triggers Postgres — registrarAuditoria ya no se llama.
+      expect(repo.registrarAuditoria).not.toHaveBeenCalled();
       expect(r.numero).toBe('D2604-000042');
       expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
     });
