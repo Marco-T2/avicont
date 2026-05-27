@@ -152,21 +152,9 @@ describe('PrismaComprobantesLockAdapter — integration vs Postgres', () => {
       expect(borradorKey?.estado).toBe(EstadoComprobante.BORRADOR);
     });
 
-    it('no afecta ANULADO (estado terminal distinto)', async () => {
-      await crearComprobante({
-        estado: EstadoComprobante.ANULADO,
-        periodoFiscalId: periodoA,
-        numero: 'D2604-000003',
-      });
-
-      const count = await prisma.$transaction((tx) => adapter.bloquearPorPeriodo(tx, periodoA));
-      expect(count).toBe(0);
-
-      const fila = await prisma.comprobante.findFirst({
-        where: { numero: 'D2604-000003' },
-      });
-      expect(fila?.estado).toBe(EstadoComprobante.ANULADO);
-    });
+    // NOTE: comprobantes-anulacion-refactor — test "no afecta ANULADO (estado terminal distinto)"
+    // removed. ANULADO is no longer a state in EstadoComprobante; anulados are now tracked via
+    // the flag anulado=true. New integration test for flag-based anulados will be added in task 6.1.
   });
 
   describe('desbloquearPorPeriodo', () => {
@@ -223,12 +211,9 @@ describe('PrismaComprobantesLockAdapter — integration vs Postgres', () => {
         numero: 'D2604-000002',
         totalBob: '2500.00',
       });
-      await crearComprobante({
-        estado: EstadoComprobante.ANULADO,
-        periodoFiscalId: periodoA,
-        numero: 'D2604-000003',
-        totalBob: '100.00',
-      });
+      // NOTE: comprobantes-anulacion-refactor — replaced ANULADO state fixture with
+      // CONTABILIZADO+anulado=true fixture once the migration lands (task 6.1).
+      // For now we remove this fixture to avoid using the dropped enum value.
       await crearComprobante({
         estado: EstadoComprobante.BORRADOR,
         periodoFiscalId: periodoA,
@@ -243,7 +228,8 @@ describe('PrismaComprobantesLockAdapter — integration vs Postgres', () => {
 
       expect(resumen.contabilizados).toBe(2);
       expect(resumen.borradores).toBe(1);
-      expect(resumen.anulados).toBe(1);
+      // anulados = 0: flag-based count pending task 5.5
+      expect(resumen.anulados).toBe(0);
       // Totales agregan sólo los CONTABILIZADO (§3 doc, §4.1 core).
       expect(resumen.totalDebeBob).toBe('4000.50');
       expect(resumen.totalHaberBob).toBe('4000.50');

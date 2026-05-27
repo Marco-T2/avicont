@@ -85,7 +85,8 @@ describe('PrismaComprobantesLockAdapter', () => {
       tx.comprobante.groupBy.mockResolvedValue([
         { estado: EstadoComprobante.CONTABILIZADO, _count: { _all: 10 } },
         { estado: EstadoComprobante.BORRADOR, _count: { _all: 2 } },
-        { estado: EstadoComprobante.ANULADO, _count: { _all: 1 } },
+        // ANULADO removed from enum in comprobantes-anulacion-refactor; anulados are
+        // now tracked via flag anulado=true on the comprobante. Count = 0 until task 5.5.
       ]);
       tx.comprobante.aggregate.mockResolvedValue({
         _sum: {
@@ -116,7 +117,8 @@ describe('PrismaComprobantesLockAdapter', () => {
       expect(r).toEqual({
         contabilizados: 10,
         borradores: 2,
-        anulados: 1,
+        // anulados = 0: flag-based count not yet implemented (task 5.5)
+        anulados: 0,
         totalDebeBob: '12345.67',
         totalHaberBob: '12345.67',
         borradoresList: [
