@@ -18,7 +18,9 @@ import type {
   DocumentosFisicosReaderPort,
 } from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
+import type { RbacService } from '@/rbac/rbac.service';
 
+import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { ComprobantesService } from './comprobantes.service';
 import type {
   ComprobanteConLineas,
@@ -45,6 +47,7 @@ type MockClock = { [K in keyof ClockPort]: jest.Mock };
 type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
 type MockDocsReader = { [K in keyof DocumentosFisicosReaderPort]: jest.Mock };
 type MockAsociacionRepo = { [K in keyof AsociacionComprobanteRepositoryPort]: jest.Mock };
+type MockRbac = Pick<RbacService, 'hasPermission'>;
 
 function makeRepoMock(): MockRepo {
   return {
@@ -58,6 +61,28 @@ function makeRepoMock(): MockRepo {
     listar: jest.fn(),
     registrarAuditoria: jest.fn(),
     listarAuditoria: jest.fn(),
+  };
+}
+
+function makeRbacMock(): { hasPermission: jest.Mock } {
+  return {
+    // Por default: usuario tiene todos los permisos. Los tests que verifican
+    // rechazo por falta de permiso sobrescriben con mockResolvedValue(false).
+    hasPermission: jest.fn().mockResolvedValue(true),
+  };
+}
+
+function makeAuditedRunnerMock() {
+  // El runner llama a fn(tx) y devuelve su resultado. Mockeamos la TX como
+  // objeto vacío — el servicio no hace calls raw sobre ella en unit tests.
+  const mockTx = {} as Prisma.TransactionClient;
+  return {
+    run: jest
+      .fn()
+      .mockImplementation(
+        async (_opts: unknown, fn: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+          fn(mockTx),
+      ),
   };
 }
 
@@ -148,8 +173,9 @@ function comprobanteFactory(overrides: Partial<ComprobanteConLineas> = {}): Comp
     totalCreditoBob: new Prisma.Decimal(0),
     origenTipo: null,
     origenId: null,
-    anulaAId: null,
-    anuladoEn: null,
+    // Post-schema (comprobantes-anulacion-refactor): flag-based anulacion
+    anulado: false,
+    fechaAnulacion: null,
     anuladoPorUserId: null,
     motivoAnulacion: null,
     createdAt: new Date('2026-04-22T10:00:00Z'),
@@ -202,6 +228,8 @@ function buildService(overrides?: {
   secuencia?: Partial<MockSecuencia>;
   docsReader?: Partial<MockDocsReader>;
   asociacionRepo?: Partial<MockAsociacionRepo>;
+  rbac?: Partial<MockRbac>;
+  auditedRunner?: ReturnType<typeof makeAuditedRunnerMock>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -211,6 +239,12 @@ function buildService(overrides?: {
   const secuencia = { ...makeSecuenciaMock(), ...(overrides?.secuencia ?? {}) };
   const docsReader = { ...makeDocsReaderMock(), ...(overrides?.docsReader ?? {}) };
   const asociacionRepo = { ...makeAsociacionRepoMock(), ...(overrides?.asociacionRepo ?? {}) };
+  const rbac = { ...makeRbacMock(), ...(overrides?.rbac ?? {}) };
+  const auditedRunner = overrides?.auditedRunner ?? makeAuditedRunnerMock();
+  // prisma ya no se usa directamente en el servicio — todas las TX pasan por
+  // auditedRunner. Lo mantenemos para los métodos legacy que aún llaman
+  // this.prisma.$transaction (crearBorrador, actualizarBorrador, etc.) antes
+  // de que task 5.5 los migre.
   const prisma = makePrismaMock();
 
   const service = new ComprobantesService(
@@ -223,6 +257,8 @@ function buildService(overrides?: {
     docsReader as unknown as DocumentosFisicosReaderPort,
     asociacionRepo as unknown as AsociacionComprobanteRepositoryPort,
     prisma,
+    auditedRunner as unknown as AuditedTransactionRunner,
+    rbac as unknown as RbacService,
   );
   return {
     service,
@@ -234,6 +270,8 @@ function buildService(overrides?: {
     secuencia,
     docsReader,
     asociacionRepo,
+    rbac,
+    auditedRunner,
     prisma,
   };
 }
@@ -1039,29 +1077,201 @@ describe('ComprobantesService', () => {
     });
   });
 
-  // NOTE: comprobantes-anulacion-refactor task 1.2 — reversion-based anular suite removed.
-  // The full flag-based unit spec will be written in task 5.1 once the schema migration
-  // (task 2.5) lands and the Prisma client knows about anulado/fechaAnulacion fields.
-  // Minimal interim tests below keep existing guards (motivo, estado, docs) alive.
+  // ============================================================
+  // anular — modelo flag (task 5.1 / comprobantes-anulacion-refactor)
+  // Cubre spec §2.2 + catálogo de errors §3:
+  //   COMPROBANTE_ANULAR_YA_ANULADO        — 409
+  //   COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO — 409
+  //   COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO  — 409 (BLOQUEADO)
+  //   COMPROBANTE_ANULAR_PERIODO_CERRADO   — 409
+  //   COMPROBANTE_ANULAR_MOTIVO_INVALIDO   — 422
+  // ============================================================
 
   describe('anular', () => {
-    it('rechaza motivo vacío', async () => {
-      const { service, repo } = buildService();
+    // Helper: comprobante listo para anular (CONTABILIZADO, anulado=false, período ABIERTO)
+    function setupAnularHappyPath() {
+      const { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia } = buildService();
 
-      await expect(service.anular(TENANT_ID, USER_ID, 'comp-orig', '')).rejects.toMatchObject({
-        code: 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO',
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: 'D2604-000042',
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
       });
-      expect(repo.findById).not.toHaveBeenCalled();
+
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+
+      // El repositorio devuelve el comprobante con anulado=true tras el UPDATE
+      const anulado = {
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date('2026-04-22T12:00:00Z'),
+        motivoAnulacion: 'Error en imputación al cliente',
+        anuladoPorUserId: USER_ID,
+      };
+      repo.marcarAnulado.mockResolvedValue(anulado);
+
+      return { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia, anulado };
+    }
+
+    it('happy path: marca anulado=true en el propio comprobante (REQ-COMP-ANULAR-01)', async () => {
+      const { service, repo, anulado } = setupAnularHappyPath();
+
+      const result = await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      // Resultado: el comprobante con anulado=true y los 3 metadatos
+      expect(result.anulado).toBe(true);
+      expect(result.fechaAnulacion).toBeDefined();
+      expect(result.motivoAnulacion).toBe('Error en imputación al cliente');
+      expect(result.anuladoPorUserId).toBe(USER_ID);
+      // Preserva numero y estado CONTABILIZADO (REQ-COMP-ANULAR-05, REQ-COMP-ANULAR-06)
+      expect(result.numero).toBe(anulado.numero);
+      expect(result.estado).toBe(EstadoComprobante.CONTABILIZADO);
     });
 
-    it('rechaza motivo con menos de 10 caracteres (incluye trim)', async () => {
-      const { service } = buildService();
+    it('preserva el numero correlativo (REQ-COMP-CORRELATIVO-03, escenario 24)', async () => {
+      const { service } = setupAnularHappyPath();
+
+      const result = await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(result.numero).toBe('D2604-000042');
+    });
+
+    it('llama a auditedTx.run con userId y motivo (REQ-COMP-AUDIT-03)', async () => {
+      const { service, auditedRunner } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID, motivo: 'Error en imputación al cliente' }),
+        expect.any(Function),
+      );
+    });
+
+    it('propaga reaperturaId al wrapper cuando hay reapertura activa (REQ-COMP-REAPERTURA-02, escenario 15)', async () => {
+      const { service, periodos, auditedRunner, repo } = buildService();
+      const comp = comprobanteFactory({
+        id: 'comp-c',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
+      });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      // Reapertura activa sobre el período
+      periodos.obtenerReaperturaActiva.mockResolvedValue({ id: 'reap-001', reopenedAt: new Date() });
+      repo.marcarAnulado.mockResolvedValue({ ...comp, anulado: true, fechaAnulacion: new Date(), motivoAnulacion: 'Motivo válido OK', anuladoPorUserId: USER_ID });
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo válido OK');
+
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ reaperturaId: 'reap-001' }),
+        expect.any(Function),
+      );
+    });
+
+    it('rechaza si anulado=true ya (COMPROBANTE_ANULAR_YA_ANULADO, 409) — REQ-COMP-ANULAR-03', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: true }),
+      );
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-orig', '  corto  '),
-      ).rejects.toMatchObject({
-        code: 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO',
-      });
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_YA_ANULADO' });
+    });
+
+    it('rechaza si estado=BORRADOR (COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO, 409) — REQ-COMP-ANULAR-04', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO' });
+    });
+
+    it('rechaza si estado=BLOQUEADO (COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO, 409)', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BLOQUEADO }));
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO' });
+    });
+
+    it('rechaza si período cerrado y sin reapertura activa (COMPROBANTE_ANULAR_PERIODO_CERRADO, 409) — escenario 14', async () => {
+      const { service, repo, periodos } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      periodos.obtenerReaperturaActiva.mockResolvedValue(null);
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Motivo suficiente largo'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_PERIODO_CERRADO' });
+    });
+
+    it('permite anular si período cerrado pero hay reapertura activa (REQ-COMP-REAPERTURA-01, escenario 15)', async () => {
+      const { service, repo, periodos } = buildService();
+      const comp = comprobanteFactory({ id: 'comp-c', estado: EstadoComprobante.CONTABILIZADO, anulado: false });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({ id: PERIODO_ID, status: PeriodoFiscalStatus.CERRADO });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({ id: 'reap-001', reopenedAt: new Date() });
+      repo.marcarAnulado.mockResolvedValue({ ...comp, anulado: true, fechaAnulacion: new Date(), motivoAnulacion: 'Corrección post-cierre X', anuladoPorUserId: USER_ID });
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', 'Corrección post-cierre X'),
+      ).resolves.toMatchObject({ anulado: true });
+    });
+
+    it('rechaza si motivo.trim().length < 10 (COMPROBANTE_ANULAR_MOTIVO_INVALIDO, 422) — REQ-COMP-ANULAR-02', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+
+      // 9 caracteres no-whitespace
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', '123456789'),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' });
+    });
+
+    it('rechaza si motivo es solo whitespace (COMPROBANTE_ANULAR_MOTIVO_INVALIDO, 422) — escenario 12', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.CONTABILIZADO, anulado: false }),
+      );
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-c', '               '),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO' });
+    });
+
+    it('NO consume SecuenciaComprobantePort (REQ-COMP-ANULAR-06)', async () => {
+      const { service, secuencia } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(secuencia.siguienteCorrelativo).not.toHaveBeenCalled();
+    });
+
+    it('desasocia documentos físicos del comprobante anulado (CLAUDE.md §4.7)', async () => {
+      const { service, asociacionRepo } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(asociacionRepo.desasociarTodasDelComprobante).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-c',
+        expect.anything(),
+      );
     });
 
     it('lanza 404 si el comprobante no existe', async () => {
@@ -1069,34 +1279,9 @@ describe('ComprobantesService', () => {
       repo.findById.mockResolvedValue(null);
 
       await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-x', 'Motivo suficiente'),
+        service.anular(TENANT_ID, USER_ID, 'comp-x', 'Motivo suficiente largo'),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_ENCONTRADO' });
     });
-
-    it('rechaza anular un BLOQUEADO con ComprobanteBloqueadoError', async () => {
-      const { service, repo } = buildService();
-      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BLOQUEADO }));
-
-      await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_BLOQUEADO' });
-    });
-
-    // NOTE: comprobantes-anulacion-refactor task 1.2 — "rechaza anular uno YA_ANULADO" with
-    // EstadoComprobante.ANULADO removed. New test using anulado=true flag will be in task 5.1.
-
-    it('rechaza anular un BORRADOR', async () => {
-      const { service, repo } = buildService();
-      repo.findById.mockResolvedValue(comprobanteFactory({ estado: EstadoComprobante.BORRADOR }));
-
-      await expect(
-        service.anular(TENANT_ID, USER_ID, 'comp-b', 'Motivo suficiente'),
-      ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
-    });
-
-    // NOTE: comprobantes-anulacion-refactor task 1.2 — period and reversion-related tests
-    // removed. New tests for the flag model will be written in task 5.1 after schema migration.
-    // Keeping the desasociarTodasDelComprobante test since it validates a cross-cutting concern.
   });
 
   describe('listar', () => {
@@ -1133,6 +1318,35 @@ describe('ComprobantesService', () => {
         page: 1,
         limit: 50,
       });
+    });
+
+    // ——— incluirAnulados toggle (task 5.6 / REQ-COMP-REPORTES-01) ———
+
+    it('default oculta anulados (incluirAnulados=false implícito) — REQ-COMP-REPORTES-01', async () => {
+      const { service, repo } = buildService();
+      repo.listar.mockResolvedValue({ items: [], total: 0 });
+
+      await service.listar(TENANT_ID, {});
+
+      // El filtro debe ir con incluirAnulados: false (o ausente + default false en repo)
+      expect(repo.listar).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ incluirAnulados: false }),
+        expect.any(Object),
+      );
+    });
+
+    it('incluirAnulados=true los incluye — REQ-COMP-REPORTES-01', async () => {
+      const { service, repo } = buildService();
+      repo.listar.mockResolvedValue({ items: [], total: 0 });
+
+      await service.listar(TENANT_ID, { incluirAnulados: true });
+
+      expect(repo.listar).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ incluirAnulados: true }),
+        expect.any(Object),
+      );
     });
   });
 
