@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
-import { useFormContext, useFormState } from 'react-hook-form';
+import { type FieldErrors, useFormContext, useFormState } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,8 +80,8 @@ export function LineaRow({
   const debitoBob = watch(`lineas.${index}.debitoBob`) as string;
   const creditoBob = watch(`lineas.${index}.creditoBob`) as string;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lineaErrors = (errors as any)?.lineas?.[index];
+  type LineasErrorsShape = { lineas?: Array<Record<string, { message?: string }>> };
+  const lineaErrors = (errors as FieldErrors<LineasErrorsShape>).lineas?.[index];
 
   return (
     <tr
