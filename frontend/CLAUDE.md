@@ -552,6 +552,138 @@ Cada antipatrón: **Qué** (una línea), **Por qué duele** (con foco en un sist
 - **Por qué duele**: pierde cache, pierde dedup, pierde invalidations. Dos componentes montados piden la misma data dos veces.
 - **Regla**: componentes importan **solo** del hook (`use-cuentas`). El hook es la fachada de la feature. Ver §8.
 
+### Anti-F-13: `toast.error()` en el cuerpo del componente (en cada render)
+- **Qué**: `if (query.isError) { toast.error('No se pudo cargar') }` escrito directamente en el cuerpo de un componente que se re-renderiza.
+- **Por qué duele**: el toast se dispara en CADA re-render mientras `isError === true`. Con un backend caído, sonner muestra 20-50 toasts por segundo y la pantalla se vuelve inusable. El error real queda oculto detrás del spam.
+- **Regla**: nunca disparar side effects (toasts, fetch, navigate) desde el cuerpo de un componente. Opciones:
+  - **Si la query es crítica para el render** (la página no puede mostrar nada sin ese dato): early return con banner inline `<div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3">` + botón de "Volver" o "Reintentar". No usar toast.
+  - **Si la query es secundaria** (es 1 query entre varias): pasar `onError` al hook (`useQuery({ ..., meta: { onError } })`) o `useEffect(() => { if (isError) toast.error(...); }, [isError])` con dep array explícito.
+  - **El `toast.error()` se reserva para errores de mutaciones** (`onError` callback de `useMutation`), donde se dispara una vez por intento del usuario.
+
+### Anti-F-14: `Textarea` dentro de Sheet/Dialog sin `[field-sizing:fixed]`
+- **Qué**: `<Textarea {...register('motivo')} />` dentro de un `<Sheet>` o `<Dialog>` sin clases que controlen el sizing.
+- **Por qué duele**: el componente `Textarea` de shadcn usa `field-sizing-content` por defecto (CSS nuevo que crece con el contenido). Si el usuario pega una línea larga sin espacios (URL, hash, JSON inlineado), el textarea **expande horizontalmente** y empuja el contenedor del Sheet/Dialog, rompiendo el layout y forzando scroll horizontal. El bug es invisible en testing porque solo se reproduce con texto real.
+- **Regla**: todo `<Textarea>` dentro de `<Sheet>` o `<Dialog>` debe llevar:
+  ```tsx
+  <Textarea
+    className="w-full max-w-full resize-y [field-sizing:fixed] min-h-[80px]"
+    {...register('campo')}
+  />
+  ```
+  El `min-h` es libre por contexto (72/80/100 px). `[field-sizing:fixed]` desactiva el sizing automático, `w-full max-w-full` fuerza al input a respetar el ancho del padre, `resize-y` permite que el usuario lo agrande verticalmente. **El `text-base md:text-sm` se mantiene** por la regla de mobile auto-zoom (§7).
+
+---
+
+## 13. Page chrome y componentes compartidos
+
+> Esta sección documenta los patrones que TODA página de listado/detalle debe seguir. Surge de divergencias detectadas en code review: cuando no hay regla escrita, cada feature reinventa el header con valores distintos y la UI termina sintiéndose inconsistente entre pantallas.
+
+### 13.1 Header canónico de página de listado
+
+**Estructura obligatoria** (copy-paste):
+
+```tsx
+<div className="space-y-6">
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 className="text-2xl md:text-3xl font-bold">{titulo}</h1>
+      <p className="text-sm md:text-base text-muted-foreground">
+        {subtitulo}
+      </p>
+    </div>
+    <Button onClick={...} className="self-start">
+      <Plus className="h-4 w-4 mr-2" />
+      {accionPrimaria}
+    </Button>
+  </div>
+
+  {/* resto de la página */}
+</div>
+```
+
+**Reglas duras**:
+1. **El container raíz NO agrega padding propio.** El `DashboardShell` ya provee `px-4 py-6 lg:px-8` en el `<main>`. Agregar `p-4 md:p-6` produce padding DOBLE y empuja el contenido hacia adentro vs. todas las demás pantallas.
+2. **`space-y-6` entre el header y el resto del contenido.** No `space-y-4` ni `space-y-5`.
+3. **Title h1 escalable**: `text-2xl md:text-3xl font-bold`. NO usar `tracking-tight` — no se usa en ninguna otra página.
+4. **Subtítulo escalable**: `text-sm md:text-base text-muted-foreground`. NO usar `mt-0.5` — el `<div>` padre ya da el spacing necesario.
+5. **Layout responsive**: `flex-col gap-3` en mobile, `sm:flex-row sm:items-start sm:justify-between` en tablet+. NO usar `items-center` — `items-start` alinea el botón al borde superior cuando el subtítulo se wrappea.
+6. **Botón con `self-start`** para que en mobile no se estire al ancho del contenedor.
+7. **Texto del botón en imperativo**: "Nueva cuenta", "Nuevo comprobante", "Nueva gestión". Singular, sin artículos.
+
+**Páginas de detalle y editor** (no listado): la regla del container `space-y-6` sin padding propio se mantiene; el header difiere porque suele tener back-button + título contextual en lugar de h1 + acción primaria. Patrón:
+
+```tsx
+<div className="space-y-6">
+  <Button variant="ghost" size="sm" onClick={handleBack} className="gap-1 -ml-2">
+    <ChevronLeft className="h-4 w-4" />
+    {textoBack}
+  </Button>
+  <div>
+    <h1 className="text-2xl md:text-3xl font-bold">{titulo}</h1>
+    <p className="text-sm md:text-base text-muted-foreground">{descripcion}</p>
+  </div>
+  {/* resto */}
+</div>
+```
+
+### 13.2 Header de sección interna
+
+Para encabezar una sección dentro de una página o drawer (ej. "Líneas", "Comprobantes", "Totales"):
+
+```tsx
+<h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+  Líneas
+</h2>
+```
+
+- `<h2>` si es el primer nivel de subsección en la página; `<h3>` si está dentro de un drawer o un card.
+- `mb-3` (no `mb-2`) para spacing consistente con el contenido siguiente.
+- Texto en español capitalizado solo en la primera letra; el uppercase lo aplica CSS.
+
+### 13.3 Paginación
+
+Usar el componente shared `@/components/shared/pagination-bar`:
+
+```tsx
+import { PaginationBar } from '@/components/shared/pagination-bar';
+
+<PaginationBar
+  page={page}
+  limit={DEFAULT_LIMIT}
+  total={data.total}
+  onPageChange={handlePageChange}
+/>
+```
+
+- **NO reimplementar inline** con `<Button><ChevronLeft /></Button>` y label custom. El componente shared maneja: no renderizar si total ≤ limit, label "Página X de Y", botones con texto + icono.
+- Si el componente shared no cubre un caso (paginación con jump-to-page, infinite scroll), discutir antes de fork-ear.
+
+### 13.4 Empty states
+
+Dos variantes según el contexto:
+
+**Empty state de tabla** (filtros activos sin resultados — la entidad existe pero no hay matches):
+```tsx
+<div className="flex h-40 items-center justify-center rounded-md border border-dashed">
+  <p className="text-sm text-muted-foreground">No se encontraron resultados.</p>
+</div>
+```
+Sin ícono, sin CTA — el usuario ya está en la pantalla, solo le mostramos que su filtro no devolvió nada.
+
+**Empty state de página** (primera vez, la entidad no existe todavía):
+```tsx
+<div className="rounded-lg border border-dashed bg-card px-6 py-12 text-center">
+  <Icono className="mx-auto h-12 w-12 text-muted-foreground" />
+  <h2 className="mt-4 text-lg font-semibold">No hay {entidades} todavía</h2>
+  <p className="mt-1 text-sm text-muted-foreground">{copy explicativo de 1 línea}</p>
+  <Button onClick={onCrear} className="mt-4">
+    <Plus className="h-4 w-4 mr-2" />
+    {accionPrimaria}
+  </Button>
+</div>
+```
+Con ícono del dominio + h2 + copy + CTA. Es la primera impresión del feature, vale la pena el peso visual.
+
 ---
 
 **Fin del documento.** Este archivo se versiona en git; cualquier cambio se discute en PR.
