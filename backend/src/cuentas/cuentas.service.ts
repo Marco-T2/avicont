@@ -6,8 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Cuenta } from '@prisma/client';
 
+import type { Cuenta } from './domain/cuenta';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
 import type { ListarCuentasQueryDto } from './dto/listar-cuentas.dto';
 import type { UpdateCuentaDto } from './dto/update-cuenta.dto';

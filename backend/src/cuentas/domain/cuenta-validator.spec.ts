@@ -1,6 +1,7 @@
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@prisma/client';
 
 import { CuentaErrorCode } from './cuenta-errors';
+import { NaturalezaCuenta, SubClaseCuenta } from './enums';
 import {
   calcularNivelDesdeCodigo,
   MAX_NIVELES_CODIGO_INTERNO,
