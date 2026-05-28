@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { superRefinePartidaDoble } from '../lib/partida-doble';
 import { lineaSchema } from './linea-schema';
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,6 +45,12 @@ export const editarComprobanteSchema = z.object({
     .min(3, 'El motivo debe tener al menos 3 caracteres')
     .max(500, 'El motivo no puede superar 500 caracteres')
     .optional(),
+})
+.superRefine((data, ctx) => {
+  // Validar partida doble solo cuando se proveen líneas (PATCH parcial — CLAUDE.md §4.1).
+  if (data.lineas !== undefined) {
+    superRefinePartidaDoble(data.lineas, ctx);
+  }
 });
 
 export type EditarComprobanteValues = z.infer<typeof editarComprobanteSchema>;

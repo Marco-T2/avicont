@@ -248,6 +248,12 @@ export function EditarComprobanteSheet({
                 Líneas
               </h3>
               <LineasEditor mode={mode} cuentas={cuentas} />
+              {/* Error de partida doble — generado por superRefinePartidaDoble en el schema (REQ-COMP-UI-EDIT-12). */}
+              {form.formState.errors.lineas?.root !== undefined && (
+                <p className="mt-1.5 text-sm text-destructive">
+                  {form.formState.errors.lineas.root.message}
+                </p>
+              )}
             </div>
 
             {/* Footer */}

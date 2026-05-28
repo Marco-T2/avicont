@@ -2,6 +2,26 @@ import { describe, expect, it } from 'vitest';
 
 import { editarComprobanteSchema } from './editar-comprobante-schema';
 
+const lineaDebito = {
+  cuentaId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+  moneda: 'BOB' as const,
+  debito: '1000.00',
+  credito: '0',
+  tipoCambio: '1',
+  debitoBob: '1000.00',
+  creditoBob: '0',
+};
+
+const lineaCredito = {
+  cuentaId: '4fa85f64-5717-4562-b3fc-2c963f66afa7',
+  moneda: 'BOB' as const,
+  debito: '0',
+  credito: '1000.00',
+  tipoCambio: '1',
+  debitoBob: '0',
+  creditoBob: '1000.00',
+};
+
 describe('editarComprobanteSchema', () => {
   it('acepta objeto completamente vacío (todos los campos son opcionales)', () => {
     const r = editarComprobanteSchema.safeParse({});
@@ -78,5 +98,44 @@ describe('editarComprobanteSchema', () => {
       motivo: 'Corrección menor',
     });
     expect(r.success).toBe(true);
+  });
+
+  describe('superRefine — validación de partida doble', () => {
+    it('es válido cuando lineas no está definido (PATCH parcial sin líneas)', () => {
+      const r = editarComprobanteSchema.safeParse({ glosa: 'Solo glosa' });
+      expect(r.success).toBe(true);
+    });
+
+    it('es válido cuando lineas está balanceado (≥2 líneas, ΣDeb===ΣCred)', () => {
+      const r = editarComprobanteSchema.safeParse({
+        lineas: [lineaDebito, lineaCredito],
+      });
+      expect(r.success).toBe(true);
+    });
+
+    it('falla cuando lineas está desbalanceado en más de Bs 0.01', () => {
+      const creditoDesbalanceado = { ...lineaCredito, creditoBob: '999.00', credito: '999.00' };
+      const r = editarComprobanteSchema.safeParse({
+        lineas: [lineaDebito, creditoDesbalanceado],
+      });
+      expect(r.success).toBe(false);
+      if (!r.success) {
+        const msgs = r.error.issues.map((i) => i.message).join(' ');
+        expect(msgs).toMatch(/débitos no igualan a los créditos/i);
+      }
+    });
+
+    it('es válido cuando lineas tiene solo 1 línea (borrador con línea única)', () => {
+      const r = editarComprobanteSchema.safeParse({ lineas: [lineaDebito] });
+      expect(r.success).toBe(true);
+    });
+
+    it('es válido cuando la diferencia es exactamente 0.01 (en el límite de tolerancia)', () => {
+      const creditoConTolerancia = { ...lineaCredito, creditoBob: '1000.01', credito: '1000.01' };
+      const r = editarComprobanteSchema.safeParse({
+        lineas: [lineaDebito, creditoConTolerancia],
+      });
+      expect(r.success).toBe(true);
+    });
   });
 });
