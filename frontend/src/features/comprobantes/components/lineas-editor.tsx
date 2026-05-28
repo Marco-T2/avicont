@@ -1,10 +1,9 @@
 import { AlertTriangle, Plus } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import type { Cuenta } from '@/types/api';
 
 import { calcularTotalesLineas } from '../lib/calcular-totales';
@@ -32,7 +31,7 @@ interface LineasEditorProps {
  * - Alt+Delete con foco en botón eliminar → eliminar la fila correspondiente.
  * - Enter global del form DESHABILITADO dentro del editor (onKeyDown capture).
  */
-export function LineasEditor({ mode, cuentas: _cuentas }: LineasEditorProps): React.JSX.Element {
+export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
   const { control } = useFormContext();
 
   const { fields, append, remove } = useFieldArray({

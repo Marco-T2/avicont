@@ -36,7 +36,9 @@ describe('crearComprobanteSchema', () => {
   });
 
   it('acepta sin monedaPrincipal (opcional)', () => {
-    const { monedaPrincipal: _, ...sin } = cabeceraValida;
+    const sin = Object.fromEntries(
+      Object.entries(cabeceraValida).filter(([k]) => k !== 'monedaPrincipal'),
+    );
     expect(crearComprobanteSchema.safeParse(sin).success).toBe(true);
   });
 
