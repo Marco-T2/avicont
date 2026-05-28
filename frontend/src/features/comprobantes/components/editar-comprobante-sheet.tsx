@@ -17,7 +17,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { mensajeComprobantes } from '@/lib/error-messages';
 import type { Comprobante, Cuenta } from '@/types/api';
 
-import { useAnularComprobante } from '../hooks/use-anular-comprobante';
 import { useCrearComprobante } from '../hooks/use-crear-comprobante';
 import { useEditarComprobante } from '../hooks/use-editar-comprobante';
 import {
@@ -95,8 +94,6 @@ export function EditarComprobanteSheet({
 
   const crearMutation = useCrearComprobante();
   const editarMutation = useEditarComprobante(comprobante?.id ?? '');
-  // useAnularComprobante hook is available but not used here directly.
-  void useAnularComprobante; // imported for type checking
 
   const isPending = isNuevo ? crearMutation.isPending : editarMutation.isPending;
 
