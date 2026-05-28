@@ -1,16 +1,13 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import type { EstadoComprobante, TipoComprobante } from '@/types/api';
-import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
 import { useComprobantes } from '../hooks/use-comprobantes';
 
 import { ComprobantesFilters } from './comprobantes-filters';
 import { ComprobantesTable } from './comprobantes-table';
-import { EditarComprobanteSheet } from './editar-comprobante-sheet';
 import { PaginationBar } from './pagination-bar';
 
 const DEFAULT_LIMIT = 20;
@@ -21,15 +18,11 @@ const DEFAULT_LIMIT = 20;
  * - URL state (useSearchParams) para filtros y paginación.
  * - useComprobantes para el fetch paginado con keepPreviousData.
  * - ComprobantesFilters → ComprobantesTable → PaginationBar.
- * - Botón "Nuevo comprobante" → EditarComprobanteSheet mode='nuevo'.
- *
- * Cross-feature: useCuentas({ esDetalle, activa, pageSize: 200 }) se pasa
- * al EditarComprobanteSheet para el CuentaAutocomplete del LineasEditor.
- * (design obs 247 §"Resolved lookups")
+ * - Botón "Nuevo comprobante" → navega a /comprobantes/nuevo (EditarComprobantePage).
  */
 export function ComprobantesPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const navigate = useNavigate();
 
   const page = parseInt(searchParams.get('page') ?? '1', 10);
   const tipo = searchParams.get('tipo') as TipoComprobante | null;
@@ -45,15 +38,6 @@ export function ComprobantesPage(): React.JSX.Element {
   };
 
   const { data, isLoading, isError } = useComprobantes(params);
-
-  // Cross-feature: cuentas de detalle para el editor de líneas.
-  const { data: cuentasData } = useCuentas({
-    esDetalle: true,
-    activa: true,
-    pageSize: 200,
-  });
-
-  const cuentas = cuentasData?.items ?? [];
 
   function handlePageChange(nextPage: number): void {
     setSearchParams((prev) => {
@@ -73,7 +57,7 @@ export function ComprobantesPage(): React.JSX.Element {
             Asientos contables del libro diario
           </p>
         </div>
-        <Button onClick={() => setNuevoOpen(true)} className="gap-1.5">
+        <Button onClick={() => void navigate('/comprobantes/nuevo')} className="gap-1.5">
           <Plus className="h-4 w-4" />
           Nuevo comprobante
         </Button>
@@ -98,14 +82,6 @@ export function ComprobantesPage(): React.JSX.Element {
           onPageChange={handlePageChange}
         />
       )}
-
-      {/* Sheet para nuevo comprobante */}
-      <EditarComprobanteSheet
-        open={nuevoOpen}
-        onOpenChange={setNuevoOpen}
-        mode="nuevo"
-        cuentas={cuentas}
-      />
     </div>
   );
 }

@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { Comprobante } from '@/types/api';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
 import { formatearFechaContable } from '../lib/formatear-fecha-contable';
@@ -22,13 +21,11 @@ import {
   secuenciaDe,
 } from '../lib/formatear-numero-correlativo';
 import { useComprobante } from '../hooks/use-comprobante';
-import type { ComprobanteMode } from '../types';
 
 import { AnularComprobanteSheet } from './anular-comprobante-sheet';
 import { AuditoriaSheet } from './auditoria-sheet';
 import { ComprobanteActionsBar } from './comprobante-actions-bar';
 import { ContabilizarComprobanteDialog } from './contabilizar-comprobante-dialog';
-import { EditarComprobanteSheet } from './editar-comprobante-sheet';
 import { EliminarComprobanteDialog } from './eliminar-comprobante-dialog';
 import { EstadoComprobanteBadge } from './estado-comprobante-badge';
 import { MontoCell } from './monto-cell';
@@ -74,15 +71,6 @@ function PageSkeleton(): React.JSX.Element {
 }
 
 /**
- * Determina el mode del EditarComprobanteSheet según el estado y flag anulado.
- */
-function determinarMode(comprobante: Comprobante): ComprobanteMode {
-  if (comprobante.estado === 'BORRADOR') return 'borrador';
-  if (comprobante.estado === 'CONTABILIZADO') return 'contabilizado';
-  return 'contabilizado'; // BLOQUEADO → tratado como contabilizado (read-only)
-}
-
-/**
  * Página de detalle de un comprobante (/comprobantes/:id).
  *
  * Carga el comprobante via useComprobante(id). Si no existe, muestra 404.
@@ -90,21 +78,21 @@ function determinarMode(comprobante: Comprobante): ComprobanteMode {
  * Secciones:
  * - Cabecera: tipo, número correlativo, estado, fecha, glosa, moneda, totales.
  * - Tabla de líneas read-only (NO usa LineasEditor — render manual con MontoCell).
- * - ComprobanteActionsBar — abre sheets/dialogs controlados por useState local.
+ * - ComprobanteActionsBar — "Editar" navega a /comprobantes/:id/editar.
  * - Banner rojo si anulado=true con info de anulación.
  *
- * Sheets/dialogs controlados:
- * - EditarComprobanteSheet (mode determinado por estado)
+ * Sheets/dialogs controlados localmente (cómodos en modal pequeño):
  * - ContabilizarComprobanteDialog
  * - AnularComprobanteSheet
  * - EliminarComprobanteDialog
  * - AuditoriaSheet
+ *
+ * Edición (form multi-línea, incómodo en Sheet): navega a /comprobantes/:id/editar.
  */
 export function ComprobanteDetailPage(): React.JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [editOpen, setEditOpen] = useState(false);
   const [contabilizarOpen, setContabilizarOpen] = useState(false);
   const [anularOpen, setAnularOpen] = useState(false);
   const [eliminarOpen, setEliminarOpen] = useState(false);
@@ -112,7 +100,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
 
   const { data: comprobante, isLoading, isError } = useComprobante(id ?? '');
 
-  // Cross-feature: cuentas para el editor de líneas.
+  // Cross-feature: cuentas para mostrar nombre·código en la tabla de líneas read-only.
   const { data: cuentasData } = useCuentas({
     esDetalle: true,
     activa: true,
@@ -139,8 +127,6 @@ export function ComprobanteDetailPage(): React.JSX.Element {
       </div>
     );
   }
-
-  const mode = determinarMode(comprobante);
 
   return (
     <>
@@ -200,7 +186,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
             </div>
             <ComprobanteActionsBar
               comprobante={comprobante}
-              onEdit={() => setEditOpen(true)}
+              onEdit={() => void navigate(`/comprobantes/${comprobante.id}/editar`)}
               onContabilizar={() => setContabilizarOpen(true)}
               onAnular={() => setAnularOpen(true)}
               onEliminar={() => setEliminarOpen(true)}
@@ -324,14 +310,6 @@ export function ComprobanteDetailPage(): React.JSX.Element {
       </div>
 
       {/* Sheets y dialogs controlados por estado local */}
-      <EditarComprobanteSheet
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        mode={mode}
-        comprobante={comprobante}
-        cuentas={cuentas}
-      />
-
       <ContabilizarComprobanteDialog
         open={contabilizarOpen}
         onOpenChange={setContabilizarOpen}

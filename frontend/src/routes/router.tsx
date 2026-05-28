@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
 import { ComprobanteDetailPage } from '@/features/comprobantes/pages/comprobante-detail-page';
 import { ComprobantesPage } from '@/features/comprobantes/pages/comprobantes-page';
+import { EditarComprobantePage } from '@/features/comprobantes/pages/editar-comprobante-page';
 import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
@@ -35,7 +36,9 @@ export const router = createBrowserRouter([
           { path: '/', element: <DashboardPage /> },
           { path: '/plan-cuentas', element: <PlanCuentasPage /> },
           { path: '/comprobantes', element: <ComprobantesPage /> },
+          { path: '/comprobantes/nuevo', element: <EditarComprobantePage /> },
           { path: '/comprobantes/:id', element: <ComprobanteDetailPage /> },
+          { path: '/comprobantes/:id/editar', element: <EditarComprobantePage /> },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/periodos-fiscales', element: <PeriodosFiscalesPage /> },
           { path: '/settings/members', element: <MembersPage /> },

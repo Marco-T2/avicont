@@ -1,9 +1,20 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ComprobantesPage } from './comprobantes-page';
+
+// Mock de useNavigate para verificar navegación sin montar el router completo.
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 // Mock hooks de datos
 vi.mock('../hooks/use-comprobantes', () => ({
@@ -12,15 +23,6 @@ vi.mock('../hooks/use-comprobantes', () => ({
     isLoading: false,
     isError: false,
   }),
-}));
-
-vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
-  useCuentas: () => ({ data: { items: [] } }),
-}));
-
-// Mock del EditarComprobanteSheet para evitar FormProvider complejo
-vi.mock('./editar-comprobante-sheet', () => ({
-  EditarComprobanteSheet: () => null,
 }));
 
 function renderPage() {
@@ -52,5 +54,12 @@ describe('ComprobantesPage (smoke)', () => {
     expect(
       screen.getByText(/No hay comprobantes para mostrar/i),
     ).toBeInTheDocument();
+  });
+
+  it('botón "Nuevo comprobante" navega a /comprobantes/nuevo', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /nuevo comprobante/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/comprobantes/nuevo');
   });
 });

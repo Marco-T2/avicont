@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +14,16 @@ vi.mock('../hooks/use-comprobante', () => ({
 vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
   useCuentas: vi.fn(),
 }));
+
+// Mock de useNavigate para verificar navegación al Editar.
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 import { useComprobante } from '../hooks/use-comprobante';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
@@ -88,9 +99,6 @@ function setupDefaultMocks(cuentas: Cuenta[] = []) {
   });
 }
 
-vi.mock('./editar-comprobante-sheet', () => ({
-  EditarComprobanteSheet: () => null,
-}));
 vi.mock('./contabilizar-comprobante-dialog', () => ({
   ContabilizarComprobanteDialog: () => null,
 }));
@@ -148,6 +156,14 @@ describe('ComprobanteDetailPage (smoke)', () => {
     setupDefaultMocks();
     renderPage();
     expect(screen.getByText('Cobro de servicios')).toBeInTheDocument();
+  });
+
+  it('botón "Editar" navega a /comprobantes/:id/editar', async () => {
+    const user = userEvent.setup();
+    setupDefaultMocks();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /editar/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/comprobantes/comp-1/editar');
   });
 });
 
