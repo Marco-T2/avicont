@@ -1,4 +1,4 @@
-import { TipoEmpresa } from '@prisma/client';
+import { TipoEmpresa } from './enums';
 
 /**
  * Mapeo normativo de cierre fiscal por tipo de empresa según Ley 843 art. 46.
