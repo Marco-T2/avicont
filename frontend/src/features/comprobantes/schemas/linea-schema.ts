@@ -22,8 +22,11 @@ export const lineaSchema = z
     debito: DECIMAL_STRING,
     credito: DECIMAL_STRING,
     tipoCambio: DECIMAL_STRING,
-    debitoBob: DECIMAL_STRING,
-    creditoBob: DECIMAL_STRING,
+    // debitoBob/creditoBob NO se trackean en el form — son derived state.
+    // Se calculan inline en el render del LineaRow + se populan en el submit
+    // antes de pasar al backend. Esto evita que `setValue('debitoBob', ...)`
+    // dentro de un useEffect regenere `field.id` del useFieldArray durante
+    // un keystroke, lo que causaba unmount/mount del input y pérdida de foco.
 
     glosaLinea: z.string().max(500, 'La glosa de línea no puede superar 500 caracteres').optional(),
   })

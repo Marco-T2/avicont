@@ -8,8 +8,6 @@ const lineaDebito = {
   debito: '1000.00',
   credito: '0',
   tipoCambio: '1',
-  debitoBob: '1000.00',
-  creditoBob: '0',
 };
 
 const lineaCredito = {
@@ -18,8 +16,6 @@ const lineaCredito = {
   debito: '0',
   credito: '1000.00',
   tipoCambio: '1',
-  debitoBob: '0',
-  creditoBob: '1000.00',
 };
 
 const cabeceraValida = {
@@ -68,7 +64,7 @@ describe('crearComprobanteSchema', () => {
   });
 
   it('rechaza cuando los totales BOB están desbalanceados (superRefine)', () => {
-    const lineaDesequilibrada = { ...lineaCredito, creditoBob: '999.00', credito: '999.00' };
+    const lineaDesequilibrada = { ...lineaCredito, credito: '999.00' };
     const r = crearComprobanteSchema.safeParse({ ...cabeceraValida, lineas: [lineaDebito, lineaDesequilibrada] });
     expect(r.success).toBe(false);
     if (!r.success) {
@@ -78,7 +74,7 @@ describe('crearComprobanteSchema', () => {
   });
 
   it('acepta comprobante con diferencia <= 0.01 BOB (tolerancia)', () => {
-    const lineaConDiff = { ...lineaCredito, creditoBob: '1000.01', credito: '1000.01' };
+    const lineaConDiff = { ...lineaCredito, credito: '1000.01' };
     const r = crearComprobanteSchema.safeParse({ ...cabeceraValida, lineas: [lineaDebito, lineaConDiff] });
     expect(r.success).toBe(true);
   });

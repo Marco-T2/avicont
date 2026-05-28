@@ -8,8 +8,6 @@ const lineaValidaBob = {
   debito: '1000.00',
   credito: '0',
   tipoCambio: '1',
-  debitoBob: '1000.00',
-  creditoBob: '0',
 };
 
 const lineaValidaUsd = {
@@ -18,8 +16,6 @@ const lineaValidaUsd = {
   debito: '100.00',
   credito: '0',
   tipoCambio: '6.96',
-  debitoBob: '696.00',
-  creditoBob: '0',
 };
 
 describe('lineaSchema', () => {
@@ -28,7 +24,7 @@ describe('lineaSchema', () => {
   });
 
   it('acepta línea válida en BOB (solo crédito)', () => {
-    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '0', credito: '1000.00', creditoBob: '1000.00', debitoBob: '0' });
+    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '0', credito: '1000.00' });
     expect(r.success).toBe(true);
   });
 
@@ -37,7 +33,7 @@ describe('lineaSchema', () => {
   });
 
   it('rechaza cuando ambos débito Y crédito son > 0 (ambigua)', () => {
-    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '500.00', credito: '500.00', creditoBob: '500.00' });
+    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '500.00', credito: '500.00' });
     expect(r.success).toBe(false);
     if (!r.success) {
       const msgs = r.error.issues.map((i) => i.message).join(' ');
@@ -46,7 +42,7 @@ describe('lineaSchema', () => {
   });
 
   it('rechaza cuando ambos débito Y crédito son 0 (sin monto)', () => {
-    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '0', credito: '0', debitoBob: '0', creditoBob: '0' });
+    const r = lineaSchema.safeParse({ ...lineaValidaBob, debito: '0', credito: '0' });
     expect(r.success).toBe(false);
   });
 

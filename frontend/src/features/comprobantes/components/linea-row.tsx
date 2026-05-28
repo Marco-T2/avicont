@@ -1,5 +1,4 @@
 import { Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
 import { type FieldErrors, useFormContext, useFormState } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
@@ -30,14 +29,15 @@ interface LineaRowProps {
  * Usa `useFormState` aislado por nombre para minimizar re-renders: solo
  * esta fila se actualiza cuando cambian sus campos.
  *
- * Auto-cálculo BOB: `useEffect` sobre watch('debito') y watch('tipoCambio')
- * para calcular `debitoBob`/`creditoBob`. El useEffect es justificado acá
- * porque es sincronización de un input controlado (derivación con side effect)
- * — Anti-F-02 no aplica (no es derived state cacheado en useState).
+ * `debitoBob`/`creditoBob` se calculan INLINE en cada render — NO viven en
+ * el form. Esto evita que un `setValue('debitoBob', ...)` durante un keystroke
+ * regenere el `field.id` del useFieldArray del padre, lo que provocaba que
+ * React desmontara el input activo y se perdiera el foco. La conversión a
+ * BOB se vuelve a hacer en el `onSubmit` del EditorForm antes de mandar al
+ * backend (single source of truth: `debito` × `tipoCambio`).
  *
- * `noUncheckedIndexedAccess`: se accede al campo por nombre string (react-hook-form
- * lo tipea correctamente). El narrowing del field object se hace en el padre
- * (LineasEditor) antes de renderizar este componente.
+ * Cuando moneda cambia a BOB, el `tipoCambio` se fuerza a "1" desde el
+ * `onValueChange` del Select (no desde un useEffect). Mismo motivo.
  */
 export function LineaRow({
   index,
@@ -56,29 +56,9 @@ export function LineaRow({
   const credito = watch(`lineas.${index}.credito`) as string;
   const tipoCambio = watch(`lineas.${index}.tipoCambio`) as string;
 
-  // Auto-calcula debitoBob cuando cambia debito o tipoCambio.
-  // useEffect justificado: input controlado con side effect de setValue
-  // (design obs 247 — no es derived state en useState).
-  useEffect(() => {
-    const montoBob = calcularMontoBob(debito, tipoCambio);
-    setValue(`lineas.${index}.debitoBob`, montoBob, { shouldValidate: false });
-  }, [debito, tipoCambio, index, setValue]);
-
-  // Auto-calcula creditoBob cuando cambia credito o tipoCambio.
-  useEffect(() => {
-    const montoBob = calcularMontoBob(credito, tipoCambio);
-    setValue(`lineas.${index}.creditoBob`, montoBob, { shouldValidate: false });
-  }, [credito, tipoCambio, index, setValue]);
-
-  // Cuando cambia la moneda a BOB, forzar tipoCambio = '1'.
-  useEffect(() => {
-    if (moneda === 'BOB') {
-      setValue(`lineas.${index}.tipoCambio`, '1', { shouldValidate: false });
-    }
-  }, [moneda, index, setValue]);
-
-  const debitoBob = watch(`lineas.${index}.debitoBob`) as string;
-  const creditoBob = watch(`lineas.${index}.creditoBob`) as string;
+  // BOB derived — calculados inline, NO trackeados en el form.
+  const debitoBob = calcularMontoBob(debito, tipoCambio);
+  const creditoBob = calcularMontoBob(credito, tipoCambio);
 
   type LineasErrorsShape = { lineas?: Array<Record<string, { message?: string }>> };
   const lineaErrors = (errors as FieldErrors<LineasErrorsShape>).lineas?.[index];
@@ -106,9 +86,14 @@ export function LineaRow({
       <td className="p-1 w-24">
         <Select
           value={moneda}
-          onValueChange={(val) =>
-            setValue(`lineas.${index}.moneda`, val, { shouldValidate: true })
-          }
+          onValueChange={(val) => {
+            setValue(`lineas.${index}.moneda`, val, { shouldValidate: true });
+            // Cuando moneda pasa a BOB, forzar TC=1 en el mismo handler — evita
+            // useEffect que dispararía setValue post-render y rompería el foco.
+            if (val === 'BOB') {
+              setValue(`lineas.${index}.tipoCambio`, '1', { shouldValidate: false });
+            }
+          }}
           disabled={disabled}
         >
           <SelectTrigger aria-label="Moneda">
@@ -166,9 +151,7 @@ export function LineaRow({
         />
       </td>
 
-      {/* Debe BOB — readonly calculado. NO usar register acá: el valor es derivado
-          y se setea con setValue desde el useEffect. Doble cableado (value + register)
-          genera conflicto controlled/uncontrolled que rompe el foco de los inputs vecinos. */}
+      {/* Debe BOB — derived inline, no register, no setValue. */}
       <td className="p-1 w-28">
         <Input
           value={debitoBob}
@@ -180,7 +163,7 @@ export function LineaRow({
         />
       </td>
 
-      {/* Haber BOB — readonly calculado. Ver nota arriba sobre por qué no register. */}
+      {/* Haber BOB — derived inline, no register, no setValue. */}
       <td className="p-1 w-28">
         <Input
           value={creditoBob}

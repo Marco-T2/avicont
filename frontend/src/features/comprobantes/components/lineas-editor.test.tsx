@@ -130,17 +130,13 @@ describe('LineasEditor', () => {
               ...LINEA_VACIA,
               _localKey: 'key-1',
               debito: '1000',
-              debitoBob: '1000.00',
               credito: '0',
-              creditoBob: '0.00',
             },
             {
               ...LINEA_VACIA,
               _localKey: 'key-2',
               debito: '0',
-              debitoBob: '0.00',
               credito: '500',
-              creditoBob: '500.00',
             },
           ]}
         />,
@@ -178,7 +174,7 @@ describe('LineasEditor', () => {
   });
 
   describe('totales calculados', () => {
-    it('calcula totalDebitoBob sumando debitoBob de todas las líneas', () => {
+    it('calcula totalDebitoBob sumando debito × tipoCambio de todas las líneas', () => {
       render(
         <Wrapper
           defaultLineas={[
@@ -186,25 +182,19 @@ describe('LineasEditor', () => {
               ...LINEA_VACIA,
               _localKey: 'k1',
               debito: '1000',
-              debitoBob: '1000.00',
               credito: '0',
-              creditoBob: '0.00',
             },
             {
               ...LINEA_VACIA,
               _localKey: 'k2',
               debito: '500',
-              debitoBob: '500.00',
               credito: '0',
-              creditoBob: '0.00',
             },
             {
               ...LINEA_VACIA,
               _localKey: 'k3',
               debito: '0',
-              debitoBob: '0.00',
               credito: '1500',
-              creditoBob: '1500.00',
             },
           ]}
         />,

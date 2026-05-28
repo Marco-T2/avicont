@@ -11,6 +11,11 @@ export type ComprobanteMode = 'nuevo' | 'borrador' | 'contabilizado';
 // `_localKey` es un UUID local generado con crypto.randomUUID() al crear la fila
 // en el cliente — no se envía al backend. Se usa como key de React para
 // garantizar identidad estable del elemento DOM (Anti-F-06 CLAUDE.md frontend).
+//
+// `debitoBob`/`creditoBob` NO viven en el form — son derived state calculados
+// inline desde `debito`/`credito`/`tipoCambio`. Se populan en el submit antes
+// de mandar al backend. Esto evita que un `setValue('debitoBob', ...)` durante
+// un keystroke regenere `field.id` del useFieldArray y desmonte el input.
 export interface LineaFormValues {
   /** UUID local generado en cliente. NO se envía al backend. */
   _localKey: string;
@@ -20,8 +25,6 @@ export interface LineaFormValues {
   debito: string;
   credito: string;
   tipoCambio: string;
-  debitoBob: string;
-  creditoBob: string;
   glosaLinea?: string;
 }
 
@@ -32,7 +35,5 @@ export const LINEA_VACIA: Omit<LineaFormValues, '_localKey'> = {
   debito: '0',
   credito: '0',
   tipoCambio: '1',
-  debitoBob: '0',
-  creditoBob: '0',
   glosaLinea: '',
 };

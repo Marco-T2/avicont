@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { calcularMontoBob } from './calcular-monto-bob';
+
 // Tolerancia de partida doble en BOB (CLAUDE.md §4.1).
 export const TOLERANCIA_BOB = 0.01;
 
@@ -24,9 +26,13 @@ export function calcularDiffBob(totalDebitoBob: number, totalCreditoBob: number)
  * Refinement de Zod compartido entre crear-comprobante-schema y editar-comprobante-schema.
  * Valida partida doble en BOB con tolerancia ±Bs 0.01 (CLAUDE.md §4.1).
  * Si hay <2 líneas, no valida (1 línea es válida para guardar borrador).
+ *
+ * Calcula `debitoBob`/`creditoBob` inline desde `debito`/`credito`/`tipoCambio` —
+ * los BOB son derived state y NO viven en el form (evita re-mount del input
+ * por regeneración de field.id del useFieldArray).
  */
 export function superRefinePartidaDoble(
-  lineas: ReadonlyArray<{ debitoBob: string; creditoBob: string }>,
+  lineas: ReadonlyArray<{ debito: string; credito: string; tipoCambio: string }>,
   ctx: z.RefinementCtx,
 ): void {
   if (lineas.length < 2) return;
@@ -35,8 +41,8 @@ export function superRefinePartidaDoble(
   let totalCreditoBob = 0;
 
   for (const linea of lineas) {
-    const deb = parseFloat(linea.debitoBob);
-    const cred = parseFloat(linea.creditoBob);
+    const deb = parseFloat(calcularMontoBob(linea.debito, linea.tipoCambio));
+    const cred = parseFloat(calcularMontoBob(linea.credito, linea.tipoCambio));
     totalDebitoBob += isFinite(deb) ? deb : 0;
     totalCreditoBob += isFinite(cred) ? cred : 0;
   }

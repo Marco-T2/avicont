@@ -13,6 +13,9 @@ import { mensajeComprobantes } from '@/lib/error-messages';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 import type { Comprobante } from '@/types/api';
 
+import { calcularMontoBob } from '../lib/calcular-monto-bob';
+import type { CrearComprobantePayload } from '../api/crear-comprobante';
+import type { EditarComprobantePayload } from '../api/editar-comprobante';
 import { useComprobante } from '../hooks/use-comprobante';
 import { useCrearComprobante } from '../hooks/use-crear-comprobante';
 import { useEditarComprobante } from '../hooks/use-editar-comprobante';
@@ -30,6 +33,9 @@ import { ComprobanteCabeceraForm } from './comprobante-cabecera-form';
 import { LineasEditor } from './lineas-editor';
 
 // Mapea un comprobante del backend a los valores del form.
+// NO incluye debitoBob/creditoBob — son derived state que el LineaRow calcula
+// inline desde debito × tipoCambio, y se vuelven a calcular en onSubmit antes
+// de mandar al backend.
 function mapComprobanteAForm(
   comprobante: Comprobante,
 ): Omit<CrearComprobanteValues, 'lineas'> & { lineas: LineaFormValues[]; motivo?: string } {
@@ -46,11 +52,22 @@ function mapComprobanteAForm(
       debito: l.debito,
       credito: l.credito,
       tipoCambio: l.tipoCambio,
-      debitoBob: l.debitoBob,
-      creditoBob: l.creditoBob,
       glosaLinea: l.glosaLinea ?? '',
     })),
   };
+}
+
+// Popula debitoBob/creditoBob calculados desde debito/credito × tipoCambio.
+// Se aplica en el submit — el form NO los trackea para evitar re-mount del
+// input por regeneración de field.id del useFieldArray.
+function poblarBobEnLineas<T extends { debito: string; credito: string; tipoCambio: string }>(
+  lineas: T[],
+): Array<T & { debitoBob: string; creditoBob: string }> {
+  return lineas.map((l) => ({
+    ...l,
+    debitoBob: calcularMontoBob(l.debito, l.tipoCambio),
+    creditoBob: calcularMontoBob(l.credito, l.tipoCambio),
+  }));
 }
 
 function PageSkeleton(): React.JSX.Element {
@@ -147,7 +164,11 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
 
   function onSubmit(values: CrearComprobanteValues | EditarComprobanteValues): void {
     if (isNuevo) {
-      const payload = values as CrearComprobanteValues;
+      const valuesCrear = values as CrearComprobanteValues;
+      const payload: CrearComprobantePayload = {
+        ...valuesCrear,
+        lineas: poblarBobEnLineas(valuesCrear.lineas),
+      };
       crearMutation.mutate(payload, {
         onSuccess: (nuevoComprobante) => {
           toast.success('Borrador guardado correctamente');
@@ -159,7 +180,13 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
         },
       });
     } else {
-      const payload = values as EditarComprobanteValues;
+      const valuesEditar = values as EditarComprobanteValues;
+      const payload: EditarComprobantePayload = {
+        ...valuesEditar,
+        ...(valuesEditar.lineas !== undefined
+          ? { lineas: poblarBobEnLineas(valuesEditar.lineas) }
+          : {}),
+      };
       editarMutation.mutate(payload, {
         onSuccess: () => {
           toast.success('Comprobante actualizado');

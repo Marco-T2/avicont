@@ -8,8 +8,6 @@ const lineaDebito = {
   debito: '1000.00',
   credito: '0',
   tipoCambio: '1',
-  debitoBob: '1000.00',
-  creditoBob: '0',
 };
 
 const lineaCredito = {
@@ -18,8 +16,6 @@ const lineaCredito = {
   debito: '0',
   credito: '1000.00',
   tipoCambio: '1',
-  debitoBob: '0',
-  creditoBob: '1000.00',
 };
 
 describe('editarComprobanteSchema', () => {
@@ -85,8 +81,6 @@ describe('editarComprobanteSchema', () => {
       debito: '1000.00',
       credito: '0',
       tipoCambio: '1',
-      debitoBob: '1000.00',
-      creditoBob: '0',
     };
     const r = editarComprobanteSchema.safeParse({ lineas: [linea] });
     expect(r.success).toBe(true);
@@ -114,7 +108,7 @@ describe('editarComprobanteSchema', () => {
     });
 
     it('falla cuando lineas está desbalanceado en más de Bs 0.01', () => {
-      const creditoDesbalanceado = { ...lineaCredito, creditoBob: '999.00', credito: '999.00' };
+      const creditoDesbalanceado = { ...lineaCredito, credito: '999.00' };
       const r = editarComprobanteSchema.safeParse({
         lineas: [lineaDebito, creditoDesbalanceado],
       });
@@ -131,7 +125,7 @@ describe('editarComprobanteSchema', () => {
     });
 
     it('es válido cuando la diferencia es exactamente 0.01 (en el límite de tolerancia)', () => {
-      const creditoConTolerancia = { ...lineaCredito, creditoBob: '1000.01', credito: '1000.01' };
+      const creditoConTolerancia = { ...lineaCredito, credito: '1000.01' };
       const r = editarComprobanteSchema.safeParse({
         lineas: [lineaDebito, creditoConTolerancia],
       });

@@ -7,7 +7,7 @@ import { estaBalanceado, calcularDiffBob, superRefinePartidaDoble, TOLERANCIA_BO
  * Ejecuta superRefinePartidaDoble contra un array de líneas
  * y retorna los issues de Zod resultantes.
  */
-function runRefine(lineas: Array<{ debitoBob: string; creditoBob: string }>) {
+function runRefine(lineas: Array<{ debito: string; credito: string; tipoCambio: string }>) {
   const issues: z.ZodIssue[] = [];
   const ctx: z.RefinementCtx = {
     addIssue: (issue) => issues.push(issue as z.ZodIssue),
@@ -76,29 +76,29 @@ describe('superRefinePartidaDoble', () => {
   });
 
   it('no agrega issues cuando hay solo 1 línea (borrador con línea única)', () => {
-    expect(runRefine([{ debitoBob: '500.00', creditoBob: '0' }])).toHaveLength(0);
+    expect(runRefine([{ debito: '500.00', credito: '0', tipoCambio: '1' }])).toHaveLength(0);
   });
 
   it('no agrega issues cuando las líneas están balanceadas exactamente', () => {
     const lineas = [
-      { debitoBob: '1000.00', creditoBob: '0' },
-      { debitoBob: '0', creditoBob: '1000.00' },
+      { debito: '1000.00', credito: '0', tipoCambio: '1' },
+      { debito: '0', credito: '1000.00', tipoCambio: '1' },
     ];
     expect(runRefine(lineas)).toHaveLength(0);
   });
 
   it('no agrega issues cuando la diferencia es exactamente 0.01 (en el límite de tolerancia)', () => {
     const lineas = [
-      { debitoBob: '1000.00', creditoBob: '0' },
-      { debitoBob: '0', creditoBob: '1000.01' },
+      { debito: '1000.00', credito: '0', tipoCambio: '1' },
+      { debito: '0', credito: '1000.01', tipoCambio: '1' },
     ];
     expect(runRefine(lineas)).toHaveLength(0);
   });
 
   it('agrega un issue cuando la diferencia supera 0.01', () => {
     const lineas = [
-      { debitoBob: '1000.00', creditoBob: '0' },
-      { debitoBob: '0', creditoBob: '999.00' },
+      { debito: '1000.00', credito: '0', tipoCambio: '1' },
+      { debito: '0', credito: '999.00', tipoCambio: '1' },
     ];
     const issues = runRefine(lineas);
     expect(issues).toHaveLength(1);
@@ -108,8 +108,8 @@ describe('superRefinePartidaDoble', () => {
 
   it('el issue incluye path: ["lineas"]', () => {
     const lineas = [
-      { debitoBob: '500.00', creditoBob: '0' },
-      { debitoBob: '0', creditoBob: '200.00' },
+      { debito: '500.00', credito: '0', tipoCambio: '1' },
+      { debito: '0', credito: '200.00', tipoCambio: '1' },
     ];
     const issues = runRefine(lineas);
     expect(issues[0]?.path).toEqual(['lineas']);
@@ -117,10 +117,19 @@ describe('superRefinePartidaDoble', () => {
 
   it('trata valores no numéricos como 0 sin lanzar error', () => {
     const lineas = [
-      { debitoBob: 'NaN', creditoBob: '0' },
-      { debitoBob: '0', creditoBob: '' },
+      { debito: 'NaN', credito: '0', tipoCambio: '1' },
+      { debito: '0', credito: '', tipoCambio: '1' },
     ];
     // Ambos se tratan como 0 → diff 0 → balanceado
+    expect(runRefine(lineas)).toHaveLength(0);
+  });
+
+  it('aplica tipoCambio para calcular BOB de líneas en USD', () => {
+    // 100 USD × 7.00 = 700 BOB (débito)  vs  700 BOB crédito → balanceado
+    const lineas = [
+      { debito: '100.00', credito: '0', tipoCambio: '7.00' },
+      { debito: '0', credito: '700.00', tipoCambio: '1' },
+    ];
     expect(runRefine(lineas)).toHaveLength(0);
   });
 });
