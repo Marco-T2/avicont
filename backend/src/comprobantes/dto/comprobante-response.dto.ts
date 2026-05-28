@@ -29,7 +29,11 @@ export class ComprobanteResponseDto {
   @ApiProperty() periodoFiscalId!: string;
   @ApiProperty() glosa!: string;
   @ApiProperty({ enum: Moneda }) monedaPrincipal!: Moneda;
-  @ApiProperty({ example: '1.00000000', description: 'T/C de presentación (re-expresión del encabezado). Siempre presente; default "1.00000000".' })
+  @ApiProperty({
+    example: '1.00000000',
+    description:
+      'T/C de presentación (re-expresión del encabezado). Siempre presente; default "1.00000000".',
+  })
   tipoCambioReexpresion!: string;
   @ApiProperty({ example: '1000.00' }) totalDebitoBob!: string;
   @ApiProperty({ example: '1000.00' }) totalCreditoBob!: string;
