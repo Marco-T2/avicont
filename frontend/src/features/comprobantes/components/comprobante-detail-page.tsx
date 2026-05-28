@@ -62,7 +62,7 @@ function CorrelativoDisplay({
 
 function PageSkeleton(): React.JSX.Element {
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-32 w-full" />
       <Skeleton className="h-48 w-full" />
@@ -115,7 +115,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
 
   if (isError || comprobante === undefined) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="space-y-4">
         <p className="text-sm text-destructive">
           Comprobante no encontrado o no tenés acceso.
         </p>
@@ -132,7 +132,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
 
   return (
     <>
-      <div className="p-4 md:p-6 space-y-5">
+      <div className="space-y-6">
         {/* Breadcrumb/back */}
         <Button
           variant="ghost"

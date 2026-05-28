@@ -48,17 +48,17 @@ export function ComprobantesPage(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Comprobantes</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="text-2xl md:text-3xl font-bold">Comprobantes</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Asientos contables del libro diario
           </p>
         </div>
-        <Button onClick={() => void navigate('/comprobantes/nuevo')} className="gap-1.5">
-          <Plus className="h-4 w-4" />
+        <Button onClick={() => void navigate('/comprobantes/nuevo')} className="self-start">
+          <Plus className="h-4 w-4 mr-2" />
           Nuevo comprobante
         </Button>
       </div>

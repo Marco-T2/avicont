@@ -72,7 +72,7 @@ function poblarBobEnLineas<T extends { debito: string; credito: string; tipoCamb
 
 function PageSkeleton(): React.JSX.Element {
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-32 w-full" />
       <Skeleton className="h-48 w-full" />
@@ -222,7 +222,7 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
       : 'Editá los datos del borrador antes de contabilizar.';
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="space-y-6">
       {/* Back / breadcrumb */}
       <Button
         variant="ghost"
@@ -236,8 +236,8 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
 
       {/* Header de página */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{titulo}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{descripcion}</p>
+        <h1 className="text-2xl md:text-3xl font-bold">{titulo}</h1>
+        <p className="text-sm md:text-base text-muted-foreground">{descripcion}</p>
       </div>
 
       {/* Banner ámbar para mode=contabilizado */}
@@ -351,7 +351,7 @@ export function EditarComprobantePage(): React.JSX.Element {
 
   if (isError || comprobante === undefined) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="space-y-4">
         <p className="text-sm text-destructive">
           Comprobante no encontrado o no tenés acceso.
         </p>
@@ -373,7 +373,7 @@ export function EditarComprobantePage(): React.JSX.Element {
 
   if (!esEditable) {
     return (
-      <div className="p-4 md:p-6 space-y-4">
+      <div className="space-y-4">
         <div
           role="alert"
           className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive text-sm"
