@@ -3,13 +3,6 @@ import { useFormContext, useFormState } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { calcularMontoBob } from '../lib/calcular-monto-bob';
 import { CuentaAutocomplete } from './cuenta-autocomplete';
@@ -51,9 +44,9 @@ export function LineaRow({
   // useFormState aislado por nombre de campo — evita re-renders en otras filas.
   const { errors } = useFormState({ control, name: `lineas.${index}` });
 
-  const moneda = watch(`lineas.${index}.moneda`) as string;
   const debito = watch(`lineas.${index}.debito`) as string;
   const credito = watch(`lineas.${index}.credito`) as string;
+  // tipoCambio siempre '1' (moneda BOB lockada); usado para calcular BOB inline.
   const tipoCambio = watch(`lineas.${index}.tipoCambio`) as string;
 
   // BOB derived — calculados inline, NO trackeados en el form.
@@ -85,29 +78,7 @@ export function LineaRow({
         )}
       </td>
 
-      {/* Moneda */}
-      <td className="p-1 w-24">
-        <Select
-          value={moneda}
-          onValueChange={(val) => {
-            setValue(`lineas.${index}.moneda`, val, { shouldValidate: true });
-            // Cuando moneda pasa a BOB, forzar TC=1 en el mismo handler — evita
-            // useEffect que dispararía setValue post-render y rompería el foco.
-            if (val === 'BOB') {
-              setValue(`lineas.${index}.tipoCambio`, '1', { shouldValidate: false });
-            }
-          }}
-          disabled={disabled}
-        >
-          <SelectTrigger aria-label="Moneda">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BOB">BOB</SelectItem>
-            <SelectItem value="USD">USD</SelectItem>
-          </SelectContent>
-        </Select>
-      </td>
+      {/* Moneda y T.C. ocultos — lockados a BOB/1; valor oculto en el form via LINEA_VACIA. */}
 
       {/* Debe */}
       <td className="p-1 w-28">
@@ -135,22 +106,6 @@ export function LineaRow({
           disabled={disabled}
           aria-invalid={!!lineaErrors?.credito}
           className={cn('font-mono text-right', lineaErrors?.credito && 'border-destructive')}
-        />
-      </td>
-
-      {/* Tipo de cambio — readonly si BOB */}
-      <td className="p-1 w-24">
-        <Input
-          {...register(`lineas.${index}.tipoCambio`)}
-          type="text"
-          inputMode="decimal"
-          aria-label="Tipo de cambio"
-          readOnly={moneda === 'BOB'}
-          disabled={disabled}
-          className={cn(
-            'font-mono text-right',
-            moneda === 'BOB' && 'bg-muted text-muted-foreground cursor-not-allowed',
-          )}
         />
       </td>
 

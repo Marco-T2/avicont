@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface ComprobanteCabeceraFormProps {
   /** Número correlativo — solo se muestra en mode=contabilizado (readonly). */
@@ -23,7 +24,8 @@ interface ComprobanteCabeceraFormProps {
  * Usa `useFormContext` — NO recibe value/onChange propios.
  * El padre es responsable de envolver con <FormProvider>.
  *
- * Campos: tipo, fechaContable, glosa, monedaPrincipal.
+ * Campos: tipo, fechaContable, glosa, tipoCambioReexpresion (opcional).
+ * monedaPrincipal fue eliminado — el sistema lockea a BOB (spec §4.3 design).
  * En mode=contabilizado el número correlativo aparece readonly como campo extra.
  */
 export function ComprobanteCabeceraForm({
@@ -38,7 +40,6 @@ export function ComprobanteCabeceraForm({
   } = useFormContext();
 
   const tipo = watch('tipo') as string | undefined;
-  const monedaPrincipal = watch('monedaPrincipal') as string | undefined;
 
   return (
     <div className="space-y-4">
@@ -119,25 +120,34 @@ export function ComprobanteCabeceraForm({
         )}
       </div>
 
-      {/* Moneda principal */}
+      {/* T/C re-expresión — campo de PRESENTACIÓN del encabezado.
+          No afecta la contabilidad (débitos/créditos siguen siendo BOB).
+          Permite ver/imprimir el comprobante expresado en otra moneda. */}
       <div className="space-y-1.5">
-        <Label htmlFor="cabecera-moneda">Moneda principal</Label>
-        <Select
-          value={monedaPrincipal ?? 'BOB'}
-          onValueChange={(v) => setValue('monedaPrincipal', v, { shouldValidate: true })}
-          disabled={readonlyCabecera}
-        >
-          <SelectTrigger id="cabecera-moneda" className="text-base md:text-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BOB">BOB — Boliviano</SelectItem>
-            <SelectItem value="USD">USD — Dólar</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.monedaPrincipal !== undefined && (
+        <Label htmlFor="cabecera-tcr">T/C re-expresión (opcional)</Label>
+        <Input
+          id="cabecera-tcr"
+          type="text"
+          inputMode="decimal"
+          placeholder="Ej: 6.96"
+          className={cn(
+            'text-base md:text-sm font-mono',
+            (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined &&
+              'border-destructive',
+          )}
+          aria-label="T/C re-expresión"
+          aria-invalid={
+            (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined
+          }
+          readOnly={readonlyCabecera}
+          {...register('tipoCambioReexpresion')}
+        />
+        <p className="text-xs text-muted-foreground">
+          Solo para presentación — no afecta débitos ni créditos en BOB.
+        </p>
+        {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion !== undefined && (
           <p className="text-sm text-destructive">
-            {errors.monedaPrincipal.message as string}
+            {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion?.message}
           </p>
         )}
       </div>

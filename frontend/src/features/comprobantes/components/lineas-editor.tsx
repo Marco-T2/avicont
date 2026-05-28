@@ -137,10 +137,9 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
           <thead>
             <tr className="bg-muted/50 text-muted-foreground">
               <th className="p-2 text-left font-medium">Cuenta</th>
-              <th className="p-2 text-left font-medium w-24">Moneda</th>
+              {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7. */}
               <th className="p-2 text-right font-medium w-28">Debe</th>
               <th className="p-2 text-right font-medium w-28">Haber</th>
-              <th className="p-2 text-right font-medium w-24">T.C.</th>
               <th className="p-2 text-right font-medium w-28">Debe BOB</th>
               <th className="p-2 text-right font-medium w-28">Haber BOB</th>
               <th className="p-2 text-left font-medium min-w-[120px]">Glosa línea</th>

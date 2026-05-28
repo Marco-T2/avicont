@@ -205,25 +205,37 @@ export function ComprobanteDetailPage(): React.JSX.Element {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Moneda</p>
-              <p className="font-medium mt-0.5">{comprobante.monedaPrincipal}</p>
+              {/* monedaPrincipal lockada a BOB; se muestra "BOB" fijo. */}
+              <p className="font-medium mt-0.5">BOB</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total Debe BOB</p>
+              {/* totalDebitoBob SIEMPRE es BOB. */}
               <MontoCell
                 monto={comprobante.totalDebitoBob}
-                moneda={comprobante.monedaPrincipal}
+                moneda="BOB"
                 className="font-medium mt-0.5 block"
               />
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total Haber BOB</p>
+              {/* totalCreditoBob SIEMPRE es BOB. */}
               <MontoCell
                 monto={comprobante.totalCreditoBob}
-                moneda={comprobante.monedaPrincipal}
+                moneda="BOB"
                 className="font-medium mt-0.5 block"
               />
             </div>
           </div>
+
+          {/* T/C re-expresión — solo visible cuando ≠ 1 (es solo presentación). */}
+          {comprobante.tipoCambioReexpresion !== '1' &&
+            comprobante.tipoCambioReexpresion !== '1.00000000' && (
+              <div>
+                <p className="text-xs text-muted-foreground">T/C re-expresión</p>
+                <p className="text-sm font-mono mt-0.5">{comprobante.tipoCambioReexpresion}</p>
+              </div>
+            )}
 
           <div>
             <p className="text-xs text-muted-foreground">Glosa</p>
