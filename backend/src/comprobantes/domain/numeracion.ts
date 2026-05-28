@@ -1,4 +1,4 @@
-import { TipoComprobante } from '@prisma/client';
+import { TipoComprobante } from '@/common/domain/enums';
 
 /**
  * Mapeo tipo → prefijo de 1 letra (ver `docs/disenos/comprobantes-asientos.md` §2).

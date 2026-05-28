@@ -21,7 +21,7 @@
  * `parse(raw)` reconstruye los componentes.
  */
 
-import { TipoComprobante } from '@prisma/client';
+import { TipoComprobante } from '@/common/domain/enums';
 
 import { PREFIJO_POR_TIPO } from './numeracion';
 

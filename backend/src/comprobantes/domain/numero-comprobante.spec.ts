@@ -1,4 +1,4 @@
-import { TipoComprobante } from '@prisma/client';
+import { TipoComprobante } from '@/common/domain/enums';
 
 import { NumeroComprobante } from './numero-comprobante';
 

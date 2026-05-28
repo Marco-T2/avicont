@@ -36,6 +36,7 @@ import {
 } from '@/periodos-fiscales/ports/periodos-reader.port';
 import { RbacService } from '@/rbac/rbac.service';
 
+import { toDominioMoneda, toDominioTipoComprobante } from './adapters/enum-mappers';
 import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { CreateComprobanteDto, CreateLineaDto } from './dto/create-comprobante.dto';
@@ -366,7 +367,7 @@ export class ComprobantesService {
       const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
       const lineasParaValidar: LineaParaValidar[] = actual.lineas.map((l) => ({
         orden: l.orden,
-        moneda: l.moneda,
+        moneda: toDominioMoneda(l.moneda),
         debito: l.debito,
         credito: l.credito,
         tipoCambio: l.tipoCambio,
@@ -417,7 +418,7 @@ export class ComprobantesService {
         tx,
       );
       const numero = NumeroComprobante.of(
-        actual.tipo,
+        toDominioTipoComprobante(actual.tipo),
         fechaContable.year,
         fechaContable.month,
         correlativo,
@@ -605,7 +606,7 @@ export class ComprobantesService {
         // 12) Validar partida doble e invariantes de contabilización.
         const lineasParaValidar: LineaParaValidar[] = lineasPersist.map((l) => ({
           orden: l.orden,
-          moneda: l.moneda,
+          moneda: toDominioMoneda(l.moneda),
           debito: new Prisma.Decimal(l.debito),
           credito: new Prisma.Decimal(l.credito),
           tipoCambio: new Prisma.Decimal(l.tipoCambio),
