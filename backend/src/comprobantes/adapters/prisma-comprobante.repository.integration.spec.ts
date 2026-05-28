@@ -586,17 +586,29 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
     });
 
     // Assert: TCR actualizado al nuevo valor (Prisma.Decimal normaliza trailing zeros).
-    expect(new Prisma.Decimal(resultado.tipoCambioReexpresion.toString()).equals(new Prisma.Decimal('7.10'))).toBe(true);
+    expect(
+      new Prisma.Decimal(resultado.tipoCambioReexpresion.toString()).equals(
+        new Prisma.Decimal('7.10'),
+      ),
+    ).toBe(true);
 
     // Assert: los valores de las líneas no fueron modificados (mismos amounts y orden).
     // Nota: Prisma.Decimal normaliza trailing zeros (500.00 → '500'), usamos .equals().
     expect(resultado.lineas).toHaveLength(2);
     const linea1 = resultado.lineas.find((l) => l.orden === 1)!;
     const linea2 = resultado.lineas.find((l) => l.orden === 2)!;
-    expect(new Prisma.Decimal(linea1.debitoBob.toString()).equals(new Prisma.Decimal('500.00'))).toBe(true);
-    expect(new Prisma.Decimal(linea1.creditoBob.toString()).equals(new Prisma.Decimal('0.00'))).toBe(true);
-    expect(new Prisma.Decimal(linea2.debitoBob.toString()).equals(new Prisma.Decimal('0.00'))).toBe(true);
-    expect(new Prisma.Decimal(linea2.creditoBob.toString()).equals(new Prisma.Decimal('500.00'))).toBe(true);
+    expect(
+      new Prisma.Decimal(linea1.debitoBob.toString()).equals(new Prisma.Decimal('500.00')),
+    ).toBe(true);
+    expect(
+      new Prisma.Decimal(linea1.creditoBob.toString()).equals(new Prisma.Decimal('0.00')),
+    ).toBe(true);
+    expect(new Prisma.Decimal(linea2.debitoBob.toString()).equals(new Prisma.Decimal('0.00'))).toBe(
+      true,
+    );
+    expect(
+      new Prisma.Decimal(linea2.creditoBob.toString()).equals(new Prisma.Decimal('500.00')),
+    ).toBe(true);
 
     // Assert: estado sigue siendo BORRADOR (reemplazarComprobante no cambia estado).
     expect(resultado.estado).toBe(EstadoComprobante.BORRADOR);
@@ -690,7 +702,11 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
     });
 
     // Assert: TCR actualizado al nuevo valor (Prisma.Decimal normaliza trailing zeros).
-    expect(new Prisma.Decimal(resultado.tipoCambioReexpresion.toString()).equals(new Prisma.Decimal('6.96'))).toBe(true);
+    expect(
+      new Prisma.Decimal(resultado.tipoCambioReexpresion.toString()).equals(
+        new Prisma.Decimal('6.96'),
+      ),
+    ).toBe(true);
 
     // Assert: la cantidad de líneas se preserva.
     expect(resultado.lineas).toHaveLength(lineasAntes);
@@ -699,15 +715,29 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
     // Nota: Prisma.Decimal normaliza trailing zeros (1000.00 → '1000'), usamos .equals().
     const linea1 = resultado.lineas.find((l) => l.orden === 1)!;
     const linea2 = resultado.lineas.find((l) => l.orden === 2)!;
-    expect(new Prisma.Decimal(linea1.debitoBob.toString()).equals(new Prisma.Decimal('1000.00'))).toBe(true);
-    expect(new Prisma.Decimal(linea1.creditoBob.toString()).equals(new Prisma.Decimal('0'))).toBe(true);
-    expect(new Prisma.Decimal(linea2.debitoBob.toString()).equals(new Prisma.Decimal('0'))).toBe(true);
-    expect(new Prisma.Decimal(linea2.creditoBob.toString()).equals(new Prisma.Decimal('1000.00'))).toBe(true);
+    expect(
+      new Prisma.Decimal(linea1.debitoBob.toString()).equals(new Prisma.Decimal('1000.00')),
+    ).toBe(true);
+    expect(new Prisma.Decimal(linea1.creditoBob.toString()).equals(new Prisma.Decimal('0'))).toBe(
+      true,
+    );
+    expect(new Prisma.Decimal(linea2.debitoBob.toString()).equals(new Prisma.Decimal('0'))).toBe(
+      true,
+    );
+    expect(
+      new Prisma.Decimal(linea2.creditoBob.toString()).equals(new Prisma.Decimal('1000.00')),
+    ).toBe(true);
 
     // Assert: balance del encabezado sin cambio (Código Tributario art. 47).
     // Totales también normalizan trailing zeros vía Prisma.Decimal.
-    expect(resultado.totalDebitoBob && new Prisma.Decimal(resultado.totalDebitoBob.toString()).equals(new Prisma.Decimal('1000'))).toBe(true);
-    expect(resultado.totalCreditoBob && new Prisma.Decimal(resultado.totalCreditoBob.toString()).equals(new Prisma.Decimal('1000'))).toBe(true);
+    expect(
+      resultado.totalDebitoBob &&
+        new Prisma.Decimal(resultado.totalDebitoBob.toString()).equals(new Prisma.Decimal('1000')),
+    ).toBe(true);
+    expect(
+      resultado.totalCreditoBob &&
+        new Prisma.Decimal(resultado.totalCreditoBob.toString()).equals(new Prisma.Decimal('1000')),
+    ).toBe(true);
 
     // Assert: estado sigue siendo CONTABILIZADO.
     expect(resultado.estado).toBe(EstadoComprobante.CONTABILIZADO);
