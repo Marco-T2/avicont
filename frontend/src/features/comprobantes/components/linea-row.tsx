@@ -20,6 +20,7 @@ interface LineaRowProps {
   onRemove: () => void;
   isOnlyRow: boolean;
   disabled?: boolean;
+  'data-row-index'?: number;
 }
 
 /**
@@ -43,6 +44,7 @@ export function LineaRow({
   onRemove,
   isOnlyRow,
   disabled = false,
+  'data-row-index': dataRowIndex,
 }: LineaRowProps): React.JSX.Element {
   const { register, setValue, watch, control } = useFormContext();
 
@@ -82,7 +84,10 @@ export function LineaRow({
   const lineaErrors = (errors as any)?.lineas?.[index];
 
   return (
-    <tr className={cn('border-b border-border', disabled && 'opacity-60')}>
+    <tr
+      className={cn('border-b border-border', disabled && 'opacity-60')}
+      data-row-index={dataRowIndex}
+    >
       {/* Cuenta */}
       <td className="p-1 min-w-[180px]">
         <CuentaAutocomplete

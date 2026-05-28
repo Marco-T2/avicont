@@ -1,0 +1,217 @@
+import { AlertTriangle, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import type { Cuenta } from '@/types/api';
+
+import { calcularTotalesLineas } from '../lib/calcular-totales';
+import type { ComprobanteMode, LineaFormValues } from '../types';
+import { LINEA_VACIA } from '../types';
+import { LineaRow } from './linea-row';
+
+interface LineasEditorProps {
+  mode: ComprobanteMode;
+  cuentas: Cuenta[];
+}
+
+/**
+ * Editor de líneas contables con useFieldArray.
+ * Se integra con el FormProvider del padre — NO recibe value/onChange.
+ *
+ * Comportamiento por mode:
+ * - 'nuevo' / 'borrador': editor completamente habilitado.
+ * - 'contabilizado': arranca disabled + WarningBanner + toggle "Reemplazar líneas".
+ *   Cuando toggle está off, las líneas NO se envían en el submit (el padre
+ *   lo decide leyendo formState.isDirty en el campo lineas).
+ *
+ * Keyboard shortcuts:
+ * - Enter en último input de última fila → nueva fila + foco al primer input.
+ * - Alt+Delete con foco en botón eliminar → eliminar la fila correspondiente.
+ * - Enter global del form DESHABILITADO dentro del editor (onKeyDown capture).
+ */
+export function LineasEditor({ mode, cuentas: _cuentas }: LineasEditorProps): React.JSX.Element {
+  const { control } = useFormContext();
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'lineas',
+  });
+
+  // Toggle para habilitar edición en mode='contabilizado'
+  const [reemplazarLineas, setReemplazarLineas] = useState(false);
+
+  const editorDisabled = mode === 'contabilizado' && !reemplazarLineas;
+
+  // Ref al contenedor para capturar eventos keyboard
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const agregarLinea = useCallback(() => {
+    append({ ...LINEA_VACIA, _localKey: crypto.randomUUID() });
+  }, [append]);
+
+  // Keyboard handler: Enter en último input de última fila → nueva fila.
+  // Alt+Delete → elimina la fila con foco.
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      // Bloquear Enter global para prevenir submit accidental dentro del editor
+      if (e.key === 'Enter' && !e.altKey) {
+        const target = e.target as HTMLElement;
+        // Si el target es un botón, permitir que active el click
+        if (target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        // Si el foco está en el último input de la última fila, agregar fila
+        const container = containerRef.current;
+        if (container == null) return;
+        const inputs = Array.from(container.querySelectorAll('input:not([readonly]):not(:disabled)'));
+        const lastInput = inputs[inputs.length - 1];
+        if (lastInput === target && !editorDisabled) {
+          agregarLinea();
+        }
+        return;
+      }
+
+      // Alt+Delete → eliminar la fila que tiene el foco
+      if (e.key === 'Delete' && e.altKey) {
+        e.preventDefault();
+        if (editorDisabled || fields.length <= 1) return;
+        const target = e.target as HTMLElement;
+        const container = containerRef.current;
+        if (container == null) return;
+        // Encontrar el tr padre del elemento con foco
+        const tr = target.closest('tr');
+        if (tr == null) return;
+        const rows = Array.from(container.querySelectorAll('tr[data-row-index]'));
+        const rowIndex = rows.findIndex((r) => r === tr);
+        if (rowIndex !== -1) {
+          remove(rowIndex);
+        }
+      }
+    },
+    [agregarLinea, editorDisabled, fields.length, remove],
+  );
+
+  // Leer debitoBob/creditoBob de todas las líneas para el footer
+  const lineasWatch = useWatch({ control, name: 'lineas' }) as LineaFormValues[] | undefined;
+  const lineas = lineasWatch ?? [];
+
+  const totales = calcularTotalesLineas(lineas);
+
+  return (
+    <div
+      ref={containerRef}
+      onKeyDown={handleKeyDown}
+      className="w-full"
+    >
+      {/* WarningBanner — solo en mode contabilizado */}
+      {mode === 'contabilizado' && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-3 mb-3 text-amber-700 dark:text-amber-400 text-sm"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium">Comprobante contabilizado</p>
+            <p className="mt-0.5 text-xs opacity-90">
+              Los cambios en las líneas quedan registrados en auditoría.
+            </p>
+          </div>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0">
+            <input
+              type="checkbox"
+              role="checkbox"
+              aria-label="Reemplazar líneas"
+              checked={reemplazarLineas}
+              onChange={(e) => setReemplazarLineas(e.target.checked)}
+              className="accent-amber-600"
+            />
+            <span className="text-xs font-medium">Reemplazar líneas</span>
+          </label>
+        </div>
+      )}
+
+      {/* Tabla de líneas */}
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/50 text-muted-foreground">
+              <th className="p-2 text-left font-medium">Cuenta</th>
+              <th className="p-2 text-left font-medium w-24">Moneda</th>
+              <th className="p-2 text-right font-medium w-28">Debe</th>
+              <th className="p-2 text-right font-medium w-28">Haber</th>
+              <th className="p-2 text-right font-medium w-24">T.C.</th>
+              <th className="p-2 text-right font-medium w-28">Debe BOB</th>
+              <th className="p-2 text-right font-medium w-28">Haber BOB</th>
+              <th className="p-2 text-left font-medium min-w-[120px]">Glosa línea</th>
+              <th className="p-2 w-10" />
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map((field, i) => {
+              // noUncheckedIndexedAccess: narrowing obligatorio antes de operar.
+              if (field === undefined) return null;
+              return (
+                <LineaRow
+                  key={field.id}
+                  index={i}
+                  onRemove={() => remove(i)}
+                  isOnlyRow={fields.length === 1}
+                  disabled={editorDisabled}
+                  data-row-index={i}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Botón agregar */}
+      <div className="mt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={agregarLinea}
+          disabled={editorDisabled}
+          className="gap-1"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          + Agregar línea
+        </Button>
+      </div>
+
+      {/* Footer con totales */}
+      <div className="mt-3 flex items-center justify-end gap-6 text-sm border-t border-border pt-3">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Total Debe BOB</span>
+          <span className="font-mono font-medium tabular-nums">
+            {totales.totalDebitoBob.toFixed(2)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Total Haber BOB</span>
+          <span className="font-mono font-medium tabular-nums">
+            {totales.totalCreditoBob.toFixed(2)}
+          </span>
+        </div>
+        {totales.estaBalanceado ? (
+          <Badge
+            variant="outline"
+            className="text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900"
+          >
+            Balanceado
+          </Badge>
+        ) : (
+          <Badge
+            variant="outline"
+            className="text-destructive border-destructive/40 bg-destructive/10"
+          >
+            Desbalanceado
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
