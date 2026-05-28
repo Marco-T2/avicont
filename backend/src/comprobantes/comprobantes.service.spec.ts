@@ -572,6 +572,49 @@ describe('ComprobantesService', () => {
         id: 'comp-ok',
       });
     });
+
+    // W-2: reglas de alcance/negocio con code estable (antes BAD_REQUEST genérico del DTO).
+    it('rechaza monedaPrincipal distinta de BOB con COMPROBANTE_MONEDA_NO_PERMITIDA', async () => {
+      const { service, periodos, repo } = buildService();
+      const dto = { ...dtoCreateDiarioBOB(), monedaPrincipal: Moneda.USD };
+
+      await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).rejects.toMatchObject({
+        code: 'COMPROBANTE_MONEDA_NO_PERMITIDA',
+        httpStatus: 400,
+      });
+      // Falla en validación de cabecera, antes de tocar período o persistir.
+      expect(periodos.obtenerPorFecha).not.toHaveBeenCalled();
+      expect(repo.crearBorrador).not.toHaveBeenCalled();
+    });
+
+    it('rechaza tipoCambioReexpresion no positivo con COMPROBANTE_CAMPO_INVALIDO', async () => {
+      const { service, periodos } = buildService();
+
+      for (const valor of ['0', '0.00', '-1.5', 'abc', '+6.96']) {
+        const dto = { ...dtoCreateDiarioBOB(), tipoCambioReexpresion: valor };
+        await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).rejects.toMatchObject({
+          code: 'COMPROBANTE_CAMPO_INVALIDO',
+          httpStatus: 400,
+          details: { campo: 'tipoCambioReexpresion' },
+        });
+      }
+      expect(periodos.obtenerPorFecha).not.toHaveBeenCalled();
+    });
+
+    it('acepta tipoCambioReexpresion decimal positivo', async () => {
+      const { service, periodos, cuentas, repo } = buildService();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      repo.crearBorrador.mockResolvedValue(comprobanteFactory({ id: 'comp-tcr' }));
+
+      const dto = { ...dtoCreateDiarioBOB(), tipoCambioReexpresion: '6.96' };
+      await expect(service.crearBorrador(TENANT_ID, USER_ID, dto)).resolves.toMatchObject({
+        id: 'comp-tcr',
+      });
+    });
   });
 
   describe('obtener', () => {
@@ -2089,10 +2132,7 @@ describe('ComprobantesService', () => {
   // ============================================================
 
   describe('crearBorrador — tipoCambioReexpresion', () => {
-    function setupCuentasYPeriodo(
-      periodos: MockPeriodos,
-      cuentas: MockCuentas,
-    ) {
+    function setupCuentasYPeriodo(periodos: MockPeriodos, cuentas: MockCuentas) {
       periodos.obtenerPorFecha.mockResolvedValue({
         id: PERIODO_ID,
         status: PeriodoFiscalStatus.ABIERTO,

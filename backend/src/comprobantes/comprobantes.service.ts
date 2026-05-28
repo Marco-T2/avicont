@@ -39,7 +39,11 @@ import { RbacService } from '@/rbac/rbac.service';
 import { toDominioMoneda, toDominioTipoComprobante } from './adapters/enum-mappers';
 import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
-import { CreateComprobanteDto, CreateLineaDto } from './dto/create-comprobante.dto';
+import {
+  CreateComprobanteDto,
+  CreateLineaDto,
+  DECIMAL_POSITIVE,
+} from './dto/create-comprobante.dto';
 import {
   ComprobanteResponseDto,
   ListarComprobantesResponseDto,
@@ -54,6 +58,7 @@ import {
   ComprobanteAnularBorradorNoPermitidoError,
   ComprobanteAnularMotivoInvalidoError,
   ComprobanteAnularPeriodoCerradoError,
+  ComprobanteCampoInvalidoError,
   ComprobanteDocumentoNoDesasociableContabilizadoError,
   ComprobanteEditarContabilizadoEnPeriodoCerradoError,
   ComprobanteEditarFechaPeriodoDestinoCerradoError,
@@ -71,6 +76,7 @@ import {
   FechaFuturaNoPermitidaError,
   GestionNoAbiertaError,
   LineaAmbiguaDebitoCreditoError,
+  ComprobanteMonedaNoPermitidaError,
   MonedaIncompatibleCuentaError,
   MontoBobIncoherenteError,
   NumeroCorrelativoInmutableError,
@@ -530,6 +536,9 @@ export class ComprobantesService {
           : FechaContable.fromDbDate(original.fechaContable);
         const glosaEfectiva = dto.glosa ?? original.glosa;
         const monedaEfectiva = dto.monedaPrincipal ?? original.monedaPrincipal;
+        // W-2: enforza alcance BOB-only + formato del T/C re-expresión con code estable.
+        // original.tipoCambioReexpresion ya es un Decimal válido en BD; solo validamos lo entrante.
+        this.validarCabeceraReexpresion(monedaEfectiva, dto.tipoCambioReexpresion);
 
         // 8) Validar período origen (con reapertura si aplica).
         const periodoOrigen = await this.periodos.obtenerPorFecha(
@@ -919,6 +928,30 @@ export class ComprobantesService {
    * shape listo para persistir. NO valida partida doble ni mínimo de líneas:
    * eso se enforza sólo al contabilizar (CLAUDE.md §4.1 core).
    */
+  /**
+   * Valida los campos de cabecera de re-expresión de moneda (W-2). Levanta
+   * DomainError con code ESTABLE en vez del BAD_REQUEST genérico del ValidationPipe:
+   * la FORMA (string/enum) se valida en el DTO, las reglas de NEGOCIO/ALCANCE
+   * viven acá con su code propio (CLAUDE.md §6.2).
+   *   - monedaPrincipal: solo BOB es aceptado (decisión de alcance §10.10).
+   *   - tipoCambioReexpresion: si llega, decimal estrictamente positivo.
+   */
+  private validarCabeceraReexpresion(
+    monedaPrincipal: Moneda,
+    tipoCambioReexpresion?: string,
+  ): void {
+    if (monedaPrincipal !== Moneda.BOB) {
+      throw new ComprobanteMonedaNoPermitidaError(monedaPrincipal);
+    }
+    if (tipoCambioReexpresion !== undefined && !DECIMAL_POSITIVE.test(tipoCambioReexpresion)) {
+      throw new ComprobanteCampoInvalidoError(
+        'tipoCambioReexpresion',
+        tipoCambioReexpresion,
+        'debe ser un decimal estrictamente positivo (ej "6.96")',
+      );
+    }
+  }
+
   private async resolverYValidarBorrador(
     tenantId: string,
     input: {
@@ -932,6 +965,8 @@ export class ComprobantesService {
     },
     tx: Prisma.TransactionClient,
   ): Promise<DatosResueltos> {
+    this.validarCabeceraReexpresion(input.monedaPrincipal, input.tipoCambioReexpresion);
+
     const fecha = FechaContable.fromIso(input.fechaContable);
 
     const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());

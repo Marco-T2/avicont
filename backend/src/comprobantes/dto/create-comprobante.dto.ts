@@ -5,7 +5,6 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
-  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -90,18 +89,25 @@ export class CreateComprobanteDto {
 
   // Solo BOB es aceptado como monedaPrincipal (decisión de alcance: multi-moneda
   // es un campo de presentación vía tipoCambioReexpresion, no transaccional).
+  // FORMA acá (enum válido); la regla de ALCANCE "solo BOB" la enforza el servicio
+  // con code estable COMPROBANTE_MONEDA_NO_PERMITIDA (CLAUDE.md §6.2).
   @ApiPropertyOptional({ enum: [Moneda.BOB], default: Moneda.BOB })
   @IsOptional()
-  @IsIn([Moneda.BOB], { message: 'monedaPrincipal debe ser BOB' })
+  @IsEnum(Moneda)
   monedaPrincipal?: Moneda;
 
   // T/C de PRESENTACIÓN del encabezado (re-expresión del comprobante).
   // NO es el tipoCambio transaccional de la línea (LineaComprobante.tipoCambio).
   // Nunca entra a validarCoherenciaLineaBorrador (§T/C-sep CLAUDE.md §4.1).
-  @ApiPropertyOptional({ example: '6.96', description: 'T/C de presentación (re-expresión). Omitir para usar default 1.' })
+  // FORMA acá (string); el chequeo de decimal positivo lo enforza el servicio
+  // con code estable COMPROBANTE_CAMPO_INVALIDO (CLAUDE.md §6.2).
+  @ApiPropertyOptional({
+    example: '6.96',
+    description:
+      'T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1.',
+  })
   @IsOptional()
   @IsString()
-  @Matches(DECIMAL_POSITIVE, { message: 'tipoCambioReexpresion debe ser un decimal estrictamente positivo (ej "6.96")' })
   tipoCambioReexpresion?: string;
 
   @ApiProperty({ type: [CreateLineaDto], minItems: 1 })
