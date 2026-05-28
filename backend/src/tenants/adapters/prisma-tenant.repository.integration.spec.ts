@@ -1,5 +1,6 @@
 import { PrismaClient, SystemRole } from '@prisma/client';
 
+import { TipoEmpresa } from '@/common/domain/enums';
 import type { PrismaService } from '@/common/prisma.service';
 
 import { PrismaTenantRepository } from './prisma-tenant.repository';
@@ -168,7 +169,7 @@ describe('PrismaTenantRepository (integration)', () => {
         granjaEnabled: false,
       });
       const updated = await repo.update(created.id, {
-        tipoEmpresaPrincipal: 'SERVICIOS',
+        tipoEmpresaPrincipal: TipoEmpresa.SERVICIOS,
       });
       expect(updated.tipoEmpresaPrincipal).toBe('SERVICIOS');
     });

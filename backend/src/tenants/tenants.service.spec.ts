@@ -1,8 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Plan, OrganizationStatus, SystemRole, TipoEmpresa } from '@prisma/client';
+import {
+  Plan,
+  OrganizationStatus,
+  SystemRole,
+  TipoEmpresa as PrismaTipoEmpresa,
+} from '@prisma/client';
 import type { Organization, Prisma } from '@prisma/client';
 
 import { RedisService } from '@/cache/redis.service';
+import { TipoEmpresa } from '@/common/domain/enums';
 import {
   GESTIONES_READER_PORT,
   type GestionesReaderPort,
@@ -77,8 +83,8 @@ describe('TenantsService (unit)', () => {
       plan: Plan.FREE,
       contabilidadEnabled: true,
       granjaEnabled: false,
-      tipoEmpresaPrincipal: TipoEmpresa.COMERCIAL,
-      tiposEmpresaActivos: [TipoEmpresa.COMERCIAL],
+      tipoEmpresaPrincipal: PrismaTipoEmpresa.COMERCIAL,
+      tiposEmpresaActivos: [PrismaTipoEmpresa.COMERCIAL],
       createdAt: new Date('2026-01-01T00:00:00Z'),
       updatedAt: new Date('2026-01-01T00:00:00Z'),
       ...overrides,
@@ -419,7 +425,7 @@ describe('TenantsService (unit)', () => {
 
     it('valida con gestionesReader cuando viene tipoEmpresaPrincipal y permite el cambio si no hay gestión', async () => {
       gestiones.existeAlgunaGestion.mockResolvedValue(false);
-      const updated = mkOrg({ tipoEmpresaPrincipal: TipoEmpresa.SERVICIOS });
+      const updated = mkOrg({ tipoEmpresaPrincipal: PrismaTipoEmpresa.SERVICIOS });
       repo.update.mockResolvedValue(updated);
 
       await service.update(TENANT_ID, { tipoEmpresaPrincipal: TipoEmpresa.SERVICIOS });

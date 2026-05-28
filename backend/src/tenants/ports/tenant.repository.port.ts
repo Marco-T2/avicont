@@ -5,14 +5,9 @@
 // Superficie mínima — sólo los métodos que el service consume. Nada de
 // `findMany` genérico ni acceso a relaciones que el caller no necesita.
 
-import type {
-  Membership,
-  Organization,
-  OrganizationStatus,
-  Plan,
-  Prisma,
-  TipoEmpresa,
-} from '@prisma/client';
+import type { Membership, Organization, OrganizationStatus, Plan, Prisma } from '@prisma/client';
+
+import type { TipoEmpresa } from '@/common/domain/enums';
 
 export const TENANT_REPOSITORY_PORT = Symbol('TENANT_REPOSITORY_PORT');
 

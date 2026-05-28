@@ -1,6 +1,8 @@
-import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, Moneda } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
+
+import { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
 
 export class CreateCuentaDto {
   @ApiProperty({

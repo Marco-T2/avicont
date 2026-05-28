@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { Cuenta, Prisma } from '@prisma/client';
+import type { Cuenta as PrismaCuenta, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
+
+import type { Cuenta } from '../domain/cuenta';
 import type {
   ActualizarCuentaData,
   CrearCuentaData,
@@ -9,6 +11,13 @@ import type {
   ListarCuentasFiltros,
   ListarCuentasResultado,
 } from '../ports/cuenta.repository.port';
+
+import {
+  toDominioNaturalezaCuenta,
+  toDominioSubClaseCuenta,
+  toPrismaNaturalezaCuenta,
+  toPrismaSubClaseCuenta,
+} from './enum-mappers';
 
 // Nombres de campos en OrgConfiguracionContable que pueden apuntar a una Cuenta.
 // Si agregás un concepto nuevo al schema, añadilo acá.
@@ -27,33 +36,47 @@ const CONCEPTO_FIELDS = [
   'ajustePorInflacionId',
 ] as const;
 
+function toDominio(row: PrismaCuenta): Cuenta {
+  return {
+    ...row,
+    naturaleza: toDominioNaturalezaCuenta(row.naturaleza),
+    subClaseCuenta:
+      row.subClaseCuenta === null ? null : toDominioSubClaseCuenta(row.subClaseCuenta),
+  };
+}
+
 @Injectable()
 export class PrismaCuentaRepository implements CuentaRepositoryPort {
   constructor(private readonly prisma: PrismaService) {}
 
-  findById(id: string, tenantId: string): Promise<Cuenta | null> {
-    return this.prisma.cuenta.findFirst({
+  async findById(id: string, tenantId: string): Promise<Cuenta | null> {
+    const row = await this.prisma.cuenta.findFirst({
       where: { id, organizationId: tenantId },
     });
+    return row === null ? null : toDominio(row);
   }
 
-  findByCodigoInterno(tenantId: string, codigoInterno: string): Promise<Cuenta | null> {
-    return this.prisma.cuenta.findUnique({
+  async findByCodigoInterno(tenantId: string, codigoInterno: string): Promise<Cuenta | null> {
+    const row = await this.prisma.cuenta.findUnique({
       where: { organizationId_codigoInterno: { organizationId: tenantId, codigoInterno } },
     });
+    return row === null ? null : toDominio(row);
   }
 
-  findParent(tenantId: string, parentId: string): Promise<Cuenta | null> {
-    return this.prisma.cuenta.findFirst({
+  async findParent(tenantId: string, parentId: string): Promise<Cuenta | null> {
+    const row = await this.prisma.cuenta.findFirst({
       where: { id: parentId, organizationId: tenantId },
     });
+    return row === null ? null : toDominio(row);
   }
 
   async listar(tenantId: string, filtros: ListarCuentasFiltros): Promise<ListarCuentasResultado> {
     const where: Prisma.CuentaWhereInput = {
       organizationId: tenantId,
       ...(filtros.claseCuenta !== undefined ? { claseCuenta: filtros.claseCuenta } : {}),
-      ...(filtros.subClaseCuenta !== undefined ? { subClaseCuenta: filtros.subClaseCuenta } : {}),
+      ...(filtros.subClaseCuenta !== undefined
+        ? { subClaseCuenta: toPrismaSubClaseCuenta(filtros.subClaseCuenta) }
+        : {}),
       ...(filtros.activa !== undefined ? { activa: filtros.activa } : {}),
       ...(filtros.esDetalle !== undefined ? { esDetalle: filtros.esDetalle } : {}),
       ...(filtros.search !== undefined && filtros.search.length > 0
@@ -66,7 +89,7 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [rows, total] = await this.prisma.$transaction([
       this.prisma.cuenta.findMany({
         where,
         orderBy: { codigoInterno: 'asc' },
@@ -76,18 +99,27 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
       this.prisma.cuenta.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: rows.map(toDominio), total };
   }
 
-  arbolCompleto(tenantId: string): Promise<Cuenta[]> {
-    return this.prisma.cuenta.findMany({
+  async arbolCompleto(tenantId: string): Promise<Cuenta[]> {
+    const rows = await this.prisma.cuenta.findMany({
       where: { organizationId: tenantId },
       orderBy: { codigoInterno: 'asc' },
     });
+    return rows.map(toDominio);
   }
 
-  crear(data: CrearCuentaData): Promise<Cuenta> {
-    return this.prisma.cuenta.create({ data });
+  async crear(data: CrearCuentaData): Promise<Cuenta> {
+    const row = await this.prisma.cuenta.create({
+      data: {
+        ...data,
+        naturaleza: toPrismaNaturalezaCuenta(data.naturaleza),
+        subClaseCuenta:
+          data.subClaseCuenta === null ? null : toPrismaSubClaseCuenta(data.subClaseCuenta),
+      },
+    });
+    return toDominio(row);
   }
 
   actualizar(id: string, tenantId: string, data: ActualizarCuentaData): Promise<Cuenta> {
@@ -102,7 +134,7 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
         throw new Error(`Cuenta ${id} no encontrada en tenant ${tenantId}`);
       }
       const updated = await tx.cuenta.findUniqueOrThrow({ where: { id } });
-      return updated;
+      return toDominio(updated);
     });
   }
 
@@ -137,7 +169,8 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
       if (result.count === 0) {
         throw new Error(`Cuenta ${id} no encontrada en tenant ${tenantId}`);
       }
-      return tx.cuenta.findUniqueOrThrow({ where: { id } });
+      const updated = await tx.cuenta.findUniqueOrThrow({ where: { id } });
+      return toDominio(updated);
     });
   }
 }

@@ -4,6 +4,11 @@ import { GestionFiscal, GestionFiscalStatus } from '@prisma/client';
 import { CLOCK_PORT, ClockPort } from '@/common/clock';
 import { calcularMesInicio } from '@/common/domain/cierre-fiscal-por-tipo-empresa';
 import { PrismaService } from '@/common/prisma.service';
+// Cross-module import a un adapter: este service ya bypassea TenantRepositoryPort
+// para leer tipoEmpresaPrincipal dentro de la misma TX que crea la gestión; el
+// mapeo Prisma → dominio del enum sigue la misma frontera. Se internaliza si más
+// adelante el flujo pasa a consumir un TenantsReaderPort transaccional.
+import { toDominioTipoEmpresa } from '@/tenants/adapters/enum-mappers';
 
 import {
   GestionConPeriodosAbiertosError,
@@ -54,7 +59,7 @@ export class GestionesFiscalesService {
         throw new TenantSinTipoEmpresaError(tenantId);
       }
 
-      const mesInicio = calcularMesInicio(org.tipoEmpresaPrincipal);
+      const mesInicio = calcularMesInicio(toDominioTipoEmpresa(org.tipoEmpresaPrincipal));
       const periodos = this.generarPeriodos(tenantId, year, mesInicio);
 
       return this.repo.crearGestionConPeriodos(

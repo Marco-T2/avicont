@@ -1,6 +1,7 @@
 import { IsOptional, IsString, MaxLength, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { TipoEmpresa } from '@prisma/client';
+
+import { TipoEmpresa } from '@/common/domain/enums';
 
 const Plan = {
   FREE: 'FREE',

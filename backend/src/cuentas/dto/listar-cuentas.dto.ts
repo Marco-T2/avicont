@@ -1,7 +1,9 @@
-import { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+
+import { SubClaseCuenta } from '../domain/enums';
 
 const toBool = ({ value }: { value: unknown }): boolean | undefined => {
   if (value === undefined || value === null || value === '') return undefined;

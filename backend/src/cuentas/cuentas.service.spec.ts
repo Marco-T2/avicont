@@ -1,9 +1,11 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ClaseCuenta, type Cuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, Moneda } from '@prisma/client';
 
 import { CuentasService } from './cuentas.service';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
+import type { Cuenta } from './domain/cuenta';
 import { CuentaErrorCode } from './domain/cuenta-errors';
+import { NaturalezaCuenta, SubClaseCuenta } from './domain/enums';
 import type { CuentaRepositoryPort } from './ports/cuenta.repository.port';
 import type { MovimientosReaderPort } from './ports/movimientos-reader.port';
 

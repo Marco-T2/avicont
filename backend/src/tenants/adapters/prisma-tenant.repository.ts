@@ -13,6 +13,8 @@ import {
   TenantUpdateData,
 } from '../ports/tenant.repository.port';
 
+import { toPrismaTipoEmpresa } from './enum-mappers';
+
 @Injectable()
 export class PrismaTenantRepository extends TenantRepositoryPort {
   constructor(private readonly prisma: PrismaService) {
@@ -62,7 +64,7 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
         ...(data.plan !== undefined ? { plan: data.plan } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.tipoEmpresaPrincipal !== undefined
-          ? { tipoEmpresaPrincipal: data.tipoEmpresaPrincipal }
+          ? { tipoEmpresaPrincipal: toPrismaTipoEmpresa(data.tipoEmpresaPrincipal) }
           : {}),
       },
     });
