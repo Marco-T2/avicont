@@ -155,7 +155,8 @@ export function ComprobantesTable({
                     {c.glosa}
                   </TableCell>
                   <TableCell className="text-right">
-                    <MontoCell monto={c.totalDebitoBob} moneda={c.monedaPrincipal} />
+                    {/* totalDebitoBob SIEMPRE es BOB — hardcodeado para evitar bug de display. */}
+                    <MontoCell monto={c.totalDebitoBob} moneda="BOB" />
                   </TableCell>
                   <TableCell>
                     <button
@@ -203,7 +204,8 @@ export function ComprobantesTable({
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <MontoCell monto={c.totalDebitoBob} moneda={c.monedaPrincipal} />
+                {/* totalDebitoBob SIEMPRE es BOB — hardcodeado para evitar bug de display. */}
+                <MontoCell monto={c.totalDebitoBob} moneda="BOB" />
                 <CorrelativoCell numero={c.numero} />
               </div>
             </button>

@@ -26,6 +26,7 @@ const mockComprobantes: ComprobanteListItem[] = [
     periodoFiscalId: 'p1',
     glosa: 'Pago de servicios de limpieza',
     monedaPrincipal: 'BOB',
+    tipoCambioReexpresion: '1.00000000',
     totalDebitoBob: '1250.00',
     totalCreditoBob: '1250.00',
     anulado: false,
@@ -45,6 +46,7 @@ const mockComprobantes: ComprobanteListItem[] = [
     periodoFiscalId: 'p1',
     glosa: 'Compra de materiales',
     monedaPrincipal: 'BOB',
+    tipoCambioReexpresion: '1.00000000',
     totalDebitoBob: '500.00',
     totalCreditoBob: '500.00',
     anulado: false,
@@ -121,5 +123,16 @@ describe('ComprobantesTable', () => {
     renderTable({ comprobantes: [anulado] });
     // getAllByText por desktop+mobile dup en JSDOM
     expect(screen.getAllByText('Anulado').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('MontoCell usa moneda BOB hardcodeada — no muestra "$" en el total', () => {
+    // El total totalDebitoBob SIEMPRE es BOB aunque monedaPrincipal pudiera ser otro valor.
+    // El componente debe hardcodear moneda="BOB" y nunca pasar c.monedaPrincipal al MontoCell.
+    renderTable();
+    // "Bs" debe estar presente (prefijo BOB)
+    expect(screen.getAllByText('Bs').length).toBeGreaterThanOrEqual(1);
+    // "$" no debe aparecer en los MontoCell del total (solo se usaría si se pasara USD)
+    const dolarSigns = screen.queryAllByText('$');
+    expect(dolarSigns).toHaveLength(0);
   });
 });

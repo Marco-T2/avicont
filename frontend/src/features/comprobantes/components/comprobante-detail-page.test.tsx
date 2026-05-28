@@ -38,6 +38,7 @@ const mockComprobante: Comprobante = {
   periodoFiscalId: 'p1',
   glosa: 'Pago de servicios de limpieza',
   monedaPrincipal: 'BOB',
+  tipoCambioReexpresion: '1.00000000',
   totalDebitoBob: '1250.00',
   totalCreditoBob: '1250.00',
   anulado: false,
@@ -164,6 +165,29 @@ describe('ComprobanteDetailPage (smoke)', () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: /editar/i }));
     expect(mockNavigate).toHaveBeenCalledWith('/comprobantes/comp-1/editar');
+  });
+});
+
+describe('ComprobanteDetailPage — T/C re-expresión', () => {
+  it('oculta el bloque T/C re-expresión cuando el valor es 1.00000000 (default)', () => {
+    setupDefaultMocks();
+    // mockComprobante tiene tipoCambioReexpresion: '1.00000000'
+    renderPage();
+    expect(screen.queryByText(/t\/c re-expresión/i)).not.toBeInTheDocument();
+  });
+
+  it('muestra el bloque T/C re-expresión cuando el valor es distinto de 1', () => {
+    (useComprobante as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockComprobante, tipoCambioReexpresion: '6.96000000' },
+      isLoading: false,
+      isError: false,
+    });
+    (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { items: [] },
+    });
+    renderPage();
+    expect(screen.getByText(/t\/c re-expresión/i)).toBeInTheDocument();
+    expect(screen.getByText('6.96000000')).toBeInTheDocument();
   });
 });
 

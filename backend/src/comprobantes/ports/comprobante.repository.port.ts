@@ -38,6 +38,8 @@ export interface ComprobanteCreateBorradorData {
   periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
+  // T/C de PRESENTACIÓN del encabezado. Nunca entra a LineaPersistData (§T/C-sep).
+  tipoCambioReexpresion?: string | Prisma.Decimal;
   createdByUserId: string;
   lineas: LineaPersistData[];
 }
@@ -48,6 +50,8 @@ export interface ComprobanteReemplazarComprobanteData {
   periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
+  // T/C de PRESENTACIÓN del encabezado. Nunca entra a LineaPersistData (§T/C-sep).
+  tipoCambioReexpresion?: string | Prisma.Decimal;
   lineas: LineaPersistData[];
   // Totales recalculados a partir de las lineas (Código Tributario art. 47 — partida doble).
   // Se persisten en la cabecera para que los reportes no tengan que sumar lineas en tiempo real.

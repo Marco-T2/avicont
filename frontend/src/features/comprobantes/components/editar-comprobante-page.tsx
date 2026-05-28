@@ -36,6 +36,7 @@ import { LineasEditor } from './lineas-editor';
 // NO incluye debitoBob/creditoBob — son derived state que el LineaRow calcula
 // inline desde debito × tipoCambio, y se vuelven a calcular en onSubmit antes
 // de mandar al backend.
+// tipoCambioReexpresion se mapea para que el form lo refleje en edición.
 function mapComprobanteAForm(
   comprobante: Comprobante,
 ): Omit<CrearComprobanteValues, 'lineas'> & { lineas: LineaFormValues[]; motivo?: string } {
@@ -43,7 +44,12 @@ function mapComprobanteAForm(
     tipo: comprobante.tipo,
     fechaContable: comprobante.fechaContable,
     glosa: comprobante.glosa,
-    monedaPrincipal: comprobante.monedaPrincipal,
+    // tipoCambioReexpresion: solo se incluye cuando no es el default (1), para
+    // no pre-rellenar el campo con "1.00000000" visualmente.
+    ...(comprobante.tipoCambioReexpresion !== '1' &&
+    comprobante.tipoCambioReexpresion !== '1.00000000'
+      ? { tipoCambioReexpresion: comprobante.tipoCambioReexpresion }
+      : {}),
     lineas: comprobante.lineas.map((l) => ({
       _localKey: crypto.randomUUID(),
       cuentaId: l.cuentaId,
@@ -117,7 +123,6 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
         tipo: 'DIARIO' as const,
         fechaContable: new Date().toISOString().slice(0, 10),
         glosa: '',
-        monedaPrincipal: 'BOB' as const,
         lineas: [{ ...LINEA_VACIA, _localKey: crypto.randomUUID() }],
       }
     : comprobante !== undefined
@@ -126,7 +131,6 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
           tipo: 'DIARIO' as const,
           fechaContable: '',
           glosa: '',
-          monedaPrincipal: 'BOB' as const,
           lineas: [],
         };
 
@@ -144,7 +148,6 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
         tipo: 'DIARIO',
         fechaContable: new Date().toISOString().slice(0, 10),
         glosa: '',
-        monedaPrincipal: 'BOB',
         lineas: [{ ...LINEA_VACIA, _localKey: crypto.randomUUID() }],
       } as unknown as Parameters<typeof form.reset>[0]);
     } else if (comprobante !== undefined) {
@@ -165,9 +168,21 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
   function onSubmit(values: CrearComprobanteValues | EditarComprobanteValues): void {
     if (isNuevo) {
       const valuesCrear = values as CrearComprobanteValues;
+      // Hardcodear monedaPrincipal='BOB' y por línea moneda='BOB'/tipoCambio='1'
+      // (la UI no expone selector de moneda — spec §4.3 design).
       const payload: CrearComprobantePayload = {
-        ...valuesCrear,
-        lineas: poblarBobEnLineas(valuesCrear.lineas),
+        tipo: valuesCrear.tipo,
+        fechaContable: valuesCrear.fechaContable,
+        glosa: valuesCrear.glosa,
+        monedaPrincipal: 'BOB',
+        ...(valuesCrear.tipoCambioReexpresion !== undefined
+          ? { tipoCambioReexpresion: valuesCrear.tipoCambioReexpresion }
+          : {}),
+        lineas: poblarBobEnLineas(valuesCrear.lineas).map((l) => ({
+          ...l,
+          moneda: 'BOB' as const,
+          tipoCambio: '1' as const,
+        })),
       };
       crearMutation.mutate(payload, {
         onSuccess: (nuevoComprobante) => {
@@ -187,7 +202,14 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
       const { lineas: lineasRaw, ...rest } = valuesEditar;
       const payload: EditarComprobantePayload =
         lineasRaw !== undefined
-          ? { ...rest, lineas: poblarBobEnLineas(lineasRaw) }
+          ? {
+              ...rest,
+              lineas: poblarBobEnLineas(lineasRaw).map((l) => ({
+                ...l,
+                moneda: 'BOB' as const,
+                tipoCambio: '1' as const,
+              })),
+            }
           : rest;
       editarMutation.mutate(payload, {
         onSuccess: () => {

@@ -10,7 +10,6 @@ function Wrapper({ children }: { children: React.ReactNode }): React.JSX.Element
       tipo: 'DIARIO',
       fechaContable: '2026-05-27',
       glosa: '',
-      monedaPrincipal: 'BOB',
     },
   });
   return <FormProvider {...methods}>{children}</FormProvider>;
@@ -48,5 +47,26 @@ describe('ComprobanteCabeceraForm', () => {
     );
 
     expect(screen.queryByDisplayValue('—')).not.toBeInTheDocument();
+  });
+
+  it('no existe selector de monedaPrincipal en el formulario', () => {
+    render(
+      <Wrapper>
+        <ComprobanteCabeceraForm />
+      </Wrapper>,
+    );
+    // El label "Moneda principal" y el contenido de las opciones BOB/USD no deben aparecer.
+    expect(screen.queryByLabelText(/moneda principal/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('BOB — Boliviano')).not.toBeInTheDocument();
+    expect(screen.queryByText('USD — Dólar')).not.toBeInTheDocument();
+  });
+
+  it('muestra el input de T/C re-expresión', () => {
+    render(
+      <Wrapper>
+        <ComprobanteCabeceraForm />
+      </Wrapper>,
+    );
+    expect(screen.getByLabelText(/t\/c re-expresión/i)).toBeInTheDocument();
   });
 });

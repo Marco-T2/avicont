@@ -68,6 +68,14 @@ describe('LineasEditor', () => {
       expect(screen.getByText('Agregar línea')).toBeInTheDocument();
     });
 
+    it('columnas Moneda y T.C. no aparecen en el header de la tabla', () => {
+      render(<Wrapper />);
+      // Las columnas de moneda y tipo de cambio por línea están ocultas.
+      // El header de la tabla no debe mostrar esas columnas.
+      expect(screen.queryByRole('columnheader', { name: /^moneda$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('columnheader', { name: /^t\.c\.$/i })).not.toBeInTheDocument();
+    });
+
     it('agregar línea aumenta el contador de filas', async () => {
       const user = userEvent.setup();
       render(<Wrapper />);

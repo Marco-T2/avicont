@@ -1,16 +1,18 @@
 import { api } from '@/lib/api';
-import type { Comprobante, Moneda, TipoComprobante } from '@/types/api';
+import type { Comprobante, TipoComprobante } from '@/types/api';
 
 import type { CrearLineaPayload } from './crear-comprobante';
 
 // PATCH /api/comprobantes/:id — sirve para BORRADOR y CONTABILIZADO.
 // Todos los campos son opcionales; si se envía `lineas`, se reemplazan completas.
 // `motivo` (3-500 chars) queda registrado en auditoría si se provee.
+// monedaPrincipal omitida — el backend lockea a BOB; la UI no expone ese campo.
 export interface EditarComprobantePayload {
   tipo?: TipoComprobante;
   fechaContable?: string;
   glosa?: string;
-  monedaPrincipal?: Moneda;
+  // T/C de re-expresión: solo presentación; no afecta la contabilidad.
+  tipoCambioReexpresion?: string;
   lineas?: CrearLineaPayload[];
   motivo?: string;
 }

@@ -3,15 +3,7 @@ import { useFormContext, useFormState } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { calcularMontoBob } from '../lib/calcular-monto-bob';
 import { CuentaAutocomplete } from './cuenta-autocomplete';
 
 interface LineaRowProps {
@@ -29,15 +21,10 @@ interface LineaRowProps {
  * Usa `useFormState` aislado por nombre para minimizar re-renders: solo
  * esta fila se actualiza cuando cambian sus campos.
  *
- * `debitoBob`/`creditoBob` se calculan INLINE en cada render — NO viven en
- * el form. Esto evita que un `setValue('debitoBob', ...)` durante un keystroke
- * regenere el `field.id` del useFieldArray del padre, lo que provocaba que
- * React desmontara el input activo y se perdiera el foco. La conversión a
- * BOB se vuelve a hacer en el `onSubmit` del EditorForm antes de mandar al
- * backend (single source of truth: `debito` × `tipoCambio`).
- *
- * Cuando moneda cambia a BOB, el `tipoCambio` se fuerza a "1" desde el
- * `onValueChange` del Select (no desde un useEffect). Mismo motivo.
+ * Debe/Haber se cargan directamente en BOB (moneda lockada a BOB, tipoCambio=1).
+ * El montoBob no se muestra por fila — sería un espejo idéntico del valor
+ * cargado. La conversión a BOB para el payload se hace en el `onSubmit` del
+ * EditorForm (single source of truth: `debito` × `tipoCambio`).
  */
 export function LineaRow({
   index,
@@ -50,15 +37,6 @@ export function LineaRow({
 
   // useFormState aislado por nombre de campo — evita re-renders en otras filas.
   const { errors } = useFormState({ control, name: `lineas.${index}` });
-
-  const moneda = watch(`lineas.${index}.moneda`) as string;
-  const debito = watch(`lineas.${index}.debito`) as string;
-  const credito = watch(`lineas.${index}.credito`) as string;
-  const tipoCambio = watch(`lineas.${index}.tipoCambio`) as string;
-
-  // BOB derived — calculados inline, NO trackeados en el form.
-  const debitoBob = calcularMontoBob(debito, tipoCambio);
-  const creditoBob = calcularMontoBob(credito, tipoCambio);
 
   // El cast a este shape plano evita el problema del tipo recursivo `FieldErrors`
   // de react-hook-form, que TS infiere como `FieldError` con `.message` que puede
@@ -85,29 +63,7 @@ export function LineaRow({
         )}
       </td>
 
-      {/* Moneda */}
-      <td className="p-1 w-24">
-        <Select
-          value={moneda}
-          onValueChange={(val) => {
-            setValue(`lineas.${index}.moneda`, val, { shouldValidate: true });
-            // Cuando moneda pasa a BOB, forzar TC=1 en el mismo handler — evita
-            // useEffect que dispararía setValue post-render y rompería el foco.
-            if (val === 'BOB') {
-              setValue(`lineas.${index}.tipoCambio`, '1', { shouldValidate: false });
-            }
-          }}
-          disabled={disabled}
-        >
-          <SelectTrigger aria-label="Moneda">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BOB">BOB</SelectItem>
-            <SelectItem value="USD">USD</SelectItem>
-          </SelectContent>
-        </Select>
-      </td>
+      {/* Moneda y T.C. ocultos — lockados a BOB/1; valor oculto en el form via LINEA_VACIA. */}
 
       {/* Debe */}
       <td className="p-1 w-28">
@@ -135,46 +91,6 @@ export function LineaRow({
           disabled={disabled}
           aria-invalid={!!lineaErrors?.credito}
           className={cn('font-mono text-right', lineaErrors?.credito && 'border-destructive')}
-        />
-      </td>
-
-      {/* Tipo de cambio — readonly si BOB */}
-      <td className="p-1 w-24">
-        <Input
-          {...register(`lineas.${index}.tipoCambio`)}
-          type="text"
-          inputMode="decimal"
-          aria-label="Tipo de cambio"
-          readOnly={moneda === 'BOB'}
-          disabled={disabled}
-          className={cn(
-            'font-mono text-right',
-            moneda === 'BOB' && 'bg-muted text-muted-foreground cursor-not-allowed',
-          )}
-        />
-      </td>
-
-      {/* Debe BOB — derived inline, no register, no setValue. */}
-      <td className="p-1 w-28">
-        <Input
-          value={debitoBob}
-          readOnly
-          aria-label="Debe BOB"
-          disabled={disabled}
-          className="font-mono text-right bg-muted text-muted-foreground cursor-not-allowed"
-          tabIndex={-1}
-        />
-      </td>
-
-      {/* Haber BOB — derived inline, no register, no setValue. */}
-      <td className="p-1 w-28">
-        <Input
-          value={creditoBob}
-          readOnly
-          aria-label="Haber BOB"
-          disabled={disabled}
-          className="font-mono text-right bg-muted text-muted-foreground cursor-not-allowed"
-          tabIndex={-1}
         />
       </td>
 

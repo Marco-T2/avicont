@@ -29,6 +29,8 @@ export class ComprobanteResponseDto {
   @ApiProperty() periodoFiscalId!: string;
   @ApiProperty() glosa!: string;
   @ApiProperty({ enum: Moneda }) monedaPrincipal!: Moneda;
+  @ApiProperty({ example: '1.00000000', description: 'T/C de presentación (re-expresión del encabezado). Siempre presente; default "1.00000000".' })
+  tipoCambioReexpresion!: string;
   @ApiProperty({ example: '1000.00' }) totalDebitoBob!: string;
   @ApiProperty({ example: '1000.00' }) totalCreditoBob!: string;
 
@@ -62,6 +64,7 @@ export function toComprobanteResponse(c: ComprobanteConLineas): ComprobanteRespo
     periodoFiscalId: c.periodoFiscalId,
     glosa: c.glosa,
     monedaPrincipal: c.monedaPrincipal,
+    tipoCambioReexpresion: c.tipoCambioReexpresion.toString(),
     totalDebitoBob: c.totalDebitoBob.toFixed(2),
     totalCreditoBob: c.totalCreditoBob.toFixed(2),
     anulado: c.anulado,
