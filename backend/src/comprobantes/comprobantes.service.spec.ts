@@ -2083,4 +2083,182 @@ describe('ComprobantesService', () => {
       expect(r).toEqual([]);
     });
   });
+
+  // ============================================================
+  // Tests: tipoCambioReexpresion (Batch 3 — TDD §T/C-sep)
+  // ============================================================
+
+  describe('crearBorrador — tipoCambioReexpresion', () => {
+    function setupCuentasYPeriodo(
+      periodos: MockPeriodos,
+      cuentas: MockCuentas,
+    ) {
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+    }
+
+    it('persiste tipoCambioReexpresion=6.96 y no altera montoBob de líneas', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      setupCuentasYPeriodo(periodos, cuentas);
+
+      const respuesta = comprobanteFactory({
+        id: 'comp-tcr',
+        tipoCambioReexpresion: new Prisma.Decimal('6.96'),
+        lineas: [
+          {
+            id: 'l-1',
+            organizationId: TENANT_ID,
+            comprobanteId: 'comp-tcr',
+            orden: 1,
+            cuentaId: CUENTA_CAJA_ID,
+            contactoId: null,
+            moneda: Moneda.BOB,
+            debito: new Prisma.Decimal('1000'),
+            credito: new Prisma.Decimal(0),
+            tipoCambio: new Prisma.Decimal(1),
+            debitoBob: new Prisma.Decimal('1000'),
+            creditoBob: new Prisma.Decimal(0),
+            glosaLinea: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ],
+      } as Partial<ComprobanteConLineas>);
+      repo.crearBorrador.mockResolvedValue(respuesta);
+
+      const dto = {
+        ...dtoCreateDiarioBOB(),
+        tipoCambioReexpresion: '6.96',
+      };
+      const result = await service.crearBorrador(TENANT_ID, USER_ID, dto);
+
+      // El repo recibe el campo
+      expect(repo.crearBorrador).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ tipoCambioReexpresion: '6.96' }),
+        expect.any(Object),
+      );
+      // El response expone el valor formateado
+      expect(result.tipoCambioReexpresion).toBe('6.96');
+      // Los montoBob de líneas NO se alteran
+      expect(result.lineas[0]?.debitoBob).toBe('1000');
+    });
+
+    it('usa default 1.00000000 cuando tipoCambioReexpresion se omite', async () => {
+      const { service, repo, periodos, cuentas } = buildService();
+      setupCuentasYPeriodo(periodos, cuentas);
+
+      const respuesta = comprobanteFactory({
+        id: 'comp-default',
+        tipoCambioReexpresion: new Prisma.Decimal(1),
+      } as Partial<ComprobanteConLineas>);
+      repo.crearBorrador.mockResolvedValue(respuesta);
+
+      const dto = dtoCreateDiarioBOB(); // sin tipoCambioReexpresion
+      const result = await service.crearBorrador(TENANT_ID, USER_ID, dto);
+
+      // El repo no recibe tipoCambioReexpresion (campo ausente → DB usa default 1)
+      const llamada = repo.crearBorrador.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(llamada).not.toHaveProperty('tipoCambioReexpresion');
+      // El response lo incluye como string
+      expect(result.tipoCambioReexpresion).toBe('1');
+    });
+
+    it('TCR=6.96 con líneas BOB/TC=1 NO dispara TipoCambioInvalidoError ni altera montoBob (invariante crítico §T/C-sep)', async () => {
+      // Este test es el guardián del invariante de separación T/C:
+      // tipoCambioReexpresion es campo de CABECERA y NUNCA entra a
+      // validarCoherenciaLineaBorrador (service.ts:1051). La firma de esa
+      // función solo recibe CreateLineaDto, que no tiene el campo de cabecera.
+      const { service, repo, periodos, cuentas } = buildService();
+      setupCuentasYPeriodo(periodos, cuentas);
+
+      const lineasBob = [
+        {
+          id: 'l-1',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-sep',
+          orden: 1,
+          cuentaId: CUENTA_CAJA_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal('500'),
+          credito: new Prisma.Decimal(0),
+          tipoCambio: new Prisma.Decimal(1),
+          debitoBob: new Prisma.Decimal('500'),
+          creditoBob: new Prisma.Decimal(0),
+          glosaLinea: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'l-2',
+          organizationId: TENANT_ID,
+          comprobanteId: 'comp-sep',
+          orden: 2,
+          cuentaId: CUENTA_VENTAS_ID,
+          contactoId: null,
+          moneda: Moneda.BOB,
+          debito: new Prisma.Decimal(0),
+          credito: new Prisma.Decimal('500'),
+          tipoCambio: new Prisma.Decimal(1),
+          debitoBob: new Prisma.Decimal(0),
+          creditoBob: new Prisma.Decimal('500'),
+          glosaLinea: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+      repo.crearBorrador.mockResolvedValue(
+        comprobanteFactory({
+          id: 'comp-sep',
+          tipoCambioReexpresion: new Prisma.Decimal('6.96'),
+          lineas: lineasBob,
+        } as Partial<ComprobanteConLineas>),
+      );
+
+      const dto = {
+        ...dtoCreateDiarioBOB(),
+        tipoCambioReexpresion: '6.96', // TCR distinto de 1
+        lineas: [
+          {
+            cuentaId: CUENTA_CAJA_ID,
+            moneda: Moneda.BOB,
+            debito: '500',
+            credito: '0',
+            tipoCambio: '1', // línea TC=1 (BOB)
+            debitoBob: '500',
+            creditoBob: '0',
+          },
+          {
+            cuentaId: CUENTA_VENTAS_ID,
+            moneda: Moneda.BOB,
+            debito: '0',
+            credito: '500',
+            tipoCambio: '1', // línea TC=1 (BOB)
+            debitoBob: '0',
+            creditoBob: '500',
+          },
+        ],
+      };
+
+      // NO debe lanzar TipoCambioInvalidoError ni ningún otro error
+      const result = await expect(
+        service.crearBorrador(TENANT_ID, USER_ID, dto),
+      ).resolves.not.toThrow();
+
+      void result; // usamos result para evitar warning de variable no usada
+
+      // Las líneas conservan debitoBob/creditoBob sin modificación
+      const persist = repo.crearBorrador.mock.calls[0]?.[1] as {
+        lineas: Array<{ debitoBob: string; creditoBob: string; tipoCambio: string }>;
+      };
+      expect(persist.lineas[0]?.debitoBob).toBe('500');
+      expect(persist.lineas[0]?.tipoCambio).toBe('1');
+      expect(persist.lineas[1]?.creditoBob).toBe('500');
+      expect(persist.lineas[1]?.tipoCambio).toBe('1');
+    });
+  });
 });
