@@ -3,8 +3,19 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Comprobante } from '@/types/api';
+import type { Comprobante, Cuenta } from '@/types/api';
 
+vi.mock('../hooks/use-comprobante', () => ({
+  useComprobante: vi.fn(),
+}));
+
+// useCuentas como vi.fn() para poder sobreescribir el retorno en cada describe.
+vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
+  useCuentas: vi.fn(),
+}));
+
+import { useComprobante } from '../hooks/use-comprobante';
+import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 import { ComprobanteDetailPage } from './comprobante-detail-page';
 
 const mockComprobante: Comprobante = {
@@ -29,7 +40,7 @@ const mockComprobante: Comprobante = {
     {
       id: 'l1',
       orden: 1,
-      cuentaId: 'cuenta-caja',
+      cuentaId: 'cuenta-caja-id',
       contactoId: null,
       moneda: 'BOB',
       debito: '1250.00',
@@ -42,17 +53,40 @@ const mockComprobante: Comprobante = {
   ],
 };
 
-vi.mock('../hooks/use-comprobante', () => ({
-  useComprobante: () => ({
+const makeCuenta = (overrides: Partial<Cuenta>): Cuenta => ({
+  id: 'uuid-1',
+  organizationId: 'org-1',
+  codigoInterno: '1.1.01',
+  nombre: 'Caja',
+  descripcion: null,
+  claseCuenta: 'ACTIVO',
+  subClaseCuenta: 'ACTIVO_CORRIENTE',
+  naturaleza: 'DEUDORA',
+  parentId: null,
+  nivel: 3,
+  esDetalle: true,
+  requiereContacto: false,
+  esContraria: false,
+  activa: true,
+  monedaFuncional: 'BOB',
+  permiteMultiMoneda: false,
+  esSystemSeed: false,
+  esRequeridaSistema: false,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  ...overrides,
+});
+
+function setupDefaultMocks(cuentas: Cuenta[] = []) {
+  (useComprobante as ReturnType<typeof vi.fn>).mockReturnValue({
     data: mockComprobante,
     isLoading: false,
     isError: false,
-  }),
-}));
-
-vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
-  useCuentas: () => ({ data: { items: [] } }),
-}));
+  });
+  (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
+    data: { items: cuentas },
+  });
+}
 
 vi.mock('./editar-comprobante-sheet', () => ({
   EditarComprobanteSheet: () => null,
@@ -90,6 +124,7 @@ function renderPage(id = 'comp-1') {
 
 describe('ComprobanteDetailPage (smoke)', () => {
   it('renderiza la glosa del comprobante', () => {
+    setupDefaultMocks();
     renderPage();
     // getAllByText porque aparece en cabecera + glosa field
     expect(
@@ -98,17 +133,41 @@ describe('ComprobanteDetailPage (smoke)', () => {
   });
 
   it('renderiza el badge de estado', () => {
+    setupDefaultMocks();
     renderPage();
     expect(screen.getAllByText('Contabilizado').length).toBeGreaterThanOrEqual(1);
   });
 
   it('botón "Volver a comprobantes" presente', () => {
+    setupDefaultMocks();
     renderPage();
     expect(screen.getByRole('button', { name: /comprobantes/i })).toBeInTheDocument();
   });
 
   it('muestra la línea del comprobante', () => {
+    setupDefaultMocks();
     renderPage();
     expect(screen.getByText('Cobro de servicios')).toBeInTheDocument();
+  });
+});
+
+describe('ComprobanteDetailPage — columna Cuenta en tabla de líneas (SUGG-2)', () => {
+  it('muestra codigoInterno y nombre cuando la cuenta se resuelve por id', () => {
+    const cuentaCaja = makeCuenta({
+      id: 'cuenta-caja-id',
+      codigoInterno: '1.1.01',
+      nombre: 'Caja Chica',
+    });
+    setupDefaultMocks([cuentaCaja]);
+    renderPage();
+    expect(screen.getByText('1.1.01')).toBeInTheDocument();
+    expect(screen.getByText('Caja Chica')).toBeInTheDocument();
+  });
+
+  it('muestra el UUID como fallback cuando la cuenta no está en la lista', () => {
+    // Lista de cuentas vacía — ninguna coincide con 'cuenta-caja-id'
+    setupDefaultMocks([]);
+    renderPage();
+    expect(screen.getByText('cuenta-caja-id')).toBeInTheDocument();
   });
 });

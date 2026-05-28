@@ -119,6 +119,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
     pageSize: 200,
   });
   const cuentas = cuentasData?.items ?? [];
+  const cuentaPorId = new Map(cuentas.map((c) => [c.id, c]));
 
   if (isLoading) return <PageSkeleton />;
 
@@ -278,8 +279,21 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                       <TableCell className="text-center text-xs text-muted-foreground">
                         {linea.orden}
                       </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {linea.cuentaId}
+                      <TableCell className="text-xs">
+                        {(() => {
+                          const cuenta = cuentaPorId.get(linea.cuentaId);
+                          if (cuenta === undefined) {
+                            // Fallback: cuenta inactiva o fuera del pageSize=200 → mostrar UUID.
+                            return <span className="font-mono text-muted-foreground">{linea.cuentaId}</span>;
+                          }
+                          return (
+                            <span>
+                              <span className="font-mono text-xs">{cuenta.codigoInterno}</span>
+                              <span className="text-muted-foreground"> · </span>
+                              <span>{cuenta.nombre}</span>
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs">{linea.moneda}</TableCell>
                       <TableCell className="text-right">
