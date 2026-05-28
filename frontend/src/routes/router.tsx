@@ -4,6 +4,8 @@ import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
 import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
+import { ComprobanteDetailPage } from '@/features/comprobantes/pages/comprobante-detail-page';
+import { ComprobantesPage } from '@/features/comprobantes/pages/comprobantes-page';
 import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
@@ -32,6 +34,8 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <DashboardPage /> },
           { path: '/plan-cuentas', element: <PlanCuentasPage /> },
+          { path: '/comprobantes', element: <ComprobantesPage /> },
+          { path: '/comprobantes/:id', element: <ComprobanteDetailPage /> },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/periodos-fiscales', element: <PeriodosFiscalesPage /> },
           { path: '/settings/members', element: <MembersPage /> },
