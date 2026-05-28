@@ -27,3 +27,6 @@ export function useHasSystemRole(roles: SystemRole[]): boolean {
 export function usePuedeReabrir(): boolean {
   return useHasSystemRole(['OWNER', 'ADMIN']);
 }
+
+// Re-export para que las features no tengan que importar desde rutas internas.
+export { usePuedeEditarContabilizado } from '@/features/comprobantes/hooks/use-puede-editar-contabilizado';

@@ -2,6 +2,7 @@ import {
   BookOpen,
   CalendarRange,
   Contact,
+  FileText,
   Home,
   Settings,
   Shield,
@@ -22,6 +23,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Panel', icon: Home },
   { to: '/plan-cuentas', label: 'Plan de cuentas', icon: BookOpen },
+  { to: '/comprobantes', label: 'Comprobantes', icon: FileText },
   { to: '/contactos', label: 'Contactos', icon: Contact },
   { to: '/periodos-fiscales', label: 'Períodos fiscales', icon: CalendarRange },
   { to: '/settings/members', label: 'Miembros', icon: Users },

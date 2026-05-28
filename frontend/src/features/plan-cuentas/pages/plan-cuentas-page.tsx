@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -173,12 +174,16 @@ function ListaTab(props: ListaTabProps): React.JSX.Element {
     ...(props.debouncedSearch.length > 0 ? { search: props.debouncedSearch } : {}),
   });
 
-  if (query.isError) {
-    toast.error('No se pudieron cargar las cuentas');
-  }
+  // Anti-F-13: el toast NO se llama en el cuerpo del componente — se dispararía
+  // en cada re-render mientras dure el error. useEffect con dep [isError]
+  // garantiza un único toast por transición a estado de error.
+  useEffect(() => {
+    if (query.isError) {
+      toast.error('No se pudieron cargar las cuentas');
+    }
+  }, [query.isError]);
 
   const data = query.data;
-  const totalPages = data !== undefined ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
     <>
@@ -195,33 +200,14 @@ function ListaTab(props: ListaTabProps): React.JSX.Element {
         onSelect={(c) => props.onSelect(c.id)}
       />
 
-      {data !== undefined && data.total > PAGE_SIZE ? (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Página {data.page} de {totalPages} — {data.total} cuentas en total
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={data.page <= 1}
-              onClick={() => props.onPageChange(data.page - 1)}
-              aria-label="Página anterior"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={data.page >= totalPages}
-              onClick={() => props.onPageChange(data.page + 1)}
-              aria-label="Página siguiente"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {data !== undefined && (
+        <PaginationBar
+          page={data.page}
+          limit={PAGE_SIZE}
+          total={data.total}
+          onPageChange={props.onPageChange}
+        />
+      )}
     </>
   );
 }
@@ -239,9 +225,12 @@ function ArbolTab({
 }): React.JSX.Element {
   const { data, isLoading, isError } = useCuentaTree();
 
-  if (isError) {
-    toast.error('No se pudo cargar el árbol de cuentas');
-  }
+  // Anti-F-13: toast en useEffect, no en render.
+  useEffect(() => {
+    if (isError) {
+      toast.error('No se pudo cargar el árbol de cuentas');
+    }
+  }, [isError]);
 
   if (isLoading) {
     return (

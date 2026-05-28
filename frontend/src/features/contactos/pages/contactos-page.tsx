@@ -1,6 +1,7 @@
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import { Button } from '@/components/ui/button';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
@@ -42,9 +43,6 @@ export function ContactosPage(): React.JSX.Element {
   const params = buildContactosParams(rol, incluirInactivos, debouncedSearch, page);
   const { data, isLoading } = useContactos(params);
 
-  const totalPages =
-    data !== undefined ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
-
   function handleSelect(id: string): void {
     setSelectedId(id);
     setDrawerOpen(true);
@@ -81,33 +79,14 @@ export function ContactosPage(): React.JSX.Element {
           onSelect={(c) => handleSelect(c.id)}
         />
 
-        {data !== undefined && data.total > PAGE_SIZE ? (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Página {data.page} de {totalPages} — {data.total} contactos en total
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={data.page <= 1}
-                onClick={() => setPage(data.page - 1)}
-                aria-label="Página anterior"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={data.page >= totalPages}
-                onClick={() => setPage(data.page + 1)}
-                aria-label="Página siguiente"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        {data !== undefined && (
+          <PaginationBar
+            page={data.page}
+            limit={PAGE_SIZE}
+            total={data.total}
+            onPageChange={setPage}
+          />
+        )}
       </div>
 
       <ContactoDetailDrawer

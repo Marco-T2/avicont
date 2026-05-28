@@ -113,6 +113,110 @@ export function mensajePeriodosFiscales(err: unknown): string {
   }
 }
 
+// ============================================================
+// Comprobantes — mapping de los 31 códigos in-scope del slice 1.
+// Los 4 códigos de documentos físicos (slice 2) caen al fallback genérico.
+// ============================================================
+
+function extraerOrden(details: Record<string, unknown> | undefined): number | null {
+  const v = details?.orden;
+  return typeof v === 'number' ? v : null;
+}
+
+function conOrden(base: string, details: Record<string, unknown> | undefined): string {
+  const orden = extraerOrden(details);
+  return orden !== null ? `La línea ${orden}: ${base}` : base;
+}
+
+export function mensajeComprobantes(err: unknown): string {
+  const p = extractBackendError(err);
+  switch (p.code) {
+    // 404 — recursos no encontrados
+    case 'COMPROBANTE_NO_ENCONTRADO':
+      return 'El comprobante no existe o pertenece a otra organización.';
+    case 'COMPROBANTE_CUENTA_NO_ENCONTRADA':
+      return 'Una de las cuentas referenciadas no existe en esta organización.';
+
+    // 409 — estado incompatible
+    case 'COMPROBANTE_ESTADO_INVALIDO':
+    case 'COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO':
+      return 'Esta operación no es válida para el estado actual del comprobante.';
+    case 'COMPROBANTE_BLOQUEADO':
+      return 'El comprobante está bloqueado. Reabrí el período primero.';
+    case 'COMPROBANTE_ANULAR_YA_ANULADO':
+      return 'Este comprobante ya fue anulado anteriormente.';
+    case 'COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO':
+      return 'No se puede anular un borrador. Eliminalo directamente si ya no lo necesitás.';
+    case 'COMPROBANTE_ANULAR_PERIODO_CERRADO':
+      return 'El período de este comprobante está cerrado. Reabrí el período para anular.';
+    case 'COMPROBANTE_ANULADO_NO_EDITABLE':
+      return 'El comprobante está anulado y no puede editarse.';
+    case 'COMPROBANTE_PERIODO_NO_ABIERTO':
+      return 'No hay un período fiscal abierto para la fecha del comprobante. Creá o abrí el período primero.';
+    case 'COMPROBANTE_CAMPOS_INMUTABLES':
+      return 'Hay campos que no pueden modificarse tras contabilizar (número, tipo, fecha).';
+    case 'COMPROBANTE_EDIT_PERIODO_CERRADO':
+      return 'El período de este comprobante está cerrado. Reabrí el período para editar.';
+    case 'COMPROBANTE_EDIT_PERIODO_DESTINO_CERRADO':
+      return 'No se puede mover el comprobante a ese período: está cerrado.';
+    case 'COMPROBANTE_EDIT_NUMERO_INMUTABLE':
+      return 'El número del comprobante no puede modificarse.';
+
+    // 422 — invariantes de dominio
+    case 'COMPROBANTE_ANULAR_MOTIVO_INVALIDO':
+      return 'El motivo no puede ser solo espacios en blanco.';
+    case 'COMPROBANTE_SIN_LINEAS':
+      return 'Se requieren al menos 2 líneas para contabilizar.';
+    case 'COMPROBANTE_DESBALANCEADO': {
+      const diffBob = p.details?.diffBob;
+      return typeof diffBob === 'string'
+        ? `Los débitos y créditos no están balanceados (diferencia: Bs ${diffBob}).`
+        : 'Los débitos y créditos no están balanceados (tolerancia ±Bs 0.01).';
+    }
+    case 'COMPROBANTE_MONTO_CERO':
+      return 'No se puede contabilizar un comprobante con monto total cero.';
+    case 'COMPROBANTE_GLOSA_REQUERIDA':
+      return 'La glosa es obligatoria y no puede estar vacía.';
+    case 'COMPROBANTE_LINEA_SIN_MONTO':
+      return conOrden('no tiene débito ni crédito. Cada línea debe tener exactamente uno.', p.details);
+    case 'COMPROBANTE_LINEA_AMBIGUA_DEBITO_CREDITO':
+      return conOrden('tiene débito y crédito al mismo tiempo. Una línea es solo DEBE o solo HABER.', p.details);
+    case 'COMPROBANTE_MONTO_BOB_INCOHERENTE':
+      return conOrden('el monto en bolivianos no coincide con monto × tipo de cambio (tolerancia ±Bs 0.01).', p.details);
+    case 'COMPROBANTE_TIPO_CAMBIO_INVALIDO':
+      return conOrden('tipo de cambio inválido para la moneda indicada.', p.details);
+    case 'COMPROBANTE_FECHA_FUTURA_NO_PERMITIDA':
+      return 'La fecha contable no puede ser posterior a hoy.';
+    case 'COMPROBANTE_CUENTA_NO_DETALLE':
+      return conOrden('la cuenta es una cuenta agrupadora. Solo se pueden usar cuentas de detalle.', p.details);
+    case 'COMPROBANTE_CUENTA_INACTIVA':
+      return conOrden('la cuenta está inactiva.', p.details);
+    case 'COMPROBANTE_CONTACTO_REQUERIDO':
+      return conOrden('esta cuenta exige asociar un contacto. Seleccioná uno.', p.details);
+    case 'COMPROBANTE_CONTACTO_NO_EXISTE':
+      return conOrden('el contacto referenciado no existe en esta organización.', p.details);
+    case 'COMPROBANTE_CONTACTO_INACTIVO':
+      return conOrden('el contacto está inactivo. Reactivalo o usá otro antes de contabilizar.', p.details);
+    case 'COMPROBANTE_MONEDA_INCOMPATIBLE_CUENTA':
+      return conOrden('la cuenta no permite la moneda seleccionada.', p.details);
+    case 'COMPROBANTE_GESTION_NO_ABIERTA':
+      return 'No existe una gestión fiscal para la fecha del comprobante. Creá la gestión primero.';
+
+    // 403
+    case 'MISSING_PERMISSION_EDIT_POSTED':
+      return 'No tenés permiso para editar comprobantes contabilizados.';
+
+    // 400
+    case 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO':
+      return 'El motivo de anulación es obligatorio y debe tener al menos 10 caracteres.';
+
+    // Fallback: cubre códigos slice 2 (COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE, etc.)
+    // y cualquier código desconocido.
+    default:
+      return p.message ?? FALLBACK_GENERICO;
+  }
+}
+
 // Labels humanizados para los conceptos de OrgConfiguracionContable.
 export const CONCEPTO_LABELS: Record<string, string> = {
   ivaCreditoId: 'IVA Crédito Fiscal',
