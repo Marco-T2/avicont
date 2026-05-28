@@ -184,3 +184,12 @@ body {
     @apply font-sans antialiased;
   }
 }
+
+/* View transition para cambio de tema (light ↔ dark) — coordinado con
+   theme-store.ts. La cross-fade default se desactiva porque animamos
+   manualmente el clip-path; mix-blend-mode: normal evita el blend que
+   oscurece los colores de la nueva capa durante la transición. */
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
