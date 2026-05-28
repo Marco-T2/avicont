@@ -4,11 +4,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import type { EstadoComprobante, TipoComprobante } from '@/types/api';
 
+import { PaginationBar } from '@/components/shared/pagination-bar';
+
 import { useComprobantes } from '../hooks/use-comprobantes';
 
 import { ComprobantesFilters } from './comprobantes-filters';
 import { ComprobantesTable } from './comprobantes-table';
-import { PaginationBar } from './pagination-bar';
 
 const DEFAULT_LIMIT = 20;
 
