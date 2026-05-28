@@ -20,7 +20,8 @@
  * viven en el servicio porque requieren I/O contra el repo de cuentas.
  */
 
-import { Moneda, Prisma } from '@prisma/client';
+import { Moneda } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import { FechaContable } from '@/common/domain/fecha-contable';
 import { Money } from '@/common/domain/money';
