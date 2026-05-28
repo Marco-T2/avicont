@@ -513,6 +513,136 @@ otro ORM, etc.).
 
 **Detectado**: 2026-05-28, exploración SDD `sdd/deudas/explore`.
 
+### 5.3 — Prisma runtime en domain — política de severidad (L1/L2/L3)
+
+`CLAUDE.md §3.5` dice "dominio puro: NO importar Prisma runtime; `import type` sí".
+La auditoría 2026-05-28 (`engram://sdd/deudas/explore`) encontró 8 archivos en
+`backend/src/**/domain/**` con value imports de `@prisma/client`. **No son
+una sola deuda uniforme** — hay tres niveles muy distintos de severidad, cada
+uno con política propia.
+
+| Nivel | Definición | Archivos | Política |
+|-------|-----------|----------|----------|
+| **L1 — Runtime real** | `new X()` o `instanceof X` de tipo Prisma usado en lógica de dominio | `common/domain/money.ts` (usa `new Prisma.Decimal`, `instanceof Prisma.Decimal`) | **Divergencia aceptada**. Documentada acá. NO se migra. |
+| **L2 — Enum value import** | `Record<EnumPrisma, ...>`, `===` con miembro del enum, iteración sobre el enum — el enum entra al runtime | `common/domain/cierre-fiscal-por-tipo-empresa.ts` (`TipoEmpresa`), `memberships/domain/membership-role.ts` (`SystemRole`), `cuentas/domain/cuenta-validator.ts` (`ClaseCuenta`, `NaturalezaCuenta`, `SubClaseCuenta`), `comprobantes/domain/numeracion.ts` (`TipoComprobante`), `comprobantes/domain/numero-comprobante.ts` (`TipoComprobante`), `comprobantes/domain/comprobante-validator.ts` (`Moneda`), `configuracion-contable/domain/concepto-reglas.ts` (`ClaseCuenta`) | **Deuda real, política incremental**. Se migra al tocar el módulo (regla de oro de abajo). |
+| **L3 — Type-only mal escrito** | El import es value pero el uso es 100% type-only (annotations, generics) | `comprobantes/domain/comprobante-validator.ts:23` (`Prisma.Decimal` en `LineaParaValidar`) | **Bug trivial**. Fix con `import type`. Se incluye en este PR como subset cierto y barato. |
+
+#### Política L1 — `Prisma.Decimal` runtime en `Money`
+
+`common/domain/money.ts` usa `new Prisma.Decimal(value)` y `value instanceof Prisma.Decimal`
+para construir y validar montos. Bajo el ideal §3.5, debería usar `Decimal` de
+`decimal.js` directamente. Lo dejamos como divergencia aceptada por tres razones:
+
+1. **Costo del cambio supera el beneficio**: `toPrismaDecimal()` (line 135 de
+   `money.ts`) es invocado por cada adapter que persiste algo derivado de `Money`.
+   Migrar a `Decimal` requeriría envolver toda persistencia con un cast
+   `decimal → Prisma.Decimal` en ~15 lugares (comprobantes, cuentas, tipos de
+   cambio, UFV, etc.). El beneficio de pureza no compensa.
+2. **Precedente**: `import type { Prisma }` ya es divergencia aceptada desde
+   Fase 1.0 (§5.1 implícito de este mismo documento).
+3. **El motor de decimales es el mismo**: `Prisma.Decimal` ES `decimal.js`
+   bundleado dentro del runtime de Prisma. No estamos eligiendo otra librería;
+   estamos eligiendo usar el bundle de Prisma en vez de la dep directa.
+
+**Mitigación introducida en este PR**: `decimal.js@^10.5.0` agregado como
+dep directa en `backend/package.json` (Prisma 6.19.x bundlea `10.5.0`).
+Documenta lo que YA usamos. Si Prisma cambia su bundling en un upgrade
+mayor, la dep directa actúa como ancla — el motor de decimales no cambia
+silenciosamente al actualizar Prisma.
+
+**Política de versión**: caret `^10.5.0`. Si Prisma upgrade trae
+`decimal.js@10.6.x`, pnpm resuelve consistente. Si Prisma rompe a `11.x`,
+ya es breaking change que requiere intervención humana de todos modos.
+**No usar exact-pinning** (`"10.5.0"`) — crea fricción con cada upgrade
+de Prisma.
+
+**Si en el futuro se migra el motor** (cambio de ORM, Prisma rompe
+semántica de decimales): reemplazar `Prisma.Decimal` por `Decimal` de
+`decimal.js` en `money.ts` y agregar `toPrismaDecimal()` cast a cada
+adapter persistente. Deuda diferida documentada.
+
+#### Política L2 — Enum value imports, migración incremental
+
+El enum entra al runtime (lookup, comparación, iteración). Para una pureza
+estricta hay que:
+1. Redefinir el enum propio en `<modulo>/domain/enums.ts` o `common/domain/enums.ts`
+   (ver convención abajo).
+2. Mapear `dominioEnum ↔ prismaEnum` en el adapter del módulo dueño.
+
+**No se migran en lote**. Los 7 enums afectados (`TipoEmpresa`, `SystemRole`,
+`ClaseCuenta`, `NaturalezaCuenta`, `SubClaseCuenta`, `TipoComprobante`, `Moneda`)
+viven en 12+ módulos. Un PR batch tocaría todo el backend → viola branch ≤ 3 días
+(§9.2 CLAUDE.md) y blast radius enorme contra beneficio chico (el dominio sigue
+funcionando bien con value imports).
+
+**Regla de oro (vigente desde 2026-05-28)**: al tocar un módulo del backend
+para agregar features o refactor, **migrar primero los value imports de Prisma
+de su `domain/` a enums propios + mapper** antes de la feature. La deuda no
+crece (la regla previene acumulación nueva) y se resuelve al ritmo que cada
+módulo va siendo tocado por trabajo de negocio.
+
+**Convención: dónde vive cada enum propio (Opción C)**:
+
+- **Cross-module** (usado en >1 módulo) → `backend/src/common/domain/enums.ts`.
+  Candidatos: `Moneda`, `SystemRole`, `TipoEmpresa`, `TipoComprobante`, `ClaseCuenta`.
+- **Single-module** (usado solo dentro del módulo dueño) → `<modulo>/domain/enums.ts`.
+  Candidatos: `NaturalezaCuenta`, `SubClaseCuenta` (cuentas).
+
+Mismo criterio que rige para errores (`common/errors/` vs `<modulo>/domain/<modulo>-errors.ts`).
+
+**Convención: forma del enum propio**:
+- Nombre en español (igual que el de Prisma): `enum Moneda { BOB = 'BOB', USD = 'USD' }`.
+- Valores idénticos string-for-string a Prisma — el mapper es identity en runtime,
+  solo separa los namespaces.
+
+**Convención: mapper dominio ↔ Prisma**:
+- Vive en el adapter del módulo dueño del enum. NO en `common/adapters/` (eso
+  acoplaría `common` a Prisma).
+- Naming: `toDominio<Enum>(p: PrismaEnum): Enum` y `toPrisma<Enum>(d: Enum): PrismaEnum`.
+- Si el adapter mapea 1 solo enum: inline en el archivo del repository.
+- Si el adapter mapea 2+: archivo separado `<modulo>/adapters/enum-mappers.ts`.
+
+```typescript
+// Ejemplo de mapper inline (cuando el módulo migre Moneda):
+// backend/src/comprobantes/adapters/prisma-comprobantes.repository.ts
+
+import { Moneda as PrismaMoneda } from '@prisma/client';
+import { Moneda } from '@/common/domain/enums';
+
+function toDominioMoneda(p: PrismaMoneda): Moneda {
+  return Moneda[p];  // identity: mismos valores string
+}
+
+function toPrismaMoneda(d: Moneda): PrismaMoneda {
+  return PrismaMoneda[d];
+}
+```
+
+#### Política L3 — Type-only mal escrito
+
+Si el uso del símbolo importado es 100% en `type` annotations (params de
+interfaces, generics, return types), el import debe ser `import type`.
+Si está como value import por error, es bug trivial — fix de 1 línea.
+
+`comprobantes/domain/comprobante-validator.ts:23` fue el único caso encontrado
+en la auditoría 2026-05-28. Resuelto en este PR.
+
+**Cómo detectarlo en revisión**: si removés el símbolo del runtime (mental
+trick: ¿el código compila si reemplazo `import { X }` por `declare const X: any`?)
+y el archivo sigue compilando, es type-only.
+
+#### Resumen de qué cubre este PR vs qué queda
+
+| Item | Estado |
+|------|--------|
+| L1 documentado como divergencia aceptada | ✅ acá |
+| `decimal.js@^10.5.0` como dep directa explícita | ✅ acá |
+| L3 fix en `comprobante-validator.ts` | ✅ acá |
+| L2 política + convenciones (enum location, mapper naming) | ✅ acá (documentación) |
+| L2 migración de los 7 enums | 🔲 incremental, regla de oro al tocar cada módulo |
+| `Money` migrado a `Decimal` de `decimal.js` directo | 🔲 diferido (solo si cambia ORM o Prisma rompe semántica) |
+| ESLint rule custom para detectar value imports de Prisma en `domain/` | 🔲 fuera de scope (tooling) |
+
 ---
 
 ## 6. Reglas de oro al atacar la deuda
