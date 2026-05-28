@@ -31,10 +31,10 @@ interface CuentaAutocompleteProps {
 
 /**
  * Combobox buscable para elegir una cuenta de detalle activa.
- * Consume `useCuentas({ esDetalle: true, activa: true, pageSize: 200 })`.
- * Filtro client-side por código y nombre (200 cuentas de detalle activas
- * es el tope razonable para un plan de cuentas boliviano — slice 2 paginará
- * si crece).
+ * Consume `useCuentas({ esDetalle: true, activa: true, pageSize: 100 })`.
+ * Filtro client-side por código y nombre. pageSize 100 = límite del backend
+ * (ListarCuentasQueryDto @Max(100)). Si un tenant supera 100 cuentas de
+ * detalle, migrar a server-side search con el param `search`.
  *
  * Cross-feature: ver JSDoc del import arriba.
  */
@@ -46,7 +46,7 @@ export function CuentaAutocomplete({
 }: CuentaAutocompleteProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
-  const { data, isLoading } = useCuentas({ esDetalle: true, activa: true, pageSize: 200 });
+  const { data, isLoading } = useCuentas({ esDetalle: true, activa: true, pageSize: 100 });
 
   const cuentas: Cuenta[] = useMemo(() => data?.items ?? [], [data]);
 

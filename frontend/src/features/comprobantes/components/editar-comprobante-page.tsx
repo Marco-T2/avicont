@@ -79,10 +79,12 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
   const isContabilizado = mode === 'contabilizado';
 
   // Cross-feature: cuentas de detalle activas para el CuentaAutocomplete del LineasEditor.
+  // pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)). Si un tenant
+  // supera 100 cuentas de detalle, migrar a server-side search con el param `search`.
   const { data: cuentasData } = useCuentas({
     esDetalle: true,
     activa: true,
-    pageSize: 200,
+    pageSize: 100,
   });
   const cuentas = cuentasData?.items ?? [];
 

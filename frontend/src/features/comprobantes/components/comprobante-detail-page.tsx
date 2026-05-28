@@ -101,10 +101,12 @@ export function ComprobanteDetailPage(): React.JSX.Element {
   const { data: comprobante, isLoading, isError } = useComprobante(id ?? '');
 
   // Cross-feature: cuentas para mostrar nombre·código en la tabla de líneas read-only.
+  // pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)). Si un tenant
+  // supera 100 cuentas de detalle, migrar a server-side search.
   const { data: cuentasData } = useCuentas({
     esDetalle: true,
     activa: true,
-    pageSize: 200,
+    pageSize: 100,
   });
   const cuentas = cuentasData?.items ?? [];
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c]));
@@ -269,7 +271,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                         {(() => {
                           const cuenta = cuentaPorId.get(linea.cuentaId);
                           if (cuenta === undefined) {
-                            // Fallback: cuenta inactiva o fuera del pageSize=200 → mostrar UUID.
+                            // Fallback: cuenta inactiva o fuera del pageSize=100 → mostrar UUID.
                             return <span className="font-mono text-muted-foreground">{linea.cuentaId}</span>;
                           }
                           return (

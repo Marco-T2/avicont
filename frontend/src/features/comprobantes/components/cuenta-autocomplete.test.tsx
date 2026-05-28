@@ -47,7 +47,7 @@ const mockResponse: CuentaListResponse = {
   items: CUENTAS,
   total: 3,
   page: 1,
-  pageSize: 200,
+  pageSize: 100,
 };
 
 function setupMock(cuentas = mockResponse) {
