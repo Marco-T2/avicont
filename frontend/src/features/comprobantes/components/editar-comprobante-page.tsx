@@ -181,12 +181,14 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
       });
     } else {
       const valuesEditar = values as EditarComprobanteValues;
-      const payload: EditarComprobantePayload = {
-        ...valuesEditar,
-        ...(valuesEditar.lineas !== undefined
-          ? { lineas: poblarBobEnLineas(valuesEditar.lineas) }
-          : {}),
-      };
+      // Omit lineas del spread y reagregarla con BOB poblado si está definida.
+      // `exactOptionalPropertyTypes` prohíbe pasar `lineas: undefined` explícito,
+      // por eso la rama sin lineas devuelve solo `rest`.
+      const { lineas: lineasRaw, ...rest } = valuesEditar;
+      const payload: EditarComprobantePayload =
+        lineasRaw !== undefined
+          ? { ...rest, lineas: poblarBobEnLineas(lineasRaw) }
+          : rest;
       editarMutation.mutate(payload, {
         onSuccess: () => {
           toast.success('Comprobante actualizado');

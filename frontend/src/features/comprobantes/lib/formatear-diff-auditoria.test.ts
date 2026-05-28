@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatearDiffAuditoria, type DiffLinea } from './formatear-diff-auditoria';
+import { formatearDiffAuditoria, type DiffEntry, type DiffLinea } from './formatear-diff-auditoria';
+
+// Helper: en operaciones UPDATE, todas las entradas son DiffLinea — extraer
+// `.campo` sin que TS se queje del union DiffEntry.
+function camposDe(diffs: DiffEntry[]): string[] {
+  return diffs.flatMap((d) => (d.tipo === 'campo' ? [d.campo] : []));
+}
 
 describe('formatearDiffAuditoria', () => {
   describe('INSERT', () => {
@@ -28,7 +34,7 @@ describe('formatearDiffAuditoria', () => {
       const rowOld = { glosa: 'Venta al contado', totalDebitoBob: '1000.00', updatedAt: '2026-04-22' };
       const rowNew = { glosa: 'Venta al por mayor', totalDebitoBob: '1000.00', updatedAt: '2026-04-23' };
       const diffs = formatearDiffAuditoria('UPDATE', rowOld, rowNew);
-      const campos = diffs.map((d) => d.campo);
+      const campos = camposDe(diffs);
       // glosa cambió → debe aparecer
       expect(campos).toContain('glosa');
       // updatedAt está en la blacklist → no debe aparecer
@@ -41,7 +47,7 @@ describe('formatearDiffAuditoria', () => {
       const rowOld = { id: 'abc', createdAt: '2026-01-01', updatedAt: '2026-01-01', glosa: 'A' };
       const rowNew = { id: 'abc', createdAt: '2026-01-01', updatedAt: '2026-01-02', glosa: 'B' };
       const diffs = formatearDiffAuditoria('UPDATE', rowOld, rowNew);
-      const campos = diffs.map((d) => d.campo);
+      const campos = camposDe(diffs);
       expect(campos).not.toContain('id');
       expect(campos).not.toContain('createdAt');
       expect(campos).not.toContain('updatedAt');
@@ -59,7 +65,9 @@ describe('formatearDiffAuditoria', () => {
       const rowOld = { glosa: 'viejo' };
       const rowNew = { glosa: 'nuevo' };
       const diffs = formatearDiffAuditoria('UPDATE', rowOld, rowNew);
-      const glosaEntry = diffs.find((d): d is DiffLinea => d.campo === 'glosa');
+      const glosaEntry = diffs.find(
+        (d): d is DiffLinea => d.tipo === 'campo' && d.campo === 'glosa',
+      );
       if (!glosaEntry) throw new Error('expected glosa diff');
       expect(glosaEntry.antes).toBe('viejo');
       expect(glosaEntry.despues).toBe('nuevo');

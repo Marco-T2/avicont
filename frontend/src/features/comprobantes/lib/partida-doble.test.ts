@@ -4,17 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { estaBalanceado, calcularDiffBob, superRefinePartidaDoble, TOLERANCIA_BOB } from './partida-doble';
 
 /**
- * Ejecuta superRefinePartidaDoble contra un array de líneas
- * y retorna los issues de Zod resultantes.
+ * Ejecuta superRefinePartidaDoble contra un array de líneas y retorna los
+ * issues de Zod resultantes.
+ *
+ * En vez de construir un `RefinementCtx` manual (cuya API cambió en zod v4 y
+ * deja de exponer `path`), envolvemos el refinement en un schema mínimo y
+ * leemos los issues del `safeParse` fallido.
  */
-function runRefine(lineas: Array<{ debito: string; credito: string; tipoCambio: string }>) {
-  const issues: z.ZodIssue[] = [];
-  const ctx: z.RefinementCtx = {
-    addIssue: (issue) => issues.push(issue as z.ZodIssue),
-    path: [],
-  };
-  superRefinePartidaDoble(lineas, ctx);
-  return issues;
+function runRefine(lineas: Array<{ debito: string; credito: string; tipoCambio: string }>): z.ZodIssue[] {
+  const schema = z
+    .object({})
+    .superRefine((_, ctx) => superRefinePartidaDoble(lineas, ctx));
+  const result = schema.safeParse({});
+  return result.success ? [] : result.error.issues;
 }
 
 describe('estaBalanceado', () => {

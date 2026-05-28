@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { type FieldErrors, useFormContext, useFormState } from 'react-hook-form';
+import { useFormContext, useFormState } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,8 +60,11 @@ export function LineaRow({
   const debitoBob = calcularMontoBob(debito, tipoCambio);
   const creditoBob = calcularMontoBob(credito, tipoCambio);
 
-  type LineasErrorsShape = { lineas?: Array<Record<string, { message?: string }>> };
-  const lineaErrors = (errors as FieldErrors<LineasErrorsShape>).lineas?.[index];
+  // El cast a este shape plano evita el problema del tipo recursivo `FieldErrors`
+  // de react-hook-form, que TS infiere como `FieldError` con `.message` que puede
+  // ser nested y rompe el render.
+  type LineaErrorShape = Record<string, { message?: string } | undefined> | undefined;
+  const lineaErrors = (errors.lineas as LineaErrorShape[] | undefined)?.[index] as LineaErrorShape;
 
   return (
     <tr

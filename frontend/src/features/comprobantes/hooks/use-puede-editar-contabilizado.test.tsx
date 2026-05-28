@@ -14,10 +14,12 @@ const mockUseAuthStore = vi.mocked(useAuthStore);
 
 function setupRoles(roles: string[] | undefined) {
   // useAuthStore is called with a selector fn: (s) => s.user?.roles
-  // We need to simulate: mockUseAuthStore returns the result of the selector.
-  mockUseAuthStore.mockImplementation((selector: (s: unknown) => unknown) => {
+  // El cast a Parameters<typeof selector>[0] evita tener que reproducir el shape
+  // completo de AuthState (acciones del store, etc.) — solo nos importa que el
+  // selector pueda leer `user.roles`.
+  mockUseAuthStore.mockImplementation((selector) => {
     const state = { user: roles !== undefined ? { roles } : undefined };
-    return (selector as (s: typeof state) => unknown)(state);
+    return selector(state as Parameters<typeof selector>[0]);
   });
 }
 
