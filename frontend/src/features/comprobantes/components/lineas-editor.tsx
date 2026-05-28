@@ -138,10 +138,12 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
             <tr className="bg-muted/50 text-muted-foreground">
               <th className="p-2 text-left font-medium">Cuenta</th>
               {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7. */}
+              {/* Debe/Haber YA están en BOB (moneda lockada a BOB, TC=1).
+                  Las columnas "Debe BOB"/"Haber BOB" eran espejos redundantes
+                  del valor original y confundían — se eliminaron. El montoBob
+                  se recalcula igual en el submit (poblarBobEnLineas). */}
               <th className="p-2 text-right font-medium w-28">Debe</th>
               <th className="p-2 text-right font-medium w-28">Haber</th>
-              <th className="p-2 text-right font-medium w-28">Debe BOB</th>
-              <th className="p-2 text-right font-medium w-28">Haber BOB</th>
               <th className="p-2 text-left font-medium min-w-[120px]">Glosa línea</th>
               <th className="p-2 w-10" />
             </tr>
@@ -183,13 +185,13 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
       {/* Footer con totales */}
       <div className="mt-3 flex items-center justify-end gap-6 text-sm border-t border-border pt-3">
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Total Debe BOB</span>
+          <span className="text-muted-foreground">Total Debe</span>
           <span className="font-mono font-medium tabular-nums">
             {totales.totalDebitoBob.toFixed(2)}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Total Haber BOB</span>
+          <span className="text-muted-foreground">Total Haber</span>
           <span className="font-mono font-medium tabular-nums">
             {totales.totalCreditoBob.toFixed(2)}
           </span>
