@@ -11,6 +11,11 @@
 // Mantener las dos superficies separadas: cada consumidor pide solo lo que
 // necesita, sin aumentar el blast radius de los dos módulos acoplados.
 
+// `Moneda` se mantiene como enum Prisma aquí (no se migra al dominio): este
+// port es una proyección cross-module que sirve a `comprobantes`, módulo que
+// trabaja en vocabulario Prisma (devuelve rows Prisma desde sus ports,
+// divergencia §5 de docs/deudas-arquitecturales.md). El boundary al dominio
+// puro lo cierra el propio `comprobantes` al construir `LineaParaValidar`.
 import type { Moneda, Prisma } from '@prisma/client';
 
 export const CUENTAS_READER_PORT = Symbol('CUENTAS_READER_PORT');

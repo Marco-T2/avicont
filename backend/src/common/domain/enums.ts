@@ -28,3 +28,27 @@ export enum ClaseCuenta {
   INGRESO = 'INGRESO',
   EGRESO = 'EGRESO',
 }
+
+// Moneda en la que se expresa un monto. BOB es la moneda funcional (§4.2).
+// Cross-module: viaja en `Cuenta.monedaFuncional` (cuentas) y en la validación
+// de líneas de comprobante (comprobantes). Los módulos que devuelven rows
+// Prisma desde sus ports (comprobantes/documentos-fisicos, divergencia §5)
+// mantienen el enum Prisma en esa capa; solo el dominio puro usa este enum.
+export enum Moneda {
+  BOB = 'BOB',
+  USD = 'USD',
+}
+
+// Tipo de comprobante contable (prefijo de 1 letra en el correlativo, §4.9).
+// Dueño del dato: módulo `comprobantes`. Consumido por el dominio puro de
+// numeración (`numeracion`, `numero-comprobante`). DTOs/ports/services de
+// comprobantes y documentos-fisicos mantienen el enum Prisma (divergencia §5).
+export enum TipoComprobante {
+  APERTURA = 'APERTURA',
+  DIARIO = 'DIARIO',
+  INGRESO = 'INGRESO',
+  EGRESO = 'EGRESO',
+  AJUSTE = 'AJUSTE',
+  TRASPASO = 'TRASPASO',
+  CIERRE = 'CIERRE',
+}

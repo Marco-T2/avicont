@@ -1,7 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Moneda } from '@prisma/client';
-
-import { ClaseCuenta } from '@/common/domain/enums';
+import { ClaseCuenta, Moneda } from '@/common/domain/enums';
 
 import { CuentasService } from './cuentas.service';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';

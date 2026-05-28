@@ -14,9 +14,11 @@ import type {
 
 import {
   toDominioClaseCuenta,
+  toDominioMoneda,
   toDominioNaturalezaCuenta,
   toDominioSubClaseCuenta,
   toPrismaClaseCuenta,
+  toPrismaMoneda,
   toPrismaNaturalezaCuenta,
   toPrismaSubClaseCuenta,
 } from './enum-mappers';
@@ -42,6 +44,7 @@ function toDominio(row: PrismaCuenta): Cuenta {
   return {
     ...row,
     claseCuenta: toDominioClaseCuenta(row.claseCuenta),
+    monedaFuncional: toDominioMoneda(row.monedaFuncional),
     naturaleza: toDominioNaturalezaCuenta(row.naturaleza),
     subClaseCuenta:
       row.subClaseCuenta === null ? null : toDominioSubClaseCuenta(row.subClaseCuenta),
@@ -120,6 +123,7 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
       data: {
         ...data,
         claseCuenta: toPrismaClaseCuenta(data.claseCuenta),
+        monedaFuncional: toPrismaMoneda(data.monedaFuncional),
         naturaleza: toPrismaNaturalezaCuenta(data.naturaleza),
         subClaseCuenta:
           data.subClaseCuenta === null ? null : toPrismaSubClaseCuenta(data.subClaseCuenta),
@@ -129,12 +133,19 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
   }
 
   actualizar(id: string, tenantId: string, data: ActualizarCuentaData): Promise<Cuenta> {
+    const { monedaFuncional, ...rest } = data;
+    const prismaData: Prisma.CuentaUncheckedUpdateInput = {
+      ...rest,
+      ...(monedaFuncional !== undefined
+        ? { monedaFuncional: toPrismaMoneda(monedaFuncional) }
+        : {}),
+    };
     // updateMany + findUnique para asegurar el filtro tenantId y devolver el registro.
     // Se usa tx para evitar inconsistencias entre el guard de tenant y el fetch.
     return this.prisma.$transaction(async (tx) => {
       const result = await tx.cuenta.updateMany({
         where: { id, organizationId: tenantId },
-        data,
+        data: prismaData,
       });
       if (result.count === 0) {
         throw new Error(`Cuenta ${id} no encontrada en tenant ${tenantId}`);

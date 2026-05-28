@@ -1,6 +1,7 @@
-import { Moneda } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString, Length } from 'class-validator';
+
+import { Moneda } from '@/common/domain/enums';
 
 // UpdateCuentaDto SOLO expone campos mutables. Los campos estructurales
 // (codigoInterno, claseCuenta, subClaseCuenta, naturaleza, parentId,

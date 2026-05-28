@@ -9,13 +9,36 @@
 
 import {
   ClaseCuenta as PrismaClaseCuenta,
+  Moneda as PrismaMoneda,
   NaturalezaCuenta as PrismaNaturalezaCuenta,
   SubClaseCuenta as PrismaSubClaseCuenta,
 } from '@prisma/client';
 
-import { ClaseCuenta } from '@/common/domain/enums';
+import { ClaseCuenta, Moneda } from '@/common/domain/enums';
 
 import { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
+
+// ------------------------------------------------------------
+// Moneda (cross-module: cuentas es dueño de monedaFuncional)
+// ------------------------------------------------------------
+
+const MONEDA_PRISMA_A_DOMINIO: Record<PrismaMoneda, Moneda> = {
+  BOB: Moneda.BOB,
+  USD: Moneda.USD,
+};
+
+const MONEDA_DOMINIO_A_PRISMA: Record<Moneda, PrismaMoneda> = {
+  [Moneda.BOB]: PrismaMoneda.BOB,
+  [Moneda.USD]: PrismaMoneda.USD,
+};
+
+export function toDominioMoneda(p: PrismaMoneda): Moneda {
+  return MONEDA_PRISMA_A_DOMINIO[p];
+}
+
+export function toPrismaMoneda(d: Moneda): PrismaMoneda {
+  return MONEDA_DOMINIO_A_PRISMA[d];
+}
 
 // ------------------------------------------------------------
 // ClaseCuenta (cross-module: cuentas es dueño, configuracion-contable consume)
