@@ -73,12 +73,12 @@ describe('AsientoService (integration)', () => {
 **E2E: en `test/` en la raíz del proyecto.** Por convención del starter — comparten fixtures, helpers y bootstrap entre suites E2E de distintos módulos.
 
 ```
-src/modules/asientos/
-├── asiento.service.ts
-├── asiento.service.spec.ts              ← unitario (al lado)
-├── asiento.service.integration.spec.ts  ← integración contra Postgres (al lado)
-├── asiento.controller.ts
-└── asiento.controller.spec.ts
+src/comprobantes/
+├── comprobantes.service.ts
+├── comprobantes.service.spec.ts              ← unitario (al lado)
+├── comprobantes.service.integration.spec.ts  ← integración contra Postgres (al lado)
+├── comprobantes.controller.ts
+└── comprobantes.controller.spec.ts
 
 test/
 ├── helpers/test-factory.ts              ← fixtures compartidas entre E2E
@@ -101,7 +101,7 @@ Migrar a Vitest = horas sin ganancia real en Fase 0. Si en Fase 2+ pesa la veloc
 ### 7.5 Coverage
 
 - **Global**: 80%.
-- **Dominio contable** (`src/modules/asientos`, `plan-cuentas`, `libro-mayor`, `cierre-mensual`, etc.): **95%**.
+- **Dominio contable** (`src/comprobantes`, `src/cuentas`, `src/periodos-fiscales`, `src/configuracion-contable`, etc.): **95%**.
 - **Cada invariante de sección 4.1**: test positivo **+** test negativo (no cuenta si solo tenés el happy path).
 
 **CI falla si coverage baja del umbral.** El número no es el objetivo — los invariantes son. El número es piso.
@@ -125,7 +125,7 @@ describe('AsientoService', () => {
 
 ### 7.7 Factories y fixtures
 
-- Ubicación: `src/modules/<modulo>/__fixtures__/` o `test/fixtures/` si es compartido.
+- Ubicación: `src/<modulo>/__fixtures__/` o `test/fixtures/` si es compartido.
 - Preferir **factories tipadas** (funciones que devuelven entidades válidas) sobre fixtures JSON estáticos.
 - Factories aceptan overrides parciales: `createAsiento({ glosa: 'custom' })`.
 

@@ -368,25 +368,30 @@ backend/src/
 │   ├── decorators/          Decoradores comunes (@CurrentUser, @RequirePermissions)
 │   └── pipes/               Pipes globales de validación
 │
-├── modules/                 Cada dominio de negocio en su propio módulo
-│   ├── auth/
-│   ├── organizations/
-│   ├── users/
-│   ├── memberships/
-│   ├── invitations/
-│   ├── asientos/
-│   ├── plan-cuentas/
-│   ├── libro-mayor/
-│   ├── ...
-│   └── granja/
+├── auth/                    Autenticación y tokens
+├── comprobantes/            Comprobantes contables
+├── configuracion-contable/  Configuración contable por tenant
+├── contactos/               Contactos (clientes/proveedores)
+├── cuentas/                 Plan de cuentas
+├── custom-roles/            Roles personalizados por tenant
+├── documentos-fisicos/      Documentos tributarios físicos
+├── impersonation/           Flujo de impersonation auditada
+├── invitations/             Invitaciones a tenant
+├── memberships/             Membresías de usuario en tenant
+├── periodos-fiscales/       Períodos y gestiones fiscales
+├── permissions/             Catálogo de permisos RBAC
+├── rbac/                    Guards y resolución de permisos
+├── tenants/                 Organizaciones / tenants
+├── tipos-documento-fisico/  Tipos de documento tributario
+├── users/                   Usuarios
 │
-├── infrastructure/          Adaptadores a sistemas externos
-│   ├── prisma/              PrismaService, migraciones, seed
-│   ├── redis/               RedisService
-│   ├── logger/              Adaptadores Pino/Winston/Loki
-│   ├── metrics/             Adaptador Prometheus
-│   ├── tracing/             Bootstrap + adaptador OpenTelemetry
-│   └── mailer/              Adaptadores SMTP/Resend/Console
+├── audit/                   Infraestructura de auditoría
+├── billing/                 Facturación / billing
+├── cache/                   Abstracción de cache (Redis)
+├── logger/                  Adaptadores de logging
+├── metrics/                 Adaptador Prometheus
+├── notifications/           Notificaciones (email)
+├── tracing/                 Bootstrap + adaptador OpenTelemetry
 │
 ├── health/                  Health checks (terminus)
 ├── app.module.ts
@@ -613,7 +618,7 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 
 - `FechaContable` (calendario puro, sin UTC, sin hora) para fechas del dominio contable: comprobantes, facturas, cotizaciones UFV, tipo de cambio.
 - `timestamptz` en UTC solo para `createdAt`, `updatedAt`, `auditoria.timestamp`.
-- `new Date()` **prohibido** en `src/modules/**/domain/` y `src/modules/**/*.service.ts`. Usar `ClockPort.hoyEnLaPaz()` inyectable.
+- `new Date()` **prohibido** en `src/**/domain/` y `src/**/*.service.ts`. Usar `ClockPort.hoyEnLaPaz()` inyectable.
 - Contenedor Docker `TZ=UTC`. `America/La_Paz` solo en capa de presentación.
 
 ### 4.7 Anulación de comprobantes vía flag (no reversa automática)
@@ -1050,9 +1055,9 @@ Antes de editar código que caiga en los paths de la tabla, o antes de las opera
 
 | Si tocás… | LEER ANTES |
 |-----------|------------|
-| `backend/src/modules/{asientos,comprobantes,libro-*,periodo-fiscal,cierre-*,plan-cuentas,facturas,ufv,tipo-cambio}/**` | `docs/claude/dominio-contable.md` |
-| `backend/src/modules/{auth,memberships,invitations}/**` o código que toque JWT / refresh / impersonation / `tenantId` / guards de permisos | `docs/claude/seguridad.md` |
-| `backend/src/modules/rbac/**`, agregás permisos al catálogo, tocás `CustomRole`, modificás guards que chequean permisos | `docs/claude/seguridad.md` + `docs/claude/antipatrones.md` Anti-25 |
+| `backend/src/{comprobantes,periodos-fiscales,cuentas,configuracion-contable,documentos-fisicos,tipos-documento-fisico,contactos}/**` | `docs/claude/dominio-contable.md` |
+| `backend/src/{auth,memberships,invitations}/**` o código que toque JWT / refresh / impersonation / `tenantId` / guards de permisos | `docs/claude/seguridad.md` |
+| `backend/src/rbac/**`, agregás permisos al catálogo, tocás `CustomRole`, modificás guards que chequean permisos | `docs/claude/seguridad.md` + `docs/claude/antipatrones.md` Anti-25 |
 | `backend/src/common/{errors,filters}/**`, agregás una `DomainError` nueva, tocás `GlobalExceptionFilter`, mapeás errores de Prisma | `docs/claude/errores-y-logs.md` |
 | Creás o modificás `*.spec.ts`, `*.integration.spec.ts`, `*.e2e-spec.ts`, factories en `test/` o `__fixtures__/` | `docs/claude/testing.md` |
 | `backend/prisma/migrations/**` o `schema.prisma` | `docs/claude/dominio-contable.md` §4.1–4.2 + `docs/claude/antipatrones.md` Anti-22, Anti-23 |

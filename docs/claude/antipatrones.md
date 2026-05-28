@@ -54,7 +54,7 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 - **Qué**: usar `new Date()` o `Date` nativo para fechas de asientos, facturas, cotizaciones UFV.
 - **Por qué duele**: el 31-dic en La Paz se vuelve 01-ene en UTC y rompe el cierre. Los reportes cambian retroactivamente cerca de medianoche.
 - **Regla**: `FechaContable` value object (sección 4.3). Nunca se convierte a `Date` nativo ni pasa por UTC.
-- **Enforcement**: lint prohíbe `new Date()` en `src/modules/**/domain/` — sólo permitido en infraestructura/presentación.
+- **Enforcement**: lint prohíbe `new Date()` en `src/**/domain/` — sólo permitido en infraestructura/presentación.
 
 #### Anti-04: Redondeo ad-hoc
 
@@ -173,7 +173,7 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 - **Qué**: generar timestamps o fechas directamente en servicios de dominio.
 - **Por qué duele**: imposible testear con tiempo congelado.
 - **Regla**: `ClockPort` inyectable con adaptador `SystemClock` en prod y `FakeClock` en test.
-- **Enforcement**: lint prohíbe `new Date()` y `Date.now()` en `src/modules/**/domain/` y `src/modules/**/*.service.ts`.
+- **Enforcement**: lint prohíbe `new Date()` y `Date.now()` en `src/**/domain/` y `src/**/*.service.ts`.
 
 ---
 

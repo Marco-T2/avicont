@@ -487,6 +487,32 @@ Si esto se formaliza, actualizar `CLAUDE.md §3.5` para reflejar la realidad
 en vez del ideal. Decisión diferida hasta que haya presión real (otro equipo,
 otro ORM, etc.).
 
+### 5.2 — Import directo de **error classes** entre módulos
+
+`documentos-fisicos.service.ts` importa y throwea `TipoDocumentoFisicoNoEncontradoError`,
+`TipoDocumentoFisicoInactivoError`, `ContactoNoEncontradoError` de módulos vecinos.
+`comprobantes.service.ts` importa y throwea `DocumentoFisicoYaAsociadoAOtroContabilizadoError`.
+
+**Por qué se acepta como divergencia**:
+- Una clase de error es **contrato público del módulo proveedor** — parte de su superficie
+  expuesta vía port, no una implementación interna. El `code` estable del error
+  (`{MODULO}_{SUBDOMINIO}_{CONDICION}`) ya forma parte del contrato que el frontend consume.
+- Re-throwear como error propio generaría duplicación sin información nueva y un
+  breaking change de los códigos que el frontend usa.
+- Mover los errores comunes a `common/errors/` solo aplicaría si fueran genuinamente
+  transversales. No es el caso: `ContactoNoEncontradoError` pertenece al dominio
+  `contactos`; los demás, a sus módulos respectivos.
+
+**Condiciones del patrón aceptado**:
+- Solo se importan **classes de error** (subclases de `DomainError`) — no services,
+  no repositorios, no ports concretos de otro módulo.
+- La clase de error importada debe vivir en `<otro-modulo>/domain/<otro-modulo>-errors.ts`
+  (carpeta `domain/`, sin lógica más allá del code + message).
+- El service consumer **throwea** el error tal cual o lo deja propagar. No se permite
+  catchear-y-re-throwear con la misma semántica (eso sería duplicar el contrato).
+
+**Detectado**: 2026-05-28, exploración SDD `sdd/deudas/explore`.
+
 ---
 
 ## 6. Reglas de oro al atacar la deuda
