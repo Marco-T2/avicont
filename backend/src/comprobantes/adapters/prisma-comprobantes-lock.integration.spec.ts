@@ -173,8 +173,14 @@ describe('PrismaComprobantesLockAdapter — integration vs Postgres', () => {
       const count = await prisma.$transaction((tx) => adapter.desbloquearPorPeriodo(tx, periodoA));
       expect(count).toBe(1);
 
-      const a = await prisma.comprobante.findFirst({ where: { numero: 'D2604-000001' } });
-      const b = await prisma.comprobante.findFirst({ where: { numero: 'D2605-000001' } });
+      // §4.2: el correlativo es único por tenant, no globalmente. Sin filtrar por
+      // organizationId, findFirst puede levantar una fila homónima de otra suite en paralelo.
+      const a = await prisma.comprobante.findFirst({
+        where: { organizationId: tenantId, numero: 'D2604-000001' },
+      });
+      const b = await prisma.comprobante.findFirst({
+        where: { organizationId: tenantId, numero: 'D2605-000001' },
+      });
       expect(a?.estado).toBe(EstadoComprobante.CONTABILIZADO);
       expect(b?.estado).toBe(EstadoComprobante.BLOQUEADO);
     });
