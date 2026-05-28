@@ -686,4 +686,141 @@ Con ícono del dominio + h2 + copy + CTA. Es la primera impresión del feature, 
 
 ---
 
+## 14. Convenciones secundarias (consistencia)
+
+> Estas reglas no atrapan bugs (a diferencia de §12), pero evitan que la UI se vea distinta entre features sin razón. Surgen de la auditoría que detectó 12 patrones repetidos sin documentar.
+
+### 14.1 Detail drawer — estructura canónica
+
+Drawers que muestran detalle de una entidad (sin form):
+
+```tsx
+<Sheet open={open} onOpenChange={onOpenChange}>
+  <SheetContent
+    side="right"
+    className="w-full sm:max-w-xl overflow-y-auto overflow-x-hidden"
+  >
+    <SheetHeader>{/* título + badge de estado */}</SheetHeader>
+    <div className="px-4 py-2 space-y-4">
+      {isLoading ? <Skeleton /> : null}
+      {isError ? <p className="text-sm text-destructive">…</p> : null}
+      {data !== undefined ? <DetailBody data={data} /> : null}
+    </div>
+    <SheetFooter className="flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+      <div className="flex gap-2">{/* acciones */}</div>
+    </SheetFooter>
+  </SheetContent>
+</Sheet>
+```
+
+- **Ancho**: `sm:max-w-xl` por default. Subir a `sm:max-w-2xl` solo si el contenido lo justifica (tabla embebida).
+- **Body**: `space-y-4` entre secciones.
+- **Footer**: Cerrar a la izquierda (variant outline), acciones primarias/destructivas a la derecha.
+
+### 14.2 Form Sheet — criterio de ancho
+
+Sheets que contienen un form (crear/editar):
+
+| Tamaño del form | Ancho |
+|---|---|
+| 1-2 campos (ej. confirmar con motivo) | `sm:max-w-md` |
+| 3-6 campos (ej. crear contacto) | `sm:max-w-xl` |
+| 7+ campos o selects con texto largo (ej. crear cuenta con jerarquía) | `sm:max-w-3xl` |
+
+El form va envuelto en `<div className="px-4 pb-6">` para consistencia con el body de los detail drawers.
+
+### 14.3 Confirm dialogs — AlertDialog con preventDefault
+
+Toda confirmación destructiva usa `AlertDialog` (no `Dialog`). El `AlertDialogAction` lleva `e.preventDefault()` para controlar el cierre manual desde el `onSuccess` de la mutation:
+
+```tsx
+<AlertDialogAction
+  onClick={(e) => {
+    e.preventDefault();
+    mutation.mutate(payload, {
+      onSuccess: () => onOpenChange(false),
+    });
+  }}
+>
+  Confirmar
+</AlertDialogAction>
+```
+
+**Cuándo colorear el botón en rojo** (`className="bg-destructive ..."`):
+- **SÍ** si la acción es **irreversible**: eliminar permanente (`DELETE` hard), anular comprobante.
+- **NO** si es **reversible**: desactivar, archivar, soft-delete. El default del `AlertDialogAction` ya transmite seriedad sin gritar.
+
+### 14.4 Botón destructivo en drawer/page footer
+
+Posición y variant según severidad:
+
+```tsx
+// Acción REVERSIBLE (desactivar, archivar) — outline + texto rojo, a la izquierda del primario:
+<Button
+  variant="outline"
+  className="text-destructive hover:text-destructive"
+  onClick={onDeactivate}
+>
+  <Power className="h-4 w-4 mr-2" />
+  Desactivar
+</Button>
+
+// Acción IRREVERSIBLE (eliminar permanente) — variant destructive, único CTA o al extremo derecho:
+<Button variant="destructive" onClick={onDelete}>
+  <Trash2 className="h-4 w-4 mr-2" />
+  Eliminar
+</Button>
+```
+
+Nunca `variant="destructive"` para acciones reversibles — visualmente es demasiado agresivo y desensibiliza al usuario para los casos genuinamente peligrosos.
+
+### 14.5 Skeleton — filas vs bloques
+
+**Skeleton de tabla** (lista que está cargando):
+
+```tsx
+<div className="space-y-2">
+  {Array.from({ length: 5 }).map((_, i) => (
+    <Skeleton key={i} className="h-10 w-full" />
+  ))}
+</div>
+```
+
+Va FUERA del `<TableBody>`, reemplazando la tabla entera mientras `isLoading`. Cantidad: 5-8 filas (suficiente para sugerir contenido, sin saturar).
+
+**Skeleton de página** (detail/editor cargando):
+
+```tsx
+<div className="space-y-4">
+  <Skeleton className="h-8 w-48" />     {/* título */}
+  <Skeleton className="h-32 w-full" />  {/* cabecera/card */}
+  <Skeleton className="h-48 w-full" />  {/* tabla/body */}
+</div>
+```
+
+Las alturas son proporcionales al contenido esperado — no usar el mismo `h-10` para todo.
+
+### 14.6 Cross-feature: importar hook de otra feature
+
+Permitido (§3 lo habilita). Convención de cómo documentar la dependencia:
+
+```tsx
+// Cross-feature: cuentas de detalle activas para el CuentaAutocomplete.
+// pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)). Si un
+// tenant supera 100 cuentas de detalle, migrar a server-side search.
+const { data: cuentasData } = useCuentas({
+  esDetalle: true,
+  activa: true,
+  pageSize: 100,
+});
+```
+
+Reglas:
+- **Importar SOLO del hook** (`@/features/<x>/hooks/use-<y>`). NO importar de `api/` ni de `components/` de otra feature.
+- **Comentario obligatorio** que empiece con `// Cross-feature:` explicando el motivo.
+- **Si la dependencia es un workaround** (ej. `pageSize` hardcodeado por límite del backend), anotar la deuda en el mismo comentario.
+
+---
+
 **Fin del documento.** Este archivo se versiona en git; cualquier cambio se discute en PR.
