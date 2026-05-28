@@ -52,7 +52,10 @@ export class HttpMetricsInterceptor implements NestInterceptor {
           });
         },
         error: (error) => {
-          const statusCode = error.status || error.statusCode || 500;
+          // DomainError expone `httpStatus` (no `status`/`statusCode`): sin esto,
+          // todo error de dominio 4xx contaría como http_requests_total{status_code="500"}.
+          const err = error as { status?: number; statusCode?: number; httpStatus?: number };
+          const statusCode = err.status ?? err.statusCode ?? err.httpStatus ?? 500;
           const duration = endTimer();
 
           this.metrics.incrementCounter('http_requests_total', {
