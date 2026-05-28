@@ -91,10 +91,19 @@ export class HttpLoggingInterceptor implements NestInterceptor {
         },
         error: (error) => {
           const duration = Date.now() - startTime;
-          const statusCode = error.status || error.statusCode || 500;
+          // DomainError expone `httpStatus` (no `status`/`statusCode`): sin esto,
+          // todo error de dominio 4xx se loguearía como 500 (falso pico de 5xx).
+          const err = error as {
+            status?: number;
+            statusCode?: number;
+            httpStatus?: number;
+            name?: string;
+            message?: string;
+          };
+          const statusCode = err.status ?? err.statusCode ?? err.httpStatus ?? 500;
 
-          // Log error response
-          this.logger.error(`← ${method} ${url} ${statusCode} ${duration}ms`, {
+          const message = `← ${method} ${url} ${statusCode} ${duration}ms`;
+          const ctx = {
             type: 'response',
             method,
             url,
@@ -105,9 +114,22 @@ export class HttpLoggingInterceptor implements NestInterceptor {
             userId,
             traceId,
             spanId,
-            errorName: error.name,
-            errorMessage: error.message,
-          });
+            errorName: err.name,
+            errorMessage: err.message,
+          };
+
+          // 4xx = error del cliente (DomainError esperado) → warn: así el nivel
+          // error queda reservado a bugs reales del servidor (5xx), que sí llevan
+          // el Error completo para diagnóstico (§6.6).
+          if (statusCode >= 500) {
+            this.logger.error(
+              message,
+              ctx,
+              error instanceof Error ? error : new Error(String(error)),
+            );
+          } else {
+            this.logger.warn(message, ctx);
+          }
         },
       }),
     );
