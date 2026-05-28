@@ -1,4 +1,4 @@
-import { SystemRole } from '@prisma/client';
+import { SystemRole } from '@/common/domain/enums';
 
 import { AsignacionRolInvalidaError } from './membership-errors';
 

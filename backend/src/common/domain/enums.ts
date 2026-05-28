@@ -3,6 +3,15 @@
 // Los valores son string-for-string idénticos a los enums Prisma; los adapters
 // mapean en el boundary (ver `<modulo>/adapters/enum-mappers.ts`).
 
+// Rol de sistema de una membership (RBAC). Dueño del dato: módulo `memberships`.
+// Lo usa el VO de dominio `MembershipRole`. El resto de la cadena (DTOs, ports,
+// services, rbac/invitations/impersonation/tenants) mantiene el enum Prisma
+// porque opera sobre rows Prisma (divergencia §5 de docs/deudas-arquitecturales.md).
+export enum SystemRole {
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
+}
+
 // Tipo de empresa según Ley 843 art. 46 (determina mes de cierre fiscal).
 // Dueño del dato: módulo `tenants` (campo `Organization.tipoEmpresaPrincipal`).
 // Consumido por: `tenants`, `common/domain/cierre-fiscal-por-tipo-empresa`,

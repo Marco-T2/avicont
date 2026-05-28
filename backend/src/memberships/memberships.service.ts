@@ -11,6 +11,7 @@ import {
 } from '@/rbac/ports/permissions-cache-invalidation.port';
 import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
 
+import { toDominioSystemRole, toPrismaSystemRole } from './adapters/enum-mappers';
 import {
   AutoDegradacionOwnerError,
   CustomRoleInvalidoParaTenantError,
@@ -44,7 +45,10 @@ export class MembershipsService {
 
   async invite(dto: InviteUserDto) {
     const tenantId = this.getTenantId();
-    const role = MembershipRole.parse(dto);
+    const role = MembershipRole.parse({
+      ...(dto.customRoleId != null ? { customRoleId: dto.customRoleId } : {}),
+      ...(dto.systemRole != null ? { systemRole: toDominioSystemRole(dto.systemRole) } : {}),
+    });
     const email = dto.email.toLowerCase().trim();
 
     const user = await this.users.findMinimalByEmail(email);
@@ -63,7 +67,7 @@ export class MembershipsService {
 
     const created = await this.repo.create(tenantId, {
       userId: user.id,
-      systemRole: role.systemRole,
+      systemRole: role.systemRole === null ? null : toPrismaSystemRole(role.systemRole),
       customRoleId: role.customRoleId,
     });
     // Invalidar el cache RBAC del nuevo miembro: su primera consulta
@@ -74,7 +78,10 @@ export class MembershipsService {
 
   async updateRole(membershipId: string, dto: UpdateMembershipDto, actorUserId: string) {
     const tenantId = this.getTenantId();
-    const role = MembershipRole.parse(dto);
+    const role = MembershipRole.parse({
+      ...(dto.customRoleId != null ? { customRoleId: dto.customRoleId } : {}),
+      ...(dto.systemRole != null ? { systemRole: toDominioSystemRole(dto.systemRole) } : {}),
+    });
 
     const membership = await this.repo.findById(tenantId, membershipId);
     if (!membership) {
@@ -92,7 +99,7 @@ export class MembershipsService {
     }
 
     const updated = await this.repo.updateRol(tenantId, membershipId, {
-      systemRole: role.systemRole,
+      systemRole: role.systemRole === null ? null : toPrismaSystemRole(role.systemRole),
       customRoleId: role.customRoleId,
     });
     // Cambio de rol → permisos cambian → invalidar cache RBAC del miembro.
