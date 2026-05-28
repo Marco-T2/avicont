@@ -7,6 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { Moneda } from '@/common/domain/enums';
+
 import type { Cuenta } from './domain/cuenta';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
 import type { ListarCuentasQueryDto } from './dto/listar-cuentas.dto';
@@ -150,7 +152,7 @@ export class CuentasService {
       esDetalle: dto.esDetalle,
       requiereContacto: dto.requiereContacto ?? false,
       esContraria,
-      monedaFuncional: dto.monedaFuncional ?? 'BOB',
+      monedaFuncional: dto.monedaFuncional ?? Moneda.BOB,
       permiteMultiMoneda: dto.permiteMultiMoneda ?? true,
       esSystemSeed: false,
       esRequeridaSistema: false,

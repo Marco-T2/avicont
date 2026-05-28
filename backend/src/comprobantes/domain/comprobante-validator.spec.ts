@@ -1,5 +1,6 @@
-import { Moneda, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
+import { Moneda } from '@/common/domain/enums';
 import { FechaContable } from '@/common/domain/fecha-contable';
 
 import {

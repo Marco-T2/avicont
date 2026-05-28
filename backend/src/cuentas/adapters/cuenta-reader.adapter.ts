@@ -6,6 +6,8 @@ import type {
   CuentaReaderPort,
 } from '@/configuracion-contable/ports/cuenta-reader.port';
 
+import { toDominioClaseCuenta } from './enum-mappers';
+
 // Adapter del port que configuracion-contable define (ver CLAUDE.md §3.7).
 // Vive en src/cuentas/adapters/ porque cuentas es el "dueño" del dato Cuenta.
 // CuentasModule registra el binding y lo EXPORTA para que ConfiguracionContableModule
@@ -32,6 +34,6 @@ export class CuentaReaderAdapter implements CuentaReaderPort {
         nombre: true,
       },
     });
-    return row ?? null;
+    return row === null ? null : { ...row, claseCuenta: toDominioClaseCuenta(row.claseCuenta) };
   }
 }

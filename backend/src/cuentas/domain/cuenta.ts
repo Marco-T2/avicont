@@ -5,11 +5,7 @@
 // El adapter `prisma-cuenta.repository.ts` mapea row Prisma ↔ `Cuenta` dominio
 // usando los enum mappers de `../adapters/enum-mappers.ts`.
 //
-// `ClaseCuenta` y `Moneda` siguen importados desde Prisma de forma transitoria:
-// son enums cross-module y se migran en PR D (ver `docs/deudas-arquitecturales.md
-// §5.3` y el plan en memory `deuda-backlog-proximas-sesiones`).
-
-import type { ClaseCuenta, Moneda } from '@prisma/client';
+import type { ClaseCuenta, Moneda } from '@/common/domain/enums';
 
 import type { NaturalezaCuenta, SubClaseCuenta } from './enums';
 

@@ -11,7 +11,7 @@
 //      Ej: Depreciación Acumulada (ACTIVO, esContraria=true) → ACREEDORA.
 //   5. subClaseCuenta debe corresponder a la claseCuenta (tabla NIIF/PCGA).
 
-import { ClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { CuentaErrorCode, cuentaError, type CuentaErrorPayload } from './cuenta-errors';
 import { NaturalezaCuenta, SubClaseCuenta } from './enums';

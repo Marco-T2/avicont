@@ -1,4 +1,6 @@
-import { ClaseCuenta, type OrgConfiguracionContable } from '@prisma/client';
+import { type OrgConfiguracionContable } from '@prisma/client';
+
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { ConfiguracionContableService } from './configuracion-contable.service';
 import { ConfigContableErrorCode } from './domain/configuracion-errors';
