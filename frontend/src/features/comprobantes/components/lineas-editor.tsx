@@ -177,7 +177,7 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
           className="gap-1"
         >
           <Plus className="h-3.5 w-3.5" />
-          + Agregar línea
+          Agregar línea
         </Button>
       </div>
 

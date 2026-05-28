@@ -65,14 +65,14 @@ describe('LineasEditor', () => {
       render(<Wrapper />);
       // Header debe estar visible
       expect(screen.getByText('Cuenta')).toBeInTheDocument();
-      expect(screen.getByText('+ Agregar línea')).toBeInTheDocument();
+      expect(screen.getByText('Agregar línea')).toBeInTheDocument();
     });
 
     it('agregar línea aumenta el contador de filas', async () => {
       const user = userEvent.setup();
       render(<Wrapper />);
 
-      const btnAgregar = screen.getByText('+ Agregar línea');
+      const btnAgregar = screen.getByText('Agregar línea');
       await user.click(btnAgregar);
 
       // Ahora debería haber 2 botones de "Eliminar fila"
@@ -154,7 +154,7 @@ describe('LineasEditor', () => {
     it('inputs deshabilitados por defecto en modo contabilizado', () => {
       render(<Wrapper mode="contabilizado" />);
       // El botón de agregar debe estar deshabilitado
-      const btnAgregar = screen.getByText('+ Agregar línea');
+      const btnAgregar = screen.getByText('Agregar línea');
       expect(btnAgregar).toBeDisabled();
     });
 
@@ -167,7 +167,7 @@ describe('LineasEditor', () => {
 
       // Tras activar el toggle, el botón agregar debe habilitarse
       await waitFor(() => {
-        const btnAgregar = screen.getByText('+ Agregar línea');
+        const btnAgregar = screen.getByText('Agregar línea');
         expect(btnAgregar).not.toBeDisabled();
       });
     });
