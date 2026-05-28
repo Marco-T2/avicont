@@ -5,7 +5,7 @@
 // El adapter concreto vive en src/cuentas/adapters/cuenta-reader.adapter.ts
 // y el binding se exporta desde CuentasModule.
 
-import type { ClaseCuenta } from '@prisma/client';
+import type { ClaseCuenta } from '@/common/domain/enums';
 
 export const CUENTA_READER_PORT = Symbol('CUENTA_READER_PORT');
 

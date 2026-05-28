@@ -1,4 +1,6 @@
-import type { ClaseCuenta, Moneda } from '@prisma/client';
+import type { Moneda } from '@prisma/client';
+
+import type { ClaseCuenta } from '@/common/domain/enums';
 
 import type { Cuenta } from '../domain/cuenta';
 import type { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';

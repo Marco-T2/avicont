@@ -13,8 +13,10 @@ import type {
 } from '../ports/cuenta.repository.port';
 
 import {
+  toDominioClaseCuenta,
   toDominioNaturalezaCuenta,
   toDominioSubClaseCuenta,
+  toPrismaClaseCuenta,
   toPrismaNaturalezaCuenta,
   toPrismaSubClaseCuenta,
 } from './enum-mappers';
@@ -39,6 +41,7 @@ const CONCEPTO_FIELDS = [
 function toDominio(row: PrismaCuenta): Cuenta {
   return {
     ...row,
+    claseCuenta: toDominioClaseCuenta(row.claseCuenta),
     naturaleza: toDominioNaturalezaCuenta(row.naturaleza),
     subClaseCuenta:
       row.subClaseCuenta === null ? null : toDominioSubClaseCuenta(row.subClaseCuenta),
@@ -73,7 +76,9 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
   async listar(tenantId: string, filtros: ListarCuentasFiltros): Promise<ListarCuentasResultado> {
     const where: Prisma.CuentaWhereInput = {
       organizationId: tenantId,
-      ...(filtros.claseCuenta !== undefined ? { claseCuenta: filtros.claseCuenta } : {}),
+      ...(filtros.claseCuenta !== undefined
+        ? { claseCuenta: toPrismaClaseCuenta(filtros.claseCuenta) }
+        : {}),
       ...(filtros.subClaseCuenta !== undefined
         ? { subClaseCuenta: toPrismaSubClaseCuenta(filtros.subClaseCuenta) }
         : {}),
@@ -114,6 +119,7 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
     const row = await this.prisma.cuenta.create({
       data: {
         ...data,
+        claseCuenta: toPrismaClaseCuenta(data.claseCuenta),
         naturaleza: toPrismaNaturalezaCuenta(data.naturaleza),
         subClaseCuenta:
           data.subClaseCuenta === null ? null : toPrismaSubClaseCuenta(data.subClaseCuenta),

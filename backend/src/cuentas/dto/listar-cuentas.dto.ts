@@ -1,7 +1,8 @@
-import { ClaseCuenta } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { SubClaseCuenta } from '../domain/enums';
 

@@ -8,7 +8,7 @@
 //   - Norma Contable N° 6: diferencias de cambio en cuentas separadas
 //     de ingreso (ganancia) y egreso (pérdida); NO compensar.
 
-import { ClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@/common/domain/enums';
 
 // Nombres de los 12 conceptos mapeables en OrgConfiguracionContable.
 // El orden refleja el schema. Si agregás un campo al modelo, añadilo acá

@@ -1,4 +1,4 @@
-import { ClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { CONCEPTOS, CONCEPTO_REGLAS, esConceptoValido, reglaParaConcepto } from './concepto-reglas';
 

@@ -17,3 +17,14 @@ export enum TipoEmpresa {
   AGROPECUARIA = 'AGROPECUARIA',
   MINERA = 'MINERA',
 }
+
+// Clase contable de la cuenta (5 valores estándar PUCT).
+// Dueño del dato: módulo `cuentas` (campo `Cuenta.claseCuenta`).
+// Consumido por: `cuentas`, `configuracion-contable` (validación de mapeos).
+export enum ClaseCuenta {
+  ACTIVO = 'ACTIVO',
+  PASIVO = 'PASIVO',
+  PATRIMONIO = 'PATRIMONIO',
+  INGRESO = 'INGRESO',
+  EGRESO = 'EGRESO',
+}

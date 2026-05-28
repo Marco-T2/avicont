@@ -1,4 +1,4 @@
-import { ClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { CuentaErrorCode } from './cuenta-errors';
 import { NaturalezaCuenta, SubClaseCuenta } from './enums';

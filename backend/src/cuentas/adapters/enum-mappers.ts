@@ -8,11 +8,42 @@
 // fuerza a actualizar el enum del dominio en el mismo PR.
 
 import {
+  ClaseCuenta as PrismaClaseCuenta,
   NaturalezaCuenta as PrismaNaturalezaCuenta,
   SubClaseCuenta as PrismaSubClaseCuenta,
 } from '@prisma/client';
 
+import { ClaseCuenta } from '@/common/domain/enums';
+
 import { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
+
+// ------------------------------------------------------------
+// ClaseCuenta (cross-module: cuentas es dueño, configuracion-contable consume)
+// ------------------------------------------------------------
+
+const CLASE_PRISMA_A_DOMINIO: Record<PrismaClaseCuenta, ClaseCuenta> = {
+  ACTIVO: ClaseCuenta.ACTIVO,
+  PASIVO: ClaseCuenta.PASIVO,
+  PATRIMONIO: ClaseCuenta.PATRIMONIO,
+  INGRESO: ClaseCuenta.INGRESO,
+  EGRESO: ClaseCuenta.EGRESO,
+};
+
+const CLASE_DOMINIO_A_PRISMA: Record<ClaseCuenta, PrismaClaseCuenta> = {
+  [ClaseCuenta.ACTIVO]: PrismaClaseCuenta.ACTIVO,
+  [ClaseCuenta.PASIVO]: PrismaClaseCuenta.PASIVO,
+  [ClaseCuenta.PATRIMONIO]: PrismaClaseCuenta.PATRIMONIO,
+  [ClaseCuenta.INGRESO]: PrismaClaseCuenta.INGRESO,
+  [ClaseCuenta.EGRESO]: PrismaClaseCuenta.EGRESO,
+};
+
+export function toDominioClaseCuenta(p: PrismaClaseCuenta): ClaseCuenta {
+  return CLASE_PRISMA_A_DOMINIO[p];
+}
+
+export function toPrismaClaseCuenta(d: ClaseCuenta): PrismaClaseCuenta {
+  return CLASE_DOMINIO_A_PRISMA[d];
+}
 
 // ------------------------------------------------------------
 // NaturalezaCuenta
