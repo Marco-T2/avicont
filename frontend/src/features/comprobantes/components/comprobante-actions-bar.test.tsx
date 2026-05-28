@@ -35,7 +35,7 @@ const defaultProps = {
 };
 
 describe('ComprobanteActionsBar (smoke)', () => {
-  it('BORRADOR: muestra Editar, Contabilizar, Eliminar', () => {
+  it('BORRADOR: muestra Editar, Contabilizar, Eliminar, Ver auditoría', () => {
     render(
       <ComprobanteActionsBar
         comprobante={{ ...baseComprobante, estado: 'BORRADOR' }}
@@ -45,6 +45,7 @@ describe('ComprobanteActionsBar (smoke)', () => {
     expect(screen.getByRole('button', { name: /editar/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /contabilizar/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /eliminar/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /auditoría/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /anular/i })).not.toBeInTheDocument();
   });
 

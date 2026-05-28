@@ -22,7 +22,7 @@ interface ComprobanteActionsBarProps {
  * Muestra botones condicionales según el estado y el flag anulado.
  *
  * Lógica (REQ-COMP-UI-DETAIL-04 y -05 del spec):
- * - BORRADOR (no anulado): Editar, Contabilizar, Eliminar
+ * - BORRADOR (no anulado): Editar, Contabilizar, Eliminar, Ver auditoría
  * - CONTABILIZADO (no anulado): Editar, Anular, Ver auditoría
  * - CONTABILIZADO (anulado): Ver auditoría (read-only)
  * - BLOQUEADO: solo Ver auditoría
@@ -59,6 +59,10 @@ export function ComprobanteActionsBar({
         >
           <Trash2 className="h-3.5 w-3.5 mr-1.5" />
           Eliminar
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onVerAuditoria}>
+          <HistoryIcon className="h-3.5 w-3.5 mr-1.5" />
+          Ver auditoría
         </Button>
       </div>
     );
