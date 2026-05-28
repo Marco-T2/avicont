@@ -166,7 +166,9 @@ export function LineaRow({
         />
       </td>
 
-      {/* Debe BOB — readonly calculado */}
+      {/* Debe BOB — readonly calculado. NO usar register acá: el valor es derivado
+          y se setea con setValue desde el useEffect. Doble cableado (value + register)
+          genera conflicto controlled/uncontrolled que rompe el foco de los inputs vecinos. */}
       <td className="p-1 w-28">
         <Input
           value={debitoBob}
@@ -174,11 +176,11 @@ export function LineaRow({
           aria-label="Debe BOB"
           disabled={disabled}
           className="font-mono text-right bg-muted text-muted-foreground cursor-not-allowed"
-          {...register(`lineas.${index}.debitoBob`)}
+          tabIndex={-1}
         />
       </td>
 
-      {/* Haber BOB — readonly calculado */}
+      {/* Haber BOB — readonly calculado. Ver nota arriba sobre por qué no register. */}
       <td className="p-1 w-28">
         <Input
           value={creditoBob}
@@ -186,7 +188,7 @@ export function LineaRow({
           aria-label="Haber BOB"
           disabled={disabled}
           className="font-mono text-right bg-muted text-muted-foreground cursor-not-allowed"
-          {...register(`lineas.${index}.creditoBob`)}
+          tabIndex={-1}
         />
       </td>
 
