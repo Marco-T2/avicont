@@ -14,6 +14,7 @@ const baseComprobante: Comprobante = {
   periodoFiscalId: 'p1',
   glosa: 'Pago de servicios',
   monedaPrincipal: 'BOB',
+  tipoCambioReexpresion: '1.00000000',
   totalDebitoBob: '1000.00',
   totalCreditoBob: '1000.00',
   anulado: false,

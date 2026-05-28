@@ -15,11 +15,15 @@ const TIPOS_COMPROBANTE = [
   'CIERRE',
 ] as const;
 
+// Valida un decimal positivo estricto (> 0). Espejo del DECIMAL_POSITIVE del backend.
+const DECIMAL_POSITIVE = /^(?!0+(\.0+)?$)\d+(\.\d+)?$/;
+
 // Schema para editar un comprobante (BORRADOR o CONTABILIZADO).
 // Todos los campos de cabecera son opcionales — solo se envían los que cambian.
 // El campo `lineas` es opcional — si se provee, reemplaza todas las líneas
 // (delete-and-reinsert atómico en backend — CLAUDE.md §4.3).
 // El campo `motivo` es para auditoría al editar CONTABILIZADO.
+// monedaPrincipal omitida — el backend lockea a BOB; la UI no expone ese campo.
 export const editarComprobanteSchema = z.object({
   tipo: z.enum(TIPOS_COMPROBANTE).optional(),
 
@@ -34,7 +38,11 @@ export const editarComprobanteSchema = z.object({
     .max(500, 'La glosa no puede superar 500 caracteres')
     .optional(),
 
-  monedaPrincipal: z.enum(['BOB', 'USD']).optional(),
+  // T/C de re-expresión: solo presentación; no afecta la contabilidad.
+  tipoCambioReexpresion: z
+    .string()
+    .regex(DECIMAL_POSITIVE, 'El T/C de re-expresión debe ser un número mayor a cero')
+    .optional(),
 
   lineas: z.array(lineaSchema).optional(),
 

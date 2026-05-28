@@ -1,13 +1,14 @@
 import { api } from '@/lib/api';
-import type { Comprobante, Moneda, TipoComprobante } from '@/types/api';
+import type { Comprobante, TipoComprobante } from '@/types/api';
 
 export interface CrearLineaPayload {
   cuentaId: string;
   contactoId?: string;
-  moneda: Moneda;
+  // moneda y tipoCambio son siempre BOB/1 — la UI no expone selector de moneda.
+  moneda: 'BOB';
   debito: string;
   credito: string;
-  tipoCambio: string;
+  tipoCambio: '1';
   debitoBob: string;
   creditoBob: string;
   glosaLinea?: string;
@@ -17,7 +18,10 @@ export interface CrearComprobantePayload {
   tipo: TipoComprobante;
   fechaContable: string;
   glosa: string;
-  monedaPrincipal?: Moneda;
+  // monedaPrincipal siempre BOB — el backend lockea a BOB; no se elige en UI.
+  monedaPrincipal: 'BOB';
+  // T/C de re-expresión: solo presentación; no afecta la contabilidad.
+  tipoCambioReexpresion?: string;
   lineas: CrearLineaPayload[];
 }
 

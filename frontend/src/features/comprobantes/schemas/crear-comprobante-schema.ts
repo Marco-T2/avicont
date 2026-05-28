@@ -16,6 +16,9 @@ const TIPOS_COMPROBANTE = [
   'CIERRE',
 ] as const;
 
+// Valida un decimal positivo estricto (> 0). Espejo del DECIMAL_POSITIVE del backend.
+const DECIMAL_POSITIVE = /^(?!0+(\.0+)?$)\d+(\.\d+)?$/;
+
 export const crearComprobanteSchema = z
   .object({
     tipo: z.enum(TIPOS_COMPROBANTE, { error: 'Tipo de comprobante inválido' }),
@@ -29,7 +32,15 @@ export const crearComprobanteSchema = z
       .min(1, 'La glosa es obligatoria')
       .max(500, 'La glosa no puede superar 500 caracteres'),
 
-    monedaPrincipal: z.enum(['BOB', 'USD']).optional(),
+    // monedaPrincipal no aparece como campo de UI — el payload hardcodea BOB.
+    // Se omite del schema de creación.
+
+    // T/C de re-expresión: campo de PRESENTACIÓN del encabezado (no afecta la
+    // contabilidad). Permite al contador ver los totales en otra moneda en impresión.
+    tipoCambioReexpresion: z
+      .string()
+      .regex(DECIMAL_POSITIVE, 'El T/C de re-expresión debe ser un número mayor a cero')
+      .optional(),
 
     lineas: z
       .array(lineaSchema)

@@ -603,6 +603,7 @@ export interface Comprobante {
   periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
+  tipoCambioReexpresion: string;
   totalDebitoBob: string;
   totalCreditoBob: string;
   anulado: boolean;
