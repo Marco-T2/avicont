@@ -659,6 +659,10 @@ model Comprobante {
 
   glosa           String
   monedaPrincipal Moneda            @default(BOB)
+  // T/C de PRESENTACIÓN (re-expresión del comprobante en otra moneda para reportes).
+  // NO es el tipoCambio transaccional de la línea (LineaComprobante.tipoCambio).
+  // Nunca entra a validarCoherenciaLineaBorrador ni a la validación de partida doble.
+  tipoCambioReexpresion Decimal @default(1) @db.Decimal(14, 8)
 
   // Totales cache en BOB, calculados al contabilizar. Validan partida doble.
   totalDebitoBob  Decimal           @default(0) @db.Decimal(18, 2)
