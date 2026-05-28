@@ -104,6 +104,8 @@ interface DatosResueltos {
   periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
+  // T/C de PRESENTACIÓN del encabezado. Nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
+  tipoCambioReexpresion?: string;
   lineas: LineaPersistData[];
 }
 
@@ -196,6 +198,7 @@ export class ComprobantesService {
     // Los triggers Postgres en comprobantes_audit capturan INSERT automáticamente;
     // auditedTx.run inyecta app.audit_user_id para que el trigger sepa el actor.
     return this.auditedTx.run({ userId }, async (tx) => {
+      // T/C re-expresión: solo cabecera, nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
       const resolved = await this.resolverYValidarBorrador(
         tenantId,
         {
@@ -203,6 +206,9 @@ export class ComprobantesService {
           fechaContable: dto.fechaContable,
           glosa: dto.glosa,
           monedaPrincipal: dto.monedaPrincipal ?? Moneda.BOB,
+          ...(dto.tipoCambioReexpresion !== undefined
+            ? { tipoCambioReexpresion: dto.tipoCambioReexpresion }
+            : {}),
           lineas: dto.lineas,
         },
         tx,
@@ -626,6 +632,7 @@ export class ComprobantesService {
 
         // 13) Persistir. reemplazarComprobante reemplaza campos y lineas atómicamente.
         // El caller ya validó estado; el repo aplica sin re-chequearlo.
+        // T/C re-expresión: solo cabecera, nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
         const editado = await this.repo.reemplazarComprobante(
           tenantId,
           id,
@@ -635,6 +642,7 @@ export class ComprobantesService {
             periodoFiscalId: periodoEfectivo.id,
             glosa: glosaEfectiva,
             monedaPrincipal: monedaEfectiva,
+            tipoCambioReexpresion: dto.tipoCambioReexpresion ?? original.tipoCambioReexpresion,
             lineas: lineasPersist,
             // Totales recalculados para mantener la cabecera sincronizada con las líneas.
             totalDebitoBob: totales.debito.amount,
@@ -918,6 +926,8 @@ export class ComprobantesService {
       fechaContable: string;
       glosa: string;
       monedaPrincipal: Moneda;
+      // T/C re-expresión: solo cabecera, nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
+      tipoCambioReexpresion?: string;
       lineas: CreateLineaDto[];
     },
     tx: Prisma.TransactionClient,
@@ -993,6 +1003,10 @@ export class ComprobantesService {
       periodoFiscalId: periodo.id,
       glosa: input.glosa,
       monedaPrincipal: input.monedaPrincipal,
+      // T/C re-expresión: solo cabecera, nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
+      ...(input.tipoCambioReexpresion !== undefined
+        ? { tipoCambioReexpresion: input.tipoCambioReexpresion }
+        : {}),
       lineas,
     };
   }
@@ -1011,6 +1025,8 @@ export class ComprobantesService {
     fechaContable: string;
     glosa: string;
     monedaPrincipal: Moneda;
+    // T/C re-expresión: solo cabecera, nunca entra a validarCoherenciaLineaBorrador (§T/C-sep).
+    tipoCambioReexpresion?: string;
     lineas: CreateLineaDto[];
   } {
     const lineasActualesComoDto: CreateLineaDto[] = actual.lineas
@@ -1033,6 +1049,8 @@ export class ComprobantesService {
       fechaContable: dto.fechaContable ?? FechaContable.fromDbDate(actual.fechaContable).toIso(),
       glosa: dto.glosa ?? actual.glosa,
       monedaPrincipal: dto.monedaPrincipal ?? actual.monedaPrincipal,
+      // Si el DTO no trae TCR, preservar el valor del comprobante actual como string.
+      tipoCambioReexpresion: dto.tipoCambioReexpresion ?? actual.tipoCambioReexpresion.toString(),
       lineas: dto.lineas ?? lineasActualesComoDto,
     };
   }

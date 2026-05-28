@@ -40,6 +40,10 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         periodoFiscalId: data.periodoFiscalId,
         glosa: data.glosa,
         monedaPrincipal: data.monedaPrincipal,
+        // exactOptionalPropertyTypes (§2.5.1): spread condicional para no pasar undefined.
+        ...(data.tipoCambioReexpresion !== undefined
+          ? { tipoCambioReexpresion: data.tipoCambioReexpresion }
+          : {}),
         createdByUserId: data.createdByUserId,
         lineas: {
           create: data.lineas.map((l) => ({
@@ -93,6 +97,10 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         periodoFiscalId: data.periodoFiscalId,
         glosa: data.glosa,
         monedaPrincipal: data.monedaPrincipal,
+        // exactOptionalPropertyTypes (§2.5.1): spread condicional para no pasar undefined.
+        ...(data.tipoCambioReexpresion !== undefined
+          ? { tipoCambioReexpresion: data.tipoCambioReexpresion }
+          : {}),
         ...(data.totalDebitoBob !== undefined ? { totalDebitoBob: data.totalDebitoBob } : {}),
         ...(data.totalCreditoBob !== undefined ? { totalCreditoBob: data.totalCreditoBob } : {}),
         lineas: {

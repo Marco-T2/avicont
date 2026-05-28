@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -16,6 +17,11 @@ import {
 // Decimales cruzan HTTP como string (CLAUDE.md §4.5) — evita pérdida IEEE-754.
 // Admite números sin signo, con o sin decimales. Lado cero válido ("0", "0.00").
 const DECIMAL_NO_NEG = /^\d+(\.\d+)?$/;
+
+// T/C re-expresión debe ser ESTRICTAMENTE positivo (> 0). DECIMAL_NO_NEG admite
+// "0" y "0.00", que son inválidos para un tipo de cambio de presentación.
+export const DECIMAL_POSITIVE = /^(?!0+(\.0+)?$)\d+(\.\d+)?$/;
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export class CreateLineaDto {
@@ -82,10 +88,21 @@ export class CreateComprobanteDto {
   @Length(1, 500)
   glosa!: string;
 
-  @ApiPropertyOptional({ enum: Moneda, default: Moneda.BOB })
+  // Solo BOB es aceptado como monedaPrincipal (decisión de alcance: multi-moneda
+  // es un campo de presentación vía tipoCambioReexpresion, no transaccional).
+  @ApiPropertyOptional({ enum: [Moneda.BOB], default: Moneda.BOB })
   @IsOptional()
-  @IsEnum(Moneda)
+  @IsIn([Moneda.BOB], { message: 'monedaPrincipal debe ser BOB' })
   monedaPrincipal?: Moneda;
+
+  // T/C de PRESENTACIÓN del encabezado (re-expresión del comprobante).
+  // NO es el tipoCambio transaccional de la línea (LineaComprobante.tipoCambio).
+  // Nunca entra a validarCoherenciaLineaBorrador (§T/C-sep CLAUDE.md §4.1).
+  @ApiPropertyOptional({ example: '6.96', description: 'T/C de presentación (re-expresión). Omitir para usar default 1.' })
+  @IsOptional()
+  @IsString()
+  @Matches(DECIMAL_POSITIVE, { message: 'tipoCambioReexpresion debe ser un decimal estrictamente positivo (ej "6.96")' })
+  tipoCambioReexpresion?: string;
 
   @ApiProperty({ type: [CreateLineaDto], minItems: 1 })
   @IsArray()

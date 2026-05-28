@@ -167,6 +167,7 @@ function comprobanteFactory(overrides: Partial<ComprobanteConLineas> = {}): Comp
     periodoFiscalId: PERIODO_ID,
     glosa: 'Venta al contado',
     monedaPrincipal: Moneda.BOB,
+    tipoCambioReexpresion: new Prisma.Decimal(1),
     totalDebitoBob: new Prisma.Decimal(0),
     totalCreditoBob: new Prisma.Decimal(0),
     origenTipo: null,
