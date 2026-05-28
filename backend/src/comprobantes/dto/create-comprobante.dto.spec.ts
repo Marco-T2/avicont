@@ -1,6 +1,8 @@
 // Tests de validación del DTO CreateComprobanteDto.
-// Cubren: lock de monedaPrincipal a BOB y validación de tipoCambioReexpresion.
-// Spec: Batch 3, paso 3.4.
+// El DTO valida solo la FORMA (tipos, enum, shape). Las reglas de ALCANCE/NEGOCIO
+// — monedaPrincipal solo BOB, tipoCambioReexpresion decimal positivo — viven en
+// ComprobantesService con codes estables COMPROBANTE_MONEDA_NO_PERMITIDA /
+// COMPROBANTE_CAMPO_INVALIDO (W-2, CLAUDE.md §6.2). Ver comprobantes.service.spec.ts.
 
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
@@ -36,7 +38,7 @@ async function validar(plain: Record<string, unknown>): Promise<string[]> {
   return errors.flatMap((e) => Object.values(e.constraints ?? {}));
 }
 
-describe('CreateComprobanteDto — monedaPrincipal lock', () => {
+describe('CreateComprobanteDto — monedaPrincipal (forma)', () => {
   it('acepta monedaPrincipal=BOB', async () => {
     const errores = await validar({ ...dtoBase(), monedaPrincipal: Moneda.BOB });
     expect(errores).toHaveLength(0);
@@ -48,13 +50,18 @@ describe('CreateComprobanteDto — monedaPrincipal lock', () => {
     expect(errores).toHaveLength(0);
   });
 
-  it('rechaza monedaPrincipal=USD', async () => {
+  it('acepta monedaPrincipal=USD a nivel FORMA (la regla BOB-only la valida el servicio)', async () => {
     const errores = await validar({ ...dtoBase(), monedaPrincipal: Moneda.USD });
-    expect(errores.some((e) => e.includes('BOB'))).toBe(true);
+    expect(errores).toHaveLength(0);
+  });
+
+  it('rechaza un valor que no es del enum Moneda', async () => {
+    const errores = await validar({ ...dtoBase(), monedaPrincipal: 'EUR' });
+    expect(errores.length).toBeGreaterThan(0);
   });
 });
 
-describe('CreateComprobanteDto — tipoCambioReexpresion validation', () => {
+describe('CreateComprobanteDto — tipoCambioReexpresion (forma)', () => {
   it('acepta tipoCambioReexpresion="6.96"', async () => {
     const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: '6.96' });
     expect(errores).toHaveLength(0);
@@ -65,35 +72,17 @@ describe('CreateComprobanteDto — tipoCambioReexpresion validation', () => {
     expect(errores).toHaveLength(0);
   });
 
-  it('acepta valores decimales válidos > 0', async () => {
-    for (const valor of ['1', '1.00000000', '6.96', '100', '0.01']) {
+  it('acepta cualquier string a nivel FORMA (el decimal positivo lo valida el servicio)', async () => {
+    // "0", "-1.5", "abc" pasan el shape (son strings); el servicio los rechaza
+    // con COMPROBANTE_CAMPO_INVALIDO. Ver comprobantes.service.spec.ts.
+    for (const valor of ['0', '0.00', '-1.5', 'abc', '+6.96']) {
       const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: valor });
       expect(errores).toHaveLength(0);
     }
   });
 
-  it('rechaza tipoCambioReexpresion="0" (cero no es T/C válido)', async () => {
-    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: '0' });
-    expect(errores.length).toBeGreaterThan(0);
-  });
-
-  it('rechaza tipoCambioReexpresion="0.00" (cero con decimales)', async () => {
-    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: '0.00' });
-    expect(errores.length).toBeGreaterThan(0);
-  });
-
-  it('rechaza tipoCambioReexpresion="-1.5" (valor negativo)', async () => {
-    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: '-1.5' });
-    expect(errores.length).toBeGreaterThan(0);
-  });
-
-  it('rechaza tipoCambioReexpresion="abc" (no numérico)', async () => {
-    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: 'abc' });
-    expect(errores.length).toBeGreaterThan(0);
-  });
-
-  it('rechaza tipoCambioReexpresion con signo positivo explícito "+6.96"', async () => {
-    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: '+6.96' });
+  it('rechaza tipoCambioReexpresion que no es string (number)', async () => {
+    const errores = await validar({ ...dtoBase(), tipoCambioReexpresion: 6.96 });
     expect(errores.length).toBeGreaterThan(0);
   });
 });

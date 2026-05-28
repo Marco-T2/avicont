@@ -481,3 +481,40 @@ export class MotivoAnulacionRequeridoError extends ValidationError {
     );
   }
 }
+
+/**
+ * Se intenta crear/editar un comprobante con `monedaPrincipal` distinta a BOB.
+ * Decisión de alcance (CLAUDE.md §10.10): el campo soporta el enum `Moneda`
+ * completo a nivel schema, pero la fase actual lo bloquea a BOB — el multi-moneda
+ * es un campo de PRESENTACIÓN (`tipoCambioReexpresion`), no transaccional.
+ *
+ * La FORMA (enum válido) se valida en el DTO; esta regla de ALCANCE vive en el
+ * servicio para exponer un code ESTABLE: un integrador distingue "moneda no
+ * soportada aún" del BAD_REQUEST genérico de un payload malformado.
+ * Code: COMPROBANTE_MONEDA_NO_PERMITIDA — 400.
+ */
+export class ComprobanteMonedaNoPermitidaError extends ValidationError {
+  constructor(monedaRecibida: string) {
+    super('COMPROBANTE_MONEDA_NO_PERMITIDA', 'La moneda principal del comprobante debe ser BOB', {
+      monedaRecibida,
+      monedasPermitidas: ['BOB'],
+    });
+  }
+}
+
+/**
+ * Un campo del comprobante llegó con FORMA válida (pasó el shape del DTO) pero
+ * con un valor semánticamente inválido. Hoy lo usa `tipoCambioReexpresion`
+ * (debe ser decimal estrictamente positivo). El code es genérico y lleva el
+ * campo en `details` para que el cliente lo ubique.
+ * Code: COMPROBANTE_CAMPO_INVALIDO — 400.
+ */
+export class ComprobanteCampoInvalidoError extends ValidationError {
+  constructor(campo: string, valorRecibido: string, motivo: string) {
+    super('COMPROBANTE_CAMPO_INVALIDO', `El campo "${campo}" tiene un valor inválido: ${motivo}`, {
+      campo,
+      valorRecibido,
+      motivo,
+    });
+  }
+}
