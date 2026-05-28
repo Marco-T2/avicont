@@ -347,7 +347,7 @@ Cuando ese slice arranque, en su SDD planning:
 
 - Crear las tablas `AgentSession`, `AgentMessage`, `AgentToolInvocation`
   con el shape de §2.4 (ajustando si el caso de uso real lo amerita).
-- Crear el módulo `agent/` en `backend/src/modules/` siguiendo
+- Crear el módulo `agent/` en `backend/src/` siguiendo
   hexagonal estricto: `domain/`, `ports/`, `adapters/`, `service`.
 - Implementar las tools como métodos del service del módulo objetivo
   (ej. `granja.service.registrarMovimientoLote`), invocadas desde un

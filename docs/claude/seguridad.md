@@ -11,7 +11,7 @@ Owner: backend-lead
 > tokens, rotación, impersonation y switch de tenant.
 >
 > **Cuándo leer este doc**: antes de editar código en
-> `backend/src/modules/{auth,memberships,invitations}/**` o cualquier código
+> `backend/src/{auth,memberships,invitations}/**` o cualquier código
 > que toque JWT / refresh / impersonation / `tenantId` / guards de permisos.
 >
 > **Regla anti-drift**: si al editar este doc descubrís algo que contradice

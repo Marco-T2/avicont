@@ -11,7 +11,7 @@ Owner: backend-lead
 > ejemplos, tablas de decimales, value objects, justificación regulatoria.
 >
 > **Cuándo leer este doc**: antes de editar código en
-> `backend/src/modules/{asientos,comprobantes,libro-*,periodo-fiscal,cierre-*,plan-cuentas,facturas,ufv,tipo-cambio}/**`
+> `backend/src/{comprobantes,periodos-fiscales,cuentas,configuracion-contable,documentos-fisicos,tipos-documento-fisico,contactos}/**`
 > o `backend/prisma/migrations/**` o `schema.prisma`.
 >
 > **Regla anti-drift**: si al editar este doc descubrís algo que contradice
