@@ -87,8 +87,8 @@ export function DocumentoFisicoForm({
     // Validar con el schema correcto (incluye condicionalidad esTributario).
     const result = schema.safeParse(values);
     if (!result.success) {
-      // Setear errores manualmente
-      result.error.errors.forEach((e) => {
+      // Setear errores manualmente. Zod v4: las issues están en `.issues` (no `.errors`).
+      result.error.issues.forEach((e) => {
         const path = e.path[0];
         if (typeof path === 'string') {
           form.setError(path as keyof DocumentoFisicoFormValues, { message: e.message });

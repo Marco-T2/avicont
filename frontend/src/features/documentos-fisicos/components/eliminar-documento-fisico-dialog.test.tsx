@@ -46,7 +46,7 @@ function setupMutate(overrides: { isPending?: boolean; mutate?: ReturnType<typeo
   mockUseEliminarDocumentoFisico.mockReturnValue({
     mutate,
     isPending: overrides.isPending ?? false,
-  } as ReturnType<typeof useEliminarDocumentoFisico>);
+  } as unknown as ReturnType<typeof useEliminarDocumentoFisico>);
   return { mutate };
 }
 

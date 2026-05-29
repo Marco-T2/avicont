@@ -89,7 +89,7 @@ function setupMocks(tipos: TipoDocumentoFisico[] = [TIPO_TRIBUTARIO, TIPO_NO_TRI
   mockUseContactos.mockReturnValue({
     data: { items: [], total: 0, page: 1, pageSize: 50 },
     isLoading: false,
-  } as ReturnType<typeof useContactos>);
+  } as unknown as ReturnType<typeof useContactos>);
 }
 
 describe('DocumentoFisicoForm', () => {
