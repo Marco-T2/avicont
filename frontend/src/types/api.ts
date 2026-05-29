@@ -381,6 +381,54 @@ export interface ListarContactosParams {
 }
 
 // ============================================================
+// Tipos de documento físico
+// ============================================================
+
+// Espejo de TipoDocumentoFisicoResponseDto en
+// backend/src/tipos-documento-fisico/dto/tipo-documento-fisico-response.dto.ts.
+export interface TipoDocumentoFisico {
+  id: string;
+  nombre: string;
+  codigo: string;
+  esTributario: boolean;
+  activo: boolean;
+  tiposComprobanteAplicables: TipoComprobante[];
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TipoDocumentoFisicoListResponse {
+  items: TipoDocumentoFisico[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateTipoDocumentoFisicoRequest {
+  nombre: string;
+  codigo: string;
+  esTributario: boolean;
+  tiposComprobanteAplicables: TipoComprobante[];
+}
+
+// codigo NO va (inmutable post-creación). activo puede ir en el mismo PATCH.
+export interface UpdateTipoDocumentoFisicoRequest {
+  nombre?: string;
+  esTributario?: boolean;
+  tiposComprobanteAplicables?: TipoComprobante[];
+  activo?: boolean;
+}
+
+// activo sin param → backend default solo activos; false → inactivos; 'all' → todos.
+export interface ListarTiposDocumentoFisicoParams {
+  q?: string;
+  activo?: boolean | 'all';
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
 // Impersonation
 // ============================================================
 
