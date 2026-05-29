@@ -4,6 +4,7 @@
 > Fase: spec
 > Slice: 2 de Fase 1.4
 > Proyecto: avicont
+> Última edición: 2026-05-29 (delta: documento-fisico-asociacion-post-contabilizado — REQ-A-02/03/06/12/13/14 y REQ-P-09/10)
 
 ---
 
@@ -81,15 +82,19 @@
 
 - **REQ-A-01**: El sistema DEBE permitir asociar un `Comprobante` a 0..N `DocumentoFisico` mediante `POST /api/comprobantes/:comprobanteId/documentos-fisicos` con body `{ documentoFisicoIds: string[] }`. La operación es aditiva: no reemplaza asociaciones previas, solo agrega las nuevas.
 
-- **REQ-A-02**: El sistema DEBE permitir desasociar un `DocumentoFisico` de un `Comprobante` mediante `DELETE /api/comprobantes/:comprobanteId/documentos-fisicos/:documentoFisicoId`, siempre que el comprobante esté en estado BORRADOR.
+- **REQ-A-02**: El sistema DEBE permitir desasociar un `DocumentoFisico` de un `Comprobante` mediante `DELETE /api/comprobantes/:comprobanteId/documentos-fisicos/:documentoFisicoId` cuando:
+  - el comprobante está en estado **BORRADOR** (comportamiento base, sin blindaje extra), **O**
+  - el comprobante está en estado **CONTABILIZADO** y su `PeriodoFiscal` está **ABIERTO** o tiene una `PeriodoFiscalReopening` activa. En este caso el sistema DEBE aplicar el blindaje de §4.3 (ver REQ-A-12 y REQ-P-10).
 
-- **REQ-A-03**: El sistema NO DEBE permitir desasociar un `DocumentoFisico` de un `Comprobante` que ya esté CONTABILIZADO. Retorna `COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO`.
+- **REQ-A-03**: El sistema NO DEBE permitir desasociar un `DocumentoFisico` de un `Comprobante` CONTABILIZADO cuyo período esté cerrado y sin reapertura activa. La corrección solo es posible vía el flujo de reapertura (§4.4). Un comprobante ANULADO no admite asociar/desasociar (terminal, §4.7) → retorna `COMPROBANTE_ANULADO_NO_EDITABLE` (409).
+
+  > **Nota de implementación**: el enum `PeriodoFiscalStatus` tiene SOLO `ABIERTO | CERRADO` (no existe `BLOQUEADO` a nivel período). Cerrar un período transiciona sus comprobantes CONTABILIZADO a estado **BLOQUEADO** (§4.1 CLAUDE.md). Por tanto, en la práctica un comprobante cuyo período fue cerrado ya NO está en estado CONTABILIZADO: `validarEstadoParaEditar` lo rechaza ANTES de evaluar el período con `COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO` (409). El code `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO` queda como defensa in-TX para el caso (no alcanzable por el flujo normal) en que el comprobante siga CONTABILIZADO pero su período figure CERRADO.
 
 - **REQ-A-04**: El sistema DEBE garantizar que un `DocumentoFisico` esté asociado a lo sumo a UN `Comprobante` en estado CONTABILIZADO simultáneamente. Constraint UNIQUE parcial a nivel BD: `UNIQUE(documentoFisicoId) WHERE comprobanteEstado = 'CONTABILIZADO'`. Implementado también como validación pre-INSERT en el servicio (defense in depth).
 
 - **REQ-A-05**: El sistema DEBE permitir que un `DocumentoFisico` esté asociado a múltiples `Comprobante` en estado BORRADOR simultáneamente. El constraint parcial de REQ-A-04 no aplica a BORRADOR.
 
-- **REQ-A-06**: El sistema DEBE validar al contabilizar un `Comprobante` (transición BORRADOR → CONTABILIZADO) que cada `DocumentoFisico` asociado: (a) existe y pertenece al tenant, (b) no está ya asociado a otro `Comprobante` CONTABILIZADO distinto. Esta validación corre dentro de la transacción del contabilizar, consumiendo `DOCUMENTOS_FISICOS_READER_PORT.idsYaAsociadosAContabilizado(tenantId, ids[], comprobanteId, tx)` (pre-validación UX; el UNIQUE PARCIAL de BD es la última línea, defense in depth).
+- **REQ-A-06**: El sistema DEBE validar que un `DocumentoFisico` no quede asociado a más de un `Comprobante` CONTABILIZADO **tanto al contabilizar (BORRADOR → CONTABILIZADO) como al asociar un documento directamente a un comprobante CONTABILIZADO**. Ambos flujos consumen la misma fuente de verdad: `DOCUMENTOS_FISICOS_READER_PORT.idsYaAsociadosAContabilizado(tenantId, ids[], comprobanteId, tx)` (pre-validación UX). El UNIQUE PARCIAL de BD `comprobante_documento_fisico_unique_contabilizado` es la última línea de defensa (defense in depth, §4.8). Al detectar conflicto, retorna `DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO`.
 
 - **REQ-A-07**: Al anular un `Comprobante` (estado → ANULADO), el sistema DEBE eliminar todas las filas de `ComprobanteDocumentoFisico` vinculadas a ese comprobante en la misma transacción del anular. Los `DocumentoFisico` referenciados NO se eliminan — quedan disponibles para re-asociar.
 
@@ -100,6 +105,20 @@
 - **REQ-A-10**: El sistema NO DEBE permitir asociar un `DocumentoFisico` de un tenant distinto al `Comprobante`. La pertenencia al tenant se valida antes del INSERT.
 
 - **REQ-A-11**: Al asociar un `DocumentoFisico` a un `Comprobante`, el sistema DEBE verificar que `TipoDocumentoFisico.tiposComprobanteAplicables` del documento incluye el `tipo` del comprobante. Si no está incluido, rechazar con **422** `TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE`. El service obtiene `tiposComprobanteAplicables` desde el shape `DocumentoFisicoParaAsociar` devuelto por `DOCUMENTOS_FISICOS_READER_PORT.obtenerBatchParaAsociar` (sin segundo query adicional).
+
+- **REQ-A-12**: El sistema DEBE permitir asociar uno o más `DocumentoFisico` a un `Comprobante` CONTABILIZADO mediante `POST /api/comprobantes/:comprobanteId/documentos-fisicos` cuando su `PeriodoFiscal` esté ABIERTO o tenga una `PeriodoFiscalReopening` activa, aplicando el blindaje de §4.3:
+  1. Verificar permiso `contabilidad.asientos.edit-posted` desde el service (REQ-P-09).
+  2. Ejecutar dentro de `auditedTx.run` con `{ userId, reaperturaId? }` para que el contexto de auditoría se propague (`fueDuranteReapertura`).
+  3. Resolver la reapertura activa del período del comprobante ANTES de abrir la TX (igual patrón que `editarContabilizado`/`anular`).
+  4. Dentro de la TX, validar el período del comprobante: si su estado no es ABIERTO y no hay reapertura → rechazar con `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO` (REQ-A-03).
+  5. Re-validar unicidad (REQ-A-06) antes de insertar.
+  6. Persistir cada asociación nueva con `comprobanteEstado = CONTABILIZADO` (REQ-A-13). La operación sigue siendo **aditiva e idempotente** (re-asociar un par existente es no-op).
+
+  El comportamiento para comprobante en BORRADOR NO cambia (sin `edit-posted`, sin auditedTx, sin chequeo de período). El número correlativo del comprobante es inmutable y no se toca (§4.9).
+
+- **REQ-A-13**: El sistema DEBE persistir el campo cache `ComprobanteDocumentoFisico.comprobanteEstado` con el estado **real** del comprobante al momento de asociar: `BORRADOR` si el comprobante está en borrador, `CONTABILIZADO` si está contabilizado. NO DEBE hardcodearse a `BORRADOR`. Este cache es la columna sobre la que opera el índice parcial `comprobante_documento_fisico_unique_contabilizado` (§11.6); un valor incorrecto rompe el invariante de unicidad o lo aplica de más.
+
+- **REQ-A-14**: Cuando se asocia o desasocia un documento físico a/de un comprobante CONTABILIZADO, la operación DEBE correr dentro de `auditedTx.run` de modo que el contexto de auditoría (actor `userId`, `reaperturaId`, `fueDuranteReapertura`) quede establecido en la sesión Postgres durante la TX. NOTA: los triggers actuales (`trg_audit_comprobantes`, `trg_audit_lineas_comprobante`) NO cubren la tabla `comprobante_documento_fisico`; la decisión sobre si se requiere un trigger adicional para esa tabla se toma explícitamente (decisión D8 opción A en este change: solo `auditedTx`, sin trigger adicional). El requisito mínimo es que el actor quede correctamente establecido en la TX (no `NULL`).
 
 ### 2.4 Multi-tenancy y seguridad
 
@@ -121,8 +140,8 @@
 - **REQ-P-06**: `POST /api/documentos-fisicos` requiere permiso `contabilidad.documentos-fisicos.create`.
 - **REQ-P-07**: `PATCH /api/documentos-fisicos/:id` requiere permiso `contabilidad.documentos-fisicos.update`.
 - **REQ-P-08**: `DELETE /api/documentos-fisicos/:id` requiere permiso `contabilidad.documentos-fisicos.delete`.
-- **REQ-P-09**: `POST /api/comprobantes/:id/documentos-fisicos` requiere permiso `contabilidad.documentos-fisicos.update` (asociar es una operación del documento) Y `contabilidad.asientos.update` (modificar el borrador del comprobante).
-- **REQ-P-10**: `DELETE /api/comprobantes/:id/documentos-fisicos/:docId` requiere permiso `contabilidad.documentos-fisicos.update` Y `contabilidad.asientos.update`.
+- **REQ-P-09**: `POST /api/comprobantes/:id/documentos-fisicos` requiere permiso `contabilidad.documentos-fisicos.update` (asociar es una operación del documento) Y `contabilidad.asientos.update` (modificar el comprobante). **Adicionalmente**, cuando el comprobante destino está CONTABILIZADO, el sistema DEBE exigir `contabilidad.asientos.edit-posted`, verificado desde el service (igual que `editarContabilizado`, §3.7). Si falta, retorna `SIN_PERMISO_EDITAR_CONTABILIZADO` (403). Para un comprobante en BORRADOR no se exige `edit-posted`.
+- **REQ-P-10**: `DELETE /api/comprobantes/:id/documentos-fisicos/:docId` requiere permiso `contabilidad.documentos-fisicos.update` Y `contabilidad.asientos.update`. **Adicionalmente**, cuando el comprobante está CONTABILIZADO, el sistema DEBE exigir `contabilidad.asientos.edit-posted` verificado desde el service. Para BORRADOR no se exige.
 - **REQ-P-11**: `GET /api/comprobantes/:id/documentos-fisicos` requiere permiso `contabilidad.documentos-fisicos.read`.
 - **REQ-P-12**: El catálogo `common/permisos/catalogo.ts` DEBE incluir los 8 permisos nuevos de este slice MÁS los 4 permisos retroactivos de contactos (`contabilidad.contactos.{read,create,update,delete}`).
 
@@ -368,6 +387,84 @@
 - **When** CONTADOR envía `POST /api/comprobantes/comp-traspaso/documentos-fisicos` con `{ documentoFisicoIds: ["doc-interno"] }`
 - **Then** respuesta **200 OK** — la asociación se crea exitosamente (TRASPASO está en la lista)
 
+#### Asociar/desasociar a CONTABILIZADO (REQ-A-12 a REQ-A-14, delta 2026-05-29)
+
+**E-A-12 (+): Asociar documento libre a CONTABILIZADO de período abierto con permiso**
+- **Given** `comp-cont` está CONTABILIZADO en `acme`, su período `P` está ABIERTO
+- **And** el usuario tiene `documentos-fisicos.update` + `asientos.update` + `asientos.edit-posted`
+- **And** `doc-libre` existe en `acme`, tipo compatible con el tipo del comprobante, no asociado a ningún CONTABILIZADO
+- **When** `POST /api/comprobantes/comp-cont/documentos-fisicos` con `{ documentoFisicoIds: ["doc-libre"] }`
+- **Then** **200 OK** con la lista actualizada
+- **And** existe fila `ComprobanteDocumentoFisico(comp-cont, doc-libre)` con `comprobanteEstado = CONTABILIZADO`
+- **And** la TX corrió bajo `auditedTx` con el `userId` correcto
+
+**E-A-13 (−): Asociar a CONTABILIZADO sin permiso `edit-posted`**
+- **Given** `comp-cont` CONTABILIZADO, período ABIERTO
+- **And** el usuario tiene `documentos-fisicos.update` + `asientos.update` pero NO `asientos.edit-posted`
+- **When** `POST .../documentos-fisicos`
+- **Then** **403 Forbidden**, `SIN_PERMISO_EDITAR_CONTABILIZADO`
+
+**E-A-14 (−): Asociar a CONTABILIZADO de período CERRADO**
+- **Given** `comp-cont` CONTABILIZADO, su período está CERRADO, sin reapertura activa
+- **And** el usuario tiene todos los permisos
+- **When** `POST .../documentos-fisicos`
+- **Then** **409 Conflict**, `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO`
+
+**E-A-15 (−): Asociar a CONTABILIZADO de período BLOQUEADO**
+- **Given** `comp-cont` CONTABILIZADO, su período está BLOQUEADO, sin reapertura
+- **When** `POST .../documentos-fisicos` con todos los permisos
+- **Then** **409 Conflict**, `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO`
+
+**E-A-16 (+): Asociar a CONTABILIZADO de período cerrado pero con reapertura activa**
+- **Given** `comp-cont` CONTABILIZADO, su período tiene una `PeriodoFiscalReopening` ACTIVA
+- **And** el usuario tiene todos los permisos
+- **When** `POST .../documentos-fisicos` con `{ documentoFisicoIds: ["doc-libre"] }`
+- **Then** **200 OK**
+- **And** la TX corrió con `reaperturaId` propagado (audit context `fueDuranteReapertura = true`)
+
+**E-A-17 (−): Asociar a CONTABILIZADO un documento ya contabilizado en OTRO comprobante**
+- **Given** `doc-1` ya está asociado a `comp-A` CONTABILIZADO
+- **And** `comp-B` está CONTABILIZADO en período abierto, usuario con permisos
+- **When** `POST /api/comprobantes/comp-B/documentos-fisicos` con `{ documentoFisicoIds: ["doc-1"] }`
+- **Then** **409/422** `DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO`, `details.comprobanteContabilizadoId = "comp-A"`
+- **And** NO se inserta fila nueva; el índice parcial no llegó a violarse (pre-validación lo atrapó)
+
+**E-A-18 (−): Asociar a comprobante ANULADO**
+- **Given** `comp-anulado` está CONTABILIZADO con `anulado = true`
+- **When** `POST .../documentos-fisicos` con permisos
+- **Then** **409 Conflict**, `COMPROBANTE_ANULADO_NO_EDITABLE`
+
+**E-A-19 (+): Asociar a BORRADOR sigue sin exigir `edit-posted` (retrocompat)**
+- **Given** `comp-borrador` BORRADOR, usuario con `documentos-fisicos.update` + `asientos.update` SIN `edit-posted`
+- **When** `POST .../documentos-fisicos` con `{ documentoFisicoIds: ["doc-libre"] }`
+- **Then** **200 OK** — comportamiento idéntico al actual; fila con `comprobanteEstado = BORRADOR`
+
+**E-A-20 (+): Idempotencia en CONTABILIZADO**
+- **Given** `doc-1` ya asociado a `comp-cont` (CONTABILIZADO, período abierto)
+- **When** `POST .../documentos-fisicos` con `{ documentoFisicoIds: ["doc-1"] }` de nuevo
+- **Then** **200 OK**, no-op (no se duplica la fila)
+
+**E-A-21 (+): Desasociar de CONTABILIZADO de período abierto con permiso**
+- **Given** `doc-1` asociado a `comp-cont` (CONTABILIZADO, período ABIERTO), usuario con `edit-posted`
+- **When** `DELETE /api/comprobantes/comp-cont/documentos-fisicos/doc-1`
+- **Then** **204 No Content**
+- **And** no existe la fila de asociación; `doc-1` persiste y queda libre para re-asociar
+
+**E-A-22 (−): Desasociar de CONTABILIZADO sin `edit-posted`**
+- **Given** `comp-cont` CONTABILIZADO período abierto, usuario sin `edit-posted`
+- **When** `DELETE .../documentos-fisicos/doc-1`
+- **Then** **403 Forbidden**, `SIN_PERMISO_EDITAR_CONTABILIZADO`
+
+**E-A-23 (−): Desasociar de CONTABILIZADO de período CERRADO**
+- **Given** `comp-cont` CONTABILIZADO, período CERRADO sin reapertura, usuario con permisos
+- **When** `DELETE .../documentos-fisicos/doc-1`
+- **Then** **409 Conflict**, `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO`
+
+**E-A-24 (+): Desasociar de BORRADOR sigue igual (retrocompat, REQ-A-02 base)**
+- **Given** `doc-1` asociado a `comp-borrador` (BORRADOR)
+- **When** `DELETE .../documentos-fisicos/doc-1`
+- **Then** **204 No Content** — sin `edit-posted`, sin auditedTx
+
 ### 3.4 Multi-tenancy
 
 **E-MT-01: Query de listado nunca retorna registros de otro tenant**
@@ -500,8 +597,15 @@ Todos extienden `DomainError`. El `GlobalExceptionFilter` los mapea al formato e
 | Code | HTTP | Mensaje | Cuándo |
 |------|------|---------|--------|
 | `DOCUMENTO_FISICO_YA_CONTABILIZADO_EN_OTRO_COMPROBANTE` | 409 | El documento físico '{numero}' ya está vinculado a otro comprobante contabilizado | Al contabilizar: UNIQUE parcial violation en ComprobanteDocumentoFisico |
-| `COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO` | 409 | No se puede desasociar un documento de un comprobante contabilizado | DELETE en endpoint de asociación cuando comprobante = CONTABILIZADO |
+| `COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO` | 409 | No se puede desasociar un documento de un comprobante contabilizado | DEPRECATED en la rama de período abierto — sigue vivo para período cerrado/anulado vía los codes nuevos. Ya no se lanza cuando el comprobante está CONTABILIZADO con período abierto. |
+| `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO` | 409 | No se puede modificar las asociaciones de documentos del comprobante porque su período está cerrado o bloqueado | Asociar/desasociar en CONTABILIZADO con período CERRADO/BLOQUEADO y sin reapertura activa |
 | `TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE` | 422 | El tipo de documento '{nombre}' no es aplicable a comprobantes de tipo {tipo}. Tipos permitidos: {lista} | Al asociar: `tiposComprobanteAplicables` del tipo no incluye el `tipo` del comprobante (REQ-A-11) |
+
+**Reusos (sin code nuevo):**
+- `SIN_PERMISO_EDITAR_CONTABILIZADO` (403) — falta `edit-posted` al tocar asociación de un CONTABILIZADO.
+- `DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO` (409/422 según ubicación) — documento ya en otro CONTABILIZADO.
+- `COMPROBANTE_ANULADO_NO_EDITABLE` (409) — comprobante anulado, terminal.
+- `COMPROBANTE_NO_ENCONTRADO` (404), `DOCUMENTO_FISICO_REFERENCIADO_NO_EXISTE` (422), `TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE` (422) — sin cambios.
 
 ### 4.4 Errores en módulo `comprobantes` (al contabilizar)
 
@@ -540,8 +644,8 @@ Viven en `comprobantes/domain/comprobante-errors.ts`:
 | Método | Path | Permiso requerido | Body | Response |
 |--------|------|-------------------|------|---------|
 | `GET` | `/api/comprobantes/:comprobanteId/documentos-fisicos` | `contabilidad.documentos-fisicos.read` | — | `DocumentoFisicoAsociadoDto[]` |
-| `POST` | `/api/comprobantes/:comprobanteId/documentos-fisicos` | `contabilidad.documentos-fisicos.update` + `contabilidad.asientos.update` | `{ documentoFisicoIds: string[] }` | `DocumentoFisicoAsociadoDto[]` (200); puede retornar 422 con `TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE`, `DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO` (si hay tipo mixto), o cualquier error de REQ-A-11 |
-| `DELETE` | `/api/comprobantes/:comprobanteId/documentos-fisicos/:documentoFisicoId` | `contabilidad.documentos-fisicos.update` + `contabilidad.asientos.update` | — | 204 No Content |
+| `POST` | `/api/comprobantes/:comprobanteId/documentos-fisicos` | `contabilidad.documentos-fisicos.update` + `contabilidad.asientos.update` (endpoint); + `contabilidad.asientos.edit-posted` verificado en service cuando comprobante = CONTABILIZADO (REQ-P-09) | `{ documentoFisicoIds: string[] }` | `DocumentoFisicoAsociadoDto[]` (200); puede retornar 403 `SIN_PERMISO_EDITAR_CONTABILIZADO`, 409 `COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO`, 422 con `TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE`, o cualquier error de REQ-A-11/A-12 |
+| `DELETE` | `/api/comprobantes/:comprobanteId/documentos-fisicos/:documentoFisicoId` | `contabilidad.documentos-fisicos.update` + `contabilidad.asientos.update` (endpoint); + `contabilidad.asientos.edit-posted` verificado en service cuando comprobante = CONTABILIZADO (REQ-P-10) | — | 204 No Content |
 
 ### 5.4 Filtros de GET listado `/api/documentos-fisicos`
 
