@@ -22,6 +22,7 @@ import type { RbacService } from '@/rbac/rbac.service';
 
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { ComprobantesService } from './comprobantes.service';
+import { ComprobanteDocumentoAsociacionPeriodoCerradoError } from './domain/comprobante-errors';
 import type {
   ComprobanteConLineas,
   ComprobanteRepositoryPort,
@@ -1857,10 +1858,40 @@ describe('ComprobantesService', () => {
       };
     }
 
+    // Helper: comprobante CONTABILIZADO con período ABIERTO listo para asociar.
+    function setupContabilizadoAbierto(overrides?: {
+      asociacionRepo?: Partial<MockAsociacionRepo>;
+      periodos?: Partial<MockPeriodos>;
+      docsReader?: Partial<MockDocsReader>;
+      rbac?: Partial<MockRbac>;
+    }) {
+      const ctx = buildService(overrides);
+      const comp = comprobanteFactory({
+        id: 'comp-cont',
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: 'D2604-000042',
+        anulado: false,
+        periodoFiscalId: PERIODO_ID,
+        tipo: TipoComprobante.DIARIO,
+      });
+      ctx.repo.findById.mockResolvedValue(comp);
+      ctx.periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      ctx.docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([[DOC_1, docParaAsociarFactory({ id: DOC_1 })]]),
+      );
+      ctx.asociacionRepo.asociar.mockImplementation(async (_t, input) =>
+        asociacionRowFactory(input.documentoFisicoId),
+      );
+      return ctx;
+    }
+
     it('ids vacíos → no-op, no consulta nada', async () => {
       const { service, repo, docsReader, asociacionRepo } = buildService();
 
-      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', []);
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-borrador', []);
 
       expect(r).toEqual([]);
       expect(repo.findById).not.toHaveBeenCalled();
@@ -1872,22 +1903,11 @@ describe('ComprobantesService', () => {
       const { service, repo } = buildService();
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.asociarDocumentos(TENANT_ID, 'comp-x', [DOC_1])).rejects.toMatchObject({
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-x', [DOC_1]),
+      ).rejects.toMatchObject({
         code: 'COMPROBANTE_NO_ENCONTRADO',
       });
-    });
-
-    it('lanza ComprobanteNoEsBorradorError si el comprobante no está en BORRADOR', async () => {
-      const { service, repo, asociacionRepo } = buildService();
-      repo.findById.mockResolvedValue(
-        comprobanteFactory({ id: 'comp-1', estado: EstadoComprobante.CONTABILIZADO }),
-      );
-
-      await expect(service.asociarDocumentos(TENANT_ID, 'comp-1', [DOC_1])).rejects.toMatchObject({
-        code: 'COMPROBANTE_NO_ES_BORRADOR',
-        details: { comprobanteId: 'comp-1', estadoActual: EstadoComprobante.CONTABILIZADO },
-      });
-      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
     });
 
     it('lanza DocumentoFisicoReferenciadoNoExisteError si un id falta del Map (cross-tenant) — E-A-07', async () => {
@@ -1899,7 +1919,7 @@ describe('ComprobantesService', () => {
       docsReader.obtenerBatchParaAsociar.mockResolvedValue(new Map());
 
       await expect(
-        service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1]),
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-borrador', [DOC_1]),
       ).rejects.toMatchObject({
         code: 'COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE',
         details: { documentoFisicoId: DOC_1 },
@@ -1928,7 +1948,7 @@ describe('ComprobantesService', () => {
       );
 
       await expect(
-        service.asociarDocumentos(TENANT_ID, 'comp-ingreso', [DOC_1]),
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-ingreso', [DOC_1]),
       ).rejects.toMatchObject({
         code: 'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE',
         details: {
@@ -1959,7 +1979,7 @@ describe('ComprobantesService', () => {
       );
       asociacionRepo.asociar.mockResolvedValue(asociacionRowFactory(DOC_1));
 
-      const r = await service.asociarDocumentos(TENANT_ID, 'comp-ingreso', [DOC_1]);
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-ingreso', [DOC_1]);
 
       expect(r).toHaveLength(1);
       expect(asociacionRepo.asociar).toHaveBeenCalledWith(
@@ -1988,7 +2008,10 @@ describe('ComprobantesService', () => {
         asociacionRowFactory(input.documentoFisicoId),
       );
 
-      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1, DOC_2]);
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-borrador', [
+        DOC_1,
+        DOC_2,
+      ]);
 
       expect(r).toHaveLength(2);
       expect(asociacionRepo.asociar).toHaveBeenCalledTimes(2);
@@ -2011,7 +2034,10 @@ describe('ComprobantesService', () => {
         asociacionRowFactory(input.documentoFisicoId),
       );
 
-      const r = await service.asociarDocumentos(TENANT_ID, 'comp-borrador', [DOC_1, DOC_2]);
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-borrador', [
+        DOC_1,
+        DOC_2,
+      ]);
 
       expect(r).toHaveLength(1);
       expect(asociacionRepo.asociar).toHaveBeenCalledTimes(1);
@@ -2021,42 +2047,251 @@ describe('ComprobantesService', () => {
         expect.any(Object),
       );
     });
+
+    it('rama BORRADOR no exige edit-posted ni corre auditedTx — E-A-19', async () => {
+      const { service, repo, docsReader, asociacionRepo, rbac, auditedRunner } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-borrador', tipo: TipoComprobante.DIARIO }),
+      );
+      docsReader.obtenerBatchParaAsociar.mockResolvedValue(
+        new Map([[DOC_1, docParaAsociarFactory({ id: DOC_1 })]]),
+      );
+      asociacionRepo.asociar.mockResolvedValue(asociacionRowFactory(DOC_1));
+
+      await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-borrador', [DOC_1]);
+
+      expect(rbac.hasPermission).not.toHaveBeenCalled();
+      expect(auditedRunner.run).not.toHaveBeenCalled();
+    });
+
+    // ----------------------------------------------------------------
+    // Rama CONTABILIZADO (CLAUDE.md §4.3)
+    // ----------------------------------------------------------------
+
+    it('asocia a un CONTABILIZADO de período abierto con permiso — E-A-12', async () => {
+      const { service, asociacionRepo, auditedRunner } = setupContabilizadoAbierto();
+
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]);
+
+      expect(r).toHaveLength(1);
+      // comprobanteEstado del cache debe reflejar CONTABILIZADO (REQ-A-13).
+      expect(asociacionRepo.asociar).toHaveBeenCalledWith(
+        TENANT_ID,
+        {
+          comprobanteId: 'comp-cont',
+          documentoFisicoId: DOC_1,
+          comprobanteEstado: EstadoComprobante.CONTABILIZADO,
+        },
+        expect.any(Object),
+      );
+      // Corrió bajo auditedTx con el userId correcto.
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID }),
+        expect.any(Function),
+      );
+    });
+
+    it('rechaza asociar a CONTABILIZADO sin edit-posted — E-A-13', async () => {
+      const { service, asociacionRepo, auditedRunner } = setupContabilizadoAbierto({
+        rbac: { hasPermission: jest.fn().mockResolvedValue(false) },
+      });
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]),
+      ).rejects.toMatchObject({ code: 'MISSING_PERMISSION_EDIT_POSTED' });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+      expect(auditedRunner.run).not.toHaveBeenCalled();
+    });
+
+    it('rechaza asociar a CONTABILIZADO de período CERRADO sin reapertura — E-A-14', async () => {
+      const { service, periodos, asociacionRepo } = setupContabilizadoAbierto();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]),
+      ).rejects.toBeInstanceOf(ComprobanteDocumentoAsociacionPeriodoCerradoError);
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('rechaza asociar cuando no existe período para la fecha — E-A-15', async () => {
+      const { service, periodos, asociacionRepo } = setupContabilizadoAbierto();
+      periodos.obtenerPorFecha.mockResolvedValue(null);
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_GESTION_NO_ABIERTA' });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('asocia a CONTABILIZADO de período cerrado con reapertura activa y propaga reaperturaId — E-A-16', async () => {
+      const { service, periodos, asociacionRepo, auditedRunner } = setupContabilizadoAbierto();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      periodos.obtenerReaperturaActiva.mockResolvedValue({
+        id: 'reapertura-1',
+        reopenedAt: new Date('2026-04-22T10:00:00Z'),
+      });
+
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]);
+
+      expect(r).toHaveLength(1);
+      expect(asociacionRepo.asociar).toHaveBeenCalled();
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID, reaperturaId: 'reapertura-1' }),
+        expect.any(Function),
+      );
+    });
+
+    it('rechaza asociar a CONTABILIZADO un documento ya en OTRO contabilizado — E-A-17', async () => {
+      const { service, docsReader, asociacionRepo } = setupContabilizadoAbierto();
+      docsReader.idsYaAsociadosAContabilizado.mockResolvedValue([DOC_1]);
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]),
+      ).rejects.toMatchObject({ code: 'DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO' });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('rechaza asociar a un comprobante ANULADO — E-A-18', async () => {
+      const { service, repo, asociacionRepo } = setupContabilizadoAbierto();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({
+          id: 'comp-cont',
+          estado: EstadoComprobante.CONTABILIZADO,
+          anulado: true,
+          periodoFiscalId: PERIODO_ID,
+        }),
+      );
+
+      await expect(
+        service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULADO_NO_EDITABLE' });
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
+
+    it('idempotencia en CONTABILIZADO: no re-inserta un par existente — E-A-20', async () => {
+      const { service, asociacionRepo } = setupContabilizadoAbierto();
+      asociacionRepo.listarPorComprobante.mockResolvedValue([asociacionRowFactory(DOC_1)]);
+
+      const r = await service.asociarDocumentos(TENANT_ID, USER_ID, 'comp-cont', [DOC_1]);
+
+      expect(r).toHaveLength(0);
+      expect(asociacionRepo.asociar).not.toHaveBeenCalled();
+    });
   });
 
   describe('desasociarDocumento', () => {
     const DOC_1 = '11111111-1111-4111-a111-111111111111';
 
+    function setupContabilizadoAbierto(overrides?: {
+      asociacionRepo?: Partial<MockAsociacionRepo>;
+      periodos?: Partial<MockPeriodos>;
+      rbac?: Partial<MockRbac>;
+    }) {
+      const ctx = buildService(overrides);
+      ctx.repo.findById.mockResolvedValue(
+        comprobanteFactory({
+          id: 'comp-cont',
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: 'D2604-000042',
+          anulado: false,
+          periodoFiscalId: PERIODO_ID,
+        }),
+      );
+      ctx.periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      return ctx;
+    }
+
     it('lanza ComprobanteNoEncontradoError si el comprobante no existe', async () => {
       const { service, repo } = buildService();
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.desasociarDocumento(TENANT_ID, 'comp-x', DOC_1)).rejects.toMatchObject({
+      await expect(
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-x', DOC_1),
+      ).rejects.toMatchObject({
         code: 'COMPROBANTE_NO_ENCONTRADO',
       });
     });
 
-    it('desasocia de un BORRADOR — E-A-04', async () => {
-      const { service, repo, asociacionRepo } = buildService();
+    it('desasocia de un BORRADOR sin edit-posted ni auditedTx — E-A-04 / E-A-24', async () => {
+      const { service, repo, asociacionRepo, rbac, auditedRunner } = buildService();
       repo.findById.mockResolvedValue(
         comprobanteFactory({ id: 'comp-borrador', estado: EstadoComprobante.BORRADOR }),
       );
 
       await expect(
-        service.desasociarDocumento(TENANT_ID, 'comp-borrador', DOC_1),
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-borrador', DOC_1),
       ).resolves.toBeUndefined();
       expect(asociacionRepo.desasociar).toHaveBeenCalledWith(TENANT_ID, 'comp-borrador', DOC_1);
+      expect(rbac.hasPermission).not.toHaveBeenCalled();
+      expect(auditedRunner.run).not.toHaveBeenCalled();
     });
 
-    it('rechaza desasociar de un CONTABILIZADO — E-A-05', async () => {
-      const { service, repo, asociacionRepo } = buildService();
+    it('desasocia de un CONTABILIZADO de período abierto con permiso — E-A-21', async () => {
+      const { service, asociacionRepo, auditedRunner } = setupContabilizadoAbierto();
+
+      await expect(
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-cont', DOC_1),
+      ).resolves.toBeUndefined();
+      expect(asociacionRepo.desasociar).toHaveBeenCalledWith(
+        TENANT_ID,
+        'comp-cont',
+        DOC_1,
+        expect.any(Object),
+      );
+      expect(auditedRunner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID }),
+        expect.any(Function),
+      );
+    });
+
+    it('rechaza desasociar de CONTABILIZADO sin edit-posted — E-A-22', async () => {
+      const { service, asociacionRepo, auditedRunner } = setupContabilizadoAbierto({
+        rbac: { hasPermission: jest.fn().mockResolvedValue(false) },
+      });
+
+      await expect(
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-cont', DOC_1),
+      ).rejects.toMatchObject({ code: 'MISSING_PERMISSION_EDIT_POSTED' });
+      expect(asociacionRepo.desasociar).not.toHaveBeenCalled();
+      expect(auditedRunner.run).not.toHaveBeenCalled();
+    });
+
+    it('rechaza desasociar de CONTABILIZADO de período CERRADO — E-A-23', async () => {
+      const { service, periodos, asociacionRepo } = setupContabilizadoAbierto();
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+
+      await expect(
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-cont', DOC_1),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO' });
+      expect(asociacionRepo.desasociar).not.toHaveBeenCalled();
+    });
+
+    it('rechaza desasociar de un comprobante ANULADO', async () => {
+      const { service, repo, asociacionRepo } = setupContabilizadoAbierto();
       repo.findById.mockResolvedValue(
-        comprobanteFactory({ id: 'comp-c', estado: EstadoComprobante.CONTABILIZADO }),
+        comprobanteFactory({
+          id: 'comp-cont',
+          estado: EstadoComprobante.CONTABILIZADO,
+          anulado: true,
+          periodoFiscalId: PERIODO_ID,
+        }),
       );
 
-      await expect(service.desasociarDocumento(TENANT_ID, 'comp-c', DOC_1)).rejects.toMatchObject({
-        code: 'COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO',
-        details: { comprobanteId: 'comp-c', documentoFisicoId: DOC_1 },
-      });
+      await expect(
+        service.desasociarDocumento(TENANT_ID, USER_ID, 'comp-cont', DOC_1),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_ANULADO_NO_EDITABLE' });
       expect(asociacionRepo.desasociar).not.toHaveBeenCalled();
     });
   });

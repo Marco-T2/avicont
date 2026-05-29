@@ -163,9 +163,15 @@ export class ComprobanteAnuladoNoEditableError extends ConflictError {
 }
 
 /**
- * Se levanta al asociar/desasociar documentos físicos a un comprobante que
- * NO está en BORRADOR. Asociar post-CONTABILIZADO viola la inmutabilidad
- * (CLAUDE.md §4.3). Cubre design §4.6 / REQ-A-02.
+ * @deprecated Modelo viejo (CONTABILIZADO = inmutable total). Desde el change
+ * `documento-fisico-asociacion-post-contabilizado` (§4.3), asociar a un
+ * CONTABILIZADO de período abierto está permitido; el rechazo por estado no
+ * editable usa `ComprobanteEstadoNoEditableContabilizadoError` (BLOQUEADO) o
+ * `ComprobanteAnuladoNoEditableError` (anulado). Ya no se lanza en el flujo de
+ * asociación. Se conserva para no romper importadores/tests heredados.
+ *
+ * Se levantaba al asociar/desasociar documentos físicos a un comprobante que
+ * NO estaba en BORRADOR.
  */
 export class ComprobanteNoEsBorradorError extends ConflictError {
   constructor(comprobanteId: string, estadoActual: string) {
@@ -178,10 +184,16 @@ export class ComprobanteNoEsBorradorError extends ConflictError {
 }
 
 /**
- * Se levanta al intentar desasociar un documento físico de un comprobante
- * CONTABILIZADO. El comprobante ya consumió su numeración y es inmutable;
- * la única vía de corrección es anular + re-crear (CLAUDE.md §4.3).
- * Cubre REQ-A-03 / escenario E-A-05.
+ * @deprecated Modelo viejo. Desde el change
+ * `documento-fisico-asociacion-post-contabilizado` (§4.3), desasociar de un
+ * CONTABILIZADO de período abierto está permitido (con permiso `edit-posted`).
+ * El rechazo por período cerrado/bloqueado usa
+ * `ComprobanteDocumentoAsociacionPeriodoCerradoError` o, si el comprobante quedó
+ * BLOQUEADO por cierre, `ComprobanteEstadoNoEditableContabilizadoError`. Ya no se
+ * lanza en el flujo de asociación. Se conserva para no romper importadores/tests.
+ *
+ * Se levantaba al intentar desasociar un documento físico de un comprobante
+ * CONTABILIZADO bajo la lectura vieja "ya consumió numeración y es inmutable".
  */
 export class ComprobanteDocumentoNoDesasociableContabilizadoError extends ConflictError {
   constructor(comprobanteId: string, documentoFisicoId: string) {
@@ -189,6 +201,30 @@ export class ComprobanteDocumentoNoDesasociableContabilizadoError extends Confli
       'COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO',
       'No se puede desasociar un documento de un comprobante contabilizado',
       { comprobanteId, documentoFisicoId },
+    );
+  }
+}
+
+/**
+ * Se intenta asociar o desasociar un documento físico a/de un comprobante
+ * CONTABILIZADO cuyo período está CERRADO o BLOQUEADO y sin reapertura activa.
+ *
+ * CLAUDE.md §4.3 (edición post-CONTABILIZADO) + §4.4 (period lock): la
+ * asociación de documentos físicos es parte de la superficie editable de un
+ * comprobante CONTABILIZADO; solo se permite con el período ABIERTO o con una
+ * `PeriodoFiscalReopening` activa. La corrección de un período cerrado pasa por
+ * el flujo de reapertura (§4.4 — sin bypass de admin).
+ *
+ * Code distinto a `COMPROBANTE_EDIT_PERIODO_CERRADO` para que el mensaje al
+ * usuario describa la operación de asociación y no la edición de cabecera/líneas.
+ * Code: COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO — 409.
+ */
+export class ComprobanteDocumentoAsociacionPeriodoCerradoError extends ConflictError {
+  constructor(comprobanteId: string, periodoFiscalId: string, periodoStatus: string) {
+    super(
+      'COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO',
+      'No se puede modificar las asociaciones de documentos del comprobante porque su período está cerrado o bloqueado',
+      { comprobanteId, periodoFiscalId, periodoStatus },
     );
   }
 }

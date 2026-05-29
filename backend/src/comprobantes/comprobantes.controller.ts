@@ -177,7 +177,10 @@ export class ComprobantesController {
   @ApiBody({ type: AsociarDocumentosDto })
   @ApiOperation({
     summary:
-      'Asociar uno o más documentos físicos a un comprobante en BORRADOR. Aditiva e idempotente (REQ-A-01).',
+      'Asociar uno o más documentos físicos a un comprobante. Aditiva e idempotente (REQ-A-01). ' +
+      'En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto edita la asociación ' +
+      '(§4.3 CLAUDE.md) — requiere permiso adicional `contabilidad.asientos.edit-posted`. ' +
+      'Rechaza período cerrado/bloqueado y comprobantes anulados.',
   })
   asociarDocumentosFisicos(
     @Req() req: AuthenticatedRequest,
@@ -186,6 +189,7 @@ export class ComprobantesController {
   ) {
     return this.service.asociarDocumentos(
       resolveTenantId(req),
+      req.user.sub,
       comprobanteId,
       dto.documentoFisicoIds,
     );
@@ -198,13 +202,20 @@ export class ComprobantesController {
   @ApiParam({ name: 'documentoFisicoId', format: 'uuid' })
   @ApiOperation({
     summary:
-      'Desasociar un documento físico de un comprobante en BORRADOR. Rechaza si está CONTABILIZADO (REQ-A-02/03).',
+      'Desasociar un documento físico de un comprobante. En BORRADOR no exige permisos extra. ' +
+      'En CONTABILIZADO con período abierto (§4.3 CLAUDE.md) requiere `contabilidad.asientos.edit-posted`. ' +
+      'Rechaza período cerrado/bloqueado y comprobantes anulados (REQ-A-02/03).',
   })
   async desasociarDocumentoFisico(
     @Req() req: AuthenticatedRequest,
     @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
     @Param('documentoFisicoId', new ParseUUIDPipe()) documentoFisicoId: string,
   ): Promise<void> {
-    await this.service.desasociarDocumento(resolveTenantId(req), comprobanteId, documentoFisicoId);
+    await this.service.desasociarDocumento(
+      resolveTenantId(req),
+      req.user.sub,
+      comprobanteId,
+      documentoFisicoId,
+    );
   }
 }
