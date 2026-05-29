@@ -199,6 +199,21 @@ describe('DocumentoFisicoCombobox — filtro disponibleParaAsociar', () => {
 });
 
 describe('DocumentoFisicoCombobox — búsqueda sin resultados', () => {
+  it('con cero documentos compatibles y búsqueda vacía, la opción "Crear nuevo documento" está visible', async () => {
+    // BUG: antes solo aparecía si search.length > 0 — este test debe FALLAR con el código original.
+    mockUseDocumentosFisicos.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+    });
+
+    renderCombobox('EGRESO');
+    await userEvent.click(screen.getByRole('combobox'));
+
+    // SIN tipear nada — el usuario acaba de abrir el picker con cero documentos.
+    // El ítem "Crear nuevo documento" debe estar visible de inmediato.
+    expect(screen.getByText(/crear nuevo documento/i)).toBeInTheDocument();
+  });
+
   it('sin resultados tras búsqueda → muestra opción "Crear nuevo documento"', async () => {
     mockUseDocumentosFisicos.mockReturnValue({
       data: { items: [] },
@@ -208,11 +223,11 @@ describe('DocumentoFisicoCombobox — búsqueda sin resultados', () => {
     renderCombobox('EGRESO');
     await userEvent.click(screen.getByRole('combobox'));
 
-    // Tipar algo para activar la búsqueda y mostrar la opción "Crear nuevo"
+    // Tipar algo para activar la búsqueda — Crear sigue visible
     const input = screen.getByPlaceholderText(/buscar por número/i);
     await userEvent.type(input, 'XYZ-999');
 
-    // Con búsqueda sin resultados aparece el ítem "Crear nuevo documento"
+    // Con búsqueda sin resultados el ítem sigue presente (con el sufijo del search)
     expect(screen.getByText(/crear nuevo documento/i)).toBeInTheDocument();
   });
 });
