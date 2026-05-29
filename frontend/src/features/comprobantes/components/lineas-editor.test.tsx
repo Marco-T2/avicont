@@ -8,6 +8,30 @@ import type { LineaFormValues } from '../types';
 import { LINEA_VACIA } from '../types';
 import { LineasEditor } from './lineas-editor';
 
+// Mock de ContactoCombobox — evita depender de useContactos en estos tests.
+vi.mock('@/components/shared/contacto-combobox', () => ({
+  ContactoCombobox: ({
+    value,
+    onSelect,
+    disabled,
+  }: {
+    value: string | null;
+    onSelect: (id: string | null) => void;
+    disabled?: boolean;
+  }) => (
+    <button
+      type="button"
+      role="combobox"
+      aria-label="Contacto"
+      onClick={() => onSelect('contacto-test-id')}
+      disabled={disabled}
+      data-value={value ?? ''}
+    >
+      {value !== null ? `Contacto: ${value}` : 'Seleccionar contacto…'}
+    </button>
+  ),
+}));
+
 // Mock de CuentaAutocomplete — simplifica el test para que no dependa de useCuentas
 vi.mock('./cuenta-autocomplete', () => ({
   CuentaAutocomplete: ({

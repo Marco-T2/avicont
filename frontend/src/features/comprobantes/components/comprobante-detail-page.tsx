@@ -1,5 +1,5 @@
 import { AlertTriangle, ChevronLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useContactos } from '@/features/contactos/hooks/use-contactos';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
 import { formatearFechaContable } from '../lib/formatear-fecha-contable';
@@ -113,6 +114,32 @@ export function ComprobanteDetailPage(): React.JSX.Element {
   });
   const cuentas = cuentasData?.items ?? [];
   const cuentaPorId = new Map(cuentas.map((c) => [c.id, c]));
+
+  // Cross-feature: contactos para mostrar razonSocial en la columna Contacto read-only.
+  // pageSize 50 = misma convención conservadora que linea-row. Si un tenant supera ese
+  // cap, el fallback muestra el UUID (riesgo conocido y aceptado, igual que cuentas).
+  const { data: contactosData, isLoading: isLoadingContactos } = useContactos({
+    activo: true,
+    pageSize: 50,
+  });
+  const contactos = contactosData?.items ?? [];
+  const contactoPorId = new Map(contactos.map((c) => [c.id, c.razonSocial]));
+
+  // Líneas que requieren contacto y no tienen uno asignado — se pasan al dialog
+  // de contabilizar para mostrar el aviso blando (REQ-CCL-UI-02).
+  // useMemo (no useEffect) — Anti-F-02.
+  const lineasSinContacto = useMemo(
+    () =>
+      (comprobante?.lineas ?? [])
+        .filter((l) => {
+          const cuenta = cuentaPorId.get(l.cuentaId);
+          return cuenta?.requiereContacto === true && !l.contactoId;
+        })
+        .map((l) => l.orden),
+    // cuentaPorId se recrea en cada render — incluyendo cuentas como dep directa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [comprobante?.lineas, cuentas],
+  );
 
   if (isLoading) return <PageSkeleton />;
 
@@ -257,6 +284,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                 <TableRow>
                   <TableHead className="w-8 text-center">#</TableHead>
                   <TableHead>Cuenta</TableHead>
+                  <TableHead>Contacto</TableHead>
                   <TableHead>Moneda</TableHead>
                   <TableHead className="text-right">Debe</TableHead>
                   <TableHead className="text-right">Haber</TableHead>
@@ -270,7 +298,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                 {comprobante.lineas.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="text-center text-sm text-muted-foreground py-6"
                     >
                       Sin líneas
@@ -296,6 +324,22 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                               <span>{cuenta.nombre}</span>
                             </span>
                           );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-xs min-w-[140px]">
+                        {(() => {
+                          if (linea.contactoId === null || linea.contactoId === undefined) {
+                            return <span className="text-muted-foreground">—</span>;
+                          }
+                          if (isLoadingContactos) {
+                            return <Skeleton className="h-4 w-24" />;
+                          }
+                          const razonSocial = contactoPorId.get(linea.contactoId);
+                          if (razonSocial === undefined) {
+                            // Fallback: contacto fuera del pageSize=50 → mostrar UUID.
+                            return <span className="font-mono text-muted-foreground">{linea.contactoId}</span>;
+                          }
+                          return <span>{razonSocial}</span>;
                         })()}
                       </TableCell>
                       <TableCell className="text-xs">{linea.moneda}</TableCell>
@@ -346,6 +390,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
         onOpenChange={setContabilizarOpen}
         comprobanteId={comprobante.id}
         glosa={comprobante.glosa}
+        lineasSinContacto={lineasSinContacto}
       />
 
       <AnularComprobanteSheet

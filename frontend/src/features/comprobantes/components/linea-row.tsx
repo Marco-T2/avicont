@@ -1,13 +1,18 @@
 import { Trash2 } from 'lucide-react';
 import { useFormContext, useFormState } from 'react-hook-form';
 
+import { ContactoCombobox } from '@/components/shared/contacto-combobox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import type { Cuenta } from '@/types/api';
+
 import { CuentaAutocomplete } from './cuenta-autocomplete';
 
 interface LineaRowProps {
   index: number;
+  /** Lista de cuentas disponibles — usada para leer `requiereContacto` de la cuenta elegida. */
+  cuentas: Cuenta[];
   onRemove: () => void;
   isOnlyRow: boolean;
   disabled?: boolean;
@@ -28,6 +33,7 @@ interface LineaRowProps {
  */
 export function LineaRow({
   index,
+  cuentas,
   onRemove,
   isOnlyRow,
   disabled = false,
@@ -43,6 +49,15 @@ export function LineaRow({
   // ser nested y rompe el render.
   type LineaErrorShape = Record<string, { message?: string } | undefined> | undefined;
   const lineaErrors = (errors.lineas as LineaErrorShape[] | undefined)?.[index] as LineaErrorShape;
+
+  // Resolver requiereContacto de la cuenta elegida en esta línea.
+  // Derivado inline: design §Decisión 2 (validación blanda, no Zod required).
+  const cuentaId = watch(`lineas.${index}.cuentaId`) as string;
+  const contactoId = watch(`lineas.${index}.contactoId`) as string | undefined;
+  const cuentaSeleccionada = cuentas.find((c) => c.id === cuentaId);
+  const requiereContacto = cuentaSeleccionada?.requiereContacto ?? false;
+  // El aviso se muestra cuando la cuenta requiere contacto y no hay uno asignado.
+  const contactoFaltante = requiereContacto && (contactoId === undefined || contactoId === '');
 
   return (
     <tr
@@ -103,6 +118,30 @@ export function LineaRow({
           disabled={disabled}
           placeholder="Descripción…"
         />
+      </td>
+
+      {/* Contacto — siempre visible; aviso blando cuando requiereContacto && !contactoId. */}
+      {/* design §Decisión 1 (columna siempre visible) y §Decisión 5 (patrón anti-foco). */}
+      <td className="p-1 min-w-[180px]">
+        <ContactoCombobox
+          value={contactoId ?? null}
+          onSelect={(id) =>
+            setValue(
+              `lineas.${index}.contactoId`,
+              id !== null ? id : undefined,
+              // shouldValidate: false — validación es blanda (design §Decisión 2).
+              { shouldValidate: false },
+            )
+          }
+          disabled={disabled}
+          aria-invalid={contactoFaltante}
+          aria-label="Contacto"
+        />
+        {contactoFaltante && (
+          <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">
+            Contacto requerido
+          </p>
+        )}
       </td>
 
       {/* Botón eliminar */}

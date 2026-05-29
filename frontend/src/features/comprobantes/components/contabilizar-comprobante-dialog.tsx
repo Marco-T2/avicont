@@ -22,6 +22,13 @@ interface ContabilizarComprobanteDialogProps {
   comprobanteId: string;
   /** Glosa del comprobante — se muestra en el diálogo de confirmación. */
   glosa?: string;
+  /**
+   * Números de línea (1-based) que requieren contacto pero no lo tienen.
+   * Si hay al menos uno, se muestra un aviso y se bloquea la contabilización
+   * hasta que el usuario complete los campos. Validación BLANDA — no bloquea
+   * guardar borrador (design §Decisión 2).
+   */
+  lineasSinContacto?: number[];
 }
 
 /**
@@ -34,10 +41,16 @@ export function ContabilizarComprobanteDialog({
   onOpenChange,
   comprobanteId,
   glosa,
+  lineasSinContacto = [],
 }: ContabilizarComprobanteDialogProps): React.JSX.Element {
   const mutation = useContabilizarComprobante(comprobanteId);
 
+  // Guard pre-submit: si hay líneas con contacto faltante, bloquear la mutación.
+  // design §Decisión 2 — validación blanda, no bloquea borrador.
+  const hayLineasSinContacto = lineasSinContacto.length > 0;
+
   function handleConfirm(): void {
+    if (hayLineasSinContacto) return;
     mutation.mutate(undefined as unknown as void, {
       onSuccess: (comprobante: Comprobante) => {
         const numero = comprobante.numero;
@@ -64,6 +77,25 @@ export function ContabilizarComprobanteDialog({
               {glosa !== undefined && glosa !== '' && (
                 <p className="font-medium text-foreground">{glosa}</p>
               )}
+
+              {/* Aviso blando de contacto faltante — REQ-CCL-UI-02. */}
+              {/* design §Decisión 2: no bloquea guardar borrador, pero sí la contabilización. */}
+              {hayLineasSinContacto && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-amber-700 dark:text-amber-400 text-xs space-y-1"
+                >
+                  <p className="font-medium">
+                    Las siguientes líneas requieren un contacto antes de contabilizar:
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {lineasSinContacto.map((n) => (
+                      <li key={n}>Línea {n}: asigná un contacto antes de continuar.</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <p>
                 Al contabilizar se asignará un número correlativo inmutable. El
                 comprobante quedará registrado en el libro diario.
@@ -84,7 +116,7 @@ export function ContabilizarComprobanteDialog({
               e.preventDefault();
               handleConfirm();
             }}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || hayLineasSinContacto}
           >
             {mutation.isPending ? (
               <>
