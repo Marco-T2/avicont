@@ -18,7 +18,7 @@ import {
   DEFAULT_CREATE_VALUES,
   type DocumentoFisicoFormValues,
 } from '../schemas/documento-fisico-form-schema';
-import { ContactoCombobox } from './contacto-combobox';
+import { ContactoCombobox } from '@/components/shared/contacto-combobox';
 
 interface DocumentoFisicoFormProps {
   mode: 'create' | 'edit';

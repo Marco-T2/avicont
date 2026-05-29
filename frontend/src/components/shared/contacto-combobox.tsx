@@ -26,6 +26,10 @@ interface ContactoComboboxProps {
   onSelect: (contactoId: string | null) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Marca el trigger como inválido (aviso blando de contacto faltante). */
+  'aria-invalid'?: boolean;
+  /** Label accesible para el trigger del combobox. */
+  'aria-label'?: string;
 }
 
 /**
@@ -38,6 +42,8 @@ export function ContactoCombobox({
   onSelect,
   disabled = false,
   placeholder = 'Seleccionar contacto…',
+  'aria-invalid': ariaInvalid,
+  'aria-label': ariaLabel,
 }: ContactoComboboxProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -74,10 +80,13 @@ export function ContactoCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-invalid={ariaInvalid}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={cn(
             'w-full justify-between font-normal',
             value === null && 'text-muted-foreground',
+            ariaInvalid === true && 'border-amber-400 dark:border-amber-600',
           )}
         >
           <span className="truncate text-left">{label}</span>

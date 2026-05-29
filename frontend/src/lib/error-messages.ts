@@ -191,8 +191,12 @@ export function mensajeComprobantes(err: unknown): string {
       return conOrden('la cuenta es una cuenta agrupadora. Solo se pueden usar cuentas de detalle.', p.details);
     case 'COMPROBANTE_CUENTA_INACTIVA':
       return conOrden('la cuenta está inactiva.', p.details);
-    case 'COMPROBANTE_CONTACTO_REQUERIDO':
-      return conOrden('esta cuenta exige asociar un contacto. Seleccioná uno.', p.details);
+    case 'COMPROBANTE_CONTACTO_REQUERIDO': {
+      const orden = extraerOrden(p.details);
+      return orden !== null
+        ? `La línea ${orden} requiere un contacto. Asigná uno antes de contabilizar.`
+        : 'Esta línea requiere un contacto. Asigná uno antes de contabilizar.';
+    }
     case 'COMPROBANTE_CONTACTO_NO_EXISTE':
       return conOrden('el contacto referenciado no existe en esta organización.', p.details);
     case 'COMPROBANTE_CONTACTO_INACTIVO':

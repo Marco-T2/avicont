@@ -38,6 +38,7 @@ vi.mock('./comprobante-cabecera-form', () => ({
   ),
 }));
 
+import { crearComprobanteSchema } from '../schemas/crear-comprobante-schema';
 import { useComprobante } from '../hooks/use-comprobante';
 import { EditarComprobantePage } from './editar-comprobante-page';
 
@@ -237,5 +238,41 @@ describe('EditarComprobantePage — loading y error', () => {
     });
     renderEditar('comp-inexistente');
     expect(screen.getByText(/no encontrado|no tenés acceso/i)).toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// W-02 — Guardar BORRADOR no bloquea cuando línea carece de contacto
+// ============================================================
+
+describe('W-02 — Schema de creación: contactoId opcional (no bloquea borrador)', () => {
+  it('crearComprobanteSchema acepta una línea sin contactoId aunque la cuenta requiera contacto', async () => {
+    // La validación de requiereContacto es BLANDA: ocurre en la UI antes de
+    // contabilizar (REQ-CCL-UI-02), pero NO en el Zod schema de creación/edición.
+    // Guardar borrador siempre avanza sin contacto.
+    const valido = {
+      tipo: 'DIARIO' as const,
+      fechaContable: '2026-05-29',
+      glosa: 'Pago de servicios',
+      lineas: [
+        {
+          cuentaId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          // contactoId: omitido — esto es el caso W-02
+          moneda: 'BOB' as const,
+          debito: '1000.00',
+          credito: '0.00',
+          tipoCambio: '1',
+        },
+        {
+          cuentaId: 'ffffffff-0000-1111-2222-333333333333',
+          moneda: 'BOB' as const,
+          debito: '0.00',
+          credito: '1000.00',
+          tipoCambio: '1',
+        },
+      ],
+    };
+    const result = await crearComprobanteSchema.safeParseAsync(valido);
+    expect(result.success).toBe(true);
   });
 });

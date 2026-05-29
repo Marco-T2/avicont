@@ -31,7 +31,7 @@ interface LineasEditorProps {
  * - Alt+Delete con foco en botón eliminar → eliminar la fila correspondiente.
  * - Enter global del form DESHABILITADO dentro del editor (onKeyDown capture).
  */
-export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
+export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.Element {
   const { control } = useFormContext();
 
   const { fields, append, remove } = useFieldArray({
@@ -145,6 +145,7 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
               <th className="p-2 text-right font-medium w-28">Debe</th>
               <th className="p-2 text-right font-medium w-28">Haber</th>
               <th className="p-2 text-left font-medium min-w-[120px]">Glosa línea</th>
+              <th className="p-2 text-left font-medium min-w-[180px]">Contacto</th>
               <th className="p-2 w-10" />
             </tr>
           </thead>
@@ -156,6 +157,7 @@ export function LineasEditor({ mode }: LineasEditorProps): React.JSX.Element {
                 <LineaRow
                   key={field.id}
                   index={i}
+                  cuentas={cuentas}
                   onRemove={() => remove(i)}
                   isOnlyRow={fields.length === 1}
                   disabled={editorDisabled}
