@@ -230,6 +230,190 @@ describe('DocumentosFisicos asociación + contabilizar (e2e)', () => {
       .set('Authorization', `Bearer ${token}`);
   }
 
+  // Crea un miembro con un CustomRole que tiene los permisos de endpoint para
+  // asociar/desasociar (documentos-fisicos.update + asientos.update + asientos.read)
+  // pero SIN `asientos.edit-posted`. Sirve para los escenarios 403.
+  async function seedMiembroSinEditPosted(orgId: string, slug: string) {
+    const hashedPassword = await bcrypt.hash('password123', 10);
+    const email = `member+${slug}@asoc.bo`;
+    const user = await prisma.user.create({
+      data: { email, hashedPassword, isEmailVerified: true },
+    });
+    const role = await prisma.customRole.create({
+      data: {
+        organizationId: orgId,
+        slug: `rol-sin-edit-${slug}`,
+        name: 'Auxiliar sin edit-posted',
+        permissions: [
+          'contabilidad.documentos-fisicos.read',
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.read',
+          'contabilidad.asientos.update',
+          'contabilidad.asientos.create',
+          'contabilidad.asientos.post',
+        ],
+      },
+    });
+    await prisma.membership.create({
+      data: { organizationId: orgId, userId: user.id, customRoleId: role.id },
+    });
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email, password: 'password123' });
+    return login.body.accessToken as string;
+  }
+
+  // Cierra el período fiscal de abril 2026 (el de los comprobantes de prueba).
+  async function periodoAbril2026Id(orgId: string): Promise<string> {
+    const periodo = await prisma.periodoFiscal.findFirstOrThrow({
+      where: { organizationId: orgId, year: 2026, month: 4 },
+    });
+    return periodo.id;
+  }
+
+  function cerrarPeriodo(token: string, periodoId: string) {
+    return request(app.getHttpServer())
+      .post(`/api/periodos/${periodoId}/cerrar`)
+      .set('Authorization', `Bearer ${token}`);
+  }
+
+  function reabrirPeriodo(token: string, periodoId: string) {
+    return request(app.getHttpServer())
+      .post(`/api/periodos/${periodoId}/reabrir`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'Reapertura para corregir documentos asociados en auditoría' });
+  }
+
+  // ==========================================================
+  // E-A-12 a E-A-23 — asociar/desasociar post-CONTABILIZADO (§4.3)
+  // ==========================================================
+
+  it('E-A-12: asociar a un CONTABILIZADO de período abierto con permiso → 201', async () => {
+    const { token, orgId } = await seed('org-ea12');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docInicial = await crearDocumento(token, tipoId, { numero: 'A12-0' });
+    const docNuevo = await crearDocumento(token, tipoId, { numero: 'A12-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docInicial]).expect(201);
+    await contabilizar(token, compId).expect(201);
+
+    const res = await asociar(token, compId, [docNuevo]);
+    expect(res.status).toBe(201);
+
+    // El cache se persistió como CONTABILIZADO (REQ-A-13).
+    const fila = await prisma.comprobanteDocumentoFisico.findFirst({
+      where: { comprobanteId: compId, documentoFisicoId: docNuevo },
+    });
+    expect(fila?.comprobanteEstado).toBe('CONTABILIZADO');
+  });
+
+  it('E-A-13: asociar a un CONTABILIZADO sin edit-posted → 403', async () => {
+    const { token, orgId } = await seed('org-ea13');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docInicial = await crearDocumento(token, tipoId, { numero: 'A13-0' });
+    const docNuevo = await crearDocumento(token, tipoId, { numero: 'A13-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docInicial]).expect(201);
+    await contabilizar(token, compId).expect(201);
+
+    const memberToken = await seedMiembroSinEditPosted(orgId, 'ea13');
+    const res = await asociar(memberToken, compId, [docNuevo]);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('MISSING_PERMISSION_EDIT_POSTED');
+  });
+
+  it('E-A-14: asociar a un comprobante BLOQUEADO por cierre de período → 409', async () => {
+    const { token, orgId } = await seed('org-ea14');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docInicial = await crearDocumento(token, tipoId, { numero: 'A14-0' });
+    const docNuevo = await crearDocumento(token, tipoId, { numero: 'A14-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docInicial]).expect(201);
+    await contabilizar(token, compId).expect(201);
+    await cerrarPeriodo(token, await periodoAbril2026Id(orgId)).expect(201);
+
+    // CLAUDE.md §4.1: cerrar el período transiciona los CONTABILIZADO a BLOQUEADO.
+    // `validarEstadoParaEditar` rechaza el estado no editable ANTES de evaluar el
+    // período → 409 COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO. La corrección pasa
+    // por reabrir el período (E-A-16). Mismo comportamiento que editarContabilizado.
+    const res = await asociar(token, compId, [docNuevo]);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO');
+  });
+
+  it('E-A-16: asociar a un CONTABILIZADO de período cerrado con reapertura activa → 201', async () => {
+    const { token, orgId } = await seed('org-ea16');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docInicial = await crearDocumento(token, tipoId, { numero: 'A16-0' });
+    const docNuevo = await crearDocumento(token, tipoId, { numero: 'A16-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docInicial]).expect(201);
+    await contabilizar(token, compId).expect(201);
+    const periodoId = await periodoAbril2026Id(orgId);
+    await cerrarPeriodo(token, periodoId).expect(201);
+    await reabrirPeriodo(token, periodoId).expect(201);
+
+    const res = await asociar(token, compId, [docNuevo]);
+    expect(res.status).toBe(201);
+  });
+
+  it('E-A-17: asociar a un CONTABILIZADO un documento ya en OTRO contabilizado → 409', async () => {
+    const { token, orgId } = await seed('org-ea17');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docCompartido = await crearDocumento(token, tipoId, { numero: 'A17-1' });
+    const docInicialB = await crearDocumento(token, tipoId, { numero: 'A17-2' });
+
+    const compA = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compA, [docCompartido]).expect(201);
+    await contabilizar(token, compA).expect(201);
+
+    const compB = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compB, [docInicialB]).expect(201);
+    await contabilizar(token, compB).expect(201);
+
+    // compB (ya CONTABILIZADO) intenta tomar el doc que ya tiene compA.
+    const res = await asociar(token, compB, [docCompartido]);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO');
+  });
+
+  it('E-A-22: desasociar de un CONTABILIZADO sin edit-posted → 403', async () => {
+    const { token, orgId } = await seed('org-ea22');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docId = await crearDocumento(token, tipoId, { numero: 'A22-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docId]).expect(201);
+    await contabilizar(token, compId).expect(201);
+
+    const memberToken = await seedMiembroSinEditPosted(orgId, 'ea22');
+    const res = await desasociar(memberToken, compId, docId);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('MISSING_PERMISSION_EDIT_POSTED');
+  });
+
+  it('E-A-23: desasociar de un comprobante BLOQUEADO por cierre de período → 409', async () => {
+    const { token, orgId } = await seed('org-ea23');
+    const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
+    const tipoId = await crearTipo(token);
+    const docId = await crearDocumento(token, tipoId, { numero: 'A23-1' });
+    const compId = await crearComprobante(token, cajaId, ventasId);
+    await asociar(token, compId, [docId]).expect(201);
+    await contabilizar(token, compId).expect(201);
+    await cerrarPeriodo(token, await periodoAbril2026Id(orgId)).expect(201);
+
+    // CLAUDE.md §4.1: el comprobante quedó BLOQUEADO al cerrar el período →
+    // 409 COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO (rechazado, como editarContabilizado).
+    const res = await desasociar(token, compId, docId);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('COMPROBANTE_NO_EDITABLE_ESTADO_INVALIDO');
+  });
+
   // ==========================================================
   // E-A-01 / E-A-02 — asociar a borradores
   // ==========================================================
@@ -294,7 +478,7 @@ describe('DocumentosFisicos asociación + contabilizar (e2e)', () => {
     expect(res.status).toBe(204);
   });
 
-  it('E-A-05: desasociar un documento de un contabilizado → 409', async () => {
+  it('E-A-21: desasociar de un CONTABILIZADO de período abierto con permiso → 204', async () => {
     const { token, orgId } = await seed();
     const { cajaId, ventasId } = await prepararContabilidad(token, orgId);
     const tipoId = await crearTipo(token);
@@ -303,9 +487,9 @@ describe('DocumentosFisicos asociación + contabilizar (e2e)', () => {
     await asociar(token, compId, [docId]).expect(201);
     await contabilizar(token, compId).expect(201);
 
+    // OWNER tiene edit-posted; período abierto → 204 (§4.3 CLAUDE.md).
     const res = await desasociar(token, compId, docId);
-    expect(res.status).toBe(409);
-    expect(res.body.error.code).toBe('COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO');
+    expect(res.status).toBe(204);
   });
 
   // ==========================================================

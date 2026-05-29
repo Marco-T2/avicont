@@ -255,6 +255,55 @@ describe('PrismaAsociacionComprobanteRepository (integration)', () => {
     },
   );
 
+  // E-A-12 + E-A-17 + REQ-A-13: asociar DIRECTAMENTE con comprobanteEstado=CONTABILIZADO
+  // (rama nueva de asociarDocumentos sobre un comprobante ya contabilizado).
+  // El cache se persiste como CONTABILIZADO y el UNIQUE PARCIAL bloquea un
+  // segundo INSERT del mismo docId en otro comprobante CONTABILIZADO.
+  it(
+    'asociar con comprobanteEstado=CONTABILIZADO — persiste el cache y el UNIQUE PARCIAL ' +
+      'rechaza un segundo CONTABILIZADO para el mismo docId (E-A-12/E-A-17, REQ-A-13)',
+    async () => {
+      const compA = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+      const compB = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+      const docId = await createDocumento(tenantA, tipoId);
+
+      const fila = await repo.asociar(
+        tenantA,
+        buildAsociarInput(compA, docId, EstadoComprobante.CONTABILIZADO),
+      );
+      expect(fila.comprobanteEstado).toBe(EstadoComprobante.CONTABILIZADO);
+
+      // Verificación directa en BD del cache (REQ-A-13: no hardcode a BORRADOR).
+      const persistida = await prisma.comprobanteDocumentoFisico.findFirst({
+        where: { comprobanteId: compA, documentoFisicoId: docId },
+      });
+      expect(persistida?.comprobanteEstado).toBe(EstadoComprobante.CONTABILIZADO);
+
+      // Segundo CONTABILIZADO con el mismo docId → UNIQUE PARCIAL revienta.
+      await expect(
+        repo.asociar(tenantA, buildAsociarInput(compB, docId, EstadoComprobante.CONTABILIZADO)),
+      ).rejects.toBeInstanceOf(DocumentoFisicoYaAsociadoAOtroContabilizadoError);
+    },
+  );
+
+  // REQ-A-05: con comprobanteEstado=BORRADOR, el mismo docId SÍ puede asociarse
+  // a un comprobante adicional aunque ya esté en uno CONTABILIZADO — el índice
+  // parcial solo aplica a filas CONTABILIZADO.
+  it('asociar — un docId ya CONTABILIZADO en compA SÍ admite una fila BORRADOR en compB (REQ-A-05)', async () => {
+    const compA = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+    const compB = await createComprobante(tenantA, periodoId, EstadoComprobante.BORRADOR);
+    const docId = await createDocumento(tenantA, tipoId);
+
+    await repo.asociar(tenantA, buildAsociarInput(compA, docId, EstadoComprobante.CONTABILIZADO));
+    const fila = await repo.asociar(
+      tenantA,
+      buildAsociarInput(compB, docId, EstadoComprobante.BORRADOR),
+    );
+
+    expect(fila.id).toBeDefined();
+    expect(fila.comprobanteEstado).toBe(EstadoComprobante.BORRADOR);
+  });
+
   // ================================================================
   // refrescarEstadoComprobante — R1 (cache drift)
   // ================================================================

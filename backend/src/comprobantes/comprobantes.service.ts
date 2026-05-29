@@ -59,13 +59,12 @@ import {
   ComprobanteAnularMotivoInvalidoError,
   ComprobanteAnularPeriodoCerradoError,
   ComprobanteCampoInvalidoError,
-  ComprobanteDocumentoNoDesasociableContabilizadoError,
+  ComprobanteDocumentoAsociacionPeriodoCerradoError,
   ComprobanteEditarContabilizadoEnPeriodoCerradoError,
   ComprobanteEditarFechaPeriodoDestinoCerradoError,
   ComprobanteEstadoInvalidoError,
   ComprobanteEstadoNoEditableContabilizadoError,
   ComprobanteNoEncontradoError,
-  ComprobanteNoEsBorradorError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
   ContactoRequeridoError,
@@ -798,103 +797,264 @@ export class ComprobantesService {
     }
   }
 
+  /**
+   * Resuelve el contexto de edición de un comprobante CONTABILIZADO (CLAUDE.md
+   * §4.3): verifica permiso `edit-posted`, valida que el estado sea editable
+   * (no anulado, CONTABILIZADO) y resuelve la reapertura activa del período.
+   *
+   * Compartido por la rama CONTABILIZADO de asociar/desasociar documentos
+   * físicos. Se ejecuta PRE-TX (sin lock); la TX re-lee y re-valida estado y
+   * período como defense in depth.
+   *
+   * @returns `{ reaperturaId? }` para propagar al `auditedTx.run`.
+   */
+  private async resolverContextoEdicionPostContabilizado(
+    tenantId: string,
+    userId: string,
+    comprobante: ComprobanteConLineas,
+  ): Promise<{ reaperturaId?: string }> {
+    // CLAUDE.md §3.7 / §4.3: el permiso edit-posted se verifica desde el servicio.
+    const tienePermiso = await this.rbac.hasPermission(
+      userId,
+      tenantId,
+      'contabilidad.asientos.edit-posted',
+    );
+    if (!tienePermiso) {
+      throw new SinPermisoEditarContabilizadoError(userId);
+    }
+
+    this.validarEstadoParaEditar(comprobante.id, comprobante.estado, comprobante.anulado);
+
+    const reapertura = await this.periodos.obtenerReaperturaActiva(
+      tenantId,
+      comprobante.periodoFiscalId,
+    );
+    return reapertura ? { reaperturaId: reapertura.id } : {};
+  }
+
+  /**
+   * Valida DENTRO de la TX que el período del comprobante CONTABILIZADO admita
+   * modificar sus asociaciones de documentos físicos (CLAUDE.md §4.3/§4.4):
+   * debe estar ABIERTO, o tener una reapertura activa. Cicatriz F-03: la
+   * validación va dentro de la TX, no solo pre-TX.
+   */
+  private async validarPeriodoEditablePostContabilizadoEnTx(
+    tenantId: string,
+    comprobanteId: string,
+    fechaContable: FechaContable,
+    hayReapertura: boolean,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const periodo = await this.periodos.obtenerPorFecha(tenantId, fechaContable, tx);
+    if (!periodo) throw new GestionNoAbiertaError(fechaContable.toIso());
+    // CLAUDE.md §4.4: sin bypass — período CERRADO/BLOQUEADO solo editable vía reapertura.
+    if (periodo.status !== PeriodoFiscalStatus.ABIERTO && !hayReapertura) {
+      throw new ComprobanteDocumentoAsociacionPeriodoCerradoError(
+        comprobanteId,
+        periodo.id,
+        periodo.status,
+      );
+    }
+  }
+
   // ============================================================
   // Documentos físicos asociados (sub-recurso del comprobante)
   // ============================================================
 
   /**
-   * Asocia uno o más documentos físicos a un comprobante en BORRADOR.
-   * Operación aditiva (REQ-A-01) e idempotente: re-asociar un par existente
-   * es no-op. Toda la lógica corre en una sola TX (design §4.2):
-   *   1) Comprobante existe + estado BORRADOR (inmutabilidad post-CONTABILIZADO,
-   *      CLAUDE.md §4.3).
-   *   2) Cada documento existe, pertenece al tenant (defense in depth §4.2) y
-   *      su tipo es compatible con el tipo del comprobante (REQ-A-11 / D11).
-   *   3) Inserta solo las asociaciones que aún no existen.
+   * Asocia uno o más documentos físicos a un comprobante.
    *
+   * CLAUDE.md §4.3: la asociación de documentos físicos es parte de la
+   * superficie editable de un comprobante. Bifurca según el estado real leído:
+   *   - BORRADOR → rama aditiva e idempotente sin blindaje extra (sin
+   *     `edit-posted`, sin auditedTx). El cache `comprobanteEstado` se persiste
+   *     con el estado real del comprobante (REQ-A-13).
+   *   - CONTABILIZADO → blindaje §4.3: permiso `contabilidad.asientos.edit-posted`,
+   *     `auditedTx.run` con `{ userId, reaperturaId? }`, validación de período
+   *     ABIERTO/reapertura DENTRO de la TX (cicatriz F-03), y re-validación de
+   *     unicidad 1-doc:1-CONTABILIZADO (REQ-A-06) antes de insertar.
+   *   - BLOQUEADO o anulado → rechazo vía `validarEstadoParaEditar`.
+   *
+   * El número correlativo del comprobante es INMUTABLE (§4.9) y no se toca.
    * `documentoFisicoIds` vacío → no-op (return []).
    */
   async asociarDocumentos(
     tenantId: string,
+    userId: string,
     comprobanteId: string,
     documentoFisicoIds: string[],
   ): Promise<ComprobanteDocumentoFisico[]> {
     if (documentoFisicoIds.length === 0) return [];
 
-    return this.prisma.$transaction(async (tx) => {
-      const comp = await this.repo.findById(tenantId, comprobanteId, tx);
-      if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
-      if (comp.estado !== EstadoComprobante.BORRADOR) {
-        throw new ComprobanteNoEsBorradorError(comprobanteId, comp.estado);
-      }
+    const comp = await this.repo.findById(tenantId, comprobanteId);
+    if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
 
-      const docMap = await this.documentosFisicosReader.obtenerBatchParaAsociar(
-        tenantId,
-        documentoFisicoIds,
-        tx,
+    if (comp.estado === EstadoComprobante.BORRADOR) {
+      return this.prisma.$transaction((tx) =>
+        this.insertarAsociaciones(
+          tenantId,
+          comprobanteId,
+          comp.tipo,
+          comp.estado,
+          documentoFisicoIds,
+          tx,
+        ),
       );
-      for (const id of documentoFisicoIds) {
-        const doc = docMap.get(id);
-        if (!doc) throw new DocumentoFisicoReferenciadoNoExisteError(id);
-        if (!doc.tiposComprobanteAplicables.includes(comp.tipo)) {
-          throw new TipoDocumentoIncompatibleConComprobanteError(
-            doc.tipoDocumentoNombre,
-            comp.tipo,
-            doc.tiposComprobanteAplicables,
-          );
-        }
-      }
+    }
 
-      // Idempotencia (REQ-A-01): re-asociar un par ya existente es no-op.
-      // Filtramos contra las asociaciones actuales del comprobante para no
-      // chocar con el UNIQUE normal (documentoFisicoId, comprobanteId), que
-      // el adapter relanza tal cual.
-      const yaAsociados = await this.asociacionRepo.listarPorComprobante(
-        tenantId,
-        comprobanteId,
-        tx,
-      );
-      const yaAsociadosIds = new Set(yaAsociados.map((a) => a.documentoFisicoId));
-      const idsAInsertar = [...new Set(documentoFisicoIds)].filter((id) => !yaAsociadosIds.has(id));
+    // Rama CONTABILIZADO — blindaje §4.3.
+    const ctx = await this.resolverContextoEdicionPostContabilizado(tenantId, userId, comp);
 
-      const result: ComprobanteDocumentoFisico[] = [];
-      for (const id of idsAInsertar) {
-        result.push(
-          await this.asociacionRepo.asociar(
-            tenantId,
-            {
-              comprobanteId,
-              documentoFisicoId: id,
-              comprobanteEstado: EstadoComprobante.BORRADOR,
-            },
-            tx,
-          ),
+    return this.auditedTx.run(
+      { userId, ...(ctx.reaperturaId ? { reaperturaId: ctx.reaperturaId } : {}) },
+      async (tx) => {
+        const compTx = await this.repo.findById(tenantId, comprobanteId, tx);
+        if (!compTx) throw new ComprobanteNoEncontradoError(comprobanteId);
+        // Defense in depth: re-validar estado dentro de la TX.
+        this.validarEstadoParaEditar(compTx.id, compTx.estado, compTx.anulado);
+        await this.validarPeriodoEditablePostContabilizadoEnTx(
+          tenantId,
+          compTx.id,
+          FechaContable.fromDbDate(compTx.fechaContable),
+          ctx.reaperturaId !== undefined,
+          tx,
         );
-      }
-      return result;
-    });
+        return this.insertarAsociaciones(
+          tenantId,
+          comprobanteId,
+          compTx.tipo,
+          compTx.estado,
+          documentoFisicoIds,
+          tx,
+          // REQ-A-06: la unicidad 1-doc:1-CONTABILIZADO se valida al asociar a
+          // un comprobante ya contabilizado (mismo método que usa contabilizar).
+          true,
+        );
+      },
+    );
   }
 
   /**
-   * Desasocia un documento físico de un comprobante en BORRADOR (REQ-A-02 /
-   * E-A-04). Si el comprobante está CONTABILIZADO, rechaza con
-   * `ComprobanteDocumentoNoDesasociableContabilizadoError` (REQ-A-03 / E-A-05):
-   * el comprobante ya consumió numeración y es inmutable (CLAUDE.md §4.3).
+   * Inserta las asociaciones que aún no existen para el comprobante,
+   * validando existencia, pertenencia al tenant y compatibilidad de tipo
+   * (REQ-A-11). Aditiva e idempotente (REQ-A-01). El cache `comprobanteEstado`
+   * se persiste con el estado REAL del comprobante (REQ-A-13, sin hardcode).
+   *
+   * Si `validarUnicidadContabilizado` es true (rama CONTABILIZADO), re-valida
+   * que ningún documento esté ya en OTRO comprobante CONTABILIZADO (REQ-A-06)
+   * antes de insertar; el UNIQUE PARCIAL en BD es la última línea de defensa
+   * (defense in depth, §4.8).
+   */
+  private async insertarAsociaciones(
+    tenantId: string,
+    comprobanteId: string,
+    tipoComprobante: TipoComprobante,
+    comprobanteEstado: EstadoComprobante,
+    documentoFisicoIds: string[],
+    tx: Prisma.TransactionClient,
+    validarUnicidadContabilizado = false,
+  ): Promise<ComprobanteDocumentoFisico[]> {
+    const docMap = await this.documentosFisicosReader.obtenerBatchParaAsociar(
+      tenantId,
+      documentoFisicoIds,
+      tx,
+    );
+    for (const id of documentoFisicoIds) {
+      const doc = docMap.get(id);
+      if (!doc) throw new DocumentoFisicoReferenciadoNoExisteError(id);
+      if (!doc.tiposComprobanteAplicables.includes(tipoComprobante)) {
+        throw new TipoDocumentoIncompatibleConComprobanteError(
+          doc.tipoDocumentoNombre,
+          tipoComprobante,
+          doc.tiposComprobanteAplicables,
+        );
+      }
+    }
+
+    // Idempotencia (REQ-A-01): re-asociar un par ya existente es no-op.
+    // Filtramos contra las asociaciones actuales del comprobante para no
+    // chocar con el UNIQUE normal (documentoFisicoId, comprobanteId), que
+    // el adapter relanza tal cual.
+    const yaAsociados = await this.asociacionRepo.listarPorComprobante(tenantId, comprobanteId, tx);
+    const yaAsociadosIds = new Set(yaAsociados.map((a) => a.documentoFisicoId));
+    const idsAInsertar = [...new Set(documentoFisicoIds)].filter((id) => !yaAsociadosIds.has(id));
+
+    if (validarUnicidadContabilizado && idsAInsertar.length > 0) {
+      // REQ-A-06: misma fuente de verdad que contabilizar. La pre-validación
+      // falla fast con id real; el UNIQUE PARCIAL en BD cubre el race (§4.8).
+      const yaContabilizados = await this.documentosFisicosReader.idsYaAsociadosAContabilizado(
+        tenantId,
+        idsAInsertar,
+        comprobanteId,
+        tx,
+      );
+      const [primerYaContabilizado] = yaContabilizados;
+      if (primerYaContabilizado !== undefined) {
+        throw new DocumentoFisicoYaAsociadoAOtroContabilizadoError(primerYaContabilizado);
+      }
+    }
+
+    const result: ComprobanteDocumentoFisico[] = [];
+    for (const id of idsAInsertar) {
+      result.push(
+        await this.asociacionRepo.asociar(
+          tenantId,
+          {
+            comprobanteId,
+            documentoFisicoId: id,
+            // REQ-A-13: el cache refleja el estado REAL del comprobante; el
+            // índice parcial de unicidad opera sobre esta columna (§11.6).
+            comprobanteEstado,
+          },
+          tx,
+        ),
+      );
+    }
+    return result;
+  }
+
+  /**
+   * Desasocia un documento físico de un comprobante.
+   *
+   * CLAUDE.md §4.3 — simétrico a `asociarDocumentos`:
+   *   - BORRADOR → desasocia directo, sin blindaje (REQ-A-02 / E-A-04).
+   *   - CONTABILIZADO → blindaje §4.3: permiso `edit-posted`, `auditedTx.run`,
+   *     período ABIERTO/reapertura validado en TX. No re-numera nada (§4.9).
+   *   - BLOQUEADO o anulado → rechazo vía `validarEstadoParaEditar`.
    */
   async desasociarDocumento(
     tenantId: string,
+    userId: string,
     comprobanteId: string,
     documentoFisicoId: string,
   ): Promise<void> {
     const comp = await this.repo.findById(tenantId, comprobanteId);
     if (!comp) throw new ComprobanteNoEncontradoError(comprobanteId);
-    if (comp.estado !== EstadoComprobante.BORRADOR) {
-      throw new ComprobanteDocumentoNoDesasociableContabilizadoError(
-        comprobanteId,
-        documentoFisicoId,
-      );
+
+    if (comp.estado === EstadoComprobante.BORRADOR) {
+      await this.asociacionRepo.desasociar(tenantId, comprobanteId, documentoFisicoId);
+      return;
     }
-    await this.asociacionRepo.desasociar(tenantId, comprobanteId, documentoFisicoId);
+
+    // Rama CONTABILIZADO — blindaje §4.3.
+    const ctx = await this.resolverContextoEdicionPostContabilizado(tenantId, userId, comp);
+
+    await this.auditedTx.run(
+      { userId, ...(ctx.reaperturaId ? { reaperturaId: ctx.reaperturaId } : {}) },
+      async (tx) => {
+        const compTx = await this.repo.findById(tenantId, comprobanteId, tx);
+        if (!compTx) throw new ComprobanteNoEncontradoError(comprobanteId);
+        this.validarEstadoParaEditar(compTx.id, compTx.estado, compTx.anulado);
+        await this.validarPeriodoEditablePostContabilizadoEnTx(
+          tenantId,
+          compTx.id,
+          FechaContable.fromDbDate(compTx.fechaContable),
+          ctx.reaperturaId !== undefined,
+          tx,
+        );
+        await this.asociacionRepo.desasociar(tenantId, comprobanteId, documentoFisicoId, tx);
+      },
+    );
   }
 
   /**
