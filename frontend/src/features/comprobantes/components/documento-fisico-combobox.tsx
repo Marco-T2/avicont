@@ -222,16 +222,46 @@ export function DocumentoFisicoCombobox({
             <CommandList>
               {isLoadingDocs ? (
                 <CommandEmpty>Buscando…</CommandEmpty>
-              ) : docsCompatibles.length === 0 && search.length === 0 ? (
-                <CommandEmpty>Tipea un número para buscar.</CommandEmpty>
-              ) : docsCompatibles.length === 0 ? (
+              ) : (
                 <>
-                  <CommandEmpty>Sin resultados.</CommandEmpty>
+                  {docsCompatibles.length === 0 ? (
+                    <CommandEmpty>
+                      {search.length === 0
+                        ? 'No hay documentos disponibles.'
+                        : 'Sin resultados.'}
+                    </CommandEmpty>
+                  ) : (
+                    <CommandGroup>
+                      {docsCompatibles.map((doc) => (
+                        <CommandItem
+                          key={doc.id}
+                          value={doc.id}
+                          onSelect={() => handleSeleccionarExistente(doc.id)}
+                          disabled={asociarMutation.isPending}
+                        >
+                          <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {doc.tipoDocumentoFisico.nombre}
+                              </span>
+                              <span className="font-mono font-semibold text-sm">{doc.numero}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">{doc.fechaEmision}</div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                  {/* "Crear nuevo documento" siempre disponible — el combobox es "buscar O crear". */}
                   <CommandGroup>
                     <CommandItem
                       value="__crear__"
                       onSelect={handleAbrirMiniForm}
-                      className="gap-2 text-primary"
+                      className={cn(
+                        'gap-2 text-primary',
+                        docsCompatibles.length > 0 && 'border-t mt-1 pt-1',
+                      )}
                     >
                       <Plus className="h-4 w-4 shrink-0" />
                       Crear nuevo documento
@@ -241,37 +271,6 @@ export function DocumentoFisicoCombobox({
                     </CommandItem>
                   </CommandGroup>
                 </>
-              ) : (
-                <CommandGroup>
-                  {docsCompatibles.map((doc) => (
-                    <CommandItem
-                      key={doc.id}
-                      value={doc.id}
-                      onSelect={() => handleSeleccionarExistente(doc.id)}
-                      disabled={asociarMutation.isPending}
-                    >
-                      <Check className="mr-2 h-4 w-4 shrink-0 opacity-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {doc.tipoDocumentoFisico.nombre}
-                          </span>
-                          <span className="font-mono font-semibold text-sm">{doc.numero}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">{doc.fechaEmision}</div>
-                      </div>
-                    </CommandItem>
-                  ))}
-                  {/* Siempre ofrece crear nuevo al final cuando hay resultados */}
-                  <CommandItem
-                    value="__crear__"
-                    onSelect={handleAbrirMiniForm}
-                    className="gap-2 text-primary border-t mt-1 pt-1"
-                  >
-                    <Plus className="h-4 w-4 shrink-0" />
-                    Crear nuevo documento
-                  </CommandItem>
-                </CommandGroup>
               )}
             </CommandList>
           </Command>
