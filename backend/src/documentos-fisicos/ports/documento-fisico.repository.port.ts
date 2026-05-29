@@ -87,6 +87,16 @@ export interface DocumentoFisicoListarFiltros {
    * Implementado vía sub-query EXISTS sobre `ComprobanteDocumentoFisico`.
    */
   estado?: 'libre' | 'asociado' | 'contabilizado';
+  /**
+   * Cuando `true`, excluye documentos que ya tienen al menos una asociación
+   * a un comprobante CONTABILIZADO. Preserva documentos sueltos y los que
+   * están solo en borradores (un papel puede estar en N borradores mientras
+   * se decide qué comprobante lo consume — brief §3).
+   *
+   * Implementado vía `asociaciones.none { comprobanteEstado: CONTABILIZADO }`.
+   * Se compone (AND) con el resto de filtros.
+   */
+  disponibleParaAsociar?: boolean;
 }
 
 export interface DocumentoFisicoListarPagination {

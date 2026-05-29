@@ -269,6 +269,12 @@ export class PrismaDocumentoFisicoRepository extends DocumentoFisicoRepositoryPo
       // Filtro por estado derivado vía sub-query sobre la tabla de asociaciones.
       // R5: revisar explain en tablas grandes; candidato a materializar.
       ...(filtros.estado !== undefined ? this.buildEstadoFilter(filtros.estado) : {}),
+      // Excluye documentos consumidos por al menos un comprobante CONTABILIZADO.
+      // Preserva sueltos y los que solo están en borradores (brief §3).
+      // Se compone (AND) con el resto de filtros si ambos están presentes.
+      ...(filtros.disponibleParaAsociar === true
+        ? { asociaciones: { none: { comprobanteEstado: 'CONTABILIZADO' } } }
+        : {}),
     };
   }
 

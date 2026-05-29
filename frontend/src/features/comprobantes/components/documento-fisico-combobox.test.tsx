@@ -186,6 +186,18 @@ describe('DocumentoFisicoCombobox — pre-filtro de compatibilidad (D4/D8)', () 
   });
 });
 
+describe('DocumentoFisicoCombobox — filtro disponibleParaAsociar', () => {
+  it('useDocumentosFisicos se invoca siempre con disponibleParaAsociar: true', () => {
+    renderCombobox('EGRESO');
+
+    // El hook debe haber sido llamado con disponibleParaAsociar: true
+    // independientemente del valor de búsqueda.
+    expect(mockUseDocumentosFisicos).toHaveBeenCalledWith(
+      expect.objectContaining({ disponibleParaAsociar: true }),
+    );
+  });
+});
+
 describe('DocumentoFisicoCombobox — búsqueda sin resultados', () => {
   it('sin resultados tras búsqueda → muestra opción "Crear nuevo documento"', async () => {
     mockUseDocumentosFisicos.mockReturnValue({

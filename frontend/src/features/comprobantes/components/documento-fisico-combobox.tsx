@@ -74,9 +74,12 @@ export function DocumentoFisicoCombobox({
   );
 
   // Cross-feature: búsqueda de documentos existentes.
+  // disponibleParaAsociar=true excluye los consumidos por otro comprobante CONTABILIZADO;
+  // los SUELTOS y los de borradores siguen apareciendo.
   const { data: docsData, isLoading: isLoadingDocs } = useDocumentosFisicos({
     numero: debouncedSearch.length > 0 ? debouncedSearch : undefined,
     pageSize: 20,
+    disponibleParaAsociar: true,
   });
 
   // D4: pre-filtro client-side — solo mostrar docs cuyo tipo es compatible.

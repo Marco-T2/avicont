@@ -127,6 +127,9 @@ export class DocumentosFisicosController {
       ...(query.contactoId !== undefined ? { contactoId: query.contactoId } : {}),
       ...(estadoMapeado !== undefined ? { estado: estadoMapeado } : {}),
       ...(query.numero !== undefined ? { q: query.numero } : {}),
+      ...(query.disponibleParaAsociar !== undefined
+        ? { disponibleParaAsociar: query.disponibleParaAsociar }
+        : {}),
     };
 
     const { items, total } = await this.service.listarConRelaciones(tenantId, filtros, {

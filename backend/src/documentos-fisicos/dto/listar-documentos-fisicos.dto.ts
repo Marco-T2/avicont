@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -73,6 +74,17 @@ export class ListarDocumentosFisicosQueryDto {
   @IsOptional()
   @IsString()
   numero?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Cuando true, devuelve SOLO documentos que no están consumidos por ningún comprobante CONTABILIZADO. ' +
+      'Preserva documentos sueltos y los que están en borradores.',
+    type: Boolean,
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => value === 'true' || value === true)
+  @IsBoolean()
+  disponibleParaAsociar?: boolean;
 
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()

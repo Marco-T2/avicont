@@ -507,6 +507,7 @@ export interface ListarDocumentosFisicosParams {
   numero?: string;
   page?: number;
   pageSize?: number;
+  disponibleParaAsociar?: boolean;
 }
 
 // ============================================================
