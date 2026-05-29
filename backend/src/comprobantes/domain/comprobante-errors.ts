@@ -163,49 +163,6 @@ export class ComprobanteAnuladoNoEditableError extends ConflictError {
 }
 
 /**
- * @deprecated Modelo viejo (CONTABILIZADO = inmutable total). Desde el change
- * `documento-fisico-asociacion-post-contabilizado` (§4.3), asociar a un
- * CONTABILIZADO de período abierto está permitido; el rechazo por estado no
- * editable usa `ComprobanteEstadoNoEditableContabilizadoError` (BLOQUEADO) o
- * `ComprobanteAnuladoNoEditableError` (anulado). Ya no se lanza en el flujo de
- * asociación. Se conserva para no romper importadores/tests heredados.
- *
- * Se levantaba al asociar/desasociar documentos físicos a un comprobante que
- * NO estaba en BORRADOR.
- */
-export class ComprobanteNoEsBorradorError extends ConflictError {
-  constructor(comprobanteId: string, estadoActual: string) {
-    super(
-      'COMPROBANTE_NO_ES_BORRADOR',
-      'El comprobante no admite cambios en sus asociaciones porque no está en BORRADOR',
-      { comprobanteId, estadoActual },
-    );
-  }
-}
-
-/**
- * @deprecated Modelo viejo. Desde el change
- * `documento-fisico-asociacion-post-contabilizado` (§4.3), desasociar de un
- * CONTABILIZADO de período abierto está permitido (con permiso `edit-posted`).
- * El rechazo por período cerrado/bloqueado usa
- * `ComprobanteDocumentoAsociacionPeriodoCerradoError` o, si el comprobante quedó
- * BLOQUEADO por cierre, `ComprobanteEstadoNoEditableContabilizadoError`. Ya no se
- * lanza en el flujo de asociación. Se conserva para no romper importadores/tests.
- *
- * Se levantaba al intentar desasociar un documento físico de un comprobante
- * CONTABILIZADO bajo la lectura vieja "ya consumió numeración y es inmutable".
- */
-export class ComprobanteDocumentoNoDesasociableContabilizadoError extends ConflictError {
-  constructor(comprobanteId: string, documentoFisicoId: string) {
-    super(
-      'COMPROBANTE_DOCUMENTO_NO_DESASOCIABLE_CONTABILIZADO',
-      'No se puede desasociar un documento de un comprobante contabilizado',
-      { comprobanteId, documentoFisicoId },
-    );
-  }
-}
-
-/**
  * Se intenta asociar o desasociar un documento físico a/de un comprobante
  * CONTABILIZADO cuyo período está CERRADO o BLOQUEADO y sin reapertura activa.
  *
