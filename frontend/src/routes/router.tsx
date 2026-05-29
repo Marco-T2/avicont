@@ -8,6 +8,7 @@ import { ComprobanteDetailPage } from '@/features/comprobantes/pages/comprobante
 import { ComprobantesPage } from '@/features/comprobantes/pages/comprobantes-page';
 import { EditarComprobantePage } from '@/features/comprobantes/pages/editar-comprobante-page';
 import { ContactosPage } from '@/features/contactos/pages/contactos-page';
+import { DocumentosFisicosPage } from '@/features/documentos-fisicos/pages/documentos-fisicos-page';
 import { TiposDocumentoFisicoPage } from '@/features/tipos-documento-fisico/pages/tipos-documento-fisico-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
           { path: '/comprobantes/:id/editar', element: <EditarComprobantePage /> },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/tipos-documento-fisico', element: <TiposDocumentoFisicoPage /> },
+          { path: '/documentos-fisicos', element: <DocumentosFisicosPage /> },
           { path: '/periodos-fiscales', element: <PeriodosFiscalesPage /> },
           { path: '/settings/members', element: <MembersPage /> },
           { path: '/settings/roles', element: <RolesPage /> },

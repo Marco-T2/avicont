@@ -429,6 +429,87 @@ export interface ListarTiposDocumentoFisicoParams {
 }
 
 // ============================================================
+// Documentos físicos
+// ============================================================
+
+// Espejo de DocumentoFisicoDto + enums del backend.
+export const EstadoAsociacion = {
+  SUELTO: 'SUELTO',
+  EN_BORRADOR: 'EN_BORRADOR',
+  CONTABILIZADO: 'CONTABILIZADO',
+} as const;
+export type EstadoAsociacion = (typeof EstadoAsociacion)[keyof typeof EstadoAsociacion];
+
+export interface TipoDocumentoFisicoEmbebido {
+  id: string;
+  nombre: string;
+  codigo: string;
+  esTributario: boolean;
+}
+
+export interface ContactoEmbebido {
+  id: string;
+  razonSocial: string;
+}
+
+export interface ComprobanteAsociadoView {
+  id: string;
+  numero: string | null;
+  estado: string;
+}
+
+// Espejo de DocumentoFisicoDto en backend/src/documentos-fisicos/dto/.
+// monto: string | null — §4.5 (dinero como string, nunca number).
+export interface DocumentoFisico {
+  id: string;
+  numero: string;
+  fechaEmision: string; // YYYY-MM-DD
+  monto: string | null;
+  moneda: string | null;
+  glosa: string | null;
+  tipoDocumentoFisico: TipoDocumentoFisicoEmbebido;
+  contacto: ContactoEmbebido | null;
+  organizationId: string;
+  createdAt: string;
+}
+
+// GET /api/documentos-fisicos/:id — incluye comprobantesAsociados para D2.
+export interface DocumentoFisicoDetalle extends DocumentoFisico {
+  comprobantesAsociados: ComprobanteAsociadoView[];
+}
+
+export interface DocumentoFisicoListResponse {
+  items: DocumentoFisico[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateDocumentoFisicoRequest {
+  tipoDocumentoFisicoId: string;
+  numero: string;
+  fechaEmision: string;
+  monto?: string | null;
+  moneda?: Moneda | null;
+  contactoId?: string | null;
+  glosa?: string | null;
+}
+
+export type UpdateDocumentoFisicoRequest = Partial<CreateDocumentoFisicoRequest>;
+
+// Query params para GET /api/documentos-fisicos.
+export interface ListarDocumentosFisicosParams {
+  tipoDocumentoFisicoId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  contactoId?: string;
+  estadoAsociacion?: EstadoAsociacion;
+  numero?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
 // Impersonation
 // ============================================================
 
