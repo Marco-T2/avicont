@@ -19,6 +19,7 @@ import type { EditarComprobantePayload } from '../api/editar-comprobante';
 import { useComprobante } from '../hooks/use-comprobante';
 import { useCrearComprobante } from '../hooks/use-crear-comprobante';
 import { useEditarComprobante } from '../hooks/use-editar-comprobante';
+import { usePuedeEditarContabilizado } from '../hooks/use-puede-editar-contabilizado';
 import {
   crearComprobanteSchema,
   type CrearComprobanteValues,
@@ -30,6 +31,7 @@ import {
 import type { ComprobanteMode, LineaFormValues } from '../types';
 import { LINEA_VACIA } from '../types';
 import { ComprobanteCabeceraForm } from './comprobante-cabecera-form';
+import { DocumentosRespaldoSection } from './documentos-respaldo-section';
 import { LineasEditor } from './lineas-editor';
 
 // Mapea un comprobante del backend a los valores del form.
@@ -100,6 +102,7 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
   const navigate = useNavigate();
   const isNuevo = mode === 'nuevo';
   const isContabilizado = mode === 'contabilizado';
+  const puedeEditarContabilizado = usePuedeEditarContabilizado();
 
   // Cross-feature: cuentas de detalle activas para el CuentaAutocomplete del LineasEditor.
   // pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)). Si un tenant
@@ -320,6 +323,20 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
               </p>
             )}
           </div>
+
+          {/* Documentos de respaldo — solo si !isNuevo (requiere comprobante.id); D5 */}
+          {!isNuevo && comprobante !== undefined ? (() => {
+            const editableEnEditar =
+              !comprobante.anulado &&
+              (comprobante.estado === 'BORRADOR' ||
+                (comprobante.estado === 'CONTABILIZADO' && puedeEditarContabilizado));
+            return (
+              <DocumentosRespaldoSection
+                comprobante={comprobante}
+                editable={editableEnEditar}
+              />
+            );
+          })() : null}
 
           {/* Footer */}
           <div className="flex justify-end gap-2 border-t border-border pt-4">

@@ -22,6 +22,7 @@ import {
 } from '../lib/formatear-numero-correlativo';
 import { useComprobante } from '../hooks/use-comprobante';
 
+import { usePuedeEditarContabilizado } from '../hooks/use-puede-editar-contabilizado';
 import { AnularComprobanteSheet } from './anular-comprobante-sheet';
 import { AuditoriaSheet } from './auditoria-sheet';
 import { ComprobanteActionsBar } from './comprobante-actions-bar';
@@ -29,6 +30,7 @@ import { ContabilizarComprobanteDialog } from './contabilizar-comprobante-dialog
 import { EliminarComprobanteDialog } from './eliminar-comprobante-dialog';
 import { EstadoComprobanteBadge } from './estado-comprobante-badge';
 import { MontoCell } from './monto-cell';
+import { DocumentosRespaldoSection } from './documentos-respaldo-section';
 
 const TIPO_LABELS: Record<string, string> = {
   DIARIO: 'Diario',
@@ -99,6 +101,7 @@ export function ComprobanteDetailPage(): React.JSX.Element {
   const [auditoriaId, setAuditoriaId] = useState<string | null>(null);
 
   const { data: comprobante, isLoading, isError } = useComprobante(id ?? '');
+  const puedeEditarContabilizado = usePuedeEditarContabilizado();
 
   // Cross-feature: cuentas para mostrar nombre·código en la tabla de líneas read-only.
   // pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)). Si un tenant
@@ -321,6 +324,20 @@ export function ComprobanteDetailPage(): React.JSX.Element {
             </Table>
           </div>
         </div>
+
+        {/* Documentos de respaldo — D5: editable solo si no anulado y estado permite */}
+        {(() => {
+          const editableEnDetail =
+            !comprobante.anulado &&
+            (comprobante.estado === 'BORRADOR' ||
+              (comprobante.estado === 'CONTABILIZADO' && puedeEditarContabilizado));
+          return (
+            <DocumentosRespaldoSection
+              comprobante={comprobante}
+              editable={editableEnDetail}
+            />
+          );
+        })()}
       </div>
 
       {/* Sheets y dialogs controlados por estado local */}
