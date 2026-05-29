@@ -722,4 +722,113 @@ describe('PrismaDocumentoFisicoRepository (integration)', () => {
     const cross = await repo.findDetalleById(tenantB, doc.id);
     expect(cross).toBeNull();
   });
+
+  // ==========================================================
+  // listar — filtro disponibleParaAsociar
+  // ==========================================================
+
+  it('disponibleParaAsociar=true — excluye documento asociado a un comprobante CONTABILIZADO', async () => {
+    const periodoId = await createPeriodo(tenantA);
+    const compContId = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+
+    const docConsumido = await repo.create(tenantA, baseCreateData({ numero: 'F-001' }));
+    const docSuelto = await repo.create(tenantA, baseCreateData({ numero: 'F-002' }));
+
+    await asociar(tenantA, compContId, docConsumido.id, EstadoComprobante.CONTABILIZADO);
+
+    const filtros: DocumentoFisicoListarFiltros = { disponibleParaAsociar: true };
+    const { items, total } = await repo.listar(tenantA, filtros, defaultPagination);
+
+    expect(total).toBe(1);
+    expect(items[0]?.id).toBe(docSuelto.id);
+  });
+
+  it('disponibleParaAsociar=true — incluye documento suelto (sin ninguna asociación)', async () => {
+    const docSuelto = await repo.create(tenantA, baseCreateData({ numero: 'F-001' }));
+
+    const filtros: DocumentoFisicoListarFiltros = { disponibleParaAsociar: true };
+    const { items, total } = await repo.listar(tenantA, filtros, defaultPagination);
+
+    expect(total).toBe(1);
+    expect(items[0]?.id).toBe(docSuelto.id);
+  });
+
+  it('disponibleParaAsociar=true — incluye documento que solo está en un BORRADOR', async () => {
+    const periodoId = await createPeriodo(tenantA);
+    const compBorradorId = await createComprobante(tenantA, periodoId, EstadoComprobante.BORRADOR);
+
+    const docEnBorrador = await repo.create(tenantA, baseCreateData({ numero: 'F-001' }));
+
+    await asociar(tenantA, compBorradorId, docEnBorrador.id, EstadoComprobante.BORRADOR);
+
+    const filtros: DocumentoFisicoListarFiltros = { disponibleParaAsociar: true };
+    const { items, total } = await repo.listar(tenantA, filtros, defaultPagination);
+
+    expect(total).toBe(1);
+    expect(items[0]?.id).toBe(docEnBorrador.id);
+  });
+
+  it('disponibleParaAsociar=undefined — devuelve todos sin excluir nada', async () => {
+    const periodoId = await createPeriodo(tenantA);
+    const compContId = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+    const compBorradorId = await createComprobante(tenantA, periodoId, EstadoComprobante.BORRADOR);
+
+    const docConsumido = await repo.create(tenantA, baseCreateData({ numero: 'F-001' }));
+    const docEnBorrador = await repo.create(tenantA, baseCreateData({ numero: 'F-002' }));
+    const docSuelto = await repo.create(tenantA, baseCreateData({ numero: 'F-003' }));
+
+    await asociar(tenantA, compContId, docConsumido.id, EstadoComprobante.CONTABILIZADO);
+    await asociar(tenantA, compBorradorId, docEnBorrador.id, EstadoComprobante.BORRADOR);
+
+    const { total } = await repo.listar(tenantA, {}, defaultPagination);
+
+    expect(total).toBe(3);
+    void docSuelto; // referenciado solo para claridad del test
+  });
+
+  it('disponibleParaAsociar=true — se compone (AND) con tipoDocumentoFisicoId', async () => {
+    const periodoId = await createPeriodo(tenantA);
+    const compContId = await createComprobante(tenantA, periodoId, EstadoComprobante.CONTABILIZADO);
+
+    // docA: tipo tributario, consumido → excluir
+    const docConsumido = await repo.create(
+      tenantA,
+      baseCreateData({ tipoDocumentoFisicoId: tipoTributario, numero: 'F-001' }),
+    );
+    // docB: tipo no-tributario, suelto → incluir
+    const docDisponible = await repo.create(
+      tenantA,
+      baseCreateData({
+        tipoDocumentoFisicoId: tipoNoTributario,
+        numero: 'R-001',
+        monto: null,
+        moneda: null,
+      }),
+    );
+    // docC: tipo no-tributario, consumido → excluir
+    const docNoTribConsumido = await repo.create(
+      tenantA,
+      baseCreateData({
+        tipoDocumentoFisicoId: tipoNoTributario,
+        numero: 'R-002',
+        monto: null,
+        moneda: null,
+      }),
+    );
+
+    await asociar(tenantA, compContId, docConsumido.id, EstadoComprobante.CONTABILIZADO);
+    await asociar(tenantA, compContId, docNoTribConsumido.id, EstadoComprobante.CONTABILIZADO);
+
+    // Filtro: disponibleParaAsociar=true AND tipoDocumentoFisicoId=tipoNoTributario
+    const filtros: DocumentoFisicoListarFiltros = {
+      disponibleParaAsociar: true,
+      tipoDocumentoFisicoId: tipoNoTributario,
+    };
+    const { items, total } = await repo.listar(tenantA, filtros, defaultPagination);
+
+    expect(total).toBe(1);
+    expect(items[0]?.id).toBe(docDisponible.id);
+    void docConsumido;
+    void docNoTribConsumido;
+  });
 });

@@ -279,10 +279,10 @@ describe('mensajeComprobantes', () => {
     expect(mensajeComprobantes(err('COMPROBANTE_MOTIVO_ANULACION_REQUERIDO'))).toMatch(/motivo/i);
   });
 
-  // Fallback para códigos slice 2 (no mapeados explícitamente)
-  it('COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE cae al message del backend', () => {
+  // Slice 2: COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE mapeado explícitamente (D6)
+  it('COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE → mensaje accionable mapeado en D6', () => {
     const msg = mensajeComprobantes(err('COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE', undefined, 'Doc no encontrado'));
-    expect(msg).toBe('Doc no encontrado');
+    expect(msg).toBe('El documento físico referenciado no existe en esta organización.');
   });
 
   it('código desconocido sin message cae al fallback genérico', () => {

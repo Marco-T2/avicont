@@ -205,13 +205,24 @@ export function mensajeComprobantes(err: unknown): string {
     // 403
     case 'MISSING_PERMISSION_EDIT_POSTED':
       return 'No tenés permiso para editar comprobantes contabilizados.';
+    case 'SIN_PERMISO_EDITAR_CONTABILIZADO':
+      return 'No tienes permiso para modificar un asiento contabilizado.';
 
     // 400
     case 'COMPROBANTE_MOTIVO_ANULACION_REQUERIDO':
       return 'El motivo de anulación es obligatorio y debe tener al menos 10 caracteres.';
 
-    // Fallback: cubre códigos slice 2 (COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE, etc.)
-    // y cualquier código desconocido.
+    // Documentos de respaldo (slice 2, D6)
+    case 'TIPO_DOCUMENTO_INCOMPATIBLE_CON_COMPROBANTE':
+      return 'Este tipo de documento no es compatible con el tipo de comprobante.';
+    case 'DOCUMENTO_FISICO_YA_ASOCIADO_A_OTRO_CONTABILIZADO':
+      return 'Este documento ya está asociado a otro asiento contabilizado.';
+    case 'COMPROBANTE_DOCUMENTO_ASOCIACION_PERIODO_CERRADO':
+      return 'El período fiscal está cerrado. No se puede modificar el asiento.';
+    case 'COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE':
+      return 'El documento físico referenciado no existe en esta organización.';
+
+    // Fallback: cubre cualquier código desconocido.
     default:
       return p.message ?? FALLBACK_GENERICO;
   }
