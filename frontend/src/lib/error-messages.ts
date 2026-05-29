@@ -217,6 +217,34 @@ export function mensajeComprobantes(err: unknown): string {
   }
 }
 
+// ============================================================
+// Documentos físicos — mapping de los 8 códigos del módulo.
+// ============================================================
+
+export function mensajeDocumentosFisicos(err: unknown): string {
+  const p = extractBackendError(err);
+  switch (p.code) {
+    case 'DOCUMENTO_FISICO_NUMERO_DUPLICADO':
+      return 'Ya existe un documento con ese número para el tipo seleccionado.';
+    case 'DOCUMENTO_FISICO_NUMERO_FORMATO_INVALIDO':
+      return 'El número solo puede contener letras mayúsculas, dígitos, puntos, guiones y barras.';
+    case 'DOCUMENTO_FISICO_MONTO_REQUERIDO_PARA_TRIBUTARIO':
+      return 'El monto y la moneda son obligatorios para documentos tributarios.';
+    case 'DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO':
+      return 'Los documentos no tributarios no llevan monto.';
+    case 'DOCUMENTO_FISICO_INMUTABLE_POR_COMPROBANTE_CONTABILIZADO':
+      return 'El documento no puede modificarse: está en un comprobante contabilizado.';
+    case 'DOCUMENTO_FISICO_REFERENCIADO_POR_COMPROBANTE':
+      return 'No se puede eliminar: el documento está asociado a uno o más comprobantes.';
+    case 'TIPO_DOCUMENTO_FISICO_NO_ENCONTRADO':
+      return 'El tipo de documento seleccionado no existe o fue desactivado.';
+    case 'CONTACTO_NO_ENCONTRADO':
+      return 'El contacto seleccionado no existe en esta organización.';
+    default:
+      return p.message ?? FALLBACK_GENERICO;
+  }
+}
+
 // Labels humanizados para los conceptos de OrgConfiguracionContable.
 export const CONCEPTO_LABELS: Record<string, string> = {
   ivaCreditoId: 'IVA Crédito Fiscal',
