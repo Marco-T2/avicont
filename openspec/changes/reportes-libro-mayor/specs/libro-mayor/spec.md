@@ -49,7 +49,7 @@ El sistema DEBE aceptar exactamente una de estas dos formas de rango:
 (b) `fechaDesde` + `fechaHasta` (ambas requeridas juntas).
 
 Si se reciben ambas formas simultáneamente, o si no se recibe ninguna, el sistema
-DEBE rechazar la solicitud con HTTP 400 y código `REPORTES_LIBRO_MAYOR_FILTRO_INVALIDO`.
+DEBE rechazar la solicitud con HTTP 400 y código `LIBRO_MAYOR_FILTRO_INVALIDO`.
 Si se recibe solo `fechaDesde` sin `fechaHasta` (o viceversa), ídem.
 
 #### Escenario: solo periodoFiscalId — válido
@@ -67,17 +67,17 @@ Si se recibe solo `fechaDesde` sin `fechaHasta` (o viceversa), ídem.
 #### Escenario: ambas formas presentes — error
 
 - CUANDO se envía `periodoFiscalId` junto con `fechaDesde` o `fechaHasta`
-- ENTONCES el sistema responde HTTP 400 con `REPORTES_LIBRO_MAYOR_FILTRO_INVALIDO`
+- ENTONCES el sistema responde HTTP 400 con `LIBRO_MAYOR_FILTRO_INVALIDO`
 
 #### Escenario: ningún filtro de rango — error
 
 - CUANDO se consulta sin `periodoFiscalId` ni `fechaDesde`/`fechaHasta`
-- ENTONCES el sistema responde HTTP 400 con `REPORTES_LIBRO_MAYOR_FILTRO_INVALIDO`
+- ENTONCES el sistema responde HTTP 400 con `LIBRO_MAYOR_FILTRO_INVALIDO`
 
 #### Escenario: fechaDesde sin fechaHasta — error
 
 - CUANDO se envía `fechaDesde` pero no `fechaHasta` (o viceversa)
-- ENTONCES el sistema responde HTTP 400 con `REPORTES_LIBRO_MAYOR_FILTRO_INVALIDO`
+- ENTONCES el sistema responde HTTP 400 con `LIBRO_MAYOR_FILTRO_INVALIDO`
 
 ---
 
@@ -248,14 +248,14 @@ rango. Si no hay movimientos en el rango, `saldoFinalBob DEBE igualar a saldoIni
 
 Si se especifica `cuentaId` de una cuenta con `esDetalle = false` (cuenta
 agrupadora / de nivel), el sistema DEBE rechazar la solicitud con HTTP 400 y código
-`REPORTES_LIBRO_MAYOR_CUENTA_NO_DETALLE`. Las cuentas agrupadoras no tienen líneas
+`LIBRO_MAYOR_CUENTA_NO_DETALLE`. Las cuentas agrupadoras no tienen líneas
 de movimiento directas y no pueden tener un Mayor calculado en esta versión.
 
 #### Escenario: cuenta agrupadora rechazada
 
 - DADO que existe la cuenta `1.1` con `esDetalle = false` (es la cabecera del grupo Caja y Bancos)
 - CUANDO se consulta `GET /api/libros/mayor?cuentaId=<id-cuenta-agrupadora>&fechaDesde=...&fechaHasta=...`
-- ENTONCES el sistema responde HTTP 400 con `REPORTES_LIBRO_MAYOR_CUENTA_NO_DETALLE`
+- ENTONCES el sistema responde HTTP 400 con `LIBRO_MAYOR_CUENTA_NO_DETALLE`
 
 #### Escenario: cuenta de detalle — válida
 
@@ -355,10 +355,13 @@ La respuesta DEBE cumplir esta forma exacta (montos `string`, fechas `"YYYY-MM-D
         }
       ]
     }
-  ],
-  generadoEn: string                 // ISO timestamp UTC
+  ]
 }
 ```
+
+> Nota: el DTO NO incluye un timestamp `generadoEn`. `new Date()` está prohibido
+> en el service/dominio (§4.6) y el Libro Diario tampoco lo expone. Si se necesita,
+> se inyecta vía `ClockPort` en un change posterior.
 
 #### Escenario: montos serializados como string
 
@@ -395,9 +398,9 @@ El sistema DEBE proteger `GET /api/libros/mayor` con el permiso
 ### REQ-LM-12: Tope defensivo
 
 Si el rango consultado (combinando todas las cuentas o la cuenta específica) implica
-procesar más de **10.000 líneas** que cumplan los filtros (estado + anulados), el
+procesar más de **20.000 líneas** que cumplan los filtros (estado + anulados), el
 sistema DEBE rechazar la solicitud con HTTP 422 y código
-`REPORTES_LIBRO_MAYOR_RANGO_EXCEDIDO`. El límite DEBE ser inyectable (constante de
+`LIBRO_MAYOR_RANGO_EXCEDIDO`. El límite DEBE ser inyectable (constante de
 módulo / variable de entorno) para facilitar ajuste sin re-deploy. NO DEBE devolver
 payload parcial silencioso.
 
@@ -406,9 +409,9 @@ de modo que sea calculable sin procesar toda la data.
 
 #### Escenario: rango excede el tope
 
-- DADO un tenant con 10.001 líneas CONTABILIZADAS en el rango especificado
+- DADO un tenant con 20.001 líneas CONTABILIZADAS en el rango especificado
 - CUANDO se consulta ese rango
-- ENTONCES el sistema responde HTTP 422 con `REPORTES_LIBRO_MAYOR_RANGO_EXCEDIDO` y un mensaje legible en español
+- ENTONCES el sistema responde HTTP 422 con `LIBRO_MAYOR_RANGO_EXCEDIDO` y un mensaje legible en español
 
 #### Escenario: rango dentro del tope — responde normalmente
 
@@ -422,18 +425,18 @@ de modo que sea calculable sin procesar toda la data.
 
 Si se usa `periodoFiscalId`, el sistema DEBE resolver las fechas del período y
 verificar que pertenezca al tenant activo. Si el período no existe o pertenece a
-otro tenant, DEBE responder HTTP 404 con `REPORTES_LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`.
+otro tenant, DEBE responder HTTP 404 con `LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`.
 
 #### Escenario: periodoFiscalId de otro tenant — 404
 
 - DADO un `periodoFiscalId` que pertenece al Tenant B
 - CUANDO el usuario del Tenant A lo usa en la consulta
-- ENTONCES el sistema responde HTTP 404 con `REPORTES_LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`
+- ENTONCES el sistema responde HTTP 404 con `LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`
 
 #### Escenario: periodoFiscalId inexistente — 404
 
 - CUANDO se usa un UUID que no corresponde a ningún período fiscal
-- ENTONCES el sistema responde HTTP 404 con `REPORTES_LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`
+- ENTONCES el sistema responde HTTP 404 con `LIBRO_MAYOR_PERIODO_NO_ENCONTRADO`
 
 ---
 
@@ -441,10 +444,12 @@ otro tenant, DEBE responder HTTP 404 con `REPORTES_LIBRO_MAYOR_PERIODO_NO_ENCONT
 
 | Código | HTTP | Descripción |
 |--------|------|-------------|
-| `REPORTES_LIBRO_MAYOR_FILTRO_INVALIDO` | 400 | Filtros de rango inválidos (ninguno, ambos, o dupla incompleta) |
-| `REPORTES_LIBRO_MAYOR_CUENTA_NO_DETALLE` | 400 | El `cuentaId` corresponde a una cuenta agrupadora (`esDetalle=false`) |
-| `REPORTES_LIBRO_MAYOR_PERIODO_NO_ENCONTRADO` | 404 | El `periodoFiscalId` no existe o no pertenece al tenant |
-| `REPORTES_LIBRO_MAYOR_RANGO_EXCEDIDO` | 422 | El rango supera el límite inyectable de líneas (default 10.000) |
+| `LIBRO_MAYOR_FILTRO_INVALIDO` | 400 | Filtros de rango inválidos (ninguno, ambos, o dupla incompleta) |
+| `LIBRO_MAYOR_RANGO_INVALIDO` | 400 | `fechaDesde` posterior a `fechaHasta` |
+| `LIBRO_MAYOR_CUENTA_NO_DETALLE` | 400 | El `cuentaId` corresponde a una cuenta agrupadora (`esDetalle=false`) |
+| `LIBRO_MAYOR_PERIODO_NO_ENCONTRADO` | 404 | El `periodoFiscalId` no existe o no pertenece al tenant |
+| `LIBRO_MAYOR_CUENTA_NO_ENCONTRADA` | 404 | El `cuentaId` no existe o no pertenece al tenant |
+| `LIBRO_MAYOR_RANGO_EXCEDIDO` | 422 | El rango supera el límite inyectable de líneas (default 20.000) |
 
 ---
 
