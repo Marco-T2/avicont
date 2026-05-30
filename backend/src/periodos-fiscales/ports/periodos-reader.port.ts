@@ -52,6 +52,28 @@ export abstract class PeriodosReaderPort {
   ): Promise<PeriodoLite | null>;
 
   /**
+   * Devuelve el rango de fechas calendario (inicio y fin de mes) del período
+   * indicado, scoped al tenant (defense in depth §4.2 CLAUDE.md).
+   *
+   * El rango se deriva de `year` y `month` del período:
+   *   - `desde` = primer día del mes a medianoche UTC (año-mes-01T00:00:00Z)
+   *   - `hasta` = último día del mes a medianoche UTC (usando el último día
+   *     real del mes calendario, ej. 2026-02-28 para febrero)
+   *
+   * Retorna `null` si:
+   *   - No existe un período con ese id para el tenant.
+   *   - El período existe pero pertenece a otro tenant (no distingue — ambos
+   *     devuelven null para evitar enumeración de ids ajenos).
+   *
+   * Consumido por `reportes` para resolver `periodoFiscalId → rango de fechas`
+   * del Libro Diario (design decisión #4).
+   */
+  abstract obtenerRangoFechas(
+    tenantId: string,
+    periodoId: string,
+  ): Promise<{ desde: Date; hasta: Date } | null>;
+
+  /**
    * Devuelve la reapertura activa (sin `reclosedAt`) del período indicado,
    * scoped al tenant por defense in depth (§4.2 CLAUDE.md).
    *

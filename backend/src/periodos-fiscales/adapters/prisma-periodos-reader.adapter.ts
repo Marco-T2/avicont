@@ -31,6 +31,29 @@ export class PrismaPeriodosReaderAdapter extends PeriodosReaderPort {
     return row ?? null;
   }
 
+  async obtenerRangoFechas(
+    tenantId: string,
+    periodoId: string,
+  ): Promise<{ desde: Date; hasta: Date } | null> {
+    // Defense in depth (CLAUDE.md §4.2): filtramos organizationId para que
+    // un periodoId de otro tenant devuelva null sin revelar su existencia.
+    const row = await this.prisma.periodoFiscal.findFirst({
+      where: { id: periodoId, organizationId: tenantId },
+      select: { year: true, month: true },
+    });
+
+    if (!row) return null;
+
+    // Derivar rango calendario del mes real (year, month).
+    // FechaContable es calendario puro (CLAUDE.md §4.6): usamos UTC para
+    // construir las fechas sin que la zona horaria del servidor las desfase.
+    const desde = new Date(Date.UTC(row.year, row.month - 1, 1));
+    // Truco: día 0 del mes siguiente = último día del mes actual.
+    const hasta = new Date(Date.UTC(row.year, row.month, 0));
+
+    return { desde, hasta };
+  }
+
   async obtenerReaperturaActiva(
     tenantId: string,
     periodoId: string,

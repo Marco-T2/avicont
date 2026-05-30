@@ -224,3 +224,112 @@ describe('PrismaPeriodosReaderAdapter — obtenerReaperturaActiva (integration)'
     });
   });
 });
+
+// ============================================================
+// obtenerRangoFechas — integration spec (Fase 1.4 / 1.5)
+// ============================================================
+
+describe('PrismaPeriodosReaderAdapter — obtenerRangoFechas (integration)', () => {
+  const SLUG_A = 'org-rango-reader-a';
+  const SLUG_B = 'org-rango-reader-b';
+
+  let prisma: PrismaClient;
+  let adapter: PrismaPeriodosReaderAdapter;
+  let tenantA: string;
+  let tenantB: string;
+  let periodoEnero: string; // 2026-01 de tenant A
+  let periodoMarzo: string; // 2026-03 de tenant A (31 días)
+
+  beforeAll(async () => {
+    prisma = new PrismaClient();
+    await prisma.$connect();
+    adapter = new PrismaPeriodosReaderAdapter(prisma as unknown as PrismaService);
+  });
+
+  afterAll(async () => {
+    await cleanup();
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await cleanup();
+
+    const [orgA, orgB] = await Promise.all([
+      prisma.organization.create({ data: { slug: SLUG_A, name: 'Org Rango A' } }),
+      prisma.organization.create({ data: { slug: SLUG_B, name: 'Org Rango B' } }),
+    ]);
+    tenantA = orgA.id;
+    tenantB = orgB.id;
+
+    const gestionA = await prisma.gestionFiscal.create({
+      data: { organizationId: tenantA, year: 2026, mesInicio: 1 },
+    });
+
+    const [p1, p3] = await Promise.all([
+      prisma.periodoFiscal.create({
+        data: {
+          organizationId: tenantA,
+          gestionId: gestionA.id,
+          year: 2026,
+          month: 1,
+          ordenEnGestion: 1,
+          status: 'ABIERTO',
+        },
+      }),
+      prisma.periodoFiscal.create({
+        data: {
+          organizationId: tenantA,
+          gestionId: gestionA.id,
+          year: 2026,
+          month: 3,
+          ordenEnGestion: 3,
+          status: 'ABIERTO',
+        },
+      }),
+    ]);
+
+    periodoEnero = p1.id;
+    periodoMarzo = p3.id;
+  });
+
+  async function cleanup() {
+    await prisma.organization.deleteMany({
+      where: { slug: { in: [SLUG_A, SLUG_B] } },
+    });
+  }
+
+  it('devuelve { desde: 2026-01-01, hasta: 2026-01-31 } para enero 2026', async () => {
+    const result = await adapter.obtenerRangoFechas(tenantA, periodoEnero);
+
+    expect(result).not.toBeNull();
+    // El desde es el primer día del mes (2026-01-01 UTC)
+    expect(result!.desde.getUTCFullYear()).toBe(2026);
+    expect(result!.desde.getUTCMonth()).toBe(0); // enero = 0
+    expect(result!.desde.getUTCDate()).toBe(1);
+    // El hasta es el último día del mes (2026-01-31 UTC)
+    expect(result!.hasta.getUTCFullYear()).toBe(2026);
+    expect(result!.hasta.getUTCMonth()).toBe(0);
+    expect(result!.hasta.getUTCDate()).toBe(31);
+  });
+
+  it('devuelve { desde: 2026-03-01, hasta: 2026-03-31 } para marzo 2026 (31 días)', async () => {
+    const result = await adapter.obtenerRangoFechas(tenantA, periodoMarzo);
+
+    expect(result).not.toBeNull();
+    expect(result!.desde.getUTCDate()).toBe(1);
+    expect(result!.desde.getUTCMonth()).toBe(2); // marzo = 2
+    expect(result!.hasta.getUTCDate()).toBe(31);
+    expect(result!.hasta.getUTCMonth()).toBe(2);
+  });
+
+  it('retorna null si el período no existe', async () => {
+    const result = await adapter.obtenerRangoFechas(tenantA, 'periodo-inexistente-uuid');
+    expect(result).toBeNull();
+  });
+
+  it('retorna null si el período existe pero pertenece a otro tenant (defense in depth §4.2)', async () => {
+    // periodoEnero pertenece a tenantA — consultamos con tenantB
+    const result = await adapter.obtenerRangoFechas(tenantB, periodoEnero);
+    expect(result).toBeNull();
+  });
+});
