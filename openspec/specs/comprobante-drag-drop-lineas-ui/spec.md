@@ -1,23 +1,21 @@
-<!--
-Change: comprobante-drag-drop-lineas
-Fase: spec
-Fecha: 2026-05-30
-Status: EN PROGRESO
-Última revisión contra core: 2026-05-30
-Owner: frontend-lead
--->
+# comprobante-drag-drop-lineas-ui Specification
 
-# Spec: Drag & drop para reordenar líneas de comprobante (UI)
+## Purpose
 
-> Spec nueva — capacidad UI sobre un contrato backend existente.
-> El campo `orden Int` y `@@unique([comprobanteId, orden])` ya existen en `LineaComprobante`
-> (schema.prisma:716). El backend re-deriva `orden = idx + 1` del array recibido en el
-> re-insert atómico §4.3. Esta spec cubre el comportamiento UI observable más una verificación
-> e2e del contrato existente.
+Reordenamiento de las líneas del editor de comprobantes mediante drag & drop (frontend).
+Capacidad UI sobre un contrato backend ya existente: el campo `orden Int` y
+`@@unique([comprobanteId, orden])` ya existen en `LineaComprobante` (schema.prisma), y el
+backend re-deriva `orden = idx + 1` del array recibido en el re-insert atómico (§4.3 del core).
+Esta spec cubre el comportamiento UI observable (handle dedicado, reorden por pointer y teclado,
+deshabilitado por estado, preservación de foco) más una verificación e2e del contrato existente.
+Implementado con `@dnd-kit` (pointer + `KeyboardSensor`), `fieldArray.move()` de react-hook-form
+y `key={field.id}` para evitar el salto de foco histórico en los inputs Debe/Haber.
 
 ---
 
-## REQ-DDL-UI-01 — Handle de arrastre dedicado por fila
+## Requirements
+
+### Requirement: Handle de arrastre dedicado por fila
 
 Cada fila del editor de líneas (`linea-row.tsx`) DEBE incluir un **handle de arrastre dedicado**
 (botón con ícono `GripVertical`), separado de los inputs editables (Cuenta, Debe, Haber, Glosa,
@@ -36,13 +34,13 @@ los inputs.
 - WHEN el usuario usa las flechas del teclado dentro del input
 - THEN el input recibe las flechas normalmente y NO se inicia ninguna operación de arrastre
 
----
-
-## REQ-DDL-UI-02 — Reordenar por arrastre (pointer)
+### Requirement: Reordenar por arrastre (pointer)
 
 El usuario DEBE poder reordenar las líneas arrastrando una fila desde su handle hasta otra
 posición. El reorden se refleja inmediatamente en el editor y se persiste como nuevo `orden`
 al guardar (el front envía el array en el nuevo orden; el backend re-deriva `orden = idx + 1`).
+El movimiento del arrastre está restringido al eje vertical y contenido dentro de la tabla
+(`restrictToVerticalAxis` + `restrictToParentElement`) para evitar scrollbars temporales.
 
 #### Scenario: Arrastrar una fila la mueve a la nueva posición
 
@@ -62,9 +60,7 @@ al guardar (el front envía el array en el nuevo orden; el backend re-deriva `or
 - WHEN una fila está siendo arrastrada
 - THEN la fila se anima in-place (transform/transition de la librería) y NO se monta un `<tr>` fuera del `<tbody>` (HTML inválido)
 
----
-
-## REQ-DDL-UI-03 — Reordenar por teclado (accesibilidad)
+### Requirement: Reordenar por teclado (accesibilidad)
 
 El reorden DEBE ser operable por teclado a través del handle, sin interferir con la navegación
 de teclado de los inputs de la fila. El handle DEBE responder al `KeyboardSensor` de la librería.
@@ -81,9 +77,7 @@ de teclado de los inputs de la fila. El handle DEBE responder al `KeyboardSensor
 - WHEN se inspecciona el handle de arrastre en el DOM
 - THEN el handle es focusable por teclado y expone un `aria-label` en español
 
----
-
-## REQ-DDL-UI-04 — Drag deshabilitado en comprobante contabilizado bloqueado
+### Requirement: Drag deshabilitado en comprobante contabilizado bloqueado
 
 Cuando `editorDisabled === true` (mode `'contabilizado'` con el toggle "Reemplazar líneas" en
 off), el handle de arrastre DEBE estar deshabilitado: no inicia arrastre y expone
@@ -101,9 +95,7 @@ off), el handle de arrastre DEBE estar deshabilitado: no inicia arrastre y expon
 - WHEN el usuario activa el toggle "Reemplazar líneas"
 - THEN el handle de arrastre de cada fila se habilita y permite reordenar
 
----
-
-## REQ-DDL-UI-05 — Preservar foco e identidad de fila tras reordenar
+### Requirement: Preservar foco e identidad de fila tras reordenar
 
 El reorden DEBE preservar la identidad estable de cada fila (`key={field.id}` de RHF) para
 evitar el bug histórico de salto de foco en los inputs Debe/Haber. El handler Alt+Delete DEBE
@@ -121,9 +113,7 @@ seguir eliminando la fila correcta tras un reorden.
 - WHEN el usuario hace Alt+Delete con foco en el botón eliminar de una fila concreta
 - THEN se elimina esa misma fila (el `data-row-index` refleja el índice actual post-reorden)
 
----
-
-## REQ-DDL-UI-06 — Persistencia del orden (verificación de contrato backend)
+### Requirement: Persistencia del orden (verificación de contrato backend)
 
 Al guardar un comprobante con líneas reordenadas, el backend DEBE persistir el nuevo `orden`
 (`orden = idx + 1` del array recibido) y devolver las líneas en ese orden. No hay cambio de
@@ -136,58 +126,19 @@ contrato — esta verificación cubre el contrato existente vía un test e2e.
 - THEN la respuesta devuelve las líneas con `orden` 1 = cuentaB y `orden` 2 = cuentaA
 - AND la partida doble se mantiene válida (sin cambio de montos)
 
----
-
-## REQ-DDL-UI-07 — Tests de componentes
+### Requirement: Tests de componentes
 
 Tests que cubren los escenarios críticos del reorden. Stack: Vitest + `@testing-library/react`
-+ `@testing-library/user-event`. El backend se cubre con 1 test e2e (REQ-DDL-UI-06).
++ `@testing-library/user-event`. El backend se cubre con 1 test e2e (Persistencia del orden).
 
-### 07.1 — `lineas-editor.test.tsx` (extensión)
+#### Scenario: `lineas-editor.test.tsx` cubre el reorden
 
-- El editor renderiza dentro de un `DndContext`/`SortableContext` sin romper los tests existentes.
-- Reorden vía la API de la librería (simular `onDragEnd` o helper) llama a `move(oldIndex, newIndex)` y reordena las filas.
-- Los tests existentes (agregar/eliminar fila, totales, Alt+Delete) siguen verdes.
+- GIVEN el editor renderizado dentro de un `DndContext`/`SortableContext`
+- WHEN se simula `onDragEnd` (helper que invoca la API de la librería)
+- THEN se llama a `move(oldIndex, newIndex)`, las filas se reordenan y los tests existentes (agregar/eliminar fila, totales, Alt+Delete) siguen verdes
 
-### 07.2 — `linea-row.test.tsx` (extensión)
+#### Scenario: `linea-row.test.tsx` cubre el handle accesible
 
-- La fila renderiza un handle de arrastre con `aria-label` accesible.
-- El handle está deshabilitado cuando `disabled` (editorDisabled) es true.
-- El handle está habilitado cuando `disabled` es false.
-- `key={field.id}` se preserva (no se introduce `key={index}`).
-
-**Criterios transversales**:
-
-- Sin `any` (excepto `Partial<T>` en mocks donde sea impracticable); `unknown` + narrowing.
-- `noUncheckedIndexedAccess`: narrow `array[i]` antes de operar.
-- Queries por rol/label (`getByRole`, `getByLabelText`), no `data-testid` como primera opción.
-- `getAllByText()` cuando hay totales o tablas duplicadas (Anti-JSDOM-dup).
-- `afterEach(() => vi.clearAllMocks())`.
-
----
-
-## Índice de requisitos
-
-| REQ | Título | Escenarios |
-|-----|--------|-----------|
-| REQ-DDL-UI-01 | Handle de arrastre dedicado por fila | 2 |
-| REQ-DDL-UI-02 | Reordenar por arrastre (pointer) | 3 |
-| REQ-DDL-UI-03 | Reordenar por teclado (accesibilidad) | 2 |
-| REQ-DDL-UI-04 | Drag deshabilitado en contabilizado bloqueado | 2 |
-| REQ-DDL-UI-05 | Preservar foco e identidad de fila | 2 |
-| REQ-DDL-UI-06 | Persistencia del orden (contrato backend) | 1 |
-| REQ-DDL-UI-07 | Tests de componentes | Sub-escenarios en §07.1–07.2 |
-
----
-
-## Decisiones cerradas reflejadas (trazabilidad)
-
-| Decisión | REQ que la implementa |
-|---|---|
-| Librería @dnd-kit (pointer + KeyboardSensor) | REQ-DDL-UI-02, REQ-DDL-UI-03 |
-| Handle dedicado, no fila entera (no choca con inputs) | REQ-DDL-UI-01 |
-| Sin DragOverlay con `<tr>` (animación in-place) | REQ-DDL-UI-02 |
-| Drag deshabilitado cuando `editorDisabled` | REQ-DDL-UI-04 |
-| `fieldArray.move()` + `key={field.id}` (anti salto de foco) | REQ-DDL-UI-05 |
-| Front manda array reordenado; backend deriva `orden = idx + 1` | REQ-DDL-UI-06 |
-| Sin migración, sin cambios de schema/service/repo/DTO | (fuera de scope) |
+- GIVEN una fila renderizada en el editor
+- WHEN se inspecciona el handle de arrastre
+- THEN expone un `aria-label` accesible, está deshabilitado cuando `disabled` (editorDisabled) es true y habilitado cuando es false, preservando `key={field.id}` (sin `key={index}`)
