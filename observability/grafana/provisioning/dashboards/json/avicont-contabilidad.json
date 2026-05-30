@@ -134,6 +134,19 @@
     },
     {
       "type": "timeseries",
+      "title": "Refresh de tokens por resultado",
+      "description": "Rotación de refresh tokens (auth_token_refresh_total). Un pico de failure puede indicar tokens expirados/revocados o intentos de reuso.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "id": 12,
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "editorMode": "code", "expr": "sum(rate(saas_auth_token_refresh_total[5m])) by (status)", "legendFormat": "{{status}}", "range": true }
+      ]
+    },
+    {
+      "type": "timeseries",
       "title": "Operaciones autenticadas por tipo",
       "description": "Operaciones autenticadas (con tenant en JWT/header) por controller.handler. Sin tenant_id por cardinalidad; el detalle per-tenant vive en logs/traces.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -148,7 +161,7 @@
     {
       "type": "row",
       "title": "Runtime Node.js",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
       "id": 102,
       "collapsed": false
     },
@@ -156,7 +169,7 @@
       "type": "timeseries",
       "title": "Heap usado vs total",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
       "id": 9,
       "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
@@ -170,7 +183,7 @@
       "title": "Event loop lag p99",
       "description": "Si sube, el proceso está bloqueado (CPU sync, JSON enorme, etc.)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
       "id": 10,
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi" } },
@@ -181,7 +194,7 @@
     {
       "type": "row",
       "title": "Logs (Loki)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
       "id": 103,
       "collapsed": false
     },
@@ -189,7 +202,7 @@
       "type": "logs",
       "title": "Logs del backend — errores y warnings",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 44 },
       "id": 11,
       "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "dedupStrategy": "none" },
       "targets": [
