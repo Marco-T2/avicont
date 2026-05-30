@@ -2,6 +2,8 @@
  * Tests de LineaRow — REQ-CCL-UI-01, REQ-CCL-UI-02, REQ-CCL-UI-03.
  * Incluye test de regresión del bug de FOCO (design §Decisión 5).
  */
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext } from '@dnd-kit/sortable';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
@@ -119,19 +121,29 @@ function Wrapper({ index = 0, cuentas = [], defaultLinea, disabled = false }: Wr
     defaultValues: { lineas: [linea] },
   });
 
+  // `useSortable` (de @dnd-kit) exige estar dentro de un DndContext/SortableContext.
+  // El id del sortable es estable (field.id de RHF en producción); en el test usamos
+  // un id fijo coherente con el SortableContext.
+  const sortableId = 'row-id-1';
+
   return (
     <FormProvider {...form}>
-      <table>
-        <tbody>
-          <LineaRow
-            index={index}
-            cuentas={cuentas}
-            onRemove={vi.fn()}
-            isOnlyRow={true}
-            disabled={disabled}
-          />
-        </tbody>
-      </table>
+      <DndContext>
+        <SortableContext items={[sortableId]}>
+          <table>
+            <tbody>
+              <LineaRow
+                id={sortableId}
+                index={index}
+                cuentas={cuentas}
+                onRemove={vi.fn()}
+                isOnlyRow={true}
+                disabled={disabled}
+              />
+            </tbody>
+          </table>
+        </SortableContext>
+      </DndContext>
     </FormProvider>
   );
 }
@@ -307,6 +319,32 @@ describe('LineaRow', () => {
     it('el combobox de contacto está deshabilitado cuando disabled=true', () => {
       render(<Wrapper cuentas={[makeCuenta()]} disabled={true} />);
       expect(screen.getByRole('combobox', { name: 'Contacto' })).toBeDisabled();
+    });
+  });
+
+  describe('REQ-DDL-UI-01 — Handle de arrastre dedicado por fila', () => {
+    it('cada fila muestra un handle de arrastre con aria-label "Reordenar línea"', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} />);
+      expect(screen.getByRole('button', { name: /reordenar línea/i })).toBeInTheDocument();
+    });
+
+    it('el handle es focusable por teclado (no tiene tabindex negativo)', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} />);
+      const handle = screen.getByRole('button', { name: /reordenar línea/i });
+      handle.focus();
+      expect(handle).toHaveFocus();
+    });
+  });
+
+  describe('REQ-DDL-UI-04 — Handle deshabilitado cuando disabled=true', () => {
+    it('el handle de arrastre está habilitado cuando disabled=false', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} disabled={false} />);
+      expect(screen.getByRole('button', { name: /reordenar línea/i })).not.toBeDisabled();
+    });
+
+    it('el handle de arrastre está deshabilitado cuando disabled=true', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} disabled={true} />);
+      expect(screen.getByRole('button', { name: /reordenar línea/i })).toBeDisabled();
     });
   });
 });
