@@ -83,13 +83,15 @@ export function ContactoCombobox({
           aria-invalid={ariaInvalid}
           aria-label={ariaLabel}
           disabled={disabled}
+          // Tooltip nativo: razón social completa al hover (se trunca en la celda).
+          {...(selected !== undefined ? { title: selected.razonSocial } : {})}
           className={cn(
             'w-full justify-between font-normal',
             value === null && 'text-muted-foreground',
             ariaInvalid === true && 'border-amber-400 dark:border-amber-600',
           )}
         >
-          <span className="truncate text-left">{label}</span>
+          <span className="truncate text-left min-w-0 flex-1">{label}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

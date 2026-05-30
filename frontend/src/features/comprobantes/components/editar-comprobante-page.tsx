@@ -14,6 +14,7 @@ import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 import type { Comprobante } from '@/types/api';
 
 import { calcularMontoBob } from '../lib/calcular-monto-bob';
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import type { CrearComprobantePayload } from '../api/crear-comprobante';
 import type { EditarComprobantePayload } from '../api/editar-comprobante';
 import { useComprobante } from '../hooks/use-comprobante';
@@ -124,8 +125,11 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
   const defaultValues = isNuevo
     ? {
         tipo: 'DIARIO' as const,
-        fechaContable: new Date().toISOString().slice(0, 10),
+        fechaContable: hoyEnLaPaz(),
         glosa: '',
+        // Default '1' = sin re-expresión. El backend ya trata '1' como su default,
+        // así el contador no necesita tocar este campo de presentación.
+        tipoCambioReexpresion: '1',
         lineas: [{ ...LINEA_VACIA, _localKey: crypto.randomUUID() }],
       }
     : comprobante !== undefined
@@ -149,8 +153,9 @@ function EditorForm({ mode, comprobante }: EditorFormProps): React.JSX.Element {
       // el cast: el resolver lo ignora, pero useForm lo necesita para el key estable.
       form.reset({
         tipo: 'DIARIO',
-        fechaContable: new Date().toISOString().slice(0, 10),
+        fechaContable: hoyEnLaPaz(),
         glosa: '',
+        tipoCambioReexpresion: '1',
         lineas: [{ ...LINEA_VACIA, _localKey: crypto.randomUUID() }],
       } as unknown as Parameters<typeof form.reset>[0]);
     } else if (comprobante !== undefined) {

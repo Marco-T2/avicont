@@ -115,6 +115,18 @@ describe('CuentaAutocomplete', () => {
     expect(screen.getByText('Caja Chica')).toBeInTheDocument();
   });
 
+  it('expone código y nombre completos en el title del trigger (tooltip al hover)', () => {
+    setupMock();
+    render(<CuentaAutocomplete value="uuid-1" onChange={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveAttribute('title', '1.1.01 · Caja Chica');
+  });
+
+  it('no pone title en el trigger cuando no hay cuenta seleccionada', () => {
+    setupMock();
+    render(<CuentaAutocomplete value="" onChange={vi.fn()} />);
+    expect(screen.getByRole('combobox')).not.toHaveAttribute('title');
+  });
+
   it('muestra "Cargando…" cuando isLoading=true', () => {
     (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined,
