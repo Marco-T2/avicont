@@ -40,9 +40,7 @@ function makeMovimiento(
   };
 }
 
-function makeCuentaCalculada(
-  overrides: Partial<CuentaMayorCalculada> = {},
-): CuentaMayorCalculada {
+function makeCuentaCalculada(overrides: Partial<CuentaMayorCalculada> = {}): CuentaMayorCalculada {
   return {
     cuentaId: 'cuenta-1',
     codigoInterno: '1.1.1.001',

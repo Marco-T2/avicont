@@ -415,7 +415,9 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
 
       expect(res.status).toBe(200);
-      const caja = res.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const caja = res.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(typeof caja.saldoInicialBob).toBe('string');
       expect(typeof caja.saldoFinalBob).toBe('string');
       expect(typeof caja.totalDebeBob).toBe('string');
@@ -428,7 +430,8 @@ describe('Libro Mayor (e2e)', () => {
     });
 
     it('saldo inicial DEUDORA correcto (movimiento previo al rango) (REQ-LM-04)', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-lm-saldoinicial');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-lm-saldoinicial');
 
       // Crear gestión 2025 + período diciembre 2025 para el movimiento previo
       const gestion2025 = await prisma.gestionFiscal.create({
@@ -446,10 +449,9 @@ describe('Libro Mayor (e2e)', () => {
       });
 
       // Asiento en diciembre 2025 (saldo inicial para enero 2026)
-      await crearAsientoContabilizado(
-        orgId, periodosDic.id, cajaId, ventasId, '2025-12-15',
-        { importe: 800 },
-      );
+      await crearAsientoContabilizado(orgId, periodosDic.id, cajaId, ventasId, '2025-12-15', {
+        importe: 800,
+      });
       // Asiento en enero 2026 (movimiento del rango)
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10');
 
@@ -459,13 +461,16 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
 
       expect(res.status).toBe(200);
-      const caja = res.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const caja = res.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       // DEUDORA: saldoInicial = 800(debe) - 0(haber) = 800
       expect(caja.saldoInicialBob).toBe('800.00');
     });
 
     it('saldoFinalBob coincide con saldoCorriente del último movimiento (REQ-LM-06)', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-lm-saldofinal');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-lm-saldofinal');
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10');
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15');
 
@@ -475,7 +480,9 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
 
       expect(res.status).toBe(200);
-      const caja = res.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const caja = res.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       const movimientos = caja.movimientos;
       const ultimoMov = movimientos[movimientos.length - 1];
       expect(caja.saldoFinalBob).toBe(ultimoMov.saldoCorrienteBob);
@@ -488,7 +495,8 @@ describe('Libro Mayor (e2e)', () => {
 
   describe('exclusión de BORRADOR', () => {
     it('no incluye comprobantes en BORRADOR en movimientos ni saldo inicial', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-lm-borrador');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-lm-borrador');
 
       // Borrador en enero — no debe aparecer en movimientos
       await prisma.comprobante.create({
@@ -511,7 +519,9 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
 
       expect(res.status).toBe(200);
-      const caja = res.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const caja = res.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(caja.movimientos).toHaveLength(1);
       expect(caja.movimientos[0].estado).toBe('CONTABILIZADO');
     });
@@ -523,7 +533,8 @@ describe('Libro Mayor (e2e)', () => {
 
   describe('toggle de anulados', () => {
     it('sin incluirAnulados: los anulados no aparecen; con incluirAnulados=true sí', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-lm-anulados');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-lm-anulados');
 
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-05');
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-06', {
@@ -541,12 +552,16 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31', incluirAnulados: 'true' });
 
       expect(resSin.status).toBe(200);
-      const cajaSin = resSin.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const cajaSin = resSin.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(cajaSin.movimientos).toHaveLength(1);
       expect(cajaSin.movimientos[0].anulado).toBe(false);
 
       expect(resCon.status).toBe(200);
-      const cajaCon = resCon.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const cajaCon = resCon.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(cajaCon.movimientos).toHaveLength(2);
     });
   });
@@ -596,7 +611,9 @@ describe('Libro Mayor (e2e)', () => {
       expect(resNoSolo.status).toBe(200);
       // Cuentas con saldo previo != 0 deben aparecer
       expect(resNoSolo.body.cuentas.length).toBeGreaterThan(0);
-      const caja = resNoSolo.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const caja = resNoSolo.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(caja.movimientos).toHaveLength(0);
       expect(caja.saldoFinalBob).toBe(caja.saldoInicialBob);
     });
@@ -627,14 +644,20 @@ describe('Libro Mayor (e2e)', () => {
 
       // Tenant A: 1 asiento con importe 1000
       await crearAsientoContabilizado(
-        tenantA.orgId, tenantA.periodoEneroId, tenantA.cajaId, tenantA.ventasId,
+        tenantA.orgId,
+        tenantA.periodoEneroId,
+        tenantA.cajaId,
+        tenantA.ventasId,
         '2026-01-10',
         { importe: 1000 },
       );
       // Tenant B: 3 asientos con importe 5000
       for (let i = 1; i <= 3; i++) {
         await crearAsientoContabilizado(
-          tenantB.orgId, tenantB.periodoEneroId, tenantB.cajaId, tenantB.ventasId,
+          tenantB.orgId,
+          tenantB.periodoEneroId,
+          tenantB.cajaId,
+          tenantB.ventasId,
           `2026-01-${String(i + 5).padStart(2, '0')}`,
           { importe: 5000 },
         );
@@ -651,13 +674,17 @@ describe('Libro Mayor (e2e)', () => {
         .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
 
       expect(resA.status).toBe(200);
-      const cajaA = resA.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const cajaA = resA.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(cajaA.movimientos).toHaveLength(1); // Solo el de A (no los 3 de B)
       // El importe de A es 1000, no 5000 de B
       expect(cajaA.movimientos[0].debeBob).toBe('1000.00');
 
       expect(resB.status).toBe(200);
-      const cajaB = resB.body.cuentas.find((c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001');
+      const cajaB = resB.body.cuentas.find(
+        (c: { codigoInterno: string }) => c.codigoInterno === '1.1.1.001',
+      );
       expect(cajaB.movimientos).toHaveLength(3);
     });
   });

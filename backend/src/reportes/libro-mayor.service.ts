@@ -16,7 +16,11 @@ import {
   PeriodoNoEncontradoError,
   RangoInvalidoError,
 } from './domain/libro-mayor-errors';
-import type { CuentaMayorCalculada, LibroMayorResponseDto, MovimientoCalculado } from './dto/libro-mayor-response.dto';
+import type {
+  CuentaMayorCalculada,
+  LibroMayorResponseDto,
+  MovimientoCalculado,
+} from './dto/libro-mayor-response.dto';
 import { toLibroMayorResponse } from './dto/libro-mayor-response.dto';
 import {
   LIBRO_MAYOR_READER_PORT,
@@ -123,10 +127,7 @@ export class LibroMayorService {
 
     // ── 3. Validación de cuenta (REQ-LM-07) ──────────────────────────────
     if (query.cuentaId !== undefined) {
-      const cuentaDetalle = await this.mayorReader.obtenerCuentaDetalle(
-        tenantId,
-        query.cuentaId,
-      );
+      const cuentaDetalle = await this.mayorReader.obtenerCuentaDetalle(tenantId, query.cuentaId);
       if (!cuentaDetalle) {
         throw new CuentaNoEncontradaError(query.cuentaId);
       }

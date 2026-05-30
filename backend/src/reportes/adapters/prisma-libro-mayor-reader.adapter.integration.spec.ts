@@ -252,7 +252,10 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
   describe('contarMovimientos', () => {
     it('cuenta solo líneas de CONTABILIZADO/BLOQUEADO, excluye BORRADOR', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       // Borrador — no debe contar
@@ -275,11 +278,17 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
     it('respeta incluirAnulados: sin flag excluye anulados; con flag los incluye', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 6)),
         1000,
         true, // anulado
@@ -297,7 +306,10 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
     it('respeta cuentaId: cuenta solo líneas de esa cuenta', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
 
@@ -311,16 +323,25 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
     it('CRÍTICO — aislamiento multi-tenant: counts separados por tenant', async () => {
       // Tenant A: 1 asiento (2 líneas)
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       // Tenant B: 2 asientos (4 líneas)
       await crearMovimientoContabilizado(
-        tenantB, periodoBId, cajaBId, ventasBId,
+        tenantB,
+        periodoBId,
+        cajaBId,
+        ventasBId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       await crearMovimientoContabilizado(
-        tenantB, periodoBId, cajaBId, ventasBId,
+        tenantB,
+        periodoBId,
+        cajaBId,
+        ventasBId,
         new Date(Date.UTC(2026, 0, 6)),
       );
 
@@ -339,7 +360,10 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
   describe('obtenerMovimientos', () => {
     it('BORRADOR nunca aparece en movimientos (REQ-LM-02)', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 10)),
       );
       await prisma.comprobante.create({
@@ -361,11 +385,17 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
     it('sin incluirAnulados: anulados excluidos; con flag: incluidos (REQ-LM-03)', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 6)),
         1000,
         true, // anulado
@@ -387,14 +417,20 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
       // Insertar en orden inverso al esperado
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         mismaFecha,
         1000,
         false,
         'D2601-000020',
       );
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         mismaFecha,
         1000,
         false,
@@ -411,11 +447,17 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
     it('CRÍTICO — aislamiento multi-tenant: query de Tenant A devuelve SOLO movimientos de Tenant A (REQ-LM-09)', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
       await crearMovimientoContabilizado(
-        tenantB, periodoBId, cajaBId, ventasBId,
+        tenantB,
+        periodoBId,
+        cajaBId,
+        ventasBId,
         new Date(Date.UTC(2026, 0, 5)),
         5000, // importe diferente para distinguir
       );
@@ -428,13 +470,20 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       // Tenant B solo ve los suyos
       expect(rowsB.every((r) => r.cuentaId === cajaBId || r.cuentaId === ventasBId)).toBe(true);
       // Importes no se mezclan
-      expect(rowsA.every((r) => r.debitoBob.toNumber() === 1000 || r.creditoBob.toNumber() === 1000)).toBe(true);
-      expect(rowsB.every((r) => r.debitoBob.toNumber() === 5000 || r.creditoBob.toNumber() === 5000)).toBe(true);
+      expect(
+        rowsA.every((r) => r.debitoBob.toNumber() === 1000 || r.creditoBob.toNumber() === 1000),
+      ).toBe(true);
+      expect(
+        rowsB.every((r) => r.debitoBob.toNumber() === 5000 || r.creditoBob.toNumber() === 5000),
+      ).toBe(true);
     });
 
     it('filtra por cuentaId cuando está presente', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
 
@@ -449,7 +498,10 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
     it('proyecta campos correctos: naturaleza, glosaLinea null, Decimal', async () => {
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
       );
 
@@ -475,7 +527,9 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       const diciembrePeriodo = await prisma.periodoFiscal.create({
         data: {
           organizationId: tenantA,
-          gestionId: (await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })).id,
+          gestionId: (
+            await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })
+          ).id,
           year: 2025,
           month: 12,
           ordenEnGestion: 12,
@@ -483,13 +537,19 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
         },
       });
       await crearMovimientoContabilizado(
-        tenantA, diciembrePeriodo.id, cajaAId, ventasAId,
+        tenantA,
+        diciembrePeriodo.id,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2025, 11, 15)), // diciembre 2025
         800,
       );
       // Asiento en enero 2026 (dentro del rango — NO debe estar en saldo inicial)
       await crearMovimientoContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2026, 0, 5)),
         1000,
       );
@@ -509,7 +569,9 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       const diciembrePeriodo = await prisma.periodoFiscal.create({
         data: {
           organizationId: tenantA,
-          gestionId: (await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })).id,
+          gestionId: (
+            await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })
+          ).id,
           year: 2025,
           month: 12,
           ordenEnGestion: 12,
@@ -536,7 +598,9 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       const periodoA2025 = await prisma.periodoFiscal.create({
         data: {
           organizationId: tenantA,
-          gestionId: (await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })).id,
+          gestionId: (
+            await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })
+          ).id,
           year: 2025,
           month: 12,
           ordenEnGestion: 12,
@@ -546,7 +610,9 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       const periodoB2025 = await prisma.periodoFiscal.create({
         data: {
           organizationId: tenantB,
-          gestionId: (await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantB } })).id,
+          gestionId: (
+            await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantB } })
+          ).id,
           year: 2025,
           month: 12,
           ordenEnGestion: 12,
@@ -556,13 +622,19 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
 
       // Tenant A: 800 antes del rango
       await crearMovimientoContabilizado(
-        tenantA, periodoA2025.id, cajaAId, ventasAId,
+        tenantA,
+        periodoA2025.id,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2025, 11, 15)),
         800,
       );
       // Tenant B: 9000 antes del rango
       await crearMovimientoContabilizado(
-        tenantB, periodoB2025.id, cajaBId, ventasBId,
+        tenantB,
+        periodoB2025.id,
+        cajaBId,
+        ventasBId,
         new Date(Date.UTC(2025, 11, 15)),
         9000,
       );
@@ -580,7 +652,9 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
       const periodoA2025 = await prisma.periodoFiscal.create({
         data: {
           organizationId: tenantA,
-          gestionId: (await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })).id,
+          gestionId: (
+            await prisma.gestionFiscal.findFirstOrThrow({ where: { organizationId: tenantA } })
+          ).id,
           year: 2025,
           month: 12,
           ordenEnGestion: 12,
@@ -588,7 +662,10 @@ describe('PrismaLibroMayorReaderAdapter (integration)', () => {
         },
       });
       await crearMovimientoContabilizado(
-        tenantA, periodoA2025.id, cajaAId, ventasAId,
+        tenantA,
+        periodoA2025.id,
+        cajaAId,
+        ventasAId,
         new Date(Date.UTC(2025, 11, 15)),
         800,
       );
