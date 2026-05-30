@@ -817,3 +817,65 @@ export interface AuditoriaEntry {
   reaperturaId: string | null;
   ts: string; // ISO timestamp
 }
+
+// ============================================================
+// Reportes — Libro Diario (GET /api/libros/diario)
+// Espejo de backend/src/reportes/dto/libro-diario-response.dto.ts
+// ============================================================
+
+// Query params para GET /api/libros/diario.
+// La regla de negocio "exactamente uno de período O rango" se valida
+// en el schema del form (libro-diario-filtro-schema.ts) y en el backend.
+export interface LibroDiarioParams {
+  /** UUID del período fiscal (exclusivo con fechaDesde/fechaHasta). */
+  periodoFiscalId?: string;
+  /** Inicio del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  fechaDesde?: string;
+  /** Fin del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  fechaHasta?: string;
+  /** Si true, incluye asientos anulados (default false — REQ-LD-03). */
+  incluirAnulados?: boolean;
+}
+
+// Espejo de LineaLibroDiarioDto.
+// Montos como string decimal (§4.5 CLAUDE.md).
+export interface LineaLibroDiario {
+  codigoCuenta: string;
+  nombreCuenta: string;
+  /** Glosa de la línea — nullable (no todas las líneas tienen glosa). */
+  glosa: string | null;
+  /** Monto debe en BOB. "0.00" si la línea es haber. */
+  debeBob: string;
+  /** Monto haber en BOB. "0.00" si la línea es debe. */
+  haberBob: string;
+}
+
+// Espejo de AsientoLibroDiarioDto.
+export interface AsientoLibroDiario {
+  id: string;
+  /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
+  fechaContable: string;
+  /** Número correlativo del comprobante. Null solo en BORRADOR, pero el
+   *  Libro Diario nunca incluye BORRADOR (REQ-LD-02). */
+  numero: string | null;
+  tipo: string;
+  estado: string;
+  glosa: string;
+  /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
+  anulado: boolean;
+  lineas: LineaLibroDiario[];
+}
+
+// Espejo de LibroDiarioResponseDto.
+export interface LibroDiarioResponse {
+  rango: {
+    fechaDesde: string; // YYYY-MM-DD
+    fechaHasta: string; // YYYY-MM-DD
+  };
+  asientos: AsientoLibroDiario[];
+  /** Suma de todos los debeBob de las líneas incluidas. */
+  totalDebeBob: string;
+  /** Suma de todos los haberBob de las líneas incluidas.
+   *  En asientos balanceados: === totalDebeBob. */
+  totalHaberBob: string;
+}
