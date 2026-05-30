@@ -35,6 +35,7 @@ import {
 import type { TipoComprobante } from '@/types/api';
 
 import { useAsociarDocumentos } from '../hooks/use-asociar-documentos';
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 
 interface DocumentoFisicoComboboxProps {
   comprobanteId: string;
@@ -101,7 +102,8 @@ export function DocumentoFisicoCombobox({
 
   const miniForm = useForm<DocumentoFisicoFormValues>({
     resolver: zodResolver(miniFormSchema),
-    defaultValues: { ...DEFAULT_CREATE_VALUES, numero: search },
+    // fechaEmision arranca en hoy (La Paz) para evitar tipeo manual; editable a mano.
+    defaultValues: { ...DEFAULT_CREATE_VALUES, numero: search, fechaEmision: hoyEnLaPaz() },
   });
 
   const { register: regMini, handleSubmit: handleMiniSubmit, formState: { errors: miniErrors }, setValue: setMiniValue, reset: resetMini } = miniForm;
@@ -125,7 +127,14 @@ export function DocumentoFisicoCombobox({
   }
 
   function handleAbrirMiniForm(): void {
-    resetMini({ ...DEFAULT_CREATE_VALUES, numero: search, tipoDocumentoFisicoId: '' });
+    // hoyEnLaPaz() se recalcula en cada apertura → siempre el día actual, incluso
+    // si la app quedó abierta cruzando la medianoche.
+    resetMini({
+      ...DEFAULT_CREATE_VALUES,
+      numero: search,
+      tipoDocumentoFisicoId: '',
+      fechaEmision: hoyEnLaPaz(),
+    });
     setTipoIdEnForm('');
     setView('create-form');
   }

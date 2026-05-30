@@ -245,6 +245,47 @@ describe('ComprobanteDetailPage — columna Cuenta en tabla de líneas (SUGG-2)'
   });
 });
 
+describe('ComprobanteDetailPage — layout de columnas de líneas (BOB-only)', () => {
+  it('muestra las columnas Cuenta, Debe, Haber, Glosa línea y Contacto', () => {
+    setupDefaultMocks();
+    renderPage();
+    expect(screen.getByRole('columnheader', { name: 'Cuenta' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Debe' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Haber' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Glosa línea' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Contacto' })).toBeInTheDocument();
+  });
+
+  it('NO muestra columnas de multimoneda (Moneda, T.C., Debe BOB, Haber BOB)', () => {
+    setupDefaultMocks();
+    renderPage();
+    expect(screen.queryByRole('columnheader', { name: 'Moneda' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'T.C.' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Debe BOB' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Haber BOB' })).not.toBeInTheDocument();
+  });
+
+  it('Contacto es la última columna y va después de Glosa línea', () => {
+    setupDefaultMocks();
+    renderPage();
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent?.trim());
+    const idxGlosa = headers.indexOf('Glosa línea');
+    const idxContacto = headers.indexOf('Contacto');
+    expect(idxGlosa).toBeGreaterThanOrEqual(0);
+    expect(idxContacto).toBeGreaterThan(idxGlosa);
+    expect(idxContacto).toBe(headers.length - 1);
+  });
+
+  it('Debe/Haber muestran el monto en BOB (debitoBob)', () => {
+    setupDefaultMocks();
+    renderPage();
+    // La línea tiene debitoBob '1250.00' — MontoCell lo prefija con Bs.
+    expect(screen.getAllByText('1250.00').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 // ============================================================
 // REQ-CCL-UI-04 — columna Contacto read-only en detalle (Grupo D)
 // ============================================================

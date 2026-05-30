@@ -29,6 +29,7 @@ import { useDocumentosFisicos } from '@/features/documentos-fisicos/hooks/use-do
 import { useCreateDocumentoFisico } from '@/features/documentos-fisicos/hooks/use-documento-fisico-mutations';
 import { useTiposDocumentoFisico } from '@/features/tipos-documento-fisico/hooks/use-tipos-documento-fisico';
 import { useAsociarDocumentos } from '../hooks/use-asociar-documentos';
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { DocumentoFisicoCombobox } from './documento-fisico-combobox';
 
 const mockToastError = toast.error as unknown as ReturnType<typeof vi.fn>;
@@ -308,6 +309,18 @@ describe('DocumentoFisicoCombobox — mini-form inline (D2)', () => {
 
     const confirmar = screen.getByRole('button', { name: /guardando/i });
     expect(confirmar).toBeDisabled();
+  });
+
+  it('la fecha de emisión arranca en hoy (La Paz) al abrir el mini-form', async () => {
+    renderCombobox('EGRESO');
+    await userEvent.click(screen.getByRole('combobox'));
+
+    const crearItems = screen.getAllByText(/crear nuevo documento/i);
+    await userEvent.click(crearItems[0]);
+
+    // hoyEnLaPaz() usa el mismo reloj real → mismo día calendario que el render.
+    const inputFecha = screen.getByLabelText(/fecha de emisión/i) as HTMLInputElement;
+    expect(inputFecha.value).toBe(hoyEnLaPaz());
   });
 
   it('mini-form inline aparece tras clic en "Crear nuevo documento" con campos Tipo, Número y Fecha', async () => {

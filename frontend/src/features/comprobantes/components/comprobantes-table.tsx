@@ -113,18 +113,33 @@ export function ComprobantesTable({
     <>
       {/* Desktop: tabla con scroll horizontal */}
       <div className="hidden md:block relative overflow-x-auto rounded-md border">
-        <Table>
+        {/* table-fixed + colgroup: anchos en % predecibles e independientes del
+            contenido (una glosa o razón social larga se trunca, no desbalancea
+            la fila). Mismo criterio que el editor y el detalle. min-w-[1000px]
+            = piso: por debajo scrollea en vez de aplastar (CLAUDE.md §7). */}
+        <Table className="min-w-[1000px] table-fixed">
+          <colgroup>
+            <col className="w-[9%]" /> {/* Fecha */}
+            <col className="w-[12%]" /> {/* Número */}
+            <col className="w-[13%]" /> {/* Documento */}
+            <col className="w-[10%]" /> {/* Nro. Ref. */}
+            <col className="w-[15%]" /> {/* Contacto */}
+            <col className="w-[21%]" /> {/* Glosa — la más ancha */}
+            <col className="w-[10%]" /> {/* Estado */}
+            <col className="w-[10%]" /> {/* Total BOB */}
+            <col className="w-[56px]" /> {/* Ver — fijo */}
+          </colgroup>
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>
-              <TableHead className="min-w-[8rem]">Número</TableHead>
+              <TableHead>Número</TableHead>
               <TableHead>Documento</TableHead>
               <TableHead>Nro. Ref.</TableHead>
               <TableHead>Contacto</TableHead>
               <TableHead>Glosa</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Total BOB</TableHead>
-              <TableHead className="w-16" />
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,16 +158,22 @@ export function ComprobantesTable({
                   <TableCell>
                     <CorrelativoCell numero={c.numero} />
                   </TableCell>
-                  <TableCell className="text-sm whitespace-nowrap">
+                  <TableCell
+                    className="text-sm truncate"
+                    title={etiquetaDocumentoTipo(c.documentosRespaldo)}
+                  >
                     {etiquetaDocumentoTipo(c.documentosRespaldo)}
                   </TableCell>
-                  <TableCell className="text-sm font-mono whitespace-nowrap">
+                  <TableCell
+                    className="text-sm font-mono truncate"
+                    title={etiquetaDocumentoNumero(c.documentosRespaldo)}
+                  >
                     {etiquetaDocumentoNumero(c.documentosRespaldo)}
                   </TableCell>
-                  <TableCell className="text-sm max-w-[180px] truncate">
+                  <TableCell className="text-sm truncate" title={etiquetaContacto(c.contactos)}>
                     {etiquetaContacto(c.contactos)}
                   </TableCell>
-                  <TableCell className="text-sm max-w-[200px] truncate">
+                  <TableCell className="text-sm truncate" title={c.glosa}>
                     {c.glosa}
                   </TableCell>
                   <TableCell>
