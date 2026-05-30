@@ -22,7 +22,7 @@
 
 ## Fase 1 — Dominio y errores
 
-- [ ] 1.1 **[RED unit]** Crear `reportes/domain/libro-mayor-errors.spec.ts` — verifica que cada
+- [x] 1.1 **[RED unit]** Crear `reportes/domain/libro-mayor-errors.spec.ts` — verifica que cada
   subclase tiene el `httpStatus` y `code` esperados. 6 casos:
   - `FiltroRequeridoError` → 400, `LIBRO_MAYOR_FILTRO_INVALIDO`
   - `RangoInvalidoError` → 400, `LIBRO_MAYOR_RANGO_INVALIDO`, details con fechaDesde/fechaHasta
@@ -32,7 +32,7 @@
   - `CuentaNoEncontradaError` → 404, `LIBRO_MAYOR_CUENTA_NO_ENCONTRADA`, details con cuentaId
   > REQ-LM-01, REQ-LM-07, REQ-LM-12, REQ-LM-13
 
-- [ ] 1.2 **[GREEN]** Crear `reportes/domain/libro-mayor-errors.ts` con las 6 subclases.
+- [x] 1.2 **[GREEN]** Crear `reportes/domain/libro-mayor-errors.ts` con las 6 subclases.
   Espeja el patrón de `libro-diario-errors.ts` (mismas clases base: `ValidationError`,
   `NotFoundError`, `InvalidStateError` de `@/common/errors`). Códigos estables: `LIBRO_MAYOR_*`.
   Comentario regulatorio en `CuentaNoDetalleError`: solo cuentas `esDetalle=true` tienen
@@ -45,7 +45,7 @@
 
 ## Fase 2 — Port + DTOs + mapper
 
-- [ ] 2.1 **[setup]** Crear `reportes/ports/libro-mayor-reader.port.ts`:
+- [x] 2.1 **[setup]** Crear `reportes/ports/libro-mayor-reader.port.ts`:
   - `Symbol('LIBRO_MAYOR_READER_PORT')` exportado como `LIBRO_MAYOR_READER_PORT`
   - `LibroMayorFiltros`: `{ cuentaId?: string; fechaDesde: Date; fechaHasta: Date; incluirAnulados: boolean }`
   - `MovimientoMayorRow`: proyección plana del JOIN (cuentaId, codigoInterno, nombreCuenta,
@@ -57,7 +57,7 @@
   - JSDoc en cada método (port es contrato público §2.3); comentario multi-tenant obligatorio (§4.2).
   > REQ-LM-01..13 (contrato base de todo el change)
 
-- [ ] 2.2 **[setup]** Crear `reportes/dto/libro-mayor-query.dto.ts`:
+- [x] 2.2 **[setup]** Crear `reportes/dto/libro-mayor-query.dto.ts`:
   - `@IsOptional() @IsUUID('4') cuentaId?: string`
   - `@IsOptional() @IsUUID('4') periodoFiscalId?: string`
   - `@IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) fechaDesde?: string`
@@ -66,7 +66,7 @@
   - `@IsOptional() @Transform(→ boolean) @IsBoolean() soloConMovimiento?: boolean` (default true)
   > REQ-LM-01, REQ-LM-03, REQ-LM-07, REQ-LM-08, REQ-LM-11
 
-- [ ] 2.3 **[RED unit]** Crear `reportes/dto/libro-mayor-response.dto.spec.ts` — verifica
+- [x] 2.3 **[RED unit]** Crear `reportes/dto/libro-mayor-response.dto.spec.ts` — verifica
   la función pura `toLibroMayorResponse` (o el mapper que compute saldos ya calculados):
   - `Decimal → string` con 2 decimales fijos: `"1250.50"`, nunca `1250.5` (REQ-LM-10)
   - `Date UTC 00:00Z → "YYYY-MM-DD"` correcto con `formatFechaContable` (§4.6)
@@ -76,7 +76,7 @@
   - `totalDebeBob` y `totalHaberBob` reflejan la suma del rango (REQ-LM-06)
   > REQ-LM-06, REQ-LM-10
 
-- [ ] 2.4 **[GREEN]** Crear `reportes/dto/libro-mayor-response.dto.ts`:
+- [x] 2.4 **[GREEN]** Crear `reportes/dto/libro-mayor-response.dto.ts`:
   - Interfaces: `MovimientoMayorDto`, `CuentaMayorDto`, `LibroMayorResponseDto` (forma exacta
     del spec REQ-LM-10). `generadoEn` **OMITIDO** del MVP (el Diario no lo tiene;
     el service no puede usar `new Date()` directo §4.6 y ClockPort no se inyecta en el mapper;
@@ -94,7 +94,7 @@
 
 ## Fase 3 — Service (corazón del cálculo)
 
-- [ ] 3.1 **[RED unit]** Crear `reportes/libro-mayor.service.spec.ts` — mocks de
+- [x] 3.1 **[RED unit]** Crear `reportes/libro-mayor.service.spec.ts` — mocks de
   `LibroMayorReaderPort` (4 métodos) + `PeriodosReaderPort` + `ConfigService` (con helper
   `makeConfigService(limit)` que inyecta el token con valor reducido para tests de tope).
   No se mockea Prisma directamente (§7.8). Fixture helpers: `makeMovimientoRow(overrides)`,
@@ -150,7 +150,7 @@
 
   > REQ-LM-01, REQ-LM-04, REQ-LM-05, REQ-LM-06, REQ-LM-07, REQ-LM-08, REQ-LM-12, REQ-LM-13
 
-- [ ] 3.2 **[GREEN]** Crear `reportes/libro-mayor.service.ts`:
+- [x] 3.2 **[GREEN]** Crear `reportes/libro-mayor.service.ts`:
   - Constantes exportadas: `LIBRO_MAYOR_MAX_MOVIMIENTOS_ENV = 'LIBRO_MAYOR_MAX_MOVIMIENTOS'`,
     `LIBRO_MAYOR_MAX_MOVIMIENTOS_DEFAULT = 20_000`. Default documentado: 20.000 líneas
     (unidad es línea, no asiento; ~2-4 líneas por asiento implica ≈5.000–10.000 asientos).
@@ -181,7 +181,7 @@
 > ⚠️ **Requiere Postgres** (`docker compose up -d postgres`).
 > Correr desde `backend/`: `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/saas" pnpm exec jest src/reportes/adapters/prisma-libro-mayor-reader.adapter.integration.spec.ts --runInBand`
 
-- [ ] 4.1 **[RED integration]** Crear `reportes/adapters/prisma-libro-mayor-reader.adapter.integration.spec.ts`.
+- [x] 4.1 **[RED integration]** Crear `reportes/adapters/prisma-libro-mayor-reader.adapter.integration.spec.ts`.
   Patrón idéntico al de `prisma-comprobantes-reader.adapter.integration.spec.ts`:
   `beforeAll` crea `PrismaClient` + adapter; `beforeEach` hace cleanup + seed de 2 tenants
   con gestión/período/cuentas (2 DEUDORA + 2 ACREEDORA, una cuenta agrupadora para test de detalle);
@@ -222,7 +222,7 @@
   - Devuelve `null` si el cuentaId pertenece a otro tenant (defense in depth §4.2)
   > REQ-LM-02, REQ-LM-03, REQ-LM-04, REQ-LM-05, REQ-LM-07, REQ-LM-09, REQ-LM-12
 
-- [ ] 4.2 **[GREEN]** Crear `reportes/adapters/prisma-libro-mayor-reader.adapter.ts`:
+- [x] 4.2 **[GREEN]** Crear `reportes/adapters/prisma-libro-mayor-reader.adapter.ts`:
   - `@Injectable() class PrismaLibroMayorReaderAdapter extends LibroMayorReaderPort`
   - Constructor: `@InjectPrismaService() prisma: PrismaService` (o `PrismaClient` según patrón del módulo).
   - `contarMovimientos`: `$queryRaw<[{count: bigint}]>` → convierte `Number(count)`.
@@ -248,7 +248,7 @@
 
 ## Fase 5 — Controller + wiring
 
-- [ ] 5.1 **[GREEN]** Modificar `reportes/reportes.controller.ts`:
+- [x] 5.1 **[GREEN]** Modificar `reportes/reportes.controller.ts`:
   - Agregar `LibroMayorService` al constructor (junto a `LibroDiarioService`).
   - Agregar método `@Get('mayor')`:
     ```typescript
@@ -266,7 +266,7 @@
   - `@RequireModule('contabilidad')` heredado del clase.
   > REQ-LM-11
 
-- [ ] 5.2 **[GREEN]** Modificar `reportes/reportes.module.ts`:
+- [x] 5.2 **[GREEN]** Modificar `reportes/reportes.module.ts`:
   - Agregar `LibroMayorService` a `providers`.
   - Agregar `PrismaLibroMayorReaderAdapter` a `providers`.
   - Agregar binding: `{ provide: LIBRO_MAYOR_READER_PORT, useExisting: PrismaLibroMayorReaderAdapter }`.
@@ -288,7 +288,7 @@
 > pnpm exec jest test/libro-mayor.e2e-spec.ts --runInBand --forceExit
 > ```
 
-- [ ] 6.1 **[RED e2e]** Crear `backend/test/libro-mayor.e2e-spec.ts`.
+- [x] 6.1 **[RED e2e]** Crear `backend/test/libro-mayor.e2e-spec.ts`.
   Patrón idéntico al `libro-diario.e2e-spec.ts` (AppModule, cleanupTestData, `seedTenant`).
   Helpers adicionales: `seedCuentaAgrupadora`, `seedMovimientoConFechaAnterior` (para saldo inicial).
 
@@ -331,7 +331,7 @@
   - Superar el límite inyectado → 422, code `LIBRO_MAYOR_RANGO_EXCEDIDO`, mensaje legible en español
   > REQ-LM-01..13 (cobertura E2E transversal)
 
-- [ ] 6.2 **[GREEN]** Hacer pasar todos los E2E del 6.1. Las implementaciones de Fase 3, 4 y 5
+- [x] 6.2 **[GREEN]** Hacer pasar todos los E2E del 6.1. Las implementaciones de Fase 3, 4 y 5
   ya deben estar verdes; este paso es confirmar que el stack completo (AppModule) funciona end-to-end.
   Si algún caso falla, ajustar la implementación correspondiente (NO ajustar el test).
 
@@ -343,17 +343,17 @@
 
 > Correr todos desde `backend/` (salvo que se indique `frontend/`).
 
-- [ ] 7.1 **[verde — unit + integration]** `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/saas" pnpm exec jest src/ --runInBand`
+- [x] 7.1 **[verde — unit + integration]** `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/saas" pnpm exec jest src/ --runInBand`
   — unit (`.spec.ts` sin DB) + integration (`.integration.spec.ts` vs Postgres real). Todo verde.
   GOTCHA: integration specs requieren Postgres en `127.0.0.1` (NO `localhost`) — §11.3 CLAUDE.md.
 
-- [ ] 7.2 **[verde — E2E]** `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/saas" JWT_ACCESS_SECRET="test-secret" JWT_REFRESH_SECRET="test-refresh" pnpm exec jest test/ --runInBand --forceExit`
+- [x] 7.2 **[verde — E2E]** `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/saas" JWT_ACCESS_SECRET="test-secret" JWT_REFRESH_SECRET="test-refresh" pnpm exec jest test/ --runInBand --forceExit`
   — suite E2E completa (Diario + Mayor). Sin regresiones en el Diario.
 
-- [ ] 7.3 **[verde — typecheck]** `pnpm exec tsc --noEmit -p tsconfig.json` desde `backend/`.
+- [x] 7.3 **[verde — typecheck]** `pnpm exec tsc --noEmit -p tsconfig.json` desde `backend/`.
   Cero errores. `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` activos (§2.5.1).
 
-- [ ] 7.4 **[verde — lint]** `pnpm run lint` desde `backend/`. Cero warnings/errors ESLint.
+- [x] 7.4 **[verde — lint]** `pnpm run lint` desde `backend/`. Cero warnings/errors ESLint.
   Verificar que no hay `any` en código de producción (§2.5) ni `new Date()` en service (§4.6).
 
 ---
