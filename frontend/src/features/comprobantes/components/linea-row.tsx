@@ -64,8 +64,8 @@ export function LineaRow({
       className={cn('border-b border-border', disabled && 'opacity-60')}
       data-row-index={dataRowIndex}
     >
-      {/* Cuenta */}
-      <td className="p-1 min-w-[180px]">
+      {/* Cuenta — ancho lo fija el colgroup del LineasEditor (table-fixed). */}
+      <td className="p-1">
         <CuentaAutocomplete
           value={watch(`lineas.${index}.cuentaId`) as string}
           onChange={(id) =>
@@ -81,7 +81,7 @@ export function LineaRow({
       {/* Moneda y T.C. ocultos — lockados a BOB/1; valor oculto en el form via LINEA_VACIA. */}
 
       {/* Debe */}
-      <td className="p-1 w-28">
+      <td className="p-1">
         <Input
           {...register(`lineas.${index}.debito`)}
           type="text"
@@ -89,6 +89,9 @@ export function LineaRow({
           aria-label="Debe"
           disabled={disabled}
           aria-invalid={!!lineaErrors?.debito}
+          // Selecciona el contenido al foco: el "0" por defecto queda resaltado y
+          // se reemplaza al tipear, en vez de quedar pegado (ej. "0" + "10" → "100").
+          onFocus={(e) => e.currentTarget.select()}
           className={cn('font-mono text-right', lineaErrors?.debito && 'border-destructive')}
         />
         {lineaErrors?.debito && (
@@ -97,7 +100,7 @@ export function LineaRow({
       </td>
 
       {/* Haber */}
-      <td className="p-1 w-28">
+      <td className="p-1">
         <Input
           {...register(`lineas.${index}.credito`)}
           type="text"
@@ -105,12 +108,14 @@ export function LineaRow({
           aria-label="Haber"
           disabled={disabled}
           aria-invalid={!!lineaErrors?.credito}
+          // Ver nota en el input de Debe: selecciona el "0" al foco.
+          onFocus={(e) => e.currentTarget.select()}
           className={cn('font-mono text-right', lineaErrors?.credito && 'border-destructive')}
         />
       </td>
 
       {/* Glosa de línea */}
-      <td className="p-1 min-w-[120px]">
+      <td className="p-1">
         <Input
           {...register(`lineas.${index}.glosaLinea`)}
           type="text"
@@ -122,7 +127,7 @@ export function LineaRow({
 
       {/* Contacto — siempre visible; aviso blando cuando requiereContacto && !contactoId. */}
       {/* design §Decisión 1 (columna siempre visible) y §Decisión 5 (patrón anti-foco). */}
-      <td className="p-1 min-w-[180px]">
+      <td className="p-1">
         <ContactoCombobox
           value={contactoId ?? null}
           onSelect={(id) =>
@@ -145,7 +150,7 @@ export function LineaRow({
       </td>
 
       {/* Botón eliminar */}
-      <td className="p-1 w-10">
+      <td className="p-1">
         <Button
           type="button"
           variant="ghost"

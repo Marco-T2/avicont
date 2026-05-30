@@ -133,20 +133,32 @@ export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.El
 
       {/* Tabla de líneas */}
       <div className="overflow-x-auto rounded-md border border-border">
-        <table className="w-full text-sm">
+        {/* table-fixed + colgroup: las proporciones de cada columna son
+            predecibles y NO dependen del contenido (un nombre de cuenta largo
+            ya no desbalancea la fila — se trunca). min-w-[800px] = piso: por
+            debajo de ese ancho el contenedor scrollea en vez de aplastar las
+            columnas (CLAUDE.md §7 — tablas con muchas columnas / mobile-usable). */}
+        <table className="w-full min-w-[800px] table-fixed text-sm">
+          <colgroup>
+            <col className="w-[22%]" /> {/* Cuenta */}
+            <col className="w-[11%]" /> {/* Debe */}
+            <col className="w-[11%]" /> {/* Haber */}
+            <col className="w-[40%]" /> {/* Glosa línea — la más ancha */}
+            <col className="w-[16%]" /> {/* Contacto */}
+            <col className="w-[44px]" /> {/* Eliminar — fijo, solo el ícono */}
+          </colgroup>
           <thead>
             <tr className="bg-muted/50 text-muted-foreground">
               <th className="p-2 text-left font-medium">Cuenta</th>
-              {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7. */}
-              {/* Debe/Haber YA están en BOB (moneda lockada a BOB, TC=1).
-                  Las columnas "Debe BOB"/"Haber BOB" eran espejos redundantes
-                  del valor original y confundían — se eliminaron. El montoBob
-                  se recalcula igual en el submit (poblarBobEnLineas). */}
-              <th className="p-2 text-right font-medium w-28">Debe</th>
-              <th className="p-2 text-right font-medium w-28">Haber</th>
-              <th className="p-2 text-left font-medium min-w-[120px]">Glosa línea</th>
-              <th className="p-2 text-left font-medium min-w-[180px]">Contacto</th>
-              <th className="p-2 w-10" />
+              {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7.
+                  Debe/Haber YA están en BOB (TC=1); las columnas espejo "Debe/Haber BOB"
+                  se eliminaron por redundantes. El montoBob se recalcula en el submit
+                  (poblarBobEnLineas). */}
+              <th className="p-2 text-right font-medium">Debe</th>
+              <th className="p-2 text-right font-medium">Haber</th>
+              <th className="p-2 text-left font-medium">Glosa línea</th>
+              <th className="p-2 text-left font-medium">Contacto</th>
+              <th className="p-2" />
             </tr>
           </thead>
           <tbody>

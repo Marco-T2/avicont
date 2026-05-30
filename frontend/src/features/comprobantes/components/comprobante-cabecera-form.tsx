@@ -56,53 +56,88 @@ export function ComprobanteCabeceraForm({
         </div>
       )}
 
-      {/* Tipo */}
-      <div className="space-y-1.5">
-        <Label htmlFor="cabecera-tipo">Tipo</Label>
-        <Select
-          value={tipo ?? ''}
-          onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
-          disabled={readonlyCabecera}
-        >
-          <SelectTrigger id="cabecera-tipo" aria-invalid={errors.tipo !== undefined} className="text-base md:text-sm">
-            <SelectValue placeholder="Seleccioná un tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="DIARIO">Diario</SelectItem>
-            <SelectItem value="INGRESO">Ingreso</SelectItem>
-            <SelectItem value="EGRESO">Egreso</SelectItem>
-            <SelectItem value="TRASPASO">Traspaso</SelectItem>
-            <SelectItem value="AJUSTE">Ajuste</SelectItem>
-            <SelectItem value="APERTURA">Apertura</SelectItem>
-            <SelectItem value="CIERRE">Cierre</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.tipo !== undefined && (
-          <p className="text-sm text-destructive">
-            {errors.tipo.message as string}
+      {/* Campos cortos: en desktop comparten una fila de 3 columnas; en mobile se apilan. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-start">
+        {/* Tipo */}
+        <div className="space-y-1.5">
+          <Label htmlFor="cabecera-tipo">Tipo</Label>
+          <Select
+            value={tipo ?? ''}
+            onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+            disabled={readonlyCabecera}
+          >
+            <SelectTrigger id="cabecera-tipo" aria-invalid={errors.tipo !== undefined} className="w-full text-base md:text-sm">
+              <SelectValue placeholder="Seleccioná un tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DIARIO">Diario</SelectItem>
+              <SelectItem value="INGRESO">Ingreso</SelectItem>
+              <SelectItem value="EGRESO">Egreso</SelectItem>
+              <SelectItem value="TRASPASO">Traspaso</SelectItem>
+              <SelectItem value="AJUSTE">Ajuste</SelectItem>
+              <SelectItem value="APERTURA">Apertura</SelectItem>
+              <SelectItem value="CIERRE">Cierre</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.tipo !== undefined && (
+            <p className="text-sm text-destructive">
+              {errors.tipo.message as string}
+            </p>
+          )}
+        </div>
+
+        {/* Fecha contable */}
+        <div className="space-y-1.5">
+          <Label htmlFor="cabecera-fecha">Fecha contable</Label>
+          <Input
+            id="cabecera-fecha"
+            type="date"
+            className="text-base md:text-sm"
+            aria-invalid={errors.fechaContable !== undefined}
+            readOnly={readonlyCabecera}
+            {...register('fechaContable')}
+          />
+          {errors.fechaContable !== undefined && (
+            <p className="text-sm text-destructive">
+              {errors.fechaContable.message as string}
+            </p>
+          )}
+        </div>
+
+        {/* T/C re-expresión — campo de PRESENTACIÓN del encabezado.
+            No afecta la contabilidad (débitos/créditos siguen siendo BOB).
+            Permite ver/imprimir el comprobante expresado en otra moneda. */}
+        <div className="space-y-1.5">
+          <Label htmlFor="cabecera-tcr">T/C re-expresión</Label>
+          <Input
+            id="cabecera-tcr"
+            type="text"
+            inputMode="decimal"
+            placeholder="Ej: 6.96"
+            className={cn(
+              'text-base md:text-sm font-mono',
+              (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined &&
+                'border-destructive',
+            )}
+            aria-label="T/C re-expresión"
+            aria-invalid={
+              (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined
+            }
+            readOnly={readonlyCabecera}
+            {...register('tipoCambioReexpresion')}
+          />
+          <p className="text-xs text-muted-foreground">
+            Solo para presentación — no afecta débitos ni créditos en BOB.
           </p>
-        )}
+          {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion !== undefined && (
+            <p className="text-sm text-destructive">
+              {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion?.message}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Fecha contable */}
-      <div className="space-y-1.5">
-        <Label htmlFor="cabecera-fecha">Fecha contable</Label>
-        <Input
-          id="cabecera-fecha"
-          type="date"
-          className="text-base md:text-sm"
-          aria-invalid={errors.fechaContable !== undefined}
-          readOnly={readonlyCabecera}
-          {...register('fechaContable')}
-        />
-        {errors.fechaContable !== undefined && (
-          <p className="text-sm text-destructive">
-            {errors.fechaContable.message as string}
-          </p>
-        )}
-      </div>
-
-      {/* Glosa */}
+      {/* Glosa — ocupa todo el ancho */}
       <div className="space-y-1.5">
         <Label htmlFor="cabecera-glosa">Glosa</Label>
         <Textarea
@@ -116,38 +151,6 @@ export function ComprobanteCabeceraForm({
         {errors.glosa !== undefined && (
           <p className="text-sm text-destructive">
             {errors.glosa.message as string}
-          </p>
-        )}
-      </div>
-
-      {/* T/C re-expresión — campo de PRESENTACIÓN del encabezado.
-          No afecta la contabilidad (débitos/créditos siguen siendo BOB).
-          Permite ver/imprimir el comprobante expresado en otra moneda. */}
-      <div className="space-y-1.5">
-        <Label htmlFor="cabecera-tcr">T/C re-expresión (opcional)</Label>
-        <Input
-          id="cabecera-tcr"
-          type="text"
-          inputMode="decimal"
-          placeholder="Ej: 6.96"
-          className={cn(
-            'text-base md:text-sm font-mono',
-            (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined &&
-              'border-destructive',
-          )}
-          aria-label="T/C re-expresión"
-          aria-invalid={
-            (errors as { tipoCambioReexpresion?: unknown }).tipoCambioReexpresion !== undefined
-          }
-          readOnly={readonlyCabecera}
-          {...register('tipoCambioReexpresion')}
-        />
-        <p className="text-xs text-muted-foreground">
-          Solo para presentación — no afecta débitos ni créditos en BOB.
-        </p>
-        {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion !== undefined && (
-          <p className="text-sm text-destructive">
-            {(errors as { tipoCambioReexpresion?: { message?: string } }).tipoCambioReexpresion?.message}
           </p>
         )}
       </div>

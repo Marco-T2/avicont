@@ -73,12 +73,17 @@ export function CuentaAutocomplete({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
+          // Tooltip nativo: muestra código + nombre completos al pasar el mouse,
+          // ya que el nombre se trunca en la celda fija de la tabla de líneas.
+          {...(selected !== undefined
+            ? { title: `${selected.codigoInterno} · ${selected.nombre}` }
+            : {})}
           className={cn(
             'w-full justify-between font-normal',
             selected === undefined && 'text-muted-foreground',
           )}
         >
-          <span className="truncate text-left">
+          <span className="truncate text-left min-w-0 flex-1">
             {selected !== undefined ? (
               <>
                 <span className="font-mono text-xs mr-2 text-muted-foreground">

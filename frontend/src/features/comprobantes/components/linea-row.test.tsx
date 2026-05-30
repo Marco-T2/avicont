@@ -2,7 +2,7 @@
  * Tests de LineaRow — REQ-CCL-UI-01, REQ-CCL-UI-02, REQ-CCL-UI-03.
  * Incluye test de regresión del bug de FOCO (design §Decisión 5).
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -280,6 +280,26 @@ describe('LineaRow', () => {
       await waitFor(() => {
         expect(screen.getByRole('textbox', { name: 'Debe' })).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('UX — Debe/Haber seleccionan su contenido al recibir foco', () => {
+    it('selecciona el "0" del input Debe al foco (no se queda pegado al tipear)', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} />);
+      const inputDebe = screen.getByRole('textbox', { name: 'Debe' }) as HTMLInputElement;
+      expect(inputDebe.value).toBe('0');
+      fireEvent.focus(inputDebe);
+      expect(inputDebe.selectionStart).toBe(0);
+      expect(inputDebe.selectionEnd).toBe(inputDebe.value.length);
+    });
+
+    it('selecciona el "0" del input Haber al foco', () => {
+      render(<Wrapper cuentas={[makeCuenta()]} />);
+      const inputHaber = screen.getByRole('textbox', { name: 'Haber' }) as HTMLInputElement;
+      expect(inputHaber.value).toBe('0');
+      fireEvent.focus(inputHaber);
+      expect(inputHaber.selectionStart).toBe(0);
+      expect(inputHaber.selectionEnd).toBe(inputHaber.value.length);
     });
   });
 
