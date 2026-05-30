@@ -1,10 +1,14 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, from, switchMap } from 'rxjs';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 @Injectable()
 export class TenantContextInterceptor implements NestInterceptor {
-  constructor(private readonly tenantContext: TenantContextService) {}
+  constructor(
+    private readonly tenantContext: TenantContextService,
+    private readonly metrics: MetricsService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req = context.switchToHttp().getRequest();
@@ -21,6 +25,15 @@ export class TenantContextInterceptor implements NestInterceptor {
 
     const tenantId = headerTenantId || jwtTenant || subdomainTenant;
     req.tenantId = tenantId;
+
+    // Solo contamos operaciones con tenant autenticado (JWT) o explícito vía
+    // header de super-admin; NO las derivadas del subdominio (resolver
+    // descartado, CLAUDE.md §10.4) para no contaminar la métrica con el Host.
+    const tenantParaMetrica = jwtTenant || headerTenantId;
+    if (tenantParaMetrica) {
+      const operation = `${context.getClass().name}.${context.getHandler().name}`;
+      this.metrics.recordTenantOperation(operation);
+    }
 
     const result = this.tenantContext.runWithContext(
       {
