@@ -11,6 +11,7 @@ import {
 import { USERS_READER_PORT, type UsersReaderPort } from '../users/ports/users-reader.port';
 import { USERS_WRITER_PORT, type UsersWriterPort } from '../users/ports/users-writer.port';
 
+import { MetricsService } from '../metrics/metrics.service';
 import { AuthService } from './auth.service';
 import {
   CredencialesInvalidasError,
@@ -34,6 +35,7 @@ describe('AuthService (unit)', () => {
   let usersReader: jest.Mocked<UsersReaderPort>;
   let usersWriter: jest.Mocked<UsersWriterPort>;
   let jwt: { sign: jest.Mock };
+  let metrics: { recordLogin: jest.Mock };
 
   beforeEach(async () => {
     credentials = {
@@ -52,6 +54,7 @@ describe('AuthService (unit)', () => {
     usersReader = { findByEmail: jest.fn(), findMinimalByEmail: jest.fn() };
     usersWriter = { create: jest.fn() };
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
+    metrics = { recordLogin: jest.fn() };
     const config = {
       get: jest.fn().mockReturnValue('30d'),
     } as unknown as ConfigService;
@@ -65,6 +68,7 @@ describe('AuthService (unit)', () => {
         { provide: MEMBERSHIPS_READER_PORT, useValue: memberships },
         { provide: JwtService, useValue: jwt },
         { provide: ConfigService, useValue: config },
+        { provide: MetricsService, useValue: metrics },
       ],
     }).compile();
 
@@ -156,6 +160,26 @@ describe('AuthService (unit)', () => {
       const signedPayload = jwt.sign.mock.calls[0]?.[0];
       expect(signedPayload).not.toHaveProperty('activeTenantId');
       expect(signedPayload.roles).toEqual([]);
+    });
+
+    it('registra la métrica de login exitoso', async () => {
+      await setupValidUser();
+      memberships.findActivasByUserId.mockResolvedValue([
+        { organizationId: 'org-1', systemRole: 'OWNER', customRoleSlug: null },
+      ]);
+
+      await service.login({ email: 'x@y.com', password: 'pw' });
+
+      expect(metrics.recordLogin).toHaveBeenCalledWith(true);
+    });
+
+    it('registra la métrica de login fallido y propaga el error', async () => {
+      usersReader.findByEmail.mockResolvedValue(null);
+
+      await expect(service.login({ email: 'x@y.com', password: 'mala' })).rejects.toBeInstanceOf(
+        CredencialesInvalidasError,
+      );
+      expect(metrics.recordLogin).toHaveBeenCalledWith(false);
     });
   });
 
