@@ -4,7 +4,6 @@ import {
   Moneda,
   NaturalezaCuenta,
   PrismaClient,
-  SystemRole,
   TipoComprobante,
 } from '@prisma/client';
 

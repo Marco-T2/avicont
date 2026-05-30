@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { PERIODOS_READER_PORT, PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
+import {
+  PERIODOS_READER_PORT,
+  PeriodosReaderPort,
+} from '@/periodos-fiscales/ports/periodos-reader.port';
 
 import {
   FiltroRequeridoError,
@@ -10,11 +13,7 @@ import {
 } from './domain/libro-diario-errors';
 import { toLibroDiarioResponse } from './dto/libro-diario-response.dto';
 import type { LibroDiarioResponseDto } from './dto/libro-diario-response.dto';
-import type { LibroDiarioQueryDto } from './dto/libro-diario-query.dto';
-import {
-  COMPROBANTES_READER_PORT,
-  ComprobantesReaderPort,
-} from './ports/comprobantes-reader.port';
+import { COMPROBANTES_READER_PORT, ComprobantesReaderPort } from './ports/comprobantes-reader.port';
 
 /** Tope defensivo de asientos por consulta (REQ-LD-10). */
 export const LIBRO_DIARIO_MAX_ASIENTOS = 5_000;
@@ -42,7 +41,7 @@ export class LibroDiarioService {
    */
   async consultarLibroDiario(
     tenantId: string,
-    query: Omit<LibroDiarioQueryDto, 'periodoFiscalId' | 'fechaDesde' | 'fechaHasta' | 'incluirAnulados'> & {
+    query: {
       periodoFiscalId?: string;
       fechaDesde?: string;
       fechaHasta?: string;

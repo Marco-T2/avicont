@@ -10,7 +10,12 @@
  * BORRADOR NUNCA incluido (REQ-LD-02).
  */
 
-import type { Comprobante, EstadoComprobante, LineaComprobante, TipoComprobante } from '@prisma/client';
+import type {
+  Comprobante,
+  EstadoComprobante,
+  LineaComprobante,
+  TipoComprobante,
+} from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
 
 export const COMPROBANTES_READER_PORT = Symbol('COMPROBANTES_READER_PORT');
@@ -34,24 +39,14 @@ export interface LibroDiarioFiltros {
  */
 export type ComprobanteLibroDiarioRow = Pick<
   Comprobante,
-  | 'id'
-  | 'organizationId'
-  | 'tipo'
-  | 'numero'
-  | 'estado'
-  | 'fechaContable'
-  | 'glosa'
-  | 'anulado'
+  'id' | 'organizationId' | 'tipo' | 'numero' | 'estado' | 'fechaContable' | 'glosa' | 'anulado'
 > & {
   tipo: TipoComprobante;
   estado: EstadoComprobante;
   lineas: ComprobanteLineaLibroDiarioRow[];
 };
 
-export type ComprobanteLineaLibroDiarioRow = Pick<
-  LineaComprobante,
-  'orden' | 'glosaLinea'
-> & {
+export type ComprobanteLineaLibroDiarioRow = Pick<LineaComprobante, 'orden' | 'glosaLinea'> & {
   debitoBob: Decimal;
   creditoBob: Decimal;
   cuenta: {

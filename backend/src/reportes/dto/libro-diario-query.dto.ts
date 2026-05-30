@@ -10,7 +10,7 @@
  */
 
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsISO8601, IsOptional, IsUUID, Matches } from 'class-validator';
+import { IsBoolean, IsOptional, IsUUID, Matches } from 'class-validator';
 
 export class LibroDiarioQueryDto {
   /**

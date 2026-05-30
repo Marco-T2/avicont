@@ -95,9 +95,11 @@ describe('toLibroDiarioResponse (unit)', () => {
   });
 
   it('incluye glosa de línea cuando existe', () => {
-    const rows = [makeAsiento({
-      lineas: [makeLinea(1, '1.1.1.001', 'Caja', 500, 0, 'Cobro cliente XYZ')],
-    })];
+    const rows = [
+      makeAsiento({
+        lineas: [makeLinea(1, '1.1.1.001', 'Caja', 500, 0, 'Cobro cliente XYZ')],
+      }),
+    ];
     const result = toLibroDiarioResponse(rows, rango);
 
     expect(result.asientos[0]!.lineas[0]!.glosa).toBe('Cobro cliente XYZ');
@@ -105,7 +107,9 @@ describe('toLibroDiarioResponse (unit)', () => {
 
   it('calcula totalDebeBob y totalHaberBob como suma de todas las líneas', () => {
     const rows = [
-      makeAsiento({ lineas: [makeLinea(1, '1.1', 'Caja', 1000, 0), makeLinea(2, '4.1', 'Ventas', 0, 1000)] }),
+      makeAsiento({
+        lineas: [makeLinea(1, '1.1', 'Caja', 1000, 0), makeLinea(2, '4.1', 'Ventas', 0, 1000)],
+      }),
       makeAsiento({
         id: 'comp-uuid-2',
         numero: 'D2601-000002',
