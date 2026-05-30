@@ -71,9 +71,12 @@ export class PrismaComprobantesReaderAdapter extends ComprobantesReaderPort {
       },
       orderBy: [
         { fechaContable: 'asc' },
-        // numero es string; Postgres lo ordena lexicográficamente.
-        // Para orden determinístico dentro del mismo día con mismo número
-        // usamos createdAt como desempate final.
+        // numero correlativo: desempate principal dentro del mismo día (REQ-LD-04, design decisión #2).
+        // NULLS LAST defensivo: BORRADOR no tiene numero, pero quedan fuera del estado IN;
+        // aun así el sort es safe ante estados futuros o datos edge.
+        { numero: { sort: 'asc', nulls: 'last' } },
+        // createdAt: desempate final si dos asientos tienen misma fecha y mismo numero
+        // (en la práctica imposible por el UNIQUE del correlativo, pero seguro).
         { createdAt: 'asc' },
       ],
     });

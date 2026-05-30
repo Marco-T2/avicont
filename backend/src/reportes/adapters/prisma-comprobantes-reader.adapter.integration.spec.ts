@@ -176,13 +176,14 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
     fechaContable: Date,
     userId: string = 'user-test',
     anulado = false,
+    numero?: string,
   ) {
     const comp = await prisma.comprobante.create({
       data: {
         organizationId: tenantId,
         tipo: TipoComprobante.DIARIO,
         estado: EstadoComprobante.CONTABILIZADO,
-        numero: `D${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
+        numero: numero ?? `D${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
         fechaContable,
         periodoFiscalId: periodoId,
         glosa: 'Asiento de prueba',
@@ -461,6 +462,42 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
       expect(result).toHaveLength(3);
       const fechas = result.map((r) => new Date(r.fechaContable).getUTCDate());
       expect(fechas).toEqual([5, 10, 15]);
+    });
+
+    it('desempata por numero ASC cuando dos asientos tienen la misma fechaContable (REQ-LD-04)', async () => {
+      // Misma fecha para ambos; insertamos en orden inverso al esperado para que
+      // el test falle si el orderBy no incluye `numero`.
+      // numero "D2601-000010" < "D2601-000020" lexicográfica y numéricamente.
+      const mismaFecha = new Date(Date.UTC(2026, 0, 20));
+
+      await crearAsientoContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        mismaFecha,
+        'user-test',
+        false,
+        'D2601-000020', // segundo en el orden esperado — insertado primero
+      );
+      await crearAsientoContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        mismaFecha,
+        'user-test',
+        false,
+        'D2601-000010', // primero en el orden esperado — insertado después
+      );
+
+      const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, filtrosEnero);
+
+      expect(result).toHaveLength(2);
+      // Sin orderBy numero, Postgres puede devolver en orden de inserción (000020 primero).
+      // Con orderBy numero ASC debe devolver 000010 primero.
+      expect(result[0]?.numero).toBe('D2601-000010');
+      expect(result[1]?.numero).toBe('D2601-000020');
     });
   });
 
