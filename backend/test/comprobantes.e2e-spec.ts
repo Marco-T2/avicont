@@ -659,6 +659,53 @@ describe('Comprobantes (e2e)', () => {
       expect(res.body.lineas).toHaveLength(2);
     });
 
+    // REQ-DDL-UI-06: el front (drag & drop) manda el array de líneas reordenado;
+    // el backend re-deriva orden = idx + 1 en el re-insert §4.3. Verifica el contrato
+    // de persistencia del orden — NO requiere cambios de producción.
+    it('escenario reorden: PATCH con líneas invertidas persiste orden = posición enviada', async () => {
+      const { id, token, cajaId, ventasId } = await crearYContabilizar('eord');
+
+      // Orden original: [caja (debito), ventas (credito)]. Se envía INVERTIDO.
+      const res = await request(app.getHttpServer())
+        .patch(`/api/comprobantes/${id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          glosa: 'Líneas reordenadas por drag & drop',
+          lineas: [
+            {
+              cuentaId: ventasId,
+              moneda: 'BOB',
+              debito: '0',
+              credito: '1000.00',
+              tipoCambio: '1',
+              debitoBob: '0',
+              creditoBob: '1000.00',
+            },
+            {
+              cuentaId: cajaId,
+              moneda: 'BOB',
+              debito: '1000.00',
+              credito: '0',
+              tipoCambio: '1',
+              debitoBob: '1000.00',
+              creditoBob: '0',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.lineas).toHaveLength(2);
+      // El backend devuelve las líneas ordenadas por `orden` (orderBy orden asc).
+      // orden 1 = la línea enviada primera (ventas); orden 2 = la enviada segunda (caja).
+      expect(res.body.lineas[0].orden).toBe(1);
+      expect(res.body.lineas[0].cuentaId).toBe(ventasId);
+      expect(res.body.lineas[1].orden).toBe(2);
+      expect(res.body.lineas[1].cuentaId).toBe(cajaId);
+      // La partida doble se mantiene (sin cambio de montos).
+      expect(res.body.totalDebitoBob).toBe('1000.00');
+      expect(res.body.totalCreditoBob).toBe('1000.00');
+    });
+
     it('escenario 3: reemplazo con líneas desbalanceadas → 422 COMPROBANTE_DESBALANCEADO', async () => {
       const { id, token, cajaId, ventasId } = await crearYContabilizar('e3');
 

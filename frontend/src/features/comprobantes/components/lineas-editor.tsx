@@ -1,3 +1,21 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  restrictToParentElement,
+  restrictToVerticalAxis,
+} from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
@@ -34,7 +52,7 @@ interface LineasEditorProps {
 export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.Element {
   const { control } = useFormContext();
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
     name: 'lineas',
   });
@@ -43,6 +61,28 @@ export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.El
   const [reemplazarLineas, setReemplazarLineas] = useState(false);
 
   const editorDisabled = mode === 'contabilizado' && !reemplazarLineas;
+
+  // PointerSensor (no native HTML5 DnD) convive con los inputs editables;
+  // KeyboardSensor da a11y de reorden por teclado (design §Decisión 6).
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // El front solo reordena el array; el backend re-deriva `orden = idx + 1` en el
+  // re-insert §4.3. `move()` reordena el fieldArray sin estado paralelo (design §Decisión 4).
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over === null || active.id === over.id) return;
+      const oldIndex = fields.findIndex((f) => f.id === active.id);
+      const newIndex = fields.findIndex((f) => f.id === over.id);
+      // noUncheckedIndexedAccess / contrato de move: ambos índices deben existir.
+      if (oldIndex === -1 || newIndex === -1) return;
+      move(oldIndex, newIndex);
+    },
+    [fields, move],
+  );
 
   // Ref al contenedor para capturar eventos keyboard
   const containerRef = useRef<HTMLDivElement>(null);
@@ -138,47 +178,63 @@ export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.El
             ya no desbalancea la fila — se trunca). min-w-[800px] = piso: por
             debajo de ese ancho el contenedor scrollea en vez de aplastar las
             columnas (CLAUDE.md §7 — tablas con muchas columnas / mobile-usable). */}
-        <table className="w-full min-w-[800px] table-fixed text-sm">
-          <colgroup>
-            <col className="w-[22%]" /> {/* Cuenta */}
-            <col className="w-[11%]" /> {/* Debe */}
-            <col className="w-[11%]" /> {/* Haber */}
-            <col className="w-[40%]" /> {/* Glosa línea — la más ancha */}
-            <col className="w-[16%]" /> {/* Contacto */}
-            <col className="w-[44px]" /> {/* Eliminar — fijo, solo el ícono */}
-          </colgroup>
-          <thead>
-            <tr className="bg-muted/50 text-muted-foreground">
-              <th className="p-2 text-left font-medium">Cuenta</th>
-              {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7.
-                  Debe/Haber YA están en BOB (TC=1); las columnas espejo "Debe/Haber BOB"
-                  se eliminaron por redundantes. El montoBob se recalcula en el submit
-                  (poblarBobEnLineas). */}
-              <th className="p-2 text-right font-medium">Debe</th>
-              <th className="p-2 text-right font-medium">Haber</th>
-              <th className="p-2 text-left font-medium">Glosa línea</th>
-              <th className="p-2 text-left font-medium">Contacto</th>
-              <th className="p-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((field, i) => {
-              // noUncheckedIndexedAccess: narrowing obligatorio antes de operar.
-              if (field === undefined) return null;
-              return (
-                <LineaRow
-                  key={field.id}
-                  index={i}
-                  cuentas={cuentas}
-                  onRemove={() => remove(i)}
-                  isOnlyRow={fields.length === 1}
-                  disabled={editorDisabled}
-                  data-row-index={i}
-                />
-              );
-            })}
-          </tbody>
-        </table>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <table className="w-full min-w-[800px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-[32px]" /> {/* Handle de arrastre — fijo, solo el ícono */}
+              <col className="w-[22%]" /> {/* Cuenta */}
+              <col className="w-[11%]" /> {/* Debe */}
+              <col className="w-[11%]" /> {/* Haber */}
+              <col className="w-[40%]" /> {/* Glosa línea — la más ancha */}
+              <col className="w-[16%]" /> {/* Contacto */}
+              <col className="w-[44px]" /> {/* Eliminar — fijo, solo el ícono */}
+            </colgroup>
+            <thead>
+              <tr className="bg-muted/50 text-muted-foreground">
+                <th className="p-2" aria-label="Reordenar" />
+                <th className="p-2 text-left font-medium">Cuenta</th>
+                {/* Moneda y T.C. ocultos — la UI lockea BOB/1; columnas eliminadas de spec §5.7.
+                    Debe/Haber YA están en BOB (TC=1); las columnas espejo "Debe/Haber BOB"
+                    se eliminaron por redundantes. El montoBob se recalcula en el submit
+                    (poblarBobEnLineas). */}
+                <th className="p-2 text-right font-medium">Debe</th>
+                <th className="p-2 text-right font-medium">Haber</th>
+                <th className="p-2 text-left font-medium">Glosa línea</th>
+                <th className="p-2 text-left font-medium">Contacto</th>
+                <th className="p-2" />
+              </tr>
+            </thead>
+            <SortableContext
+              items={fields.map((f) => f.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <tbody>
+                {fields.map((field, i) => {
+                  // noUncheckedIndexedAccess: narrowing obligatorio antes de operar.
+                  if (field === undefined) return null;
+                  return (
+                    <LineaRow
+                      key={field.id}
+                      id={field.id}
+                      index={i}
+                      cuentas={cuentas}
+                      onRemove={() => remove(i)}
+                      isOnlyRow={fields.length === 1}
+                      disabled={editorDisabled}
+                      data-row-index={i}
+                      data-field-id={field.id}
+                    />
+                  );
+                })}
+              </tbody>
+            </SortableContext>
+          </table>
+        </DndContext>
       </div>
 
       {/* Botón agregar */}
