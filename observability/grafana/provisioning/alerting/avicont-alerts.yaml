@@ -1,0 +1,137 @@
+apiVersion: 1
+
+# Reglas de alerta provisionadas para Avicont (Grafana unified alerting).
+# Solo se alertan métricas con datos reales (RED HTTP + disponibilidad).
+# Las métricas de dominio (db_query, auth_login, tenant_operations) están en 0
+# hasta instrumentarlas en el código; alertar sobre ellas hoy daría falsos NoData.
+groups:
+  - orgId: 1
+    name: avicont-red
+    folder: SaaS
+    interval: 1m
+    rules:
+      - uid: avicont-5xx-rate
+        title: 'Avicont — tasa de errores 5xx alta'
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          modulo: http
+        annotations:
+          summary: 'Más del 5% de las respuestas HTTP son 5xx en los últimos 5 minutos.'
+          runbook: 'Revisar logs en Loki {service_name="saas-api"} y la traza del error en Tempo.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              expr: 'sum(rate(saas_http_requests_total{status_code=~"5.."}[5m])) / clamp_min(sum(rate(saas_http_requests_total[5m])), 0.001)'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.05]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+
+      - uid: avicont-latency-p95
+        title: 'Avicont — latencia HTTP p95 alta'
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          modulo: http
+        annotations:
+          summary: 'La latencia p95 de las requests HTTP supera 1s en los últimos 5 minutos.'
+          runbook: 'Abrir Tempo, filtrar { .service.name = "saas-api" && duration > 1s } y ver en qué span se va el tiempo (suele ser una query a Postgres).'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              expr: 'histogram_quantile(0.95, sum(rate(saas_http_request_duration_seconds_bucket[5m])) by (le))'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+
+      - uid: avicont-backend-down
+        title: 'Avicont — backend caído (sin scrape)'
+        condition: C
+        for: 1m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+          modulo: disponibilidad
+        annotations:
+          summary: 'Prometheus no puede scrapear el backend (up=0 o target ausente).'
+          runbook: 'Verificar que el backend del host esté corriendo en :3000 y que host.docker.internal resuelva desde Prometheus.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              expr: 'up{job="saas-api"}'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
