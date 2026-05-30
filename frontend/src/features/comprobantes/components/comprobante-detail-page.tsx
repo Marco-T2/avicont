@@ -278,27 +278,37 @@ export function ComprobanteDetailPage(): React.JSX.Element {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
             Líneas
           </h2>
+          {/* table-fixed + colgroup: anchos predecibles e independientes del
+              contenido (un nombre de cuenta largo se trunca, no desbalancea la
+              fila). Mismo criterio que el editor (lineas-editor.tsx). min-w-[800px]
+              = piso: por debajo scrollea en vez de aplastar (CLAUDE.md §7).
+              Columnas de multimoneda (Moneda, T.C., Debe/Haber nativos) ocultas:
+              la UI lockea BOB; Debe/Haber muestran el monto en BOB (debitoBob). */}
           <div className="overflow-x-auto rounded-md border">
-            <Table>
+            <Table className="min-w-[800px] table-fixed">
+              <colgroup>
+                <col className="w-[44px]" /> {/* # orden */}
+                <col className="w-[24%]" /> {/* Cuenta */}
+                <col className="w-[13%]" /> {/* Debe */}
+                <col className="w-[13%]" /> {/* Haber */}
+                <col className="w-[34%]" /> {/* Glosa línea */}
+                <col className="w-[16%]" /> {/* Contacto */}
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8 text-center">#</TableHead>
+                  <TableHead className="text-center">#</TableHead>
                   <TableHead>Cuenta</TableHead>
-                  <TableHead>Contacto</TableHead>
-                  <TableHead>Moneda</TableHead>
                   <TableHead className="text-right">Debe</TableHead>
                   <TableHead className="text-right">Haber</TableHead>
-                  <TableHead className="text-right">T.C.</TableHead>
-                  <TableHead className="text-right">Debe BOB</TableHead>
-                  <TableHead className="text-right">Haber BOB</TableHead>
                   <TableHead>Glosa línea</TableHead>
+                  <TableHead>Contacto</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {comprobante.lineas.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={10}
+                      colSpan={6}
                       className="text-center text-sm text-muted-foreground py-6"
                     >
                       Sin líneas
@@ -315,10 +325,17 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                           const cuenta = cuentaPorId.get(linea.cuentaId);
                           if (cuenta === undefined) {
                             // Fallback: cuenta inactiva o fuera del pageSize=100 → mostrar UUID.
-                            return <span className="font-mono text-muted-foreground">{linea.cuentaId}</span>;
+                            return (
+                              <span className="block truncate font-mono text-muted-foreground" title={linea.cuentaId}>
+                                {linea.cuentaId}
+                              </span>
+                            );
                           }
                           return (
-                            <span>
+                            <span
+                              className="block truncate"
+                              title={`${cuenta.codigoInterno} · ${cuenta.nombre}`}
+                            >
                               <span className="font-mono text-xs">{cuenta.codigoInterno}</span>
                               <span className="text-muted-foreground"> · </span>
                               <span>{cuenta.nombre}</span>
@@ -326,7 +343,18 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                           );
                         })()}
                       </TableCell>
-                      <TableCell className="text-xs min-w-[140px]">
+                      <TableCell className="text-right">
+                        <MontoCell monto={linea.debitoBob} moneda="BOB" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <MontoCell monto={linea.creditoBob} moneda="BOB" />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <span className="block truncate" title={linea.glosaLinea ?? undefined}>
+                          {linea.glosaLinea ?? '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs">
                         {(() => {
                           if (linea.contactoId === null || linea.contactoId === undefined) {
                             return <span className="text-muted-foreground">—</span>;
@@ -337,29 +365,18 @@ export function ComprobanteDetailPage(): React.JSX.Element {
                           const razonSocial = contactoPorId.get(linea.contactoId);
                           if (razonSocial === undefined) {
                             // Fallback: contacto fuera del pageSize=50 → mostrar UUID.
-                            return <span className="font-mono text-muted-foreground">{linea.contactoId}</span>;
+                            return (
+                              <span className="block truncate font-mono text-muted-foreground" title={linea.contactoId}>
+                                {linea.contactoId}
+                              </span>
+                            );
                           }
-                          return <span>{razonSocial}</span>;
+                          return (
+                            <span className="block truncate" title={razonSocial}>
+                              {razonSocial}
+                            </span>
+                          );
                         })()}
-                      </TableCell>
-                      <TableCell className="text-xs">{linea.moneda}</TableCell>
-                      <TableCell className="text-right">
-                        <MontoCell monto={linea.debito} moneda={linea.moneda} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MontoCell monto={linea.credito} moneda={linea.moneda} />
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-mono text-muted-foreground">
-                        {linea.tipoCambio}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MontoCell monto={linea.debitoBob} moneda="BOB" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <MontoCell monto={linea.creditoBob} moneda="BOB" />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {linea.glosaLinea ?? '—'}
                       </TableCell>
                     </TableRow>
                   ))

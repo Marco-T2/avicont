@@ -140,6 +140,15 @@ describe('ComprobantesTable', () => {
     expect(dolarSigns).toHaveLength(0);
   });
 
+  it('la tabla desktop usa table-fixed con colgroup de 9 columnas', () => {
+    renderTable();
+    const table = document.querySelector('table');
+    expect(table).not.toBeNull();
+    expect(table?.className).toContain('table-fixed');
+    const cols = document.querySelectorAll('table > colgroup > col');
+    expect(cols.length).toBe(9);
+  });
+
   it('ya no muestra la columna Tipo', () => {
     renderTable();
     expect(screen.queryByRole('columnheader', { name: 'Tipo' })).toBeNull();
