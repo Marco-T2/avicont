@@ -72,6 +72,16 @@ export class MetricsService {
   }
 
   /**
+   * Registra una rotación de refresh token. status ∈ {success, failure};
+   * sin tenant_id por cardinalidad (igual criterio que recordLogin).
+   */
+  recordTokenRefresh(success: boolean): void {
+    this.metrics.incrementCounter('auth_token_refresh_total', {
+      status: success ? 'success' : 'failure',
+    });
+  }
+
+  /**
    * Set active users for a tenant
    */
   setActiveUsers(tenantId: string, count: number): void {

@@ -111,6 +111,7 @@ export class AuthService {
     const hash = RefreshTokenHash.fromRaw(refreshToken);
     const stored = await this.credentials.findActiveByHash(hash.toString());
     if (!stored) {
+      this.metrics.recordTokenRefresh(false);
       throw new TokenInvalidoError();
     }
 
@@ -135,6 +136,8 @@ export class AuthService {
       activeTenantId,
       TokenFamily.of(stored.familyId),
     );
+
+    this.metrics.recordTokenRefresh(true);
 
     return { accessToken, refreshToken: newRefreshToken };
   }
