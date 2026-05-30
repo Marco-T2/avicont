@@ -23,6 +23,7 @@ import {
 } from './ports/credentials.repository.port';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { MetricsService } from '../metrics/metrics.service';
 
 import * as crypto from 'crypto';
 
@@ -44,6 +45,7 @@ export class AuthService {
     private readonly memberships: MembershipsReaderPort,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly metrics: MetricsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -76,7 +78,13 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<TokenPair> {
-    const user = await this.validateUser(dto.email, dto.password);
+    let user: Awaited<ReturnType<typeof this.validateUser>>;
+    try {
+      user = await this.validateUser(dto.email, dto.password);
+    } catch (err) {
+      this.metrics.recordLogin(false);
+      throw err;
+    }
     const memberships = await this.memberships.findActivasByUserId(user.id);
 
     const activeTenantId = memberships[0]?.organizationId;
@@ -93,6 +101,8 @@ export class AuthService {
     // Login = nueva familia de refresh tokens. Detección de reuso (CLAUDE.md §5.3)
     // pendiente de implementar en Fase 0.6; por ahora sólo persistimos familyId.
     const refreshToken = await this.createRefreshToken(user.id, activeTenantId);
+
+    this.metrics.recordLogin(true);
 
     return { accessToken, refreshToken };
   }

@@ -52,21 +52,21 @@ export class MetricsService {
   }
 
   /**
-   * Record a login attempt
+   * Registra un intento de login. Sin tenant_id en la label: es un UUID y
+   * dispararía cardinalidad no acotada (el detalle per-tenant va en logs).
    */
-  recordLogin(success: boolean, tenantId?: string): void {
+  recordLogin(success: boolean): void {
     this.metrics.incrementCounter('auth_login_total', {
       status: success ? 'success' : 'failure',
-      tenant_id: tenantId || 'unknown',
     });
   }
 
   /**
-   * Record a tenant operation
+   * Registra una operación autenticada, etiquetada por tipo (controller.handler).
+   * Sin tenant_id por cardinalidad: la atribución per-tenant vive en logs/traces.
    */
-  recordTenantOperation(tenantId: string, operation: string): void {
+  recordTenantOperation(operation: string): void {
     this.metrics.incrementCounter('tenant_operations_total', {
-      tenant_id: tenantId,
       operation,
     });
   }

@@ -54,16 +54,17 @@ export class PrometheusAdapter implements MetricsPort, OnModuleInit {
       'status_code',
     ]);
 
-    // Tenant-specific metrics
-    this.registerCounter('tenant_operations_total', 'Total operations per tenant', [
-      'tenant_id',
+    // Operaciones autenticadas, etiquetadas por tipo (controller.handler).
+    // SIN tenant_id: es un UUID → cardinalidad no acotada en Prometheus. El
+    // detalle per-tenant vive en logs/traces (alta cardinalidad correcta ahí).
+    this.registerCounter('tenant_operations_total', 'Total authenticated operations by type', [
       'operation',
     ]);
 
     this.registerGauge('tenant_active_users', 'Number of active users per tenant', ['tenant_id']);
 
-    // Auth metrics
-    this.registerCounter('auth_login_total', 'Total login attempts', ['status', 'tenant_id']);
+    // Auth metrics. status ∈ {success, failure}; sin tenant_id por cardinalidad.
+    this.registerCounter('auth_login_total', 'Total login attempts', ['status']);
     this.registerCounter('auth_token_refresh_total', 'Total token refreshes', ['status']);
 
     // Database metrics
