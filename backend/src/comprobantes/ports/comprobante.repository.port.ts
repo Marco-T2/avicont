@@ -83,6 +83,22 @@ export interface ListarFiltros {
 
 export type ComprobanteConLineas = Comprobante & { lineas: LineaComprobante[] };
 
+/**
+ * Fila del listado: el comprobante con una proyección liviana para la tabla.
+ * No trae las líneas completas — solo el contacto de cada una (para derivar
+ * los contactos distintos) y los documentos físicos de respaldo asociados.
+ */
+export type ComprobanteListRow = Comprobante & {
+  lineas: { contacto: { id: string; razonSocial: string } | null }[];
+  documentosFisicosAsociados: {
+    documentoFisico: {
+      id: string;
+      numero: string;
+      tipoDocumento: { nombre: string };
+    };
+  }[];
+};
+
 // ============================================================
 // Port
 // ============================================================
@@ -171,7 +187,7 @@ export abstract class ComprobanteRepositoryPort {
     filtros: ListarFiltros,
     pagination: { page: number; limit: number },
     tx?: Prisma.TransactionClient,
-  ): Promise<{ items: ComprobanteConLineas[]; total: number }>;
+  ): Promise<{ items: ComprobanteListRow[]; total: number }>;
 
   /**
    * Lista el historial de auditoría de un comprobante desde la tabla raw

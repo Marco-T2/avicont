@@ -36,6 +36,8 @@ const mockComprobantes: ComprobanteListItem[] = [
     createdByUserId: 'u1',
     createdAt: '2026-04-22T10:00:00Z',
     updatedAt: '2026-04-22T10:00:00Z',
+    contactos: [{ id: 'c-1', nombre: 'Avícola Sur S.R.L.' }],
+    documentosRespaldo: [{ id: 'd-1', tipoNombre: 'Factura', numero: '0042' }],
   },
   {
     id: 'comp-2',
@@ -56,6 +58,8 @@ const mockComprobantes: ComprobanteListItem[] = [
     createdByUserId: 'u1',
     createdAt: '2026-05-01T08:00:00Z',
     updatedAt: '2026-05-01T08:00:00Z',
+    contactos: [],
+    documentosRespaldo: [],
   },
 ];
 
@@ -134,5 +138,36 @@ describe('ComprobantesTable', () => {
     // "$" no debe aparecer en los MontoCell del total (solo se usaría si se pasara USD)
     const dolarSigns = screen.queryAllByText('$');
     expect(dolarSigns).toHaveLength(0);
+  });
+
+  it('ya no muestra la columna Tipo', () => {
+    renderTable();
+    expect(screen.queryByRole('columnheader', { name: 'Tipo' })).toBeNull();
+  });
+
+  it('muestra el contacto único y el documento de respaldo', () => {
+    renderTable();
+    expect(screen.getAllByText('Avícola Sur S.R.L.').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Factura').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('0042').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('muestra "Sin contacto asociado" cuando el comprobante no tiene contactos', () => {
+    renderTable();
+    expect(
+      screen.getAllByText('Sin contacto asociado').length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('muestra "Varios" cuando hay más de un contacto distinto', () => {
+    const conVarios: ComprobanteListItem = {
+      ...mockComprobantes[0]!,
+      contactos: [
+        { id: 'c-1', nombre: 'Avícola Sur S.R.L.' },
+        { id: 'c-2', nombre: 'Molinos SA' },
+      ],
+    };
+    renderTable({ comprobantes: [conVarios] });
+    expect(screen.getAllByText('Varios').length).toBeGreaterThanOrEqual(1);
   });
 });

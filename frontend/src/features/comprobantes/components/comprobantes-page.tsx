@@ -28,6 +28,8 @@ export function ComprobantesPage(): React.JSX.Element {
   const page = parseInt(searchParams.get('page') ?? '1', 10);
   const tipo = searchParams.get('tipo') as TipoComprobante | null;
   const estado = searchParams.get('estado') as EstadoComprobante | null;
+  const periodoFiscalId = searchParams.get('periodoFiscalId');
+  const q = searchParams.get('q');
   const incluirAnulados = searchParams.get('incluirAnulados') === 'true';
 
   const params = {
@@ -35,6 +37,8 @@ export function ComprobantesPage(): React.JSX.Element {
     limit: DEFAULT_LIMIT,
     ...(tipo !== null ? { tipo } : {}),
     ...(estado !== null ? { estado } : {}),
+    ...(periodoFiscalId !== null ? { periodoFiscalId } : {}),
+    ...(q !== null && q !== '' ? { q } : {}),
     ...(incluirAnulados ? { incluirAnulados } : {}),
   };
 
