@@ -35,7 +35,7 @@ describe('AuthService (unit)', () => {
   let usersReader: jest.Mocked<UsersReaderPort>;
   let usersWriter: jest.Mocked<UsersWriterPort>;
   let jwt: { sign: jest.Mock };
-  let metrics: { recordLogin: jest.Mock };
+  let metrics: { recordLogin: jest.Mock; recordTokenRefresh: jest.Mock };
 
   beforeEach(async () => {
     credentials = {
@@ -54,7 +54,7 @@ describe('AuthService (unit)', () => {
     usersReader = { findByEmail: jest.fn(), findMinimalByEmail: jest.fn() };
     usersWriter = { create: jest.fn() };
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
-    metrics = { recordLogin: jest.fn() };
+    metrics = { recordLogin: jest.fn(), recordTokenRefresh: jest.fn() };
     const config = {
       get: jest.fn().mockReturnValue('30d'),
     } as unknown as ConfigService;
@@ -204,6 +204,7 @@ describe('AuthService (unit)', () => {
       );
       expect(credentials.revokeById).not.toHaveBeenCalled();
       expect(credentials.create).not.toHaveBeenCalled();
+      expect(metrics.recordTokenRefresh).toHaveBeenCalledWith(false);
     });
 
     it('rota: revoca el anterior y crea uno nuevo preservando familyId', async () => {
@@ -226,6 +227,7 @@ describe('AuthService (unit)', () => {
       expect(createArgs?.familyId).toBe('123e4567-e89b-42d3-a456-426614174000');
       expect(createArgs?.organizationId).toBe('org-1');
       expect(result.refreshToken).not.toBe('raw-token');
+      expect(metrics.recordTokenRefresh).toHaveBeenCalledWith(true);
     });
   });
 
