@@ -324,8 +324,8 @@ describe('Contactos (e2e)', () => {
   // Filtro activo: true / false / 'all'
   // ==========================================================
 
-  describe("filtro activo en GET /api/contactos", () => {
-    it("sin param activo → solo activos; activo=true → solo activos; activo=false → solo inactivos; activo=all → todos", async () => {
+  describe('filtro activo en GET /api/contactos', () => {
+    it('sin param activo → solo activos; activo=true → solo activos; activo=false → solo inactivos; activo=all → todos', async () => {
       const { token } = await seed();
 
       // Crear 2 contactos activos

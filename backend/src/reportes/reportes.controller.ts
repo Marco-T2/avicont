@@ -9,7 +9,9 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { LibroDiarioQueryDto } from './dto/libro-diario-query.dto';
+import { LibroMayorQueryDto } from './dto/libro-mayor-query.dto';
 import { LibroDiarioService } from './libro-diario.service';
+import { LibroMayorService } from './libro-mayor.service';
 
 // ---- Resolución de tenantId desde JWT + header opcional (mismo patrón que comprobantes) ----
 
@@ -34,7 +36,10 @@ function resolveTenantId(req: AuthenticatedRequest): string {
 @RequireModule('contabilidad')
 @Controller('libros')
 export class ReportesController {
-  constructor(private readonly libroDiarioService: LibroDiarioService) {}
+  constructor(
+    private readonly libroDiarioService: LibroDiarioService,
+    private readonly libroMayorService: LibroMayorService,
+  ) {}
 
   @Get('diario')
   @RequirePermissions('contabilidad.libro-diario.read')
@@ -52,6 +57,28 @@ export class ReportesController {
       ...(query.fechaDesde !== undefined ? { fechaDesde: query.fechaDesde } : {}),
       ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('mayor')
+  @RequirePermissions('contabilidad.libro-mayor.read')
+  @ApiOperation({
+    summary:
+      'Libro Mayor: vista por cuenta con saldo inicial, running balance y saldo final. ' +
+      'Filtrar por periodoFiscalId O fechaDesde+fechaHasta. Filtro opcional por cuentaId. ' +
+      'Tope: 20.000 movimientos (REQ-LM-12).',
+  })
+  obtenerLibroMayor(@Req() req: AuthenticatedRequest, @Query() query: LibroMayorQueryDto) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.libroMayorService.consultarLibroMayor(tenantId, {
+      ...(query.cuentaId !== undefined ? { cuentaId: query.cuentaId } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
+      ...(query.fechaDesde !== undefined ? { fechaDesde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+      soloConMovimiento: query.soloConMovimiento ?? true,
     });
   }
 }

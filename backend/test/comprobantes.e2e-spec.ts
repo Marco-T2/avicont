@@ -605,7 +605,13 @@ describe('Comprobantes (e2e)', () => {
       const { body: contabilizado } = await request(app.getHttpServer())
         .post(`/api/comprobantes/${borrador.id}/contabilizar`)
         .set('Authorization', `Bearer ${token}`);
-      return { id: contabilizado.id as string, numero: contabilizado.numero as string, token, cajaId, ventasId };
+      return {
+        id: contabilizado.id as string,
+        numero: contabilizado.numero as string,
+        token,
+        cajaId,
+        ventasId,
+      };
     }
 
     it('escenario 1: happy path solo cabecera — glosa cambia, número preservado', async () => {
