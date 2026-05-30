@@ -7,51 +7,51 @@
 
 ## Fase 1: Infraestructura y dominio base
 
-- [ ] 1.1 **[setup]** Crear estructura de carpetas `backend/src/reportes/{domain,ports,adapters,dto}/`.
-- [ ] 1.2 **[RED unit]** Escribir `reportes/domain/libro-diario-errors.spec.ts` — verifica que cada subclase (`FiltroRequeridoError`, `RangoInvalidoError`, `RangoExcedeLimiteError`, `PeriodoNoEncontradoError`) tiene el `httpStatus` y `code` esperados (REQ-LD-01, REQ-LD-10).
-- [ ] 1.3 **[GREEN]** Crear `reportes/domain/libro-diario-errors.ts` con las 4 subclases de `DomainError` (`REPORTES_LIBRO_DIARIO_FILTRO_REQUERIDO` 400, `REPORTES_LIBRO_DIARIO_RANGO_INVALIDO` 400, `REPORTES_LIBRO_DIARIO_RANGO_EXCEDE_LIMITE` 422, `REPORTES_PERIODO_NO_ENCONTRADO` 404).
-- [ ] 1.4 **[RED integration — periodos]** En `periodos-fiscales/adapters/prisma-periodos-reader.adapter.integration.spec.ts`, agregar casos: `obtenerRangoFechas` devuelve `{desde, hasta}` para año/mes del período; devuelve `null` si `periodoId` no existe o es de otro tenant (REQ-LD-01, §4.2).
-- [ ] 1.5 **[GREEN]** Ampliar `periodos-fiscales/ports/periodos-reader.port.ts` con `obtenerRangoFechas(tenantId, periodoId): Promise<{desde: Date; hasta: Date} | null>`. Implementar en `prisma-periodos-reader.adapter.ts` (deriva `[year-month-01, fin-de-mes]` desde `year`+`month` del período). Registro en `PeriodosReaderModule`.
+- [x] 1.1 **[setup]** Crear estructura de carpetas `backend/src/reportes/{domain,ports,adapters,dto}/`.
+- [x] 1.2 **[RED unit]** Escribir `reportes/domain/libro-diario-errors.spec.ts` — verifica que cada subclase (`FiltroRequeridoError`, `RangoInvalidoError`, `RangoExcedeLimiteError`, `PeriodoNoEncontradoError`) tiene el `httpStatus` y `code` esperados (REQ-LD-01, REQ-LD-10).
+- [x] 1.3 **[GREEN]** Crear `reportes/domain/libro-diario-errors.ts` con las 4 subclases de `DomainError` (`REPORTES_LIBRO_DIARIO_FILTRO_REQUERIDO` 400, `REPORTES_LIBRO_DIARIO_RANGO_INVALIDO` 400, `REPORTES_LIBRO_DIARIO_RANGO_EXCEDE_LIMITE` 422, `REPORTES_PERIODO_NO_ENCONTRADO` 404).
+- [x] 1.4 **[RED integration — periodos]** En `periodos-fiscales/adapters/prisma-periodos-reader.adapter.integration.spec.ts`, agregar casos: `obtenerRangoFechas` devuelve `{desde, hasta}` para año/mes del período; devuelve `null` si `periodoId` no existe o es de otro tenant (REQ-LD-01, §4.2).
+- [x] 1.5 **[GREEN]** Ampliar `periodos-fiscales/ports/periodos-reader.port.ts` con `obtenerRangoFechas(tenantId, periodoId): Promise<{desde: Date; hasta: Date} | null>`. Implementar en `prisma-periodos-reader.adapter.ts` (deriva `[year-month-01, fin-de-mes]` desde `year`+`month` del período). Registro en `PeriodosReaderModule`.
   - _Commit sugerido_: `feat(periodos-fiscales): ampliar PeriodosReaderPort con obtenerRangoFechas`
 
 ---
 
 ## Fase 2: Port y adapter de comprobantes
 
-- [ ] 2.1 **[setup]** Crear `reportes/ports/comprobantes-reader.port.ts` — `ComprobantesReaderPort` abstract con `Symbol`, tipos `LibroDiarioFiltros` y `ComprobanteLibroDiarioRow` (filas Prisma, decisión 1).
-- [ ] 2.2 **[RED integration]** Crear `reportes/adapters/prisma-comprobantes-reader.adapter.integration.spec.ts` — seed 2 tenants, probar (REQ-LD-02, REQ-LD-03, REQ-LD-04, REQ-LD-08):
+- [x] 2.1 **[setup]** Crear `reportes/ports/comprobantes-reader.port.ts` — `ComprobantesReaderPort` abstract con `Symbol`, tipos `LibroDiarioFiltros` y `ComprobanteLibroDiarioRow` (filas Prisma, decisión 1).
+- [x] 2.2 **[RED integration]** Crear `reportes/adapters/prisma-comprobantes-reader.adapter.integration.spec.ts` — seed 2 tenants, probar (REQ-LD-02, REQ-LD-03, REQ-LD-04, REQ-LD-08):
   - `contarAsientos`: cuenta solo CONTABILIZADO/BLOQUEADO del tenant, excluye BORRADOR, respeta `incluirAnulados`.
   - `obtenerAsientosParaLibroDiario`: aísla tenant (2 tenants en misma fecha → sin fuga), orden cronológico estable, líneas ordenadas por `orden`, anulados excluidos/incluidos por flag.
-- [ ] 2.3 **[GREEN]** Crear `reportes/adapters/prisma-comprobantes-reader.adapter.ts` — `findMany` con include anidado (`lineas → cuenta`), `where` con `organizationId` + `estado IN [CONTABILIZADO, BLOQUEADO]` + `anulado` condicional + `fechaContable` rango; orden `fechaContable ASC, numero ASC NULLS LAST, createdAt ASC`; `count` paralelo para el tope.
+- [x] 2.3 **[GREEN]** Crear `reportes/adapters/prisma-comprobantes-reader.adapter.ts` — `findMany` con include anidado (`lineas → cuenta`), `where` con `organizationId` + `estado IN [CONTABILIZADO, BLOQUEADO]` + `anulado` condicional + `fechaContable` rango; orden `fechaContable ASC, numero ASC NULLS LAST, createdAt ASC`; `count` paralelo para el tope.
   - _Commit sugerido_: `feat(reportes): ComprobantesReaderPort + adapter Prisma con aislamiento multi-tenant`
 
 ---
 
 ## Fase 3: DTOs y mapper
 
-- [ ] 3.1 **[RED unit]** Crear `reportes/dto/libro-diario-response.dto.spec.ts` — verifica `toLibroDiarioResponse`: `Decimal → string` con 2 decimales, fecha `@db.Date → "YYYY-MM-DD"`, líneas anidadas correctas, `totalDebeBob === totalHaberBob` para asiento válido, período vacío → `"0.00"` (REQ-LD-05, REQ-LD-06, REQ-LD-07).
-- [ ] 3.2 **[GREEN]** Crear `reportes/dto/libro-diario-response.dto.ts` — DTO anidado + función pura `toLibroDiarioResponse(rows, rango)`.
-- [ ] 3.3 **[setup]** Crear `reportes/dto/libro-diario-query.dto.ts` — class-validator: `periodoFiscalId?` (IsUUID), `fechaDesde?`/`fechaHasta?` (regex `^\d{4}-\d{2}-\d{2}$`), `incluirAnulados?` (`@Transform` → boolean, default false).
+- [x] 3.1 **[RED unit]** Crear `reportes/dto/libro-diario-response.dto.spec.ts` — verifica `toLibroDiarioResponse`: `Decimal → string` con 2 decimales, fecha `@db.Date → "YYYY-MM-DD"`, líneas anidadas correctas, `totalDebeBob === totalHaberBob` para asiento válido, período vacío → `"0.00"` (REQ-LD-05, REQ-LD-06, REQ-LD-07).
+- [x] 3.2 **[GREEN]** Crear `reportes/dto/libro-diario-response.dto.ts` — DTO anidado + función pura `toLibroDiarioResponse(rows, rango)`.
+- [x] 3.3 **[setup]** Crear `reportes/dto/libro-diario-query.dto.ts` — class-validator: `periodoFiscalId?` (IsUUID), `fechaDesde?`/`fechaHasta?` (regex `^\d{4}-\d{2}-\d{2}$`), `incluirAnulados?` (`@Transform` → boolean, default false).
 
 ---
 
 ## Fase 4: Service
 
-- [ ] 4.1 **[RED unit]** Crear `reportes/libro-diario.service.spec.ts` — mocks de `ComprobantesReaderPort` + `PeriodosReaderPort`, casos (REQ-LD-01, REQ-LD-10):
+- [x] 4.1 **[RED unit]** Crear `reportes/libro-diario.service.spec.ts` — mocks de `ComprobantesReaderPort` + `PeriodosReaderPort`, casos (REQ-LD-01, REQ-LD-10):
   - Lanza `FiltroRequeridoError` si ningún filtro.
   - Lanza `FiltroRequeridoError` si ambas formas presentes.
   - Lanza `RangoInvalidoError` si `fechaDesde > fechaHasta`.
   - Resuelve `periodoFiscalId → rango` vía `PeriodosReaderPort.obtenerRangoFechas`; lanza `PeriodoNoEncontradoError` si `null`.
   - Lanza `RangoExcedeLimiteError` si `contarAsientos > 5000`.
   - Retorna `LibroDiarioResponseDto` bien formado en happy path.
-- [ ] 4.2 **[GREEN]** Crear `reportes/libro-diario.service.ts` — orquesta validación → resolución período → `count` previo → `obtenerAsientos` → mapper → totales.
+- [x] 4.2 **[GREEN]** Crear `reportes/libro-diario.service.ts` — orquesta validación → resolución período → `count` previo → `obtenerAsientos` → mapper → totales.
   - _Commit sugerido_: `feat(reportes): LibroDiarioService con validación, tope defensivo y mapeo`
 
 ---
 
 ## Fase 5: Controller y módulo
 
-- [ ] 5.1 **[RED e2e]** Crear `backend/test/libro-diario.e2e-spec.ts` — `--runInBand --forceExit`, seed 2 tenants con comprobantes CONTABILIZADO/BORRADOR/anulado, casos (REQ-LD-08, REQ-LD-09, REQ-LD-02, REQ-LD-03, REQ-LD-10):
+- [x] 5.1 **[RED e2e]** Crear `backend/test/libro-diario.e2e-spec.ts` — `--runInBand --forceExit`, seed 2 tenants con comprobantes CONTABILIZADO/BORRADOR/anulado, casos (REQ-LD-08, REQ-LD-09, REQ-LD-02, REQ-LD-03, REQ-LD-10):
   - `GET /api/libros/diario` sin JWT → 401.
   - Con JWT sin `contabilidad.libro-diario.read` → 403.
   - Con JWT y permiso + `periodoFiscalId` válido → 200, sin BORRADOR, sin asientos de Tenant B.
@@ -60,9 +60,9 @@
   - Sin filtro → 400.
   - Con `incluirAnulados=true` → anulado visible con `"anulado":true`.
   - Tope 5.000 excedido → 422 `REPORTES_LIBRO_DIARIO_RANGO_EXCEDE_LIMITE`.
-- [ ] 5.2 **[GREEN]** Crear `reportes/reportes.controller.ts` — `@Controller('libros')`, `GET diario`, `@RequirePermissions('contabilidad.libro-diario.read')`, guards: `JwtAuthGuard`, `ModuleEnabledGuard('contabilidad')`, `PermissionsGuard`.
-- [ ] 5.3 **[GREEN]** Crear `reportes/reportes.module.ts` — DI: `ComprobantesReaderPort → PrismaComprobantesReaderAdapter`; imports: `PrismaModule`, `PeriodosReaderModule`, `RbacModule`.
-- [ ] 5.4 **[GREEN]** Registrar `ReportesModule` en `backend/src/app.module.ts`.
+- [x] 5.2 **[GREEN]** Crear `reportes/reportes.controller.ts` — `@Controller('libros')`, `GET diario`, `@RequirePermissions('contabilidad.libro-diario.read')`, guards: `JwtAuthGuard`, `ModuleEnabledGuard('contabilidad')`, `PermissionsGuard`.
+- [x] 5.3 **[GREEN]** Crear `reportes/reportes.module.ts` — DI: `ComprobantesReaderPort → PrismaComprobantesReaderAdapter`; imports: `PrismaModule`, `PeriodosReaderModule`, `RbacModule`.
+- [x] 5.4 **[GREEN]** Registrar `ReportesModule` en `backend/src/app.module.ts`.
   - _Commit sugerido_: `feat(reportes): controller GET /libros/diario + módulo + wiring app`
 
 ---
