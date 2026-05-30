@@ -1,5 +1,6 @@
 import { EstadoComprobante, TipoComprobante } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { ConfigService } from '@nestjs/config';
 
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
@@ -9,7 +10,7 @@ import {
   RangoExcedeLimiteError,
   RangoInvalidoError,
 } from './domain/libro-diario-errors';
-import { LibroDiarioService } from './libro-diario.service';
+import { LibroDiarioService, LIBRO_DIARIO_MAX_ASIENTOS_DEFAULT } from './libro-diario.service';
 import type { ComprobantesReaderPort } from './ports/comprobantes-reader.port';
 
 // ============================================================
@@ -76,6 +77,17 @@ const TENANT_ID = 'org-test-1';
 // Tests
 // ============================================================
 
+/** Crea un ConfigService stub que devuelve el límite indicado para LIBRO_DIARIO_MAX_ASIENTOS. */
+function makeConfigService(maxAsientos: number = LIBRO_DIARIO_MAX_ASIENTOS_DEFAULT): ConfigService {
+  return {
+    get: (_key: string, defaultVal?: number) => {
+      // Retorna el límite para la key esperada; para cualquier otra key usa el default.
+      if (_key === 'LIBRO_DIARIO_MAX_ASIENTOS') return maxAsientos;
+      return defaultVal;
+    },
+  } as unknown as ConfigService;
+}
+
 describe('LibroDiarioService (unit)', () => {
   let service: LibroDiarioService;
   let comprobantesReader: MockComprobantesReader;
@@ -87,6 +99,7 @@ describe('LibroDiarioService (unit)', () => {
     service = new LibroDiarioService(
       comprobantesReader as unknown as ComprobantesReaderPort,
       periodosReader as unknown as PeriodosReaderPort,
+      makeConfigService(),
     );
   });
 

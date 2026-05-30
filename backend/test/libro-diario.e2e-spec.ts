@@ -142,7 +142,8 @@ describe('Libro Diario (e2e)', () => {
         organizationId: orgId,
         tipo: TipoComprobante.DIARIO,
         estado: opts.estado ?? EstadoComprobante.CONTABILIZADO,
-        numero: opts.numero ?? `D2601-${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
+        numero:
+          opts.numero ?? `D2601-${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
         fechaContable: new Date(`${fechaContable}T00:00:00Z`),
         periodoFiscalId: periodoId,
         glosa: 'Venta de prueba E2E',
@@ -348,7 +349,8 @@ describe('Libro Diario (e2e)', () => {
 
   describe('exclusión de BORRADOR', () => {
     it('no incluye comprobantes en BORRADOR en el resultado', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-ld-borrador');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-ld-borrador');
 
       // Borrador
       await prisma.comprobante.create({
@@ -428,7 +430,8 @@ describe('Libro Diario (e2e)', () => {
 
   describe('toggle de anulados', () => {
     it('sin incluirAnulados: los anulados no aparecen; con incluirAnulados=true sí', async () => {
-      const { token, orgId, cajaId, ventasId, periodoEneroId } = await seedTenant('org-ld-anulados');
+      const { token, orgId, cajaId, ventasId, periodoEneroId } =
+        await seedTenant('org-ld-anulados');
 
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-05');
       await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-06', {
@@ -493,27 +496,145 @@ describe('Libro Diario (e2e)', () => {
   // ============================================================
 
   describe('tope defensivo', () => {
-    it('422 con code LIBRO_DIARIO_RANGO_EXCEDIDO cuando se supera el límite de 5000', async () => {
-      // Este test verifica que el service inyecta el tope — mockeamos el conteo
-      // en la BD directamente inyectando muchos registros sería demasiado lento.
-      // En su lugar, testeamos que el servicio responda 422 cuando el count > 5000.
-      // Aquí creamos solo un asiento normal pero pasamos un rango muy amplio que
-      // en otra implementación podría triggear el tope; el test clave es que el
-      // count guard funciona.
-      //
-      // Para un E2E real del tope necesitaríamos insertar >5000 comprobantes,
-      // lo que es inviable en un test de CI. El tope está validado en los unit
-      // tests del service (libro-diario.service.spec.ts). Aquí verificamos
-      // la forma de la respuesta de error 422.
-      //
-      // Estrategia alternativa: usamos el módulo de configuración para reducir
-      // el límite en tests. Como eso requiere refactor mayor, verificamos el
-      // código de error directamente testeando el service mock.
-      //
-      // Nota: este escenario E2E completo no se puede probar sin data masiva.
-      // El test de contrato 422 queda cubierto por el unit test del service.
-      // Marcamos esto como una limitación conocida del E2E y lo documentamos.
-      expect(true).toBe(true); // placeholder — ver unit tests para tope
+    // El límite real (5000) haría inviable insertar >5000 registros en CI.
+    // Solución: levantamos una segunda instancia de la app con el límite fijado
+    // en 1 via process.env antes de compilar el módulo, de modo que ConfigService
+    // lea el override. 2 comprobantes CONTABILIZADOS ya superan el límite de 1.
+    let appTope: INestApplication;
+    let prismaTope: PrismaService;
+
+    beforeAll(async () => {
+      // Override ANTES de compilar — ConfigModule lee process.env en forRoot.
+      process.env['LIBRO_DIARIO_MAX_ASIENTOS'] = '1';
+
+      const fixture: TestingModule = await Test.createTestingModule({
+        imports: [AppModule],
+      }).compile();
+
+      appTope = fixture.createNestApplication();
+      appTope.setGlobalPrefix('api');
+      appTope.useGlobalPipes(
+        new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
+      );
+      await appTope.init();
+      prismaTope = fixture.get(PrismaService);
+    });
+
+    afterAll(async () => {
+      delete process.env['LIBRO_DIARIO_MAX_ASIENTOS'];
+      await appTope.close();
+    });
+
+    it('422 con LIBRO_DIARIO_RANGO_EXCEDIDO cuando la cantidad supera el límite configurado', async () => {
+      // Limitamos a 1 para no insertar 5001 comprobantes.
+      // Con 2 asientos CONTABILIZADOS en el rango, el count (2) supera el límite (1) → 422.
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const owner = await prismaTope.user.create({
+        data: { email: 'owner+tope@ld.bo', hashedPassword, isEmailVerified: true },
+      });
+      const org = await prismaTope.organization.create({
+        data: {
+          slug: 'org-ld-tope',
+          name: 'Org Tope',
+          memberships: { create: { userId: owner.id, systemRole: SystemRole.OWNER } },
+        },
+      });
+
+      const loginRes = await request(appTope.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'owner+tope@ld.bo', password: 'password123' });
+      expect(loginRes.status).toBe(200);
+      const token = loginRes.body.accessToken as string;
+
+      // Crear gestión y períodos
+      const gestRes = await request(appTope.getHttpServer())
+        .post('/api/gestiones')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ year: 2026 });
+      expect(gestRes.status).toBe(201);
+
+      // Cuentas de detalle
+      const [caja, ventas] = await Promise.all([
+        prismaTope.cuenta.create({
+          data: {
+            organizationId: org.id,
+            codigoInterno: '1.1.1.001',
+            nombre: 'Caja MN',
+            claseCuenta: ClaseCuenta.ACTIVO,
+            naturaleza: NaturalezaCuenta.DEUDORA,
+            nivel: 4,
+            esDetalle: true,
+          },
+        }),
+        prismaTope.cuenta.create({
+          data: {
+            organizationId: org.id,
+            codigoInterno: '4.1.1.001',
+            nombre: 'Ventas',
+            claseCuenta: ClaseCuenta.INGRESO,
+            naturaleza: NaturalezaCuenta.ACREEDORA,
+            nivel: 4,
+            esDetalle: true,
+          },
+        }),
+      ]);
+
+      const periodo = await prismaTope.periodoFiscal.findFirstOrThrow({
+        where: { organizationId: org.id, year: 2026, month: 1 },
+      });
+
+      // 2 asientos CONTABILIZADOS — con límite=1, count(2) > 1 → 422.
+      // Usamos prismaTope directamente (crearAsientoContabilizado del scope padre usa `prisma`).
+      for (let i = 1; i <= 2; i++) {
+        const comp = await prismaTope.comprobante.create({
+          data: {
+            organizationId: org.id,
+            tipo: TipoComprobante.DIARIO,
+            estado: EstadoComprobante.CONTABILIZADO,
+            numero: `D2601-00000${i}`,
+            fechaContable: new Date(`2026-01-0${i}T00:00:00Z`),
+            periodoFiscalId: periodo.id,
+            glosa: 'Asiento para test de tope',
+            totalDebitoBob: 1000,
+            totalCreditoBob: 1000,
+            createdByUserId: 'e2e-tope',
+          },
+        });
+        await prismaTope.lineaComprobante.createMany({
+          data: [
+            {
+              organizationId: org.id,
+              comprobanteId: comp.id,
+              orden: 1,
+              cuentaId: caja.id,
+              moneda: Moneda.BOB,
+              debito: 1000,
+              credito: 0,
+              debitoBob: 1000,
+              creditoBob: 0,
+            },
+            {
+              organizationId: org.id,
+              comprobanteId: comp.id,
+              orden: 2,
+              cuentaId: ventas.id,
+              moneda: Moneda.BOB,
+              debito: 0,
+              credito: 1000,
+              debitoBob: 0,
+              creditoBob: 1000,
+            },
+          ],
+        });
+      }
+
+      const res = await request(appTope.getHttpServer())
+        .get('/api/libros/diario')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31' });
+
+      expect(res.status).toBe(422);
+      expect(res.body.error?.code).toBe('LIBRO_DIARIO_RANGO_EXCEDIDO');
     });
   });
 });

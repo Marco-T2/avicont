@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import {
   PERIODOS_READER_PORT,
@@ -15,17 +16,30 @@ import { toLibroDiarioResponse } from './dto/libro-diario-response.dto';
 import type { LibroDiarioResponseDto } from './dto/libro-diario-response.dto';
 import { COMPROBANTES_READER_PORT, ComprobantesReaderPort } from './ports/comprobantes-reader.port';
 
-/** Tope defensivo de asientos por consulta (REQ-LD-10). */
-export const LIBRO_DIARIO_MAX_ASIENTOS = 5_000;
+/** Nombre de la variable de entorno para el tope de asientos (REQ-LD-10). */
+export const LIBRO_DIARIO_MAX_ASIENTOS_ENV = 'LIBRO_DIARIO_MAX_ASIENTOS';
+
+/** Tope defensivo por defecto cuando la env no está configurada. */
+export const LIBRO_DIARIO_MAX_ASIENTOS_DEFAULT = 5_000;
 
 @Injectable()
 export class LibroDiarioService {
+  private readonly maxAsientos: number;
+
   constructor(
     @Inject(COMPROBANTES_READER_PORT)
     private readonly comprobantesReader: ComprobantesReaderPort,
     @Inject(PERIODOS_READER_PORT)
     private readonly periodosReader: PeriodosReaderPort,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    // REQ-LD-10: umbral configurable via env LIBRO_DIARIO_MAX_ASIENTOS (default 5000).
+    // Permite reducirlo en tests sin modificar lógica.
+    this.maxAsientos = this.config.get<number>(
+      LIBRO_DIARIO_MAX_ASIENTOS_ENV,
+      LIBRO_DIARIO_MAX_ASIENTOS_DEFAULT,
+    );
+  }
 
   /**
    * Consulta el Libro Diario para el tenant activo.
@@ -94,8 +108,8 @@ export class LibroDiarioService {
 
     // ── 3. Tope defensivo por count previo (design decisión #5, REQ-LD-10) ─
     const cantidad = await this.comprobantesReader.contarAsientos(tenantId, filtros);
-    if (cantidad > LIBRO_DIARIO_MAX_ASIENTOS) {
-      throw new RangoExcedeLimiteError(cantidad, LIBRO_DIARIO_MAX_ASIENTOS);
+    if (cantidad > this.maxAsientos) {
+      throw new RangoExcedeLimiteError(cantidad, this.maxAsientos);
     }
 
     // ── 4. Consulta y mapeo ───────────────────────────────────────────────
