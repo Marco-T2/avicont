@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   BookOpen,
   BookText,
   CalendarRange,
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/plan-cuentas', label: 'Plan de cuentas', icon: BookOpen },
   { to: '/comprobantes', label: 'Comprobantes', icon: FileText },
   { to: '/libros/diario', label: 'Libro Diario', icon: BookText },
+  { to: '/libros/mayor', label: 'Libro Mayor', icon: BookMarked },
   { to: '/contactos', label: 'Contactos', icon: Contact },
   { to: '/tipos-documento-fisico', label: 'Tipos de documento', icon: FileBadge },
   { to: '/documentos-fisicos', label: 'Documentos físicos', icon: FileStack },

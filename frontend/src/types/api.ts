@@ -879,3 +879,82 @@ export interface LibroDiarioResponse {
    *  En asientos balanceados: === totalDebeBob. */
   totalHaberBob: string;
 }
+
+// ============================================================
+// Libro Mayor — GET /api/libros/mayor
+// ============================================================
+
+// Query params para GET /api/libros/mayor.
+// La regla "exactamente uno de período O rango" se valida en el schema del
+// form (libro-mayor-filtro-schema.ts) y en el backend (service, no DTO).
+export interface LibroMayorParams {
+  /** UUID de la cuenta. Si se pasa, el Mayor muestra solo esa cuenta de detalle. */
+  cuentaId?: string;
+  /** UUID del período fiscal (exclusivo con fechaDesde/fechaHasta). */
+  periodoFiscalId?: string;
+  /** Inicio del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  fechaDesde?: string;
+  /** Fin del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  fechaHasta?: string;
+  /** Si true, incluye movimientos de comprobantes anulados (default false — REQ-LM-03). */
+  incluirAnulados?: boolean;
+  /** Si false, incluye cuentas con saldo inicial pero sin movimientos en el rango
+   *  (default true — solo cuentas con movimiento — REQ-LM-08). */
+  soloConMovimiento?: boolean;
+}
+
+// Espejo de MovimientoMayorDto.
+// Montos como string decimal (§4.5 CLAUDE.md).
+export interface MovimientoLibroMayor {
+  comprobanteId: string;
+  /** Número correlativo del comprobante. Null solo en BORRADOR — el Mayor nunca lo muestra. */
+  numeroComprobante: string | null;
+  /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
+  fechaContable: string;
+  /** Glosa del comprobante cabecera. */
+  glosa: string;
+  /** Glosa de la línea (nullable). */
+  glosaLinea: string | null;
+  estado: string;
+  /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
+  anulado: boolean;
+  orden: number;
+  /** Monto debe en BOB. "0.00" si la línea es haber. */
+  debeBob: string;
+  /** Monto haber en BOB. "0.00" si la línea es debe. */
+  haberBob: string;
+  /** Saldo corriente acumulado después de este movimiento. String decimal (§4.5). */
+  saldoCorrienteBob: string;
+}
+
+// Espejo de CuentaMayorDto.
+export interface CuentaLibroMayor {
+  cuentaId: string;
+  codigoInterno: string;
+  nombreCuenta: string;
+  /** Naturaleza contable: DEUDORA (activos/egresos) o ACREEDORA (pasivos/patrimonio/ingresos). */
+  naturaleza: 'DEUDORA' | 'ACREEDORA';
+  /** Saldo antes del primer movimiento del rango. String decimal, puede ser negativo. (§4.5) */
+  saldoInicialBob: string;
+  /** Saldo al final del rango (= saldoCorriente del último movimiento). String decimal. (§4.5) */
+  saldoFinalBob: string;
+  /** Suma de debeBob de los movimientos del rango. */
+  totalDebeBob: string;
+  /** Suma de haberBob de los movimientos del rango. */
+  totalHaberBob: string;
+  movimientos: MovimientoLibroMayor[];
+}
+
+// Espejo de LibroMayorResponseDto.
+export interface LibroMayorResponse {
+  rango: {
+    fechaDesde: string; // YYYY-MM-DD
+    fechaHasta: string; // YYYY-MM-DD
+  };
+  /** Cuentas con movimiento (o con saldo previo si soloConMovimiento=false), ordenadas por codigoInterno ASC. */
+  cuentas: CuentaLibroMayor[];
+  /** Suma de todos los debeBob del rango, de todas las cuentas. */
+  totalDebeBob: string;
+  /** Suma de todos los haberBob del rango, de todas las cuentas. */
+  totalHaberBob: string;
+}
