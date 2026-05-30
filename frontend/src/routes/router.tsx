@@ -12,6 +12,7 @@ import { DocumentosFisicosPage } from '@/features/documentos-fisicos/pages/docum
 import { TiposDocumentoFisicoPage } from '@/features/tipos-documento-fisico/pages/tipos-documento-fisico-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
+import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
           { path: '/comprobantes/nuevo', element: <EditarComprobantePage /> },
           { path: '/comprobantes/:id', element: <ComprobanteDetailPage /> },
           { path: '/comprobantes/:id/editar', element: <EditarComprobantePage /> },
+          { path: '/libros/diario', element: <LibroDiarioPage /> },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/tipos-documento-fisico', element: <TiposDocumentoFisicoPage /> },
           { path: '/documentos-fisicos', element: <DocumentosFisicosPage /> },

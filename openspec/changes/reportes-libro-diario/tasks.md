@@ -69,15 +69,15 @@
 
 ## Fase 6: Frontend
 
-- [ ] 6.1 **[RED vitest]** Crear `frontend/src/features/libro-diario/schemas/libro-diario-filtro-schema.test.ts` — refine "período O rango requerido", "no ambos", "fechaDesde ≤ fechaHasta", mensajes en español (REQ-LD-01, REQ-LD-11).
-- [ ] 6.2 **[GREEN]** Crear `frontend/src/features/libro-diario/schemas/libro-diario-filtro-schema.ts` — zod con refine.
-- [ ] 6.3 **[setup]** Crear `frontend/src/features/libro-diario/types.ts` + agregar `LibroDiarioParams`, `LibroDiarioResponse` en `frontend/src/types/api.ts` (REQ-LD-07).
-- [ ] 6.4 **[setup]** Crear `frontend/src/features/libro-diario/api/get-libro-diario.ts` — `api.get('/api/libros/diario', { params })`.
-- [ ] 6.5 **[setup]** Crear `frontend/src/features/libro-diario/hooks/use-libro-diario.ts` — `useQuery(['libro-diario', params])`, `keepPreviousData`, `enabled` cuando el filtro es válido.
-- [ ] 6.6 **[RED vitest]** Crear `frontend/src/features/libro-diario/components/libro-diario-tabla.test.tsx` — Testing Library: tabla agrupa asientos (cabecera + subfilas líneas), total al pie, estado vacío, estado error (REQ-LD-11).
-- [ ] 6.7 **[GREEN]** Crear `frontend/src/features/libro-diario/components/libro-diario-tabla.tsx` + `libro-diario-filtros.tsx` (RHF + zodResolver, selector período/rango, toggle anulados).
-- [ ] 6.8 **[setup]** Crear `frontend/src/features/libro-diario/pages/libro-diario-page.tsx` — contenedor: hook + filtros + tabla + gating por módulo `contabilidad`.
-- [ ] 6.9 **[setup]** Registrar ruta `/libros/diario → LibroDiarioPage` en `frontend/src/routes/router.tsx` + item "Libro Diario" en `dashboard-shell.tsx`.
+- [x] 6.1 **[RED vitest]** Crear `frontend/src/features/libro-diario/schemas/libro-diario-filtro-schema.test.ts` — refine "período O rango requerido", "no ambos", "fechaDesde ≤ fechaHasta", mensajes en español (REQ-LD-01, REQ-LD-11).
+- [x] 6.2 **[GREEN]** Crear `frontend/src/features/libro-diario/schemas/libro-diario-filtro-schema.ts` — zod con refine.
+- [x] 6.3 **[setup]** Crear `frontend/src/features/libro-diario/types.ts` + agregar `LibroDiarioParams`, `LibroDiarioResponse` en `frontend/src/types/api.ts` (REQ-LD-07).
+- [x] 6.4 **[setup]** Crear `frontend/src/features/libro-diario/api/get-libro-diario.ts` — `api.get('/api/libros/diario', { params })`.
+- [x] 6.5 **[setup]** Crear `frontend/src/features/libro-diario/hooks/use-libro-diario.ts` — `useQuery(['libros', 'diario', params])`, `keepPreviousData`, `enabled` cuando el filtro es válido.
+- [x] 6.6 **[RED vitest]** Crear `frontend/src/features/libro-diario/components/libro-diario-tabla.test.tsx` — Testing Library: tabla agrupa asientos (cabecera + subfilas líneas), total al pie, estado vacío, estado error (REQ-LD-11).
+- [x] 6.7 **[GREEN]** Crear `frontend/src/features/libro-diario/components/libro-diario-tabla.tsx` + `libro-diario-filtros.tsx` (RHF + zodResolver, selector período/rango, toggle anulados).
+- [x] 6.8 **[setup]** Crear `frontend/src/features/libro-diario/pages/libro-diario-page.tsx` — contenedor: hook + filtros + tabla + gating por módulo `contabilidad`.
+- [x] 6.9 **[setup]** Registrar ruta `/libros/diario → LibroDiarioPage` en `frontend/src/routes/router.tsx` + item "Libro Diario" en `nav-items.ts`.
   - _Commit sugerido_: `feat(reportes): feature libro-diario frontend (schema, tabla, página, ruta)`
 
 ---
