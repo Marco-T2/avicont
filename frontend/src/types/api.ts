@@ -746,8 +746,43 @@ export interface Comprobante {
   lineas: LineaComprobante[];
 }
 
-// Item de la lista paginada (puede omitir lineas para eficiencia).
-export type ComprobanteListItem = Omit<Comprobante, 'lineas'>;
+// Espejo de ContactoResumenDto: contacto distinto referenciado por las líneas.
+export interface ContactoResumen {
+  id: string;
+  nombre: string;
+}
+
+// Espejo de DocumentoRespaldoResumenDto: documento físico de respaldo asociado.
+export interface DocumentoRespaldoResumen {
+  id: string;
+  tipoNombre: string;
+  numero: string;
+}
+
+// Item de la lista paginada. No trae líneas; en su lugar proyecta los contactos
+// distintos y los documentos de respaldo. Espejo de ComprobanteListItemDto.
+export interface ComprobanteListItem {
+  id: string;
+  tipo: TipoComprobante;
+  numero: string | null;
+  estado: EstadoComprobante;
+  fechaContable: string; // YYYY-MM-DD
+  periodoFiscalId: string;
+  glosa: string;
+  monedaPrincipal: Moneda;
+  tipoCambioReexpresion: string;
+  totalDebitoBob: string;
+  totalCreditoBob: string;
+  anulado: boolean;
+  fechaAnulacion: string | null;
+  anuladoPorUserId: string | null;
+  motivoAnulacion: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  contactos: ContactoResumen[];
+  documentosRespaldo: DocumentoRespaldoResumen[];
+}
 
 export interface ListarComprobantesResponse {
   items: ComprobanteListItem[];
@@ -762,6 +797,9 @@ export interface ListarComprobantesParams {
   limit?: number;
   tipo?: TipoComprobante;
   estado?: EstadoComprobante;
+  periodoFiscalId?: string;
+  // Texto libre: el backend busca en número + glosa (case-insensitive).
+  q?: string;
   incluirAnulados?: boolean;
 }
 

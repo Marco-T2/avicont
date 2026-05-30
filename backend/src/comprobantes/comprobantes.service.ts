@@ -47,6 +47,7 @@ import {
 import {
   ComprobanteResponseDto,
   ListarComprobantesResponseDto,
+  toComprobanteListItem,
   toComprobanteResponse,
 } from './dto/comprobante-response.dto';
 import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
@@ -184,7 +185,7 @@ export class ComprobantesService {
 
     const { items, total } = await this.repo.listar(tenantId, filtros, { page, limit });
     return {
-      items: items.map(toComprobanteResponse),
+      items: items.map(toComprobanteListItem),
       total,
       page,
       limit,

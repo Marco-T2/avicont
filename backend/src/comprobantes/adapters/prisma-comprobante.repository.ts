@@ -12,12 +12,34 @@ import {
   AnularData,
   ComprobanteConLineas,
   ComprobanteCreateBorradorData,
+  ComprobanteListRow,
   ComprobanteReemplazarComprobanteData,
   ComprobanteRepositoryPort,
   ListarFiltros,
 } from '../ports/comprobante.repository.port';
 
 const LINEAS_INCLUDE = { lineas: { orderBy: { orden: 'asc' as const } } };
+
+// Proyección liviana del listado: solo el contacto de cada línea (para derivar
+// contactos distintos) y los documentos físicos de respaldo. No trae las líneas
+// completas — la tabla no las usa.
+const LIST_INCLUDE = {
+  lineas: {
+    select: { contacto: { select: { id: true, razonSocial: true } } },
+    orderBy: { orden: 'asc' as const },
+  },
+  documentosFisicosAsociados: {
+    select: {
+      documentoFisico: {
+        select: {
+          id: true,
+          numero: true,
+          tipoDocumento: { select: { nombre: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.ComprobanteInclude;
 
 @Injectable()
 export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
@@ -194,7 +216,7 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     filtros: ListarFiltros,
     pagination: { page: number; limit: number },
     tx?: Prisma.TransactionClient,
-  ): Promise<{ items: ComprobanteConLineas[]; total: number }> {
+  ): Promise<{ items: ComprobanteListRow[]; total: number }> {
     const client = tx ?? this.prisma;
 
     const where: Prisma.ComprobanteWhereInput = {
@@ -225,7 +247,7 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     const [items, total] = await Promise.all([
       client.comprobante.findMany({
         where,
-        include: LINEAS_INCLUDE,
+        include: LIST_INCLUDE,
         orderBy: [{ fechaContable: 'desc' }, { numero: { sort: 'desc', nulls: 'first' } }],
         skip: (pagination.page - 1) * pagination.limit,
         take: pagination.limit,

@@ -11,6 +11,11 @@ import {
 } from '@/components/ui/table';
 import type { ComprobanteListItem } from '@/types/api';
 
+import { etiquetaContacto } from '../lib/etiquetas-resumen';
+import {
+  etiquetaDocumentoNumero,
+  etiquetaDocumentoTipo,
+} from '../lib/etiquetas-resumen';
 import { formatearFechaContable } from '../lib/formatear-fecha-contable';
 import {
   formatearNumeroCorrelativo,
@@ -31,7 +36,7 @@ function TableSkeleton(): React.JSX.Element {
     <>
       {[1, 2, 3, 4, 5].map((i) => (
         <TableRow key={i}>
-          <TableCell colSpan={7}>
+          <TableCell colSpan={9}>
             <Skeleton className="h-8 w-full" />
           </TableCell>
         </TableRow>
@@ -62,19 +67,10 @@ function CorrelativoCell({ numero }: { numero: string | null }): React.JSX.Eleme
   );
 }
 
-const TIPO_LABELS: Record<string, string> = {
-  DIARIO: 'Diario',
-  INGRESO: 'Ingreso',
-  EGRESO: 'Egreso',
-  TRASPASO: 'Traspaso',
-  AJUSTE: 'Ajuste',
-  APERTURA: 'Apertura',
-  CIERRE: 'Cierre',
-};
-
 /**
  * Tabla de comprobantes con estrategia responsive:
- * - Desktop (md+): tabla con columnas (tipo, correlativo, estado, fecha, glosa, monto, acción).
+ * - Desktop (md+): tabla con columnas (fecha, número, doc. respaldo + nº ref,
+ *   contacto, glosa, estado, total, acción). Scroll horizontal por el ancho.
  * - Mobile: card-stack por comprobante.
  *
  * JSDOM renderiza ambos simultáneamente — los tests deben usar `getAllByText()`
@@ -120,11 +116,13 @@ export function ComprobantesTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tipo</TableHead>
-              <TableHead className="min-w-[8rem]">Número</TableHead>
-              <TableHead>Estado</TableHead>
               <TableHead>Fecha</TableHead>
+              <TableHead className="min-w-[8rem]">Número</TableHead>
+              <TableHead>Documento</TableHead>
+              <TableHead>Nro. Ref.</TableHead>
+              <TableHead>Contacto</TableHead>
               <TableHead>Glosa</TableHead>
+              <TableHead>Estado</TableHead>
               <TableHead className="text-right">Total BOB</TableHead>
               <TableHead className="w-16" />
             </TableRow>
@@ -139,20 +137,26 @@ export function ComprobantesTable({
                   onClick={() => handleRowClick(c.id)}
                   className="cursor-pointer hover:bg-muted/50"
                 >
-                  <TableCell className="text-sm">
-                    {TIPO_LABELS[c.tipo] ?? c.tipo}
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {formatearFechaContable(c.fechaContable)}
                   </TableCell>
                   <TableCell>
                     <CorrelativoCell numero={c.numero} />
                   </TableCell>
-                  <TableCell>
-                    <EstadoComprobanteBadge estado={c.estado} anulado={c.anulado} />
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {etiquetaDocumentoTipo(c.documentosRespaldo)}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatearFechaContable(c.fechaContable)}
+                  <TableCell className="text-sm font-mono whitespace-nowrap">
+                    {etiquetaDocumentoNumero(c.documentosRespaldo)}
+                  </TableCell>
+                  <TableCell className="text-sm max-w-[180px] truncate">
+                    {etiquetaContacto(c.contactos)}
                   </TableCell>
                   <TableCell className="text-sm max-w-[200px] truncate">
                     {c.glosa}
+                  </TableCell>
+                  <TableCell>
+                    <EstadoComprobanteBadge estado={c.estado} anulado={c.anulado} />
                   </TableCell>
                   <TableCell className="text-right">
                     {/* totalDebitoBob SIEMPRE es BOB — hardcodeado para evitar bug de display. */}
@@ -194,13 +198,17 @@ export function ComprobantesTable({
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <EstadoComprobanteBadge estado={c.estado} anulado={c.anulado} />
-                  <span className="text-xs text-muted-foreground">
-                    {TIPO_LABELS[c.tipo] ?? c.tipo}
+                  <span className="text-xs text-muted-foreground truncate">
+                    {etiquetaContacto(c.contactos)}
                   </span>
                 </div>
                 <p className="text-sm font-medium truncate">{c.glosa}</p>
                 <p className="text-xs text-muted-foreground">
-                  {formatearFechaContable(c.fechaContable)}
+                  {formatearFechaContable(c.fechaContable)} ·{' '}
+                  {etiquetaDocumentoTipo(c.documentosRespaldo)}
+                  {c.documentosRespaldo.length === 1
+                    ? ` ${etiquetaDocumentoNumero(c.documentosRespaldo)}`
+                    : ''}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
