@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { usePermissions } from '@/lib/use-permissions';
 import { cn } from '@/lib/utils';
 
 import { NAV_ITEMS, type NavItem } from './nav-items';
@@ -16,9 +17,17 @@ export function NavList({
   onItemClick,
   collapsed = false,
 }: NavListProps): React.JSX.Element {
+  // Filtrado por permiso: has() es fail-closed (false durante loading) → los
+  // ítems con requiredPermission permanecen ocultos hasta que carguen los permisos.
+  // Ítem sin requiredPermission → siempre visible (migración incremental, G-7).
+  const { has } = usePermissions();
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => item.requiredPermission === undefined || has(item.requiredPermission),
+  );
+
   return (
     <nav className="flex-1 space-y-1 p-2">
-      {NAV_ITEMS.map((item) => {
+      {visibleItems.map((item) => {
         const trigger = (
           <NavItemRenderer item={item} onItemClick={onItemClick} collapsed={collapsed} />
         );

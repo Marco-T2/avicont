@@ -1010,6 +1010,22 @@ export interface BalanceGeneralResponse {
 }
 
 // ============================================================
+// Permisos efectivos del usuario — GET /me/permissions
+// Espejo de MePermissionsResponseDto del backend (backend/src/me/dto/).
+// `permissions` son strings de permiso EXACTOS, ya expandidos contra el catálogo
+// por el backend (NO patrones de wildcards).
+// ============================================================
+
+export interface MePermissionsResponse {
+  /** Permisos efectivos exactos del usuario (ej. ["contabilidad.eeff.read"]). */
+  permissions: string[];
+  /** true si el usuario es OWNER o ADMIN (tiene acceso total). */
+  isOwner: boolean;
+  /** ID del tenant activo en el JWT en el momento de la consulta. */
+  activeTenantId: string;
+}
+
+// ============================================================
 // Estado de Resultados (Income Statement) — GET /api/eeff/resultados
 // Espejo del EstadoResultadosResponseDto del backend (montos string §4.5,
 // rango fechaDesde/fechaHasta YYYY-MM-DD §4.6). Reporte de FLUJO del período.

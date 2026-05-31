@@ -4,6 +4,7 @@ import {
   hasAnyPermission,
   matchesPermission,
 } from './domain/permission-matcher';
+import { CATALOGO_PERMISOS, expandirPatron } from '@/common/permisos/catalogo';
 import { PermissionsCacheInvalidationPort } from './ports/permissions-cache-invalidation.port';
 import { PERMISSIONS_CACHE_PORT, PermissionsCachePort } from './ports/permissions-cache.port';
 import {
@@ -27,6 +28,36 @@ export class RbacService implements PermissionsCacheInvalidationPort {
     @Inject(PERMISSIONS_CACHE_PORT)
     private readonly cache: PermissionsCachePort,
   ) {}
+
+  /**
+   * Devuelve los permisos efectivos del usuario en la organización dada,
+   * expandidos contra el catálogo. Orientado al cliente HTTP: sin wildcards crudos.
+   *
+   * - OWNER o ADMIN → todos los keys del catálogo, isOwner refleja esOwner.
+   * - MEMBER → cada wildcard expandido contra CATALOGO_PERMISOS, deduplicado.
+   * - Sin membresía activa → { permissions: [], isOwner: false }.
+   */
+  async resolverPermisosConContexto(
+    userId: string,
+    organizationId: string,
+  ): Promise<{ permissions: string[]; isOwner: boolean }> {
+    const resolved = await this.getPermissions(userId, organizationId);
+
+    if (resolved.esOwner || resolved.esAdmin) {
+      // Owner y Admin tienen acceso completo: expandir '*' contra el catálogo.
+      const allKeys = CATALOGO_PERMISOS.map((p) => p.key);
+      return { permissions: allKeys, isOwner: resolved.esOwner };
+    }
+
+    // MEMBER: expandir cada wildcard y deduplicar.
+    const expanded = new Set<string>();
+    for (const wildcard of resolved.wildcards) {
+      for (const key of expandirPatron(wildcard)) {
+        expanded.add(key);
+      }
+    }
+    return { permissions: [...expanded], isOwner: false };
+  }
 
   async getPermissions(userId: string, organizationId: string): Promise<ResolvedPermissions> {
     const cached = await this.cache.get(userId, organizationId);
