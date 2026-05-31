@@ -5,6 +5,7 @@
 Última revisión contra core: 2026-05-31
 Owner: backend-lead
 -->
+<!-- 2026-05-31: alineación con implementación real — WARNING-01 (codes: REPORTES_* prefix) + SUGGESTION-01 (shape plano: subsecciones[].cuentas[] con saldoBob/nivel, sin capa grupos) -->
 
 > Fecha: 2026-05-31
 > Fase: spec
@@ -70,7 +71,7 @@ El Balance introduce lógica de dominio nueva sobre el Mayor:
 
 El endpoint `GET /api/eeff/balance` DEBE requerir el parámetro `?fecha` en formato
 `YYYY-MM-DD`. Si `fecha` está ausente o tiene formato inválido, el sistema DEBE
-rechazar con HTTP 400 y código `BALANCE_GENERAL_FECHA_INVALIDA`.
+rechazar con HTTP 400 y código `REPORTES_BALANCE_FECHA_INVALIDA`.
 
 El parámetro `fecha` es una `FechaContable` (calendario puro, sin hora ni zona
 horaria). El sistema DEBE interpretar el corte como `fechaContable <= fecha`
@@ -85,12 +86,18 @@ horaria). El sistema DEBE interpretar el corte como `fechaContable <= fecha`
 #### Escenario: fecha ausente — error 400
 
 - CUANDO se consulta `GET /api/eeff/balance` sin el parámetro `fecha`
-- ENTONCES el sistema responde HTTP 400 con `BALANCE_GENERAL_FECHA_INVALIDA`
+- ENTONCES el sistema responde HTTP 400 con `REPORTES_BALANCE_FECHA_INVALIDA`
 
 #### Escenario: formato de fecha inválido — error 400
 
 - CUANDO se consulta `GET /api/eeff/balance?fecha=31-05-2026` (formato incorrecto)
-- ENTONCES el sistema responde HTTP 400 con `BALANCE_GENERAL_FECHA_INVALIDA`
+- ENTONCES el sistema responde HTTP 400 con `REPORTES_BALANCE_FECHA_INVALIDA`
+
+#### Escenario: fecha semánticamente inválida — error 400
+
+- CUANDO se consulta `GET /api/eeff/balance?fecha=2026-02-30` (pasa el regex pero no existe en el calendario)
+- ENTONCES el sistema responde HTTP 400 con `REPORTES_BALANCE_FECHA_INVALIDA`
+  (el ValidationPipe acepta el formato; el service rechaza con `FechaCorteInvalidaError`)
 
 ---
 
@@ -99,7 +106,7 @@ horaria). El sistema DEBE interpretar el corte como `fechaContable <= fecha`
 El sistema DEBE determinar automáticamente la **gestión fiscal vigente** para la
 `fecha` de corte consultada, buscando la `GestionFiscal` cuyo rango contiene esa
 fecha. Si ninguna gestión cubre la fecha indicada, el sistema DEBE responder HTTP 422
-con código `BALANCE_GENERAL_FECHA_SIN_GESTION`.
+con código `REPORTES_BALANCE_SIN_GESTION`.
 
 La gestión vigente se usa exclusivamente para delimitar el período del
 **Resultado del Ejercicio** (REQ-BG-07). Los Activos, Pasivos y el resto del
@@ -117,7 +124,7 @@ la fecha de corte, sin restricción por gestión (REQ-BG-05).
 
 - DADO que no existe ninguna `GestionFiscal` que cubra la fecha 2025-06-15
 - CUANDO se consulta con `fecha=2025-06-15`
-- ENTONCES el sistema responde HTTP 422 con `BALANCE_GENERAL_FECHA_SIN_GESTION`
+- ENTONCES el sistema responde HTTP 422 con `REPORTES_BALANCE_SIN_GESTION`
   y un mensaje legible en español
 
 ---
@@ -409,11 +416,11 @@ del tenant. El orden dentro de cada nivel DEBE ser por `codigoInterno` ASC.
 
 ---
 
-### REQ-BG-11: Verificación de ecuación contable — `cuadra` y `diferencia`
+### REQ-BG-11: Verificación de ecuación contable — `cuadra` y `diferenciaBob`
 
 El sistema DEBE verificar la ecuación contable `Activo = Pasivo + Patrimonio`
 con tolerancia `±Bs 0.01` (§4.1 CLAUDE.md) y exponer el resultado como
-`cuadra: boolean` y `diferencia: string` (diferencia absoluta en BOB) en
+`cuadra: boolean` y `diferenciaBob: string` (diferencia en BOB) en
 la raíz de la respuesta.
 
 `cuadra=false` NO es un error duro: el sistema DEBE devolver HTTP 200 con el
@@ -428,7 +435,7 @@ un problema en los datos (ej. asientos mal registrados), no en el endpoint.
 
 - DADO un Balance donde Activo = Bs 100000, Pasivo = Bs 60000, Patrimonio = Bs 40000
 - CUANDO se consulta el Balance General
-- ENTONCES `cuadra: true` y `diferencia: "0.00"`
+- ENTONCES `cuadra: true` y `diferenciaBob: "0.00"`
 
 #### Escenario: ecuación no cuadra — cuadra=false, respuesta 200
 
@@ -436,7 +443,7 @@ un problema en los datos (ej. asientos mal registrados), no en el endpoint.
   (diferencia de Bs 1.50 por datos inconsistentes)
 - CUANDO se consulta el Balance General
 - ENTONCES la respuesta es HTTP 200
-- Y `cuadra: false`, `diferencia: "1.50"`, y el árbol completo está presente
+- Y `cuadra: false`, `diferenciaBob: "1.50"`, y el árbol completo está presente
 
 #### Escenario: diferencia dentro de la tolerancia — cuadra=true
 
@@ -471,8 +478,8 @@ aunque compartan la misma fecha de corte.
 
 - DADO un tenant recién creado sin ningún comprobante
 - CUANDO consulta el Balance General
-- ENTONCES la respuesta tiene `activo.total: "0.00"`, `pasivo.total: "0.00"`,
-  `patrimonio.total: "0.00"`, `cuadra: true`, `diferencia: "0.00"`
+- ENTONCES la respuesta tiene `totalActivoBob: "0.00"`, `totalPasivoBob: "0.00"`,
+  `totalPatrimonioBob: "0.00"`, `cuadra: true`, `diferenciaBob: "0.00"`
 
 ---
 
@@ -505,62 +512,72 @@ de plan de cuentas.
 
 - DADO un tenant válido sin ninguna cuenta en el plan de cuentas
 - CUANDO consulta el Balance General
-- ENTONCES la respuesta es HTTP 200 con `activo.total: "0.00"`,
-  `pasivo.total: "0.00"`, `patrimonio.total: "0.00"`, `cuadra: true`
+- ENTONCES la respuesta es HTTP 200 con `totalActivoBob: "0.00"`,
+  `totalPasivoBob: "0.00"`, `totalPatrimonioBob: "0.00"`, `cuadra: true`
 
 ---
 
 ### REQ-BG-15: Forma del DTO de respuesta
 
-La respuesta DEBE cumplir esta forma exacta (montos `string`, fechas `"YYYY-MM-DD"`):
+La respuesta DEBE cumplir esta forma exacta (montos `string`, fechas `"YYYY-MM-DD"`).
+El shape es **plano por subsección**: cada `subsecciones[]` contiene directamente
+`cuentas[]` con todas las hojas con saldo ≠ 0 de esa subclase (sin capa intermedia de
+grupos). El `nivel` de la cuenta informa su profundidad en el árbol del plan de cuentas.
 
-```
+```typescript
 {
-  fechaCorte: string,                   // "YYYY-MM-DD" — la fecha solicitada
-  gestionId: string,                    // UUID de la GestionFiscal inferida
+  fechaCorte: string,              // "YYYY-MM-DD" — la fecha solicitada
+  gestionId: string,               // UUID de la GestionFiscal inferida
+
   activo: {
-    total: string,                      // Σ de todas las subsecciones
-    subSecciones: [
+    claseCuenta: "ACTIVO",
+    titulo: string,
+    totalBob: string,              // Σ de todas las subsecciones (§4.5 CLAUDE.md)
+    subsecciones: [
       {
-        subClase: "ACTIVO_CORRIENTE" | "ACTIVO_NO_CORRIENTE",
-        total: string,
-        grupos: [
+        subClaseCuenta: "ACTIVO_CORRIENTE" | "ACTIVO_NO_CORRIENTE",
+        titulo: string,
+        totalBob: string,
+        cuentas: [                 // hojas con saldo ≠ 0 + líneas sintéticas
           {
-            cuentaId: string,           // UUID del agrupador
-            codigoInterno: string,      // ej. "1.1"
+            cuentaId: string | null,       // null en la línea sintética del Resultado
+            codigoInterno: string | null,  // null en la línea sintética
             nombre: string,
-            total: string,
-            cuentas: [                  // solo hojas con saldo ≠ 0
-              {
-                cuentaId: string,
-                codigoInterno: string,  // ej. "1.1.01"
-                nombre: string,
-                esContraria: boolean,
-                saldo: string           // monto neto de la hoja (siempre ≥ 0 en valor absoluto)
-              }
-            ]
+            nivel: number,                 // profundidad en el árbol del plan de cuentas
+            esContraria: boolean,          // true → la cuenta resta del total del grupo
+            esSintetica: boolean,          // true → línea calculada (Resultado del Ejercicio)
+            saldoBob: string               // monto neto en BOB como string decimal
           }
         ]
       }
     ]
   },
-  pasivo: {                             // misma forma que activo, con subClase:
-    total: string,                      // "PASIVO_CORRIENTE" | "PASIVO_NO_CORRIENTE"
-    subSecciones: [...]
+
+  pasivo: {                        // misma forma que activo
+    claseCuenta: "PASIVO",
+    titulo: string,
+    totalBob: string,
+    subsecciones: [                // subClaseCuenta: "PASIVO_CORRIENTE" | "PASIVO_NO_CORRIENTE"
+      { subClaseCuenta: string, titulo: string, totalBob: string, cuentas: [...] }
+    ]
   },
-  patrimonio: {
-    total: string,                      // Σ capital + resultadosAcumulados + resultadoEjercicio
-    subSecciones: [
-      {
-        subClase: "PATRIMONIO_CAPITAL" | "PATRIMONIO_RESULTADOS",
-        total: string,
-        grupos: [...]
-      }
-    ],
-    resultadoEjercicio: string          // línea calculada (puede ser negativo: "-5000.00")
+
+  patrimonio: {                    // misma forma que activo
+    claseCuenta: "PATRIMONIO",
+    titulo: string,
+    totalBob: string,
+    subsecciones: [                // subClaseCuenta: "PATRIMONIO_CAPITAL" | "PATRIMONIO_RESULTADOS"
+      { subClaseCuenta: string, titulo: string, totalBob: string, cuentas: [...] }
+    ]
   },
-  cuadra: boolean,                      // |activo − (pasivo + patrimonio)| ≤ 0.01
-  diferencia: string                    // diferencia absoluta en BOB; "0.00" si cuadra
+
+  resultadoEjercicioBob: string,   // Σ INGRESO − Σ EGRESO de la gestión; puede ser negativo
+  totalActivoBob: string,          // Σ activo.totalBob (atajo para el frontend)
+  totalPasivoBob: string,          // Σ pasivo.totalBob
+  totalPatrimonioBob: string,      // Σ patrimonio.totalBob
+
+  cuadra: boolean,                 // |Activo − (Pasivo + Patrimonio)| ≤ 0.01 (§4.1)
+  diferenciaBob: string            // Activo − (Pasivo + Patrimonio) en BOB; "0.00" si cuadra
 }
 ```
 
@@ -572,7 +589,8 @@ La respuesta DEBE cumplir esta forma exacta (montos `string`, fechas `"YYYY-MM-D
 
 - DADO un Balance con un saldo de Bs 1.250,50
 - CUANDO se consulta el Balance General
-- ENTONCES todos los campos `saldo`, `total` y `resultadoEjercicio` en la respuesta JSON
+- ENTONCES todos los campos `saldoBob`, `totalBob`, `totalActivoBob`, `totalPasivoBob`,
+  `totalPatrimonioBob`, `resultadoEjercicioBob` y `diferenciaBob` en la respuesta JSON
   son strings como `"1250.50"`, nunca números como `1250.5`
 
 #### Escenario: fechaCorte en la respuesta
@@ -605,8 +623,8 @@ exactamente la misma fórmula de naturaleza, previniendo divergencia.
 
 | Código | HTTP | Descripción |
 |--------|------|-------------|
-| `BALANCE_GENERAL_FECHA_INVALIDA` | 400 | `?fecha` ausente o con formato inválido (no `YYYY-MM-DD`) |
-| `BALANCE_GENERAL_FECHA_SIN_GESTION` | 422 | No existe `GestionFiscal` que cubra la fecha de corte |
+| `REPORTES_BALANCE_FECHA_INVALIDA` | 400 | `?fecha` ausente, con formato inválido (`YYYY-MM-DD`) o semánticamente inválida (ej. `2026-02-30`) |
+| `REPORTES_BALANCE_SIN_GESTION` | 422 | No existe `GestionFiscal` que cubra la fecha de corte |
 
 ---
 
