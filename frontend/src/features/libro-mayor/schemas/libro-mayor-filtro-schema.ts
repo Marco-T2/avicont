@@ -22,6 +22,8 @@ const fechaContableZod = z
 const togglesShape = {
   incluirAnulados: z.boolean().optional().default(false),
   soloConMovimiento: z.boolean().optional().default(true),
+  /** UUID de cuenta de detalle. Si se pasa, filtra por esa cuenta. Sin validación UUID en el form — el backend valida @IsUUID. */
+  cuentaId: z.string().uuid().optional(),
 };
 
 export const libroMayorFiltroSchema = z.discriminatedUnion('modo', [

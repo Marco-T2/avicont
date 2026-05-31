@@ -98,6 +98,56 @@ describe('libroMayorFiltroSchema', () => {
     });
   });
 
+  describe('campo cuentaId', () => {
+    it('modo periodo: acepta cuentaId UUID válido y lo preserva en el output', () => {
+      const r = libroMayorFiltroSchema.safeParse({
+        modo: 'periodo',
+        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
+        cuentaId: 'f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBe('f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5');
+      }
+    });
+
+    it('modo rango: acepta cuentaId UUID válido y lo preserva en el output', () => {
+      const r = libroMayorFiltroSchema.safeParse({
+        modo: 'rango',
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-03-31',
+        cuentaId: 'f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBe('f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5');
+      }
+    });
+
+    it('modo periodo: sin cuentaId → cuentaId ausente en el output (campo opcional)', () => {
+      const r = libroMayorFiltroSchema.safeParse({
+        modo: 'periodo',
+        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBeUndefined();
+      }
+    });
+
+    it('modo rango: sin cuentaId → cuentaId ausente en el output (campo opcional)', () => {
+      const r = libroMayorFiltroSchema.safeParse({
+        modo: 'rango',
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-03-31',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBeUndefined();
+      }
+    });
+  });
+
   describe('modo ausente o inválido', () => {
     it('rechaza sin modo', () => {
       const r = libroMayorFiltroSchema.safeParse({
