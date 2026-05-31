@@ -74,3 +74,41 @@ export class PeriodoNoEncontradoError extends NotFoundError {
     );
   }
 }
+
+// ============================================================
+// 404 — cuenta no encontrada (REQ-LD-13)
+// ============================================================
+
+/**
+ * El cuentaId no existe o no pertenece al tenant activo.
+ * Defense in depth (CLAUDE.md §4.2): no distinguir "no existe" de "no es tuyo".
+ * Anti-31: no enumerar ids ajenos — mismo mensaje para ambos casos.
+ */
+export class CuentaNoEncontradaError extends NotFoundError {
+  constructor(cuentaId: string) {
+    super(
+      'LIBRO_DIARIO_CUENTA_NO_ENCONTRADA',
+      'La cuenta indicada no existe o no pertenece a esta organización',
+      { cuentaId },
+    );
+  }
+}
+
+// ============================================================
+// 400 — cuenta agrupadora (REQ-LD-14)
+// ============================================================
+
+/**
+ * La cuenta indicada es agrupadora (esDetalle=false) — no tiene movimientos directos.
+ * Código de Comercio art. 36: el plan analítico distingue cuentas de detalle
+ * de cuentas de agrupación — solo las primeras tienen movimientos directos.
+ */
+export class CuentaNoDetalleError extends ValidationError {
+  constructor(cuentaId: string) {
+    super(
+      'LIBRO_DIARIO_CUENTA_NO_DETALLE',
+      'La cuenta indicada es una cuenta agrupadora y no tiene movimientos directos. Seleccioná una cuenta de detalle.',
+      { cuentaId },
+    );
+  }
+}

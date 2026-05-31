@@ -1,4 +1,6 @@
 import {
+  CuentaNoDetalleError,
+  CuentaNoEncontradaError,
   FiltroRequeridoError,
   PeriodoNoEncontradoError,
   RangoExcedeLimiteError,
@@ -39,6 +41,38 @@ describe('Libro Diario — DomainErrors (unit)', () => {
       expect(err.httpStatus).toBe(404);
       expect(err.code).toBe('LIBRO_DIARIO_PERIODO_NO_ENCONTRADO');
       expect(err.details).toMatchObject({ periodoFiscalId: 'periodo-uuid-123' });
+    });
+  });
+
+  describe('errores de cuenta', () => {
+    describe('CuentaNoEncontradaError', () => {
+      it('tiene httpStatus 404 y code LIBRO_DIARIO_CUENTA_NO_ENCONTRADA', () => {
+        const err = new CuentaNoEncontradaError('cuenta-uuid-456');
+        expect(err.httpStatus).toBe(404);
+        expect(err.code).toBe('LIBRO_DIARIO_CUENTA_NO_ENCONTRADA');
+        expect(err.details).toMatchObject({ cuentaId: 'cuenta-uuid-456' });
+      });
+
+      it('es instancia de NotFoundError', () => {
+        const err = new CuentaNoEncontradaError('cuenta-uuid-456');
+        // La clase base NotFoundError produce httpStatus 404
+        expect(err.httpStatus).toBe(404);
+      });
+    });
+
+    describe('CuentaNoDetalleError', () => {
+      it('tiene httpStatus 400 y code LIBRO_DIARIO_CUENTA_NO_DETALLE', () => {
+        const err = new CuentaNoDetalleError('cuenta-agrupadora-789');
+        expect(err.httpStatus).toBe(400);
+        expect(err.code).toBe('LIBRO_DIARIO_CUENTA_NO_DETALLE');
+        expect(err.details).toMatchObject({ cuentaId: 'cuenta-agrupadora-789' });
+      });
+
+      it('es instancia de ValidationError', () => {
+        const err = new CuentaNoDetalleError('cuenta-agrupadora-789');
+        // La clase base ValidationError produce httpStatus 400
+        expect(err.httpStatus).toBe(400);
+      });
     });
   });
 });
