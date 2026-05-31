@@ -9,12 +9,8 @@
 
 export const PERMISSIONS = {
   contabilidad: {
-    comprobantes: {
-      read: 'contabilidad.comprobantes.read',
-      create: 'contabilidad.comprobantes.create',
-      update: 'contabilidad.comprobantes.update',
-      delete: 'contabilidad.comprobantes.delete',
-    },
+    // "Asiento" es el sinónimo user-facing de Comprobante en el catálogo RBAC
+    // (CLAUDE.md §1): en código la entidad es Comprobante, en permisos es asientos.
     asientos: {
       read: 'contabilidad.asientos.read',
       create: 'contabilidad.asientos.create',
@@ -23,8 +19,8 @@ export const PERMISSIONS = {
       post: 'contabilidad.asientos.post',
       void: 'contabilidad.asientos.void',
     },
-    cuentas: {
-      read: 'contabilidad.cuentas.read',
+    planCuentas: {
+      read: 'contabilidad.plan-cuentas.read',
     },
     /** Balance General + Estado de Resultados. */
     eeff: {
