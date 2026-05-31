@@ -8,7 +8,9 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { BalanceGeneralService } from './balance-general.service';
+import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
+import { EstadoResultadosService } from './estado-resultados.service';
 import { resolveTenantId } from './tenant-id';
 import type { AuthenticatedRequest } from './tenant-id';
 
@@ -17,9 +19,8 @@ import type { AuthenticatedRequest } from './tenant-id';
  *
  * Separado de ReportesController (@Controller('libros')) porque los EEFF
  * son una familia distinta de los Libros Contables.
- * Change 4 sumará GET /eeff/resultados al mismo EeffController.
  *
- * RBAC: contabilidad.eeff.read (REQ-BG-13).
+ * RBAC: contabilidad.eeff.read (REQ-BG-13, REQ-ER-11).
  */
 @ApiTags('Estados Financieros')
 @ApiBearerAuth('JWT-auth')
@@ -27,7 +28,10 @@ import type { AuthenticatedRequest } from './tenant-id';
 @RequireModule('contabilidad')
 @Controller('eeff')
 export class EeffController {
-  constructor(private readonly balanceGeneralService: BalanceGeneralService) {}
+  constructor(
+    private readonly balanceGeneralService: BalanceGeneralService,
+    private readonly estadoResultadosService: EstadoResultadosService,
+  ) {}
 
   @Get('balance')
   @RequirePermissions('contabilidad.eeff.read')
@@ -43,6 +47,31 @@ export class EeffController {
     // para campos opcionales del DTO.
     return this.balanceGeneralService.consultarBalanceGeneral(tenantId, {
       fecha: query.fecha,
+      ...(query.gestionId !== undefined ? { gestionId: query.gestionId } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('resultados')
+  @RequirePermissions('contabilidad.eeff.read')
+  @ApiOperation({
+    summary:
+      'Estado de Resultados (Income Statement) — flujo del período. ' +
+      'Acepta fechaDesde+fechaHasta, periodoFiscalId o gestionId. ' +
+      'Presenta Ingresos y Egresos con Resultado del Ejercicio. ' +
+      'REQ-ER-01..12.',
+  })
+  obtenerEstadoResultados(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: EeffResultadosQueryDto,
+  ) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.estadoResultadosService.consultarEstadoResultados(tenantId, {
+      ...(query.fechaDesde !== undefined ? { fechaDesde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       ...(query.gestionId !== undefined ? { gestionId: query.gestionId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });

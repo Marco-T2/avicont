@@ -28,7 +28,7 @@ import type {
   SeccionCalculada,
   SubseccionCalculada,
 } from '../dto/balance-response.dto';
-import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/balance-reader.port';
+import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
 import { calcularSaldoNeto } from './saldo-naturaleza';
 
 // ============================================================

@@ -2,14 +2,14 @@ import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-read
 
 import { BalanceGeneralService } from './balance-general.service';
 import { FechaCorteInvalidaError, GestionNoEncontradaError } from './domain/balance-errors';
-import type { BalanceReaderPort } from './ports/balance-reader.port';
+import type { EeffSaldosReaderPort } from './ports/eeff-saldos-reader.port';
 
 // ============================================================
 // Mocks tipados (§7.8 CLAUDE.md — nunca se mockea Prisma directamente)
 // ============================================================
 
 type MockBalanceReader = {
-  [K in keyof BalanceReaderPort]: jest.Mock;
+  [K in keyof EeffSaldosReaderPort]: jest.Mock;
 };
 
 type MockPeriodosReader = {
@@ -54,7 +54,7 @@ describe('BalanceGeneralService (unit)', () => {
     balanceReader = makeBalanceReaderMock();
     periodosReader = makePeriodosReaderMock();
     service = new BalanceGeneralService(
-      balanceReader as unknown as BalanceReaderPort,
+      balanceReader as unknown as EeffSaldosReaderPort,
       periodosReader as unknown as PeriodosReaderPort,
     );
 

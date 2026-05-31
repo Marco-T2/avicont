@@ -10,26 +10,26 @@ import {
 
 import type { PrismaService } from '@/common/prisma.service';
 
-import { PrismaBalanceReaderAdapter } from './prisma-balance-reader.adapter';
+import { PrismaEeffSaldosReaderAdapter } from './prisma-eeff-saldos-reader.adapter';
 
 /**
- * Integration spec del adapter `PrismaBalanceReaderAdapter` contra Postgres real.
+ * Integration spec del adapter `PrismaEeffSaldosReaderAdapter` contra Postgres real.
  *
  * Valida:
  *   - aislamiento multi-tenant CRÍTICO (2 tenants, §4.2 CLAUDE.md, Anti-31)
- *   - exclusión de BORRADOR siempre (REQ-BG-03)
- *   - toggle de anulados (REQ-BG-04)
+ *   - exclusión de BORRADOR siempre (REQ-BG-03, REQ-ER-03)
+ *   - toggle de anulados (REQ-BG-04, REQ-ER-04)
  *   - corte de fecha: ≤ fechaCorte incluido, > fechaCorte excluido
- *   - obtenerSaldosEnRango: solo el rango indicado
+ *   - obtenerSaldosEnRango: solo el rango indicado (flujo — REQ-ER-02)
  *   - obtenerEstructuraCuentas: agrupadoras sin movimiento; activa=false excluida;
  *     cuenta esContraria=true presente con el flag correcto
  */
-describe('PrismaBalanceReaderAdapter (integration)', () => {
+describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
   const SLUG_A = 'org-balance-reader-a';
   const SLUG_B = 'org-balance-reader-b';
 
   let prisma: PrismaClient;
-  let adapter: PrismaBalanceReaderAdapter;
+  let adapter: PrismaEeffSaldosReaderAdapter;
   let tenantA: string;
   let tenantB: string;
 
@@ -49,7 +49,7 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaClient();
     await prisma.$connect();
-    adapter = new PrismaBalanceReaderAdapter(prisma as unknown as PrismaService);
+    adapter = new PrismaEeffSaldosReaderAdapter(prisma as unknown as PrismaService);
   });
 
   afterAll(async () => {
@@ -519,6 +519,196 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
       const cuentaIds = estructuraA.map((c) => c.id);
       expect(cuentaIds).not.toContain(cajaBId);
       expect(cuentaIds).not.toContain(ventasBId);
+    });
+  });
+
+  // ============================================================
+  // Estado de Resultados — no-arrastre de flujo (REQ-ER-02, CRÍTICO)
+  // ============================================================
+
+  describe('obtenerSaldosEnRango — flujo puro Estado de Resultados (REQ-ER-02)', () => {
+    it('CRÍTICO: comprobante con fechaContable < fechaDesde NO aparece en obtenerSaldosEnRango', async () => {
+      // Comprobante FUERA del rango (abril 2026, antes de mayo)
+      const fechaFuera = new Date(Date.UTC(2026, 3, 15)); // 2026-04-15
+      // Comprobante DENTRO del rango (mayo 2026)
+      const fechaDentro = new Date(Date.UTC(2026, 4, 10)); // 2026-05-10
+
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaFuera,
+        10000,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDentro,
+        5000,
+      );
+
+      const saldos = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)), // desde 2026-05-01
+        new Date(Date.UTC(2026, 4, 31)), // hasta 2026-05-31
+        false,
+      );
+
+      // Solo el movimiento de mayo debe aparecer: ventas tiene creditoBob solo
+      const ventasRow = saldos.find((s) => s.cuentaId === ventasAId);
+      expect(ventasRow).toBeDefined();
+      // Haber de ventas: solo el comprobante de mayo (5000), no el de abril (10000)
+      expect(ventasRow!.totalCreditoBob.toNumber()).toBe(5000);
+    });
+
+    it('comprobante con fechaContable = fechaDesde SÍ aparece (inclusive desde)', async () => {
+      const fechaDesde = new Date(Date.UTC(2026, 4, 1)); // 2026-05-01
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDesde,
+        3000,
+      );
+
+      const saldos = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        fechaDesde,
+        new Date(Date.UTC(2026, 4, 31)),
+        false,
+      );
+
+      const ventasRow = saldos.find((s) => s.cuentaId === ventasAId);
+      expect(ventasRow).toBeDefined();
+      expect(ventasRow!.totalCreditoBob.toNumber()).toBe(3000);
+    });
+
+    it('comprobante con fechaContable > fechaHasta NO aparece (flujo puro)', async () => {
+      const fechaDentro = new Date(Date.UTC(2026, 4, 10)); // 2026-05-10
+      const fechaFuera = new Date(Date.UTC(2026, 5, 1)); // 2026-06-01 (junio)
+
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDentro,
+        2000,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaFuera,
+        9000,
+      );
+
+      const saldos = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)),
+        new Date(Date.UTC(2026, 4, 31)),
+        false,
+      );
+
+      const ventasRow = saldos.find((s) => s.cuentaId === ventasAId);
+      expect(ventasRow).toBeDefined();
+      // Solo el de mayo (2000), el de junio no debe aparecer
+      expect(ventasRow!.totalCreditoBob.toNumber()).toBe(2000);
+    });
+  });
+
+  // ============================================================
+  // Estado de Resultados — multi-tenant (REQ-ER-10, CRÍTICO)
+  // ============================================================
+
+  describe('obtenerSaldosEnRango — multi-tenant Estado de Resultados (REQ-ER-10)', () => {
+    it('CRÍTICO: Tenant A e Tenant B en mismo rango — sin fuga de datos', async () => {
+      const fecha = new Date(Date.UTC(2026, 4, 15));
+      // Tenant A: ventas 100000
+      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 100000);
+      // Tenant B: ventas 300000
+      await crearComprobanteContabilizado(tenantB, periodoBId, cajaBId, ventasBId, fecha, 300000);
+
+      const saldosA = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)),
+        new Date(Date.UTC(2026, 4, 30)),
+        false,
+      );
+
+      // Tenant A debe ver SOLO sus datos (ventas = 100000 creditoBob)
+      const cuentaIds = saldosA.map((s) => s.cuentaId);
+      expect(cuentaIds).not.toContain(cajaBId);
+      expect(cuentaIds).not.toContain(ventasBId);
+      const ventasARow = saldosA.find((s) => s.cuentaId === ventasAId);
+      expect(ventasARow).toBeDefined();
+      expect(ventasARow!.totalCreditoBob.toNumber()).toBe(100000);
+    });
+  });
+
+  // ============================================================
+  // Estado de Resultados — BORRADOR y anulados (REQ-ER-03, REQ-ER-04)
+  // ============================================================
+
+  describe('obtenerSaldosEnRango — BORRADOR y anulados Estado de Resultados', () => {
+    it('BORRADOR no aporta al flujo (REQ-ER-03)', async () => {
+      const fecha = new Date(Date.UTC(2026, 4, 10));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        5000,
+        false,
+        EstadoComprobante.BORRADOR,
+      );
+
+      const saldos = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)),
+        new Date(Date.UTC(2026, 4, 31)),
+        false,
+      );
+
+      expect(saldos).toHaveLength(0);
+    });
+
+    it('incluirAnulados=false: anulado excluido del flujo; incluirAnulados=true: incluido (REQ-ER-04)', async () => {
+      const fecha = new Date(Date.UTC(2026, 4, 10));
+      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 3000); // vigente
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        2000,
+        true, // anulado
+      );
+
+      const sinAnulados = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)),
+        new Date(Date.UTC(2026, 4, 31)),
+        false,
+      );
+      const ventasSin = sinAnulados.find((s) => s.cuentaId === ventasAId);
+      expect(ventasSin!.totalCreditoBob.toNumber()).toBe(3000);
+
+      const conAnulados = await adapter.obtenerSaldosEnRango(
+        tenantA,
+        new Date(Date.UTC(2026, 4, 1)),
+        new Date(Date.UTC(2026, 4, 31)),
+        true,
+      );
+      const ventasCon = conAnulados.find((s) => s.cuentaId === ventasAId);
+      expect(ventasCon!.totalCreditoBob.toNumber()).toBe(5000);
     });
   });
 });

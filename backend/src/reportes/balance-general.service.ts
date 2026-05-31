@@ -9,7 +9,7 @@ import { construirBalance } from './domain/balance-arbol';
 import { FechaCorteInvalidaError, GestionNoEncontradaError } from './domain/balance-errors';
 import { toBalanceResponse } from './dto/balance-response.dto';
 import type { BalanceResponseDto } from './dto/balance-response.dto';
-import { BALANCE_READER_PORT, BalanceReaderPort } from './ports/balance-reader.port';
+import { EEFF_SALDOS_READER_PORT, EeffSaldosReaderPort } from './ports/eeff-saldos-reader.port';
 
 /**
  * Parsea "YYYY-MM-DD" a Date UTC (§4.6 CLAUDE.md — FechaContable calendario puro).
@@ -41,8 +41,8 @@ function parseFechaContable(fecha: string): Date | null {
 @Injectable()
 export class BalanceGeneralService {
   constructor(
-    @Inject(BALANCE_READER_PORT)
-    private readonly balanceReader: BalanceReaderPort,
+    @Inject(EEFF_SALDOS_READER_PORT)
+    private readonly balanceReader: EeffSaldosReaderPort,
     @Inject(PERIODOS_READER_PORT)
     private readonly periodosReader: PeriodosReaderPort,
   ) {}
