@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ export function ReabrirPeriodoDialog({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm<ReabrirPeriodoValues>({
@@ -54,7 +54,7 @@ export function ReabrirPeriodoDialog({
     if (open) reset({ motivo: '' });
   }, [open, periodoId, reset]);
 
-  const motivoValue = watch('motivo') ?? '';
+  const motivoValue = useWatch({ control, name: 'motivo' }) ?? '';
   // Contar caracteres sobre el valor sin trim, para dar feedback real-time.
   const charCount = motivoValue.length;
 

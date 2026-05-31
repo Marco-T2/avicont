@@ -1,4 +1,4 @@
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,11 +35,11 @@ export function ComprobanteCabeceraForm({
   const {
     register,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useFormContext();
 
-  const tipo = watch('tipo') as string | undefined;
+  const tipo = useWatch({ control, name: 'tipo' }) as string | undefined;
 
   return (
     <div className="space-y-4">

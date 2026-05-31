@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import type { Resolver } from 'react-hook-form';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -46,12 +46,14 @@ export function TipoDocumentoFisicoForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = form;
 
-  const seleccionados = watch('tiposComprobanteAplicables');
+  const seleccionados = useWatch({ control, name: 'tiposComprobanteAplicables' });
+  const esTributario = useWatch({ control, name: 'esTributario' });
+  const activo = useWatch({ control, name: 'activo' });
 
   function toggleTipoComprobante(value: string, checked: boolean): void {
     const next = checked
@@ -113,7 +115,7 @@ export function TipoDocumentoFisicoForm({
         <div className="flex items-start gap-3 rounded-md border px-3 py-3">
           <Checkbox
             id="esTributario"
-            checked={watch('esTributario')}
+            checked={esTributario}
             onCheckedChange={(v) =>
               setValue('esTributario', v === true, { shouldDirty: true })
             }
@@ -136,7 +138,7 @@ export function TipoDocumentoFisicoForm({
           <div className="flex items-start gap-3 rounded-md border px-3 py-3">
             <Checkbox
               id="activo"
-              checked={watch('activo')}
+              checked={activo}
               onCheckedChange={(v) =>
                 setValue('activo', v === true, { shouldDirty: true })
               }

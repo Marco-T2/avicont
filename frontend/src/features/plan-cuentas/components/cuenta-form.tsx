@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -130,14 +130,22 @@ export function CuentaForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = form;
 
-  const claseCuenta = watch('claseCuenta');
-  const esContraria = watch('esContraria');
-  const codigoInterno = watch('codigoInterno');
+  // useWatch por nombre: cada campo controlado se suscribe individualmente.
+  const claseCuenta = useWatch({ control, name: 'claseCuenta' });
+  const esContraria = useWatch({ control, name: 'esContraria' });
+  const codigoInterno = useWatch({ control, name: 'codigoInterno' });
+  const subClaseCuenta = useWatch({ control, name: 'subClaseCuenta' });
+  const naturaleza = useWatch({ control, name: 'naturaleza' });
+  const parentId = useWatch({ control, name: 'parentId' });
+  const esDetalle = useWatch({ control, name: 'esDetalle' });
+  const requiereContacto = useWatch({ control, name: 'requiereContacto' });
+  const permiteMultiMoneda = useWatch({ control, name: 'permiteMultiMoneda' });
+  const monedaFuncional = useWatch({ control, name: 'monedaFuncional' });
   const subClasesValidas = SUBCLASES_POR_CLASE[claseCuenta];
 
   // Al cambiar claseCuenta o esContraria (solo en create), auto-setea la
@@ -253,7 +261,7 @@ export function CuentaForm({
           disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
         >
           <Select
-            value={watch('claseCuenta')}
+            value={claseCuenta}
             onValueChange={(v) => setValue('claseCuenta', v as ClaseCuenta)}
             disabled={structuralDisabled}
           >
@@ -277,7 +285,7 @@ export function CuentaForm({
           disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
         >
           <Select
-            value={watch('subClaseCuenta') ?? '__none__'}
+            value={subClaseCuenta ?? '__none__'}
             onValueChange={(v) =>
               setValue(
                 'subClaseCuenta',
@@ -316,7 +324,7 @@ export function CuentaForm({
         disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
       >
         <Select
-          value={watch('naturaleza')}
+          value={naturaleza}
           onValueChange={(v) => setValue('naturaleza', v as NaturalezaCuenta)}
           disabled={structuralDisabled}
         >
@@ -341,7 +349,7 @@ export function CuentaForm({
       >
         <CuentaParentPicker
           agrupadores={agrupadores}
-          value={watch('parentId')}
+          value={parentId}
           onChange={(v) => setValue('parentId', v, { shouldValidate: true })}
           filterByClase={claseCuenta}
           disabled={structuralDisabled}
@@ -353,7 +361,7 @@ export function CuentaForm({
           id="esDetalle"
           label="Es cuenta de detalle (hoja)"
           hint="Si false, es agrupador — no acepta asientos directos."
-          checked={watch('esDetalle')}
+          checked={esDetalle}
           onCheckedChange={(c) => setValue('esDetalle', c)}
           disabled={structuralDisabled}
           disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
@@ -362,7 +370,7 @@ export function CuentaForm({
           id="esContraria"
           label="Es cuenta contraria"
           hint="Naturaleza opuesta a la default (ej. Depreciación Acumulada)."
-          checked={watch('esContraria')}
+          checked={esContraria}
           onCheckedChange={(c) => setValue('esContraria', c)}
           disabled={structuralDisabled}
           disabledHint={structuralDisabled ? 'Inmutable post-creación.' : undefined}
@@ -371,21 +379,21 @@ export function CuentaForm({
           id="requiereContacto"
           label="Requiere contacto"
           hint="Los asientos contra esta cuenta deben tener contactoId."
-          checked={watch('requiereContacto')}
+          checked={requiereContacto}
           onCheckedChange={(c) => setValue('requiereContacto', c)}
         />
         <CheckRow
           id="permiteMultiMoneda"
           label="Permite multi-moneda"
           hint="Si false, acepta solo asientos en la moneda funcional."
-          checked={watch('permiteMultiMoneda')}
+          checked={permiteMultiMoneda}
           onCheckedChange={(c) => setValue('permiteMultiMoneda', c)}
         />
       </div>
 
       <Field label="Moneda funcional" error={errors.monedaFuncional?.message}>
         <Select
-          value={watch('monedaFuncional')}
+          value={monedaFuncional}
           onValueChange={(v) => setValue('monedaFuncional', v as Moneda)}
         >
           <SelectTrigger className="max-w-xs">

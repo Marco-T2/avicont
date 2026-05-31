@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import type { Resolver } from 'react-hook-form';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -66,10 +66,13 @@ export function ContactoForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = form;
+
+  const esCliente = useWatch({ control, name: 'esCliente' });
+  const esProveedor = useWatch({ control, name: 'esProveedor' });
 
   // Error del refinement cross-field (esCliente || esProveedor).
   // Zod pone el error en el path 'esCliente'; lo extraemos para mostrarlo.
@@ -158,14 +161,14 @@ export function ContactoForm({
             id="esCliente"
             label="Es cliente"
             hint="El contacto compra productos o servicios de la empresa."
-            checked={watch('esCliente')}
+            checked={esCliente}
             onCheckedChange={(c) => setValue('esCliente', c, { shouldValidate: true })}
           />
           <CheckRow
             id="esProveedor"
             label="Es proveedor"
             hint="El contacto vende productos o servicios a la empresa."
-            checked={watch('esProveedor')}
+            checked={esProveedor}
             onCheckedChange={(c) => setValue('esProveedor', c, { shouldValidate: true })}
           />
         </div>
