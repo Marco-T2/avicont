@@ -12,6 +12,7 @@ import {
   Settings,
   Shield,
   ToggleRight,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 
@@ -32,6 +33,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/libros/diario', label: 'Libro Diario', icon: BookText },
   { to: '/libros/mayor', label: 'Libro Mayor', icon: BookMarked },
   { to: '/eeff/balance', label: 'Balance General', icon: Scale },
+  { to: '/eeff/resultados', label: 'Estado de Resultados', icon: TrendingUp },
   { to: '/contactos', label: 'Contactos', icon: Contact },
   { to: '/tipos-documento-fisico', label: 'Tipos de documento', icon: FileBadge },
   { to: '/documentos-fisicos', label: 'Documentos físicos', icon: FileStack },
