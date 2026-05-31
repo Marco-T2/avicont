@@ -835,6 +835,8 @@ export interface LibroDiarioParams {
   fechaHasta?: string;
   /** Si true, incluye asientos anulados (default false — REQ-LD-03). */
   incluirAnulados?: boolean;
+  /** UUID de cuenta de detalle. Solo asientos con ≥1 línea en esa cuenta. */
+  cuentaId?: string;
 }
 
 // Espejo de LineaLibroDiarioDto.

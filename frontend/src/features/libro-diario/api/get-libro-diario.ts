@@ -17,6 +17,7 @@ export async function getLibroDiario(
 ): Promise<LibroDiarioResponse> {
   const res = await api.get<LibroDiarioResponse>('/api/libros/diario', {
     params: {
+      ...(params.cuentaId !== undefined ? { cuentaId: params.cuentaId } : {}),
       ...(params.periodoFiscalId !== undefined
         ? { periodoFiscalId: params.periodoFiscalId }
         : {}),

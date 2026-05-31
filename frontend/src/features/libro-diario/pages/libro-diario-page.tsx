@@ -34,12 +34,14 @@ export function LibroDiarioPage(): React.JSX.Element {
       setParams({
         periodoFiscalId: values.periodoFiscalId,
         incluirAnulados: values.incluirAnulados,
+        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
       });
     } else {
       setParams({
         fechaDesde: values.fechaDesde,
         fechaHasta: values.fechaHasta,
         incluirAnulados: values.incluirAnulados,
+        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
       });
     }
   }

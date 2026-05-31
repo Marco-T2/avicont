@@ -26,6 +26,8 @@ export const libroDiarioFiltroSchema = z.discriminatedUnion('modo', [
     modo: z.literal('periodo'),
     periodoFiscalId: z.string().min(1, 'El período fiscal es obligatorio'),
     incluirAnulados: z.boolean().optional().default(false),
+    /** UUID de cuenta de detalle. Si se pasa, filtra por esa cuenta. Sin validación UUID en el form — el backend valida @IsUUID. */
+    cuentaId: z.string().uuid().optional(),
   }),
   z
     .object({
@@ -33,6 +35,8 @@ export const libroDiarioFiltroSchema = z.discriminatedUnion('modo', [
       fechaDesde: fechaContableZod,
       fechaHasta: fechaContableZod,
       incluirAnulados: z.boolean().optional().default(false),
+      /** UUID de cuenta de detalle. Si se pasa, filtra por esa cuenta. Sin validación UUID en el form — el backend valida @IsUUID. */
+      cuentaId: z.string().uuid().optional(),
     })
     .refine((d) => d.fechaDesde <= d.fechaHasta, {
       message: 'La fecha de inicio no puede ser posterior al rango de fechas final',
