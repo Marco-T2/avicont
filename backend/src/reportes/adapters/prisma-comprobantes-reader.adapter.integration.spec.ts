@@ -33,6 +33,7 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
   // IDs de cuentas
   let cajaAId: string;
   let ventasAId: string;
+  let bancoAId: string;
   let cajaBId: string;
   let ventasBId: string;
 
@@ -93,7 +94,7 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
     periodoBId = pB.id;
 
     // Cuentas para ambos tenants (esDetalle = true)
-    const [cA, vA, cB, vB] = await Promise.all([
+    const [cA, vA, bA, cB, vB] = await Promise.all([
       prisma.cuenta.create({
         data: {
           organizationId: tenantA,
@@ -112,6 +113,17 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
           nombre: 'Ventas',
           claseCuenta: ClaseCuenta.INGRESO,
           naturaleza: NaturalezaCuenta.ACREEDORA,
+          nivel: 4,
+          esDetalle: true,
+        },
+      }),
+      prisma.cuenta.create({
+        data: {
+          organizationId: tenantA,
+          codigoInterno: '1.1.2.001',
+          nombre: 'Banco MN',
+          claseCuenta: ClaseCuenta.ACTIVO,
+          naturaleza: NaturalezaCuenta.DEUDORA,
           nivel: 4,
           esDetalle: true,
         },
@@ -141,6 +153,7 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
     ]);
     cajaAId = cA.id;
     ventasAId = vA.id;
+    bancoAId = bA.id;
     cajaBId = cB.id;
     ventasBId = vB.id;
   });
@@ -217,6 +230,65 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
           credito: 1000,
           debitoBob: 0,
           creditoBob: 1000,
+        },
+      ],
+    });
+
+    return comp;
+  }
+
+  /**
+   * Crea un asiento con un par de cuentas personalizadas (débito/crédito arbitrarios).
+   * Útil para escenarios donde cajaAId y ventasAId no son suficientes.
+   */
+  async function crearAsientoConCuentas(
+    tenantId: string,
+    periodoId: string,
+    debitoCuentaId: string,
+    creditoCuentaId: string,
+    fechaContable: Date,
+    anulado = false,
+    numero?: string,
+  ) {
+    const comp = await prisma.comprobante.create({
+      data: {
+        organizationId: tenantId,
+        tipo: TipoComprobante.DIARIO,
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: numero ?? `D${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
+        fechaContable,
+        periodoFiscalId: periodoId,
+        glosa: 'Asiento custom',
+        totalDebitoBob: 500,
+        totalCreditoBob: 500,
+        createdByUserId: 'user-test',
+        anulado,
+      },
+    });
+
+    await prisma.lineaComprobante.createMany({
+      data: [
+        {
+          organizationId: tenantId,
+          comprobanteId: comp.id,
+          orden: 1,
+          cuentaId: debitoCuentaId,
+          moneda: Moneda.BOB,
+          debito: 500,
+          credito: 0,
+          debitoBob: 500,
+          creditoBob: 0,
+        },
+        {
+          organizationId: tenantId,
+          comprobanteId: comp.id,
+          orden: 2,
+          cuentaId: creditoCuentaId,
+          moneda: Moneda.BOB,
+          debito: 0,
+          credito: 500,
+          debitoBob: 0,
+          creditoBob: 500,
         },
       ],
     });
@@ -611,6 +683,234 @@ describe('PrismaComprobantesReaderAdapter (integration)', () => {
       expect(linea1!.cuenta.nombre).toBe('Caja MN');
       expect(linea1!.debitoBob.toNumber()).toBe(1000);
       expect(linea1!.creditoBob.toNumber()).toBe(0);
+    });
+  });
+
+  // ============================================================
+  // filtro por cuentaId (REQ-LD-12, REQ-LD-15, REQ-LD-16)
+  // ============================================================
+
+  describe('filtro por cuentaId (REQ-LD-12, REQ-LD-15, REQ-LD-16)', () => {
+    /**
+     * Seed de 3 asientos:
+     *   Asiento 1: cajaAId (debe) + ventasAId (haber)
+     *   Asiento 2: cajaAId (debe) + bancoAId (haber)
+     *   Asiento 3: ventasAId (debe) + bancoAId (haber) — sin cajaAId
+     */
+    async function seedTresAsientos() {
+      const a1 = await crearAsientoContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        new Date(Date.UTC(2026, 0, 5)),
+      );
+      const a2 = await crearAsientoConCuentas(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        bancoAId,
+        new Date(Date.UTC(2026, 0, 6)),
+      );
+      const a3 = await crearAsientoConCuentas(
+        tenantA,
+        periodoAId,
+        ventasAId,
+        bancoAId,
+        new Date(Date.UTC(2026, 0, 7)),
+      );
+      return { a1, a2, a3 };
+    }
+
+    describe('contarAsientos con cuentaId', () => {
+      it('cuentaId = cajaAId → count 2 (asientos 1 y 2)', async () => {
+        await seedTresAsientos();
+        const count = await adapter.contarAsientos(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+        expect(count).toBe(2);
+      });
+
+      it('cuentaId = ventasAId → count 2 (asientos 1 y 3)', async () => {
+        await seedTresAsientos();
+        const count = await adapter.contarAsientos(tenantA, {
+          ...filtrosEnero,
+          cuentaId: ventasAId,
+        });
+        expect(count).toBe(2);
+      });
+
+      it('cuenta sin movimientos en el rango → count 0', async () => {
+        await seedTresAsientos();
+        // Crear cuenta nueva sin movimientos
+        const cuentaNula = await prisma.cuenta.create({
+          data: {
+            organizationId: tenantA,
+            codigoInterno: '5.1.1.001',
+            nombre: 'Gasto sin movimientos',
+            claseCuenta: ClaseCuenta.EGRESO,
+            naturaleza: NaturalezaCuenta.DEUDORA,
+            nivel: 4,
+            esDetalle: true,
+          },
+        });
+        const count = await adapter.contarAsientos(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cuentaNula.id,
+        });
+        expect(count).toBe(0);
+      });
+
+      it('CRÍTICO multi-tenant (§4.2): cajaAId del Tenant A NO cuenta asientos de Tenant B', async () => {
+        await seedTresAsientos();
+        // Crear 5 asientos para tenant B con cajaAId-equivalent
+        for (let i = 0; i < 5; i++) {
+          await crearAsientoContabilizado(
+            tenantB,
+            periodoBId,
+            cajaBId,
+            ventasBId,
+            new Date(Date.UTC(2026, 0, i + 1)),
+          );
+        }
+        // Consultar tenantA con cajaAId → solo cuenta asientos de tenantA
+        const count = await adapter.contarAsientos(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+        expect(count).toBe(2); // solo asientos 1 y 2 de tenantA
+      });
+    });
+
+    describe('obtenerAsientosParaLibroDiario con cuentaId', () => {
+      it('cuentaId = cajaAId → retorna asientos 1 y 2 COMPLETOS (Opción A — todas las líneas)', async () => {
+        const { a1, a2 } = await seedTresAsientos();
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+
+        expect(result).toHaveLength(2);
+        const ids = result.map((r) => r.id);
+        expect(ids).toContain(a1.id);
+        expect(ids).toContain(a2.id);
+
+        // Opción A: asiento 1 tiene AMBAS líneas (caja + ventas), no solo la de caja
+        const asiento1 = result.find((r) => r.id === a1.id);
+        expect(asiento1).toBeDefined();
+        expect(asiento1!.lineas).toHaveLength(2);
+        const cuentaIds1 = asiento1!.lineas.map((l) => l.cuenta.codigoInterno);
+        expect(cuentaIds1).toContain('1.1.1.001'); // caja
+        expect(cuentaIds1).toContain('4.1.1.001'); // ventas
+      });
+
+      it('asiento 3 (sin cajaAId) NO aparece en el resultado al filtrar por cajaAId', async () => {
+        const { a3 } = await seedTresAsientos();
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+
+        const ids = result.map((r) => r.id);
+        expect(ids).not.toContain(a3.id);
+      });
+
+      it('cuentaId = ventasAId → retorna asientos 1 y 3 completos', async () => {
+        const { a1, a2, a3 } = await seedTresAsientos();
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          cuentaId: ventasAId,
+        });
+
+        const ids = result.map((r) => r.id);
+        expect(ids).toContain(a1.id);
+        expect(ids).toContain(a3.id);
+        expect(ids).not.toContain(a2.id);
+      });
+
+      it('sin cuentaId → retorna los 3 asientos del rango (comportamiento pre-change)', async () => {
+        await seedTresAsientos();
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, filtrosEnero);
+        expect(result).toHaveLength(3);
+      });
+
+      it('CRÍTICO multi-tenant (§4.2): Tenant A con cajaAId no ve asientos de Tenant B', async () => {
+        await seedTresAsientos();
+        await crearAsientoContabilizado(
+          tenantB,
+          periodoBId,
+          cajaBId,
+          ventasBId,
+          new Date(Date.UTC(2026, 0, 5)),
+        );
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+
+        // Solo asientos 1 y 2 de tenantA; los de tenantB excluidos
+        expect(result.every((r) => r.organizationId === tenantA)).toBe(true);
+      });
+
+      it('incluirAnulados=false + asiento anulado con cajaAId → excluido', async () => {
+        await crearAsientoContabilizado(
+          tenantA,
+          periodoAId,
+          cajaAId,
+          ventasAId,
+          new Date(Date.UTC(2026, 0, 5)),
+          'user-test',
+          true, // anulado
+        );
+        await crearAsientoContabilizado(
+          tenantA,
+          periodoAId,
+          cajaAId,
+          ventasAId,
+          new Date(Date.UTC(2026, 0, 6)),
+        );
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          cuentaId: cajaAId,
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0]!.anulado).toBe(false);
+      });
+
+      it('incluirAnulados=true → asiento anulado con cajaAId incluido', async () => {
+        await crearAsientoContabilizado(
+          tenantA,
+          periodoAId,
+          cajaAId,
+          ventasAId,
+          new Date(Date.UTC(2026, 0, 5)),
+          'user-test',
+          true, // anulado
+        );
+        await crearAsientoContabilizado(
+          tenantA,
+          periodoAId,
+          cajaAId,
+          ventasAId,
+          new Date(Date.UTC(2026, 0, 6)),
+        );
+
+        const result = await adapter.obtenerAsientosParaLibroDiario(tenantA, {
+          ...filtrosEnero,
+          incluirAnulados: true,
+          cuentaId: cajaAId,
+        });
+
+        expect(result).toHaveLength(2);
+      });
     });
   });
 });
