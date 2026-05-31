@@ -15,6 +15,7 @@ import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-pag
 import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { LibroMayorPage } from '@/features/libro-mayor/pages/libro-mayor-page';
 import { BalanceGeneralPage } from '@/features/balance-general/pages/balance-general-page';
+import { EstadoResultadosPage } from '@/features/estado-resultados/pages/estado-resultados-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
           { path: '/libros/diario', element: <LibroDiarioPage /> },
           { path: '/libros/mayor', element: <LibroMayorPage /> },
           { path: '/eeff/balance', element: <BalanceGeneralPage /> },
+          { path: '/eeff/resultados', element: <EstadoResultadosPage /> },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/tipos-documento-fisico', element: <TiposDocumentoFisicoPage /> },
           { path: '/documentos-fisicos', element: <DocumentosFisicosPage /> },

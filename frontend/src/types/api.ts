@@ -1008,3 +1008,50 @@ export interface BalanceGeneralResponse {
   cuadra: boolean;
   diferenciaBob: string;
 }
+
+// ============================================================
+// Estado de Resultados (Income Statement) — GET /api/eeff/resultados
+// Espejo del EstadoResultadosResponseDto del backend (montos string §4.5,
+// rango fechaDesde/fechaHasta YYYY-MM-DD §4.6). Reporte de FLUJO del período.
+// A diferencia del Balance: dos secciones raíz (Ingresos/Egresos), sin línea
+// sintética, y el Resultado del Ejercicio es un campo escalar en raíz.
+// Las ramas vacías ya vienen podadas del backend (REQ-ER-08).
+// ============================================================
+
+export interface CuentaResultados {
+  cuentaId: string;
+  codigoInterno: string;
+  nombre: string;
+  nivel: number;
+  esContraria: boolean;
+  saldoBob: string;
+}
+
+export interface SubseccionResultados {
+  subClaseCuenta: string;
+  titulo: string;
+  cuentas: CuentaResultados[];
+  totalBob: string;
+}
+
+export interface SeccionResultados {
+  claseCuenta: string;
+  titulo: string;
+  subsecciones: SubseccionResultados[];
+  totalBob: string;
+}
+
+export interface EstadoResultadosResponse {
+  /** Inicio del rango de flujo (inclusive), YYYY-MM-DD. */
+  fechaDesde: string;
+  /** Fin del rango de flujo (inclusive), YYYY-MM-DD. */
+  fechaHasta: string;
+  ingreso: SeccionResultados;
+  egreso: SeccionResultados;
+  /** Resultado del Ejercicio = Σ INGRESO − Σ EGRESO; puede ser negativo (pérdida). */
+  resultadoEjercicioBob: string;
+  totalIngresoBob: string;
+  totalEgresoBob: string;
+  /** true si resultadoEjercicio >= 0 (utilidad o break-even). */
+  esGanancia: boolean;
+}
