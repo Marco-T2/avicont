@@ -14,6 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+// Cross-feature: reutilizamos CuentaAutocomplete de comprobantes — filtra
+// cuentas de detalle activas con pageSize 100.
+import { CuentaAutocomplete } from '@/features/comprobantes/components/cuenta-autocomplete';
 // Cross-feature: períodos del tenant para el selector de período fiscal.
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
 import { formatPeriodoCorto } from '@/lib/meses';
@@ -36,6 +39,7 @@ const formSchema = z.object({
   fechaDesde: z.string(),
   fechaHasta: z.string(),
   incluirAnulados: z.boolean(),
+  cuentaId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -92,11 +96,13 @@ export function LibroDiarioFiltros({
       fechaDesde: '',
       fechaHasta: '',
       incluirAnulados: false,
+      cuentaId: '',
     },
   });
 
   const modo = watch('modo');
   const incluirAnulados = watch('incluirAnulados');
+  const cuentaId = watch('cuentaId');
 
   function handleModoChange(nuevoModo: 'periodo' | 'rango'): void {
     setValue('modo', nuevoModo);
@@ -112,6 +118,7 @@ export function LibroDiarioFiltros({
         modo: 'periodo',
         periodoFiscalId: raw.periodoFiscalId,
         incluirAnulados: raw.incluirAnulados,
+        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
       });
     } else {
       // Validar formato y orden de fechas
@@ -134,6 +141,7 @@ export function LibroDiarioFiltros({
         fechaDesde: raw.fechaDesde,
         fechaHasta: raw.fechaHasta,
         incluirAnulados: raw.incluirAnulados,
+        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
       });
     }
   }
@@ -232,6 +240,22 @@ export function LibroDiarioFiltros({
             </div>
           </>
         )}
+
+        {/* Filtro por cuenta (opcional) */}
+        <div className="space-y-1">
+          <Label htmlFor="libro-cuenta" className="text-xs text-muted-foreground">
+            Cuenta (opcional)
+          </Label>
+          {/* Cross-feature: reutilizamos CuentaAutocomplete de comprobantes — filtra
+              cuentas de detalle activas con pageSize 100. Ver frontend CLAUDE.md §14.6. */}
+          <div className="w-56">
+            <CuentaAutocomplete
+              value={cuentaId}
+              onChange={(id) => setValue('cuentaId', id)}
+              placeholder="Todas las cuentas"
+            />
+          </div>
+        </div>
 
         {/* Toggle incluir anulados */}
         <div className="flex items-center gap-2 pb-0.5">
