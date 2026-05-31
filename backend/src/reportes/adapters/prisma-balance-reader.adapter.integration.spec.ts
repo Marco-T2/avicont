@@ -282,7 +282,14 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
       const fecha = new Date(Date.UTC(2026, 0, 10));
       // BORRADOR: no debe aparecer
       await crearComprobanteContabilizado(
-        tenantA, periodoAId, cajaAId, ventasAId, fecha, 5000, false, EstadoComprobante.BORRADOR,
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        5000,
+        false,
+        EstadoComprobante.BORRADOR,
       );
 
       const saldos = await adapter.obtenerSaldosHasta(tenantA, {
@@ -296,8 +303,16 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
 
     it('sin incluirAnulados: anulados excluidos; con flag: incluidos (REQ-BG-04)', async () => {
       const fecha = new Date(Date.UTC(2026, 0, 10));
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 1000);           // normal
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 500, true);      // anulado
+      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 1000); // normal
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        500,
+        true,
+      ); // anulado
 
       // Sin incluirAnulados: solo el comprobante normal
       const sinAnulados = await adapter.obtenerSaldosHasta(tenantA, {
@@ -322,11 +337,18 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
       const dentroCorte = new Date(Date.UTC(2026, 0, 15));
       const fueraCorte = new Date(Date.UTC(2026, 0, 20));
 
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, dentroCorte, 1000);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        dentroCorte,
+        1000,
+      );
       await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fueraCorte, 500);
 
       const saldos = await adapter.obtenerSaldosHasta(tenantA, {
-        fechaCorte: new Date(Date.UTC(2026, 0, 15)),  // corte = 15-ene
+        fechaCorte: new Date(Date.UTC(2026, 0, 15)), // corte = 15-ene
         incluirAnulados: false,
       });
 
@@ -419,7 +441,15 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
     it('toggle incluirAnulados funciona igual que en obtenerSaldosHasta', async () => {
       const fecha = new Date(Date.UTC(2026, 0, 10));
       await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 1000);
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 300, true);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        300,
+        true,
+      );
 
       const sinAnulados = await adapter.obtenerSaldosEnRango(
         tenantA,

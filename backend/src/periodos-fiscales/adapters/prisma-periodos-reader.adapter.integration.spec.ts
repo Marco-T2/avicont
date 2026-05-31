@@ -453,7 +453,9 @@ describe('PrismaPeriodosReaderAdapter — obtenerRangoGestion* (integration)', (
       // Consultar tenantB con una fecha que tiene gestión en tenantA
       // — pero en tenantB también hay gestión para esa fecha, así que lo verificamos
       // con un tenant sin gestión
-      const orgC = await prisma.organization.create({ data: { slug: 'org-gestion-c-tmp', name: 'C' } });
+      const orgC = await prisma.organization.create({
+        data: { slug: 'org-gestion-c-tmp', name: 'C' },
+      });
       const result = await adapter.obtenerRangoGestionPorFecha(orgC.id, fecha);
       expect(result).toBeNull();
       await prisma.organization.delete({ where: { id: orgC.id } });

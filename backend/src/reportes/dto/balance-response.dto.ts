@@ -18,12 +18,12 @@ import { Money } from '@/common/domain/money';
 
 /** Cuenta ya calculada con Money, antes de la serialización a DTO. */
 export interface CuentaBalanceCalculada {
-  cuentaId: string | null;        // null en la línea sintética del Resultado
-  codigoInterno: string | null;   // null en la línea sintética
+  cuentaId: string | null; // null en la línea sintética del Resultado
+  codigoInterno: string | null; // null en la línea sintética
   nombre: string;
   nivel: number;
   esContraria: boolean;
-  esSintetica: boolean;           // true solo para "Resultado del Ejercicio (en curso)"
+  esSintetica: boolean; // true solo para "Resultado del Ejercicio (en curso)"
   saldoBob: Money;
 }
 

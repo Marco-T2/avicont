@@ -75,10 +75,7 @@ export abstract class BalanceReaderPort {
    * Cuenta sin movimiento puede no aparecer — el service la trata como saldo 0.
    * // organizationId SIEMPRE primer predicado (§4.2 Anti-31)
    */
-  abstract obtenerSaldosHasta(
-    tenantId: string,
-    filtros: BalanceFiltros,
-  ): Promise<SaldoCuentaRow[]>;
+  abstract obtenerSaldosHasta(tenantId: string, filtros: BalanceFiltros): Promise<SaldoCuentaRow[]>;
 
   /**
    * Suma de débitos/créditos por cuenta acotada a un rango [desde, hasta]

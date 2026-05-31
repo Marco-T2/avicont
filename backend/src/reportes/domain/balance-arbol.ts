@@ -18,11 +18,16 @@
  *   8. Calcular cuadre: |Activo − (Pasivo + Patrimonio)| ≤ Money.TOLERANCIA_BOB.
  */
 
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
 
 import { Money } from '@/common/domain/money';
 
-import type { BalanceArbolResult, CuentaBalanceCalculada, SeccionCalculada, SubseccionCalculada } from '../dto/balance-response.dto';
+import type {
+  BalanceArbolResult,
+  CuentaBalanceCalculada,
+  SeccionCalculada,
+  SubseccionCalculada,
+} from '../dto/balance-response.dto';
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/balance-reader.port';
 import { calcularSaldoNeto } from './saldo-naturaleza';
 
@@ -32,7 +37,7 @@ import { calcularSaldoNeto } from './saldo-naturaleza';
 
 interface NodoArbol {
   cuenta: CuentaEstructuraRow;
-  saldoNeto: Money;       // saldo calculado (hoja = saldoNeto directo; agrupador = propagado)
+  saldoNeto: Money; // saldo calculado (hoja = saldoNeto directo; agrupador = propagado)
   tieneContenido: boolean; // true si el nodo o algún descendiente tiene saldo ≠ 0
 }
 
@@ -144,8 +149,22 @@ export function construirBalance(params: ConstruirBalanceParams): BalanceArbolRe
   const resultadoEjercicio = calcularResultadoEjercicio(estructura, saldosGestion);
 
   // Ensamblar árbol por claseCuenta → subClaseCuenta
-  const activo = ensamblarSeccion(ClaseCuenta.ACTIVO, 'Activo', estructura, nodos, cuentasPorId, hijosPorParentId);
-  const pasivo = ensamblarSeccion(ClaseCuenta.PASIVO, 'Pasivo', estructura, nodos, cuentasPorId, hijosPorParentId);
+  const activo = ensamblarSeccion(
+    ClaseCuenta.ACTIVO,
+    'Activo',
+    estructura,
+    nodos,
+    cuentasPorId,
+    hijosPorParentId,
+  );
+  const pasivo = ensamblarSeccion(
+    ClaseCuenta.PASIVO,
+    'Pasivo',
+    estructura,
+    nodos,
+    cuentasPorId,
+    hijosPorParentId,
+  );
   const patrimonio = ensamblarSeccionPatrimonio(
     estructura,
     nodos,
@@ -161,7 +180,14 @@ export function construirBalance(params: ConstruirBalanceParams): BalanceArbolRe
   // Código Tributario art. 47: tolerancia ±Bs 0.01 por redondeos de conversión multi-moneda.
   const cuadra = diferenciaBob.abs().lessThanOrEqualTo(Money.TOLERANCIA_BOB);
 
-  return { activo, pasivo, patrimonio, resultadoEjercicioBob: resultadoEjercicio, cuadra, diferenciaBob };
+  return {
+    activo,
+    pasivo,
+    patrimonio,
+    resultadoEjercicioBob: resultadoEjercicio,
+    cuadra,
+    diferenciaBob,
+  };
 }
 
 // ============================================================
@@ -179,7 +205,9 @@ function calcularResultadoEjercicio(
   estructura: CuentaEstructuraRow[],
   saldosGestion: SaldoCuentaRow[],
 ): Money {
-  const saldosGestionMap = new Map<string, SaldoCuentaRow>(saldosGestion.map((s) => [s.cuentaId, s]));
+  const saldosGestionMap = new Map<string, SaldoCuentaRow>(
+    saldosGestion.map((s) => [s.cuentaId, s]),
+  );
 
   let totalIngreso = Money.ZERO;
   let totalEgreso = Money.ZERO;
@@ -190,7 +218,11 @@ function calcularResultadoEjercicio(
     const saldoRow = saldosGestionMap.get(cuenta.id);
     if (!saldoRow) continue;
 
-    const saldoNeto = calcularSaldoNeto(saldoRow.totalDebitoBob, saldoRow.totalCreditoBob, cuenta.naturaleza);
+    const saldoNeto = calcularSaldoNeto(
+      saldoRow.totalDebitoBob,
+      saldoRow.totalCreditoBob,
+      cuenta.naturaleza,
+    );
 
     if (cuenta.claseCuenta === ClaseCuenta.INGRESO) {
       totalIngreso = totalIngreso.plus(saldoNeto);
@@ -223,11 +255,11 @@ function ensamblarSeccion(
   );
 
   // Agrupar por subClaseCuenta
-  const subClasesUnicas = [...new Set(
-    cuentasDeClase
-      .map((c) => c.subClaseCuenta)
-      .filter((s): s is SubClaseCuenta => s !== null),
-  )];
+  const subClasesUnicas = [
+    ...new Set(
+      cuentasDeClase.map((c) => c.subClaseCuenta).filter((s): s is SubClaseCuenta => s !== null),
+    ),
+  ];
 
   const subsecciones: SubseccionCalculada[] = [];
   let totalSeccion = Money.ZERO;
@@ -265,11 +297,7 @@ function ensamblarSeccion(
 
     if (!tieneContenido) continue;
 
-    const cuentasParaDto = recolectarCuentasParaDto(
-      cuentasRaizDeSubClase,
-      nodos,
-      hijosPorParentId,
-    );
+    const cuentasParaDto = recolectarCuentasParaDto(cuentasRaizDeSubClase, nodos, hijosPorParentId);
 
     if (cuentasParaDto.length === 0) continue;
 

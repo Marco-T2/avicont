@@ -1,8 +1,12 @@
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
 
 import { Money } from '@/common/domain/money';
 
-import type { BalanceArbolResult, CuentaBalanceCalculada, SubseccionCalculada } from './balance-response.dto';
+import type {
+  BalanceArbolResult,
+  CuentaBalanceCalculada,
+  SubseccionCalculada,
+} from './balance-response.dto';
 import { toBalanceResponse, formatFechaContable } from './balance-response.dto';
 
 // ============================================================
@@ -10,7 +14,9 @@ import { toBalanceResponse, formatFechaContable } from './balance-response.dto';
 // REQ-BG-09, REQ-BG-11, REQ-BG-15
 // ============================================================
 
-function makeCuentaCalculada(overrides: Partial<CuentaBalanceCalculada> = {}): CuentaBalanceCalculada {
+function makeCuentaCalculada(
+  overrides: Partial<CuentaBalanceCalculada> = {},
+): CuentaBalanceCalculada {
   return {
     cuentaId: 'cuenta-1',
     codigoInterno: '1.1.1.001',
@@ -55,9 +61,24 @@ describe('toBalanceResponse', () => {
       Money.of('1250.5'),
     );
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [subseccion], totalBob: Money.of('1250.5') },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.ZERO },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [subseccion],
+        totalBob: Money.of('1250.5'),
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
       cuadra: false,
       diferenciaBob: Money.of('1250.5'),
@@ -72,9 +93,24 @@ describe('toBalanceResponse', () => {
 
   it('fecha de corte como "YYYY-MM-DD" en la respuesta (REQ-BG-15)', () => {
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.ZERO },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
       cuadra: true,
       diferenciaBob: Money.ZERO,
@@ -100,8 +136,18 @@ describe('toBalanceResponse', () => {
         subsecciones: [subseccion],
         totalBob: Money.of('1250.50'),
       },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.ZERO },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
       cuadra: true,
       diferenciaBob: Money.ZERO,
@@ -118,9 +164,24 @@ describe('toBalanceResponse', () => {
 
   it('resultadoEjercicioBob como string decimal (REQ-BG-09)', () => {
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.of('5000.00') },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.of('5000.00'),
+      },
       resultadoEjercicioBob: Money.of('5000.00'),
       cuadra: true,
       diferenciaBob: Money.ZERO,
@@ -134,9 +195,24 @@ describe('toBalanceResponse', () => {
 
   it('resultadoEjercicioBob negativo (pérdida) como string negativo (REQ-BG-09)', () => {
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.of('-10000.00') },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.of('-10000.00'),
+      },
       resultadoEjercicioBob: Money.of('-10000.00'),
       cuadra: true,
       diferenciaBob: Money.ZERO,
@@ -149,9 +225,24 @@ describe('toBalanceResponse', () => {
 
   it('cuadra: true cuando diferencia es 0 (REQ-BG-11)', () => {
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.ZERO },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
       cuadra: true,
       diferenciaBob: Money.ZERO,
@@ -165,9 +256,24 @@ describe('toBalanceResponse', () => {
 
   it('cuadra: false con diferencia en string (REQ-BG-11)', () => {
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
-      patrimonio: { claseCuenta: ClaseCuenta.PATRIMONIO, titulo: 'Patrimonio', subsecciones: [], totalBob: Money.ZERO },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      patrimonio: {
+        claseCuenta: ClaseCuenta.PATRIMONIO,
+        titulo: 'Patrimonio',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
       cuadra: false,
       diferenciaBob: Money.of('1.50'),
@@ -193,8 +299,18 @@ describe('toBalanceResponse', () => {
       Money.of('3000.00'),
     );
     const arbol: BalanceArbolResult = {
-      activo: { claseCuenta: ClaseCuenta.ACTIVO, titulo: 'Activo', subsecciones: [], totalBob: Money.ZERO },
-      pasivo: { claseCuenta: ClaseCuenta.PASIVO, titulo: 'Pasivo', subsecciones: [], totalBob: Money.ZERO },
+      activo: {
+        claseCuenta: ClaseCuenta.ACTIVO,
+        titulo: 'Activo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      pasivo: {
+        claseCuenta: ClaseCuenta.PASIVO,
+        titulo: 'Pasivo',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       patrimonio: {
         claseCuenta: ClaseCuenta.PATRIMONIO,
         titulo: 'Patrimonio',

@@ -20,10 +20,7 @@ import { InvalidStateError, ValidationError } from '@/common/errors';
  */
 export class FechaCorteInvalidaError extends ValidationError {
   constructor() {
-    super(
-      'REPORTES_BALANCE_FECHA_INVALIDA',
-      'La fecha de corte debe tener formato YYYY-MM-DD',
-    );
+    super('REPORTES_BALANCE_FECHA_INVALIDA', 'La fecha de corte debe tener formato YYYY-MM-DD');
   }
 }
 

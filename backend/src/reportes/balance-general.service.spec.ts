@@ -1,11 +1,8 @@
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
-
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
 import { BalanceGeneralService } from './balance-general.service';
 import { FechaCorteInvalidaError, GestionNoEncontradaError } from './domain/balance-errors';
-import type { BalanceReaderPort, CuentaEstructuraRow, SaldoCuentaRow } from './ports/balance-reader.port';
+import type { BalanceReaderPort } from './ports/balance-reader.port';
 
 // ============================================================
 // Mocks tipados (§7.8 CLAUDE.md — nunca se mockea Prisma directamente)
@@ -39,34 +36,10 @@ function makePeriodosReaderMock(): MockPeriodosReader {
 // Fixtures
 // ============================================================
 
-function makeSaldoCuentaRow(cuentaId: string, debe: string, haber: string): SaldoCuentaRow {
-  return {
-    cuentaId,
-    totalDebitoBob: new Decimal(debe),
-    totalCreditoBob: new Decimal(haber),
-  };
-}
-
-function makeCuentaEstructuraRow(overrides: Partial<CuentaEstructuraRow> = {}): CuentaEstructuraRow {
-  return {
-    id: 'cuenta-1',
-    parentId: null,
-    nivel: 1,
-    esDetalle: true,
-    esContraria: false,
-    claseCuenta: ClaseCuenta.ACTIVO,
-    subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
-    naturaleza: NaturalezaCuenta.DEUDORA,
-    codigoInterno: '1.1.1.001',
-    nombre: 'Caja MN',
-    ...overrides,
-  };
-}
-
 const TENANT_ID = 'org-test-1';
 const GESTION_ID = 'gestion-uuid-1';
-const DESDE = new Date(Date.UTC(2026, 0, 1));   // 2026-01-01
-const HASTA = new Date(Date.UTC(2026, 11, 31));  // 2026-12-31
+const DESDE = new Date(Date.UTC(2026, 0, 1)); // 2026-01-01
+const HASTA = new Date(Date.UTC(2026, 11, 31)); // 2026-12-31
 
 // ============================================================
 // Tests
@@ -133,7 +106,10 @@ describe('BalanceGeneralService (unit)', () => {
 
   describe('inferencia de gestión', () => {
     it('sin gestionId → llama a obtenerRangoGestionPorFecha', async () => {
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2026-05-31', incluirAnulados: false });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2026-05-31',
+        incluirAnulados: false,
+      });
 
       expect(periodosReader.obtenerRangoGestionPorFecha).toHaveBeenCalledWith(
         TENANT_ID,
@@ -180,12 +156,15 @@ describe('BalanceGeneralService (unit)', () => {
       // hastaEfectivo debe ser 2026-05-31 (la fechaCorte es menor)
       const fechaCorte = new Date(Date.UTC(2026, 4, 31)); // 2026-05-31
 
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2026-05-31', incluirAnulados: false });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2026-05-31',
+        incluirAnulados: false,
+      });
 
       expect(balanceReader.obtenerSaldosEnRango).toHaveBeenCalledWith(
         TENANT_ID,
         DESDE,
-        fechaCorte,  // hastaEfectivo = fechaCorte (menor que hasta_gestion 2026-12-31)
+        fechaCorte, // hastaEfectivo = fechaCorte (menor que hasta_gestion 2026-12-31)
         false,
       );
     });
@@ -198,7 +177,10 @@ describe('BalanceGeneralService (unit)', () => {
         hasta: new Date(Date.UTC(2026, 11, 31)),
       });
 
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2025-12-31', incluirAnulados: false });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2025-12-31',
+        incluirAnulados: false,
+      });
 
       // hastaEfectivo = min(hasta_gestion=2026-12-31, fechaCorte=2025-12-31)
       // = 2025-12-31 que es < desde 2026-01-01, pero el range call aún debe hacerse
@@ -212,7 +194,10 @@ describe('BalanceGeneralService (unit)', () => {
 
   describe('toggle incluirAnulados', () => {
     it('incluirAnulados=false propagado a obtenerSaldosHasta y obtenerSaldosEnRango', async () => {
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2026-05-31', incluirAnulados: false });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2026-05-31',
+        incluirAnulados: false,
+      });
 
       expect(balanceReader.obtenerSaldosHasta).toHaveBeenCalledWith(
         TENANT_ID,
@@ -227,7 +212,10 @@ describe('BalanceGeneralService (unit)', () => {
     });
 
     it('incluirAnulados=true propagado a ambas queries', async () => {
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2026-05-31', incluirAnulados: true });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2026-05-31',
+        incluirAnulados: true,
+      });
 
       expect(balanceReader.obtenerSaldosHasta).toHaveBeenCalledWith(
         TENANT_ID,
@@ -266,7 +254,10 @@ describe('BalanceGeneralService (unit)', () => {
         return [];
       });
 
-      await service.consultarBalanceGeneral(TENANT_ID, { fecha: '2026-05-31', incluirAnulados: false });
+      await service.consultarBalanceGeneral(TENANT_ID, {
+        fecha: '2026-05-31',
+        incluirAnulados: false,
+      });
 
       // Las 3 llamadas deben haber ocurrido
       expect(saldosHastaOrder).toBeDefined();

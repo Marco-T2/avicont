@@ -37,10 +37,7 @@ export class EeffController {
       'Requiere fecha=YYYY-MM-DD. Presenta Activo, Pasivo y Patrimonio con Resultado del Ejercicio. ' +
       'REQ-BG-01..15.',
   })
-  obtenerBalanceGeneral(
-    @Req() req: AuthenticatedRequest,
-    @Query() query: BalanceQueryDto,
-  ) {
+  obtenerBalanceGeneral(@Req() req: AuthenticatedRequest, @Query() query: BalanceQueryDto) {
     const tenantId = resolveTenantId(req);
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
     // para campos opcionales del DTO.

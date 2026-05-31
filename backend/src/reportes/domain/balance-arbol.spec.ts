@@ -1,8 +1,6 @@
 import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
-import { Money } from '@/common/domain/money';
-
 import { construirBalance } from './balance-arbol';
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/balance-reader.port';
 
@@ -43,7 +41,11 @@ describe('construirBalance — saldo neto de hoja', () => {
     const cuenta = makeCuenta({ id: 'c1', esDetalle: true, naturaleza: NaturalezaCuenta.DEUDORA });
     const saldos = [makeSaldo('c1', '5000.00', '1200.00')];
 
-    const result = construirBalance({ estructura: [cuenta], saldosHasta: saldos, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [cuenta],
+      saldosHasta: saldos,
+      saldosGestion: [],
+    });
 
     const cuentaEnArbol = result.activo.subsecciones[0]?.cuentas[0];
     expect(cuentaEnArbol).toBeDefined();
@@ -60,7 +62,11 @@ describe('construirBalance — saldo neto de hoja', () => {
     });
     const saldos = [makeSaldo('c1', '200.00', '800.00')];
 
-    const result = construirBalance({ estructura: [cuenta], saldosHasta: saldos, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [cuenta],
+      saldosHasta: saldos,
+      saldosGestion: [],
+    });
 
     const cuentaEnArbol = result.pasivo.subsecciones[0]?.cuentas[0];
     expect(cuentaEnArbol).toBeDefined();
@@ -120,10 +126,7 @@ describe('construirBalance — propagación jerárquica', () => {
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
 
-    const saldos = [
-      makeSaldo('h1', '3000.00', '0.00'),
-      makeSaldo('h2', '2000.00', '0.00'),
-    ];
+    const saldos = [makeSaldo('h1', '3000.00', '0.00'), makeSaldo('h2', '2000.00', '0.00')];
 
     const result = construirBalance({
       estructura: [raiz, agrupador, hoja1, hoja2],
@@ -139,20 +142,36 @@ describe('construirBalance — propagación jerárquica', () => {
     // Árbol: nivel1 → nivel2 → nivel3 → nivel4 (hoja)
     // El nivel1 NO debe contar nivel2 + nivel3 + nivel4 por separado
     const n1 = makeCuenta({
-      id: 'n1', parentId: null, nivel: 1, esDetalle: false,
-      codigoInterno: '1', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+      id: 'n1',
+      parentId: null,
+      nivel: 1,
+      esDetalle: false,
+      codigoInterno: '1',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const n2 = makeCuenta({
-      id: 'n2', parentId: 'n1', nivel: 2, esDetalle: false,
-      codigoInterno: '1.1', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+      id: 'n2',
+      parentId: 'n1',
+      nivel: 2,
+      esDetalle: false,
+      codigoInterno: '1.1',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const n3 = makeCuenta({
-      id: 'n3', parentId: 'n2', nivel: 3, esDetalle: false,
-      codigoInterno: '1.1.1', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+      id: 'n3',
+      parentId: 'n2',
+      nivel: 3,
+      esDetalle: false,
+      codigoInterno: '1.1.1',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const hoja = makeCuenta({
-      id: 'hoja', parentId: 'n3', nivel: 4, esDetalle: true,
-      codigoInterno: '1.1.1.001', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+      id: 'hoja',
+      parentId: 'n3',
+      nivel: 4,
+      esDetalle: true,
+      codigoInterno: '1.1.1.001',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
 
     const saldos = [makeSaldo('hoja', '1000.00', '0.00')];
@@ -194,8 +213,8 @@ describe('construirBalance — esContraria resta del grupo', () => {
       parentId: 'grupo-anc',
       nivel: 3,
       esDetalle: true,
-      esContraria: true,       // CRÍTICO
-      naturaleza: NaturalezaCuenta.ACREEDORA,  // contra-activo
+      esContraria: true, // CRÍTICO
+      naturaleza: NaturalezaCuenta.ACREEDORA, // contra-activo
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_NO_CORRIENTE,
       codigoInterno: '1.2.1.002',
@@ -215,8 +234,8 @@ describe('construirBalance — esContraria resta del grupo', () => {
     });
 
     const saldos = [
-      makeSaldo('equipo', '10000.00', '0.00'),   // saldo neto DEUDORA = 10000
-      makeSaldo('dep', '0.00', '2000.00'),        // saldo neto ACREEDORA = 2000
+      makeSaldo('equipo', '10000.00', '0.00'), // saldo neto DEUDORA = 10000
+      makeSaldo('dep', '0.00', '2000.00'), // saldo neto ACREEDORA = 2000
     ];
 
     const result = construirBalance({
@@ -232,7 +251,9 @@ describe('construirBalance — esContraria resta del grupo', () => {
   it('cuenta esContraria=true con saldo 0 no afecta al grupo', () => {
     const equipo = makeCuenta({
       id: 'equipo',
-      nivel: 3, esDetalle: true, esContraria: false,
+      nivel: 3,
+      esDetalle: true,
+      esContraria: false,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_NO_CORRIENTE,
@@ -240,7 +261,9 @@ describe('construirBalance — esContraria resta del grupo', () => {
     });
     const dep = makeCuenta({
       id: 'dep',
-      nivel: 3, esDetalle: true, esContraria: true,
+      nivel: 3,
+      esDetalle: true,
+      esContraria: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_NO_CORRIENTE,
@@ -249,7 +272,7 @@ describe('construirBalance — esContraria resta del grupo', () => {
 
     const saldos = [
       makeSaldo('equipo', '5000.00', '0.00'),
-      makeSaldo('dep', '0.00', '0.00'),  // saldo 0
+      makeSaldo('dep', '0.00', '0.00'), // saldo 0
     ];
 
     const result = construirBalance({
@@ -263,14 +286,20 @@ describe('construirBalance — esContraria resta del grupo', () => {
 
   it('grupo sin cuentas contrarias: todos los saldos se suman normalmente', () => {
     const h1 = makeCuenta({
-      id: 'h1', nivel: 2, esDetalle: true, esContraria: false,
+      id: 'h1',
+      nivel: 2,
+      esDetalle: true,
+      esContraria: false,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
       codigoInterno: '1.1.001',
     });
     const h2 = makeCuenta({
-      id: 'h2', nivel: 2, esDetalle: true, esContraria: false,
+      id: 'h2',
+      nivel: 2,
+      esDetalle: true,
+      esContraria: false,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
@@ -295,15 +324,29 @@ describe('construirBalance — esContraria resta del grupo', () => {
 
 describe('construirBalance — omisión de saldo 0', () => {
   it('hoja con saldo 0 es omitida del reporte', () => {
-    const h1 = makeCuenta({ id: 'h1', esDetalle: true, codigoInterno: '1.1.001', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE });
-    const h2 = makeCuenta({ id: 'h2', esDetalle: true, codigoInterno: '1.1.002', subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE });
+    const h1 = makeCuenta({
+      id: 'h1',
+      esDetalle: true,
+      codigoInterno: '1.1.001',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+    });
+    const h2 = makeCuenta({
+      id: 'h2',
+      esDetalle: true,
+      codigoInterno: '1.1.002',
+      subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+    });
 
     const saldos = [
       makeSaldo('h1', '1000.00', '0.00'),
-      makeSaldo('h2', '500.00', '500.00'),  // saldo 0
+      makeSaldo('h2', '500.00', '500.00'), // saldo 0
     ];
 
-    const result = construirBalance({ estructura: [h1, h2], saldosHasta: saldos, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [h1, h2],
+      saldosHasta: saldos,
+      saldosGestion: [],
+    });
 
     const cuentas = result.activo.subsecciones.flatMap((s) => s.cuentas);
     expect(cuentas.some((c) => c.cuentaId === 'h2')).toBe(false);
@@ -312,41 +355,67 @@ describe('construirBalance — omisión de saldo 0', () => {
 
   it('agrupador con todos los hijos en saldo 0 es omitido', () => {
     const agrup = makeCuenta({
-      id: 'agrup', nivel: 1, esDetalle: false, codigoInterno: '1',
+      id: 'agrup',
+      nivel: 1,
+      esDetalle: false,
+      codigoInterno: '1',
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const hoja = makeCuenta({
-      id: 'hoja', parentId: 'agrup', nivel: 2, esDetalle: true, codigoInterno: '1.001',
+      id: 'hoja',
+      parentId: 'agrup',
+      nivel: 2,
+      esDetalle: true,
+      codigoInterno: '1.001',
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
 
-    const saldos = [makeSaldo('hoja', '500.00', '500.00')];  // saldo 0
+    const saldos = [makeSaldo('hoja', '500.00', '500.00')]; // saldo 0
 
-    const result = construirBalance({ estructura: [agrup, hoja], saldosHasta: saldos, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [agrup, hoja],
+      saldosHasta: saldos,
+      saldosGestion: [],
+    });
 
     expect(result.activo.subsecciones).toHaveLength(0);
   });
 
   it('agrupador con ≥1 hijo con saldo ≠ 0 permanece en el reporte', () => {
     const agrup = makeCuenta({
-      id: 'agrup', nivel: 1, esDetalle: false, codigoInterno: '1',
+      id: 'agrup',
+      nivel: 1,
+      esDetalle: false,
+      codigoInterno: '1',
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const hojaConSaldo = makeCuenta({
-      id: 'h1', parentId: 'agrup', nivel: 2, esDetalle: true, codigoInterno: '1.001',
+      id: 'h1',
+      parentId: 'agrup',
+      nivel: 2,
+      esDetalle: true,
+      codigoInterno: '1.001',
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
     const horaSinSaldo = makeCuenta({
-      id: 'h2', parentId: 'agrup', nivel: 2, esDetalle: true, codigoInterno: '1.002',
+      id: 'h2',
+      parentId: 'agrup',
+      nivel: 2,
+      esDetalle: true,
+      codigoInterno: '1.002',
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     });
 
     const saldos = [
       makeSaldo('h1', '1000.00', '0.00'),
-      makeSaldo('h2', '500.00', '500.00'),  // saldo 0
+      makeSaldo('h2', '500.00', '500.00'), // saldo 0
     ];
 
-    const result = construirBalance({ estructura: [agrup, hojaConSaldo, horaSinSaldo], saldosHasta: saldos, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [agrup, hojaConSaldo, horaSinSaldo],
+      saldosHasta: saldos,
+      saldosGestion: [],
+    });
 
     expect(result.activo.subsecciones).toHaveLength(1);
     const cuentas = result.activo.subsecciones[0]!.cuentas;
@@ -383,11 +452,15 @@ describe('construirBalance — Resultado del Ejercicio', () => {
     // saldosHasta (para balance) — vacíos para simplificar
     // saldosGestion (para resultado ejercicio): ingreso 10000, egreso 6000
     const saldosGestion = [
-      makeSaldo('ing1', '0.00', '10000.00'),  // ACREEDORA: saldo = haber - debe = 10000
-      makeSaldo('egr1', '6000.00', '0.00'),    // DEUDORA: saldo = debe - haber = 6000
+      makeSaldo('ing1', '0.00', '10000.00'), // ACREEDORA: saldo = haber - debe = 10000
+      makeSaldo('egr1', '6000.00', '0.00'), // DEUDORA: saldo = debe - haber = 6000
     ];
 
-    const result = construirBalance({ estructura: [ingreso, egreso], saldosHasta: [], saldosGestion });
+    const result = construirBalance({
+      estructura: [ingreso, egreso],
+      saldosHasta: [],
+      saldosGestion,
+    });
 
     // Resultado = 10000 − 6000 = 4000
     expect(result.resultadoEjercicioBob.toBob()).toBe('4000.00');
@@ -395,14 +468,16 @@ describe('construirBalance — Resultado del Ejercicio', () => {
 
   it('pérdida: resultado negativo como string negativo', () => {
     const ingreso = makeCuenta({
-      id: 'ing1', esDetalle: true,
+      id: 'ing1',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.INGRESO,
       subClaseCuenta: SubClaseCuenta.INGRESO_OPERATIVO,
       codigoInterno: '4.1.001',
     });
     const egreso = makeCuenta({
-      id: 'egr1', esDetalle: true,
+      id: 'egr1',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.EGRESO,
       subClaseCuenta: SubClaseCuenta.EGRESO_OPERATIVO,
@@ -414,7 +489,11 @@ describe('construirBalance — Resultado del Ejercicio', () => {
       makeSaldo('egr1', '15000.00', '0.00'),
     ];
 
-    const result = construirBalance({ estructura: [ingreso, egreso], saldosHasta: [], saldosGestion });
+    const result = construirBalance({
+      estructura: [ingreso, egreso],
+      saldosHasta: [],
+      saldosGestion,
+    });
 
     // Resultado = 5000 − 15000 = -10000
     expect(result.resultadoEjercicioBob.toBob()).toBe('-10000.00');
@@ -422,7 +501,8 @@ describe('construirBalance — Resultado del Ejercicio', () => {
 
   it('línea sintética en PATRIMONIO_RESULTADOS: cuentaId null, esSintetica true', () => {
     const ingreso = makeCuenta({
-      id: 'ing1', esDetalle: true,
+      id: 'ing1',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.INGRESO,
       subClaseCuenta: SubClaseCuenta.INGRESO_OPERATIVO,
@@ -445,22 +525,31 @@ describe('construirBalance — Resultado del Ejercicio', () => {
 
   it('cuentas INGRESO/EGRESO NO aparecen en el árbol del Balance', () => {
     const ingreso = makeCuenta({
-      id: 'ing1', esDetalle: true,
+      id: 'ing1',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.INGRESO,
       subClaseCuenta: SubClaseCuenta.INGRESO_OPERATIVO,
       codigoInterno: '4.1.001',
     });
     const egreso = makeCuenta({
-      id: 'egr1', esDetalle: true,
+      id: 'egr1',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.EGRESO,
       subClaseCuenta: SubClaseCuenta.EGRESO_OPERATIVO,
       codigoInterno: '5.1.001',
     });
-    const saldosGestion = [makeSaldo('ing1', '0.00', '5000.00'), makeSaldo('egr1', '3000.00', '0.00')];
+    const saldosGestion = [
+      makeSaldo('ing1', '0.00', '5000.00'),
+      makeSaldo('egr1', '3000.00', '0.00'),
+    ];
 
-    const result = construirBalance({ estructura: [ingreso, egreso], saldosHasta: [], saldosGestion });
+    const result = construirBalance({
+      estructura: [ingreso, egreso],
+      saldosHasta: [],
+      saldosGestion,
+    });
 
     // No debe haber secciones de INGRESO ni EGRESO
     const todasLasSecciones = [result.activo, result.pasivo, result.patrimonio];
@@ -479,21 +568,24 @@ describe('construirBalance — cuadre de ecuación contable', () => {
   it('Activo = Pasivo + Patrimonio: cuadra=true, diferencia="0.00"', () => {
     // Activo: 10000. Pasivo: 6000. Patrimonio: 4000 (capital). Balance cuadra.
     const activo = makeCuenta({
-      id: 'act', esDetalle: true,
+      id: 'act',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
       codigoInterno: '1.1.001',
     });
     const pasivo = makeCuenta({
-      id: 'pas', esDetalle: true,
+      id: 'pas',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.PASIVO,
       subClaseCuenta: SubClaseCuenta.PASIVO_CORRIENTE,
       codigoInterno: '2.1.001',
     });
     const patrimonio = makeCuenta({
-      id: 'pat', esDetalle: true,
+      id: 'pat',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.PATRIMONIO,
       subClaseCuenta: SubClaseCuenta.PATRIMONIO_CAPITAL,
@@ -506,7 +598,11 @@ describe('construirBalance — cuadre de ecuación contable', () => {
       makeSaldo('pat', '0.00', '4000.00'),
     ];
 
-    const result = construirBalance({ estructura: [activo, pasivo, patrimonio], saldosHasta, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [activo, pasivo, patrimonio],
+      saldosHasta,
+      saldosGestion: [],
+    });
 
     expect(result.cuadra).toBe(true);
     expect(result.diferenciaBob.toBob()).toBe('0.00');
@@ -514,7 +610,8 @@ describe('construirBalance — cuadre de ecuación contable', () => {
 
   it('descuadre de Bs 1.50: cuadra=false, diferencia="1.50" (respuesta 200, no error)', () => {
     const activo = makeCuenta({
-      id: 'act', esDetalle: true,
+      id: 'act',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
@@ -532,14 +629,16 @@ describe('construirBalance — cuadre de ecuación contable', () => {
 
   it('diferencia dentro de tolerancia ±0.01: cuadra=true', () => {
     const activo = makeCuenta({
-      id: 'act', esDetalle: true,
+      id: 'act',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.DEUDORA,
       claseCuenta: ClaseCuenta.ACTIVO,
       subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
       codigoInterno: '1.1.001',
     });
     const pasivo = makeCuenta({
-      id: 'pas', esDetalle: true,
+      id: 'pas',
+      esDetalle: true,
       naturaleza: NaturalezaCuenta.ACREEDORA,
       claseCuenta: ClaseCuenta.PASIVO,
       subClaseCuenta: SubClaseCuenta.PASIVO_CORRIENTE,
@@ -547,12 +646,13 @@ describe('construirBalance — cuadre de ecuación contable', () => {
     });
 
     // Activo = 100.01, Pasivo = 100.00 → diferencia = 0.01 ≤ tolerancia
-    const saldosHasta = [
-      makeSaldo('act', '100.01', '0.00'),
-      makeSaldo('pas', '0.00', '100.00'),
-    ];
+    const saldosHasta = [makeSaldo('act', '100.01', '0.00'), makeSaldo('pas', '0.00', '100.00')];
 
-    const result = construirBalance({ estructura: [activo, pasivo], saldosHasta, saldosGestion: [] });
+    const result = construirBalance({
+      estructura: [activo, pasivo],
+      saldosHasta,
+      saldosGestion: [],
+    });
 
     expect(result.cuadra).toBe(true);
   });

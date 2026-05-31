@@ -31,11 +31,7 @@ function parseFechaContable(fecha: string): Date | null {
 
   const date = new Date(Date.UTC(year, month, day));
   // Validar que la fecha resultante tiene los mismos valores (evita fechas como 2026-02-30)
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month ||
-    date.getUTCDate() !== day
-  ) {
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
     return null;
   }
 
@@ -96,7 +92,10 @@ export class BalanceGeneralService {
       desde = rango.desde;
       hasta = rango.hasta;
     } else {
-      const rangoConId = await this.periodosReader.obtenerRangoGestionPorFecha(tenantId, fechaCorte);
+      const rangoConId = await this.periodosReader.obtenerRangoGestionPorFecha(
+        tenantId,
+        fechaCorte,
+      );
       if (!rangoConId) {
         throw new GestionNoEncontradaError(query.fecha);
       }

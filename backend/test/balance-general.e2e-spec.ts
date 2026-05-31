@@ -330,7 +330,9 @@ describe('Balance General (e2e)', () => {
     it('montos como strings "NNN.NN", fechaCorte como "YYYY-MM-DD"', async () => {
       const { token, orgId } = await seedTenant('org-bg-dto');
       const { cajaId, ventasId, periodoEneroId } = await seedCuentaBase(orgId);
-      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', { importe: 1250 });
+      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', {
+        importe: 1250,
+      });
 
       const res = await request(app.getHttpServer())
         .get('/api/eeff/balance')
@@ -400,8 +402,13 @@ describe('Balance General (e2e)', () => {
       const { token, orgId } = await seedTenant('org-bg-anulado');
       const { cajaId, ventasId, periodoEneroId } = await seedCuentaBase(orgId);
 
-      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10', { importe: 1000 });
-      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10', { importe: 500, anulado: true });
+      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10', {
+        importe: 1000,
+      });
+      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-10', {
+        importe: 500,
+        anulado: true,
+      });
 
       const sinAnulados = await request(app.getHttpServer())
         .get('/api/eeff/balance')
@@ -463,7 +470,14 @@ describe('Balance General (e2e)', () => {
       });
 
       // Asiento: débito Equipo 10000 / crédito Depreciación 2000 (separate entries)
-      await crearAsientoContabilizado(orgId, periodoEnero.id, equipo.id, depreciacion.id, '2026-01-10', { importe: 10000 });
+      await crearAsientoContabilizado(
+        orgId,
+        periodoEnero.id,
+        equipo.id,
+        depreciacion.id,
+        '2026-01-10',
+        { importe: 10000 },
+      );
 
       const res = await request(app.getHttpServer())
         .get('/api/eeff/balance')
@@ -486,7 +500,9 @@ describe('Balance General (e2e)', () => {
     it('línea sintética presente en Patrimonio', async () => {
       const { token, orgId } = await seedTenant('org-bg-resultado');
       const { cajaId, ventasId, periodoEneroId } = await seedCuentaBase(orgId);
-      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', { importe: 3000 });
+      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', {
+        importe: 3000,
+      });
 
       const res = await request(app.getHttpServer())
         .get('/api/eeff/balance')
@@ -518,7 +534,9 @@ describe('Balance General (e2e)', () => {
     it('cuadra: true con datos coherentes', async () => {
       const { token, orgId } = await seedTenant('org-bg-cuadra');
       const { cajaId, ventasId, periodoEneroId } = await seedCuentaBase(orgId);
-      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', { importe: 5000 });
+      await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-15', {
+        importe: 5000,
+      });
 
       const res = await request(app.getHttpServer())
         .get('/api/eeff/balance')
@@ -541,14 +559,24 @@ describe('Balance General (e2e)', () => {
       const { token: _tokenB, orgId: orgBId } = await seedTenant('org-bg-b-mt');
 
       // Tenant A: Caja con saldo 8000
-      const { cajaId: cajaAId, ventasId: ventasAId, periodoEneroId: periodoAId } =
-        await seedCuentaBase(orgAId);
-      await crearAsientoContabilizado(orgAId, periodoAId, cajaAId, ventasAId, '2026-01-15', { importe: 8000 });
+      const {
+        cajaId: cajaAId,
+        ventasId: ventasAId,
+        periodoEneroId: periodoAId,
+      } = await seedCuentaBase(orgAId);
+      await crearAsientoContabilizado(orgAId, periodoAId, cajaAId, ventasAId, '2026-01-15', {
+        importe: 8000,
+      });
 
       // Tenant B: Caja con saldo 9999
-      const { cajaId: cajaBId, ventasId: ventasBId, periodoEneroId: periodoBId } =
-        await seedCuentaBase(orgBId);
-      await crearAsientoContabilizado(orgBId, periodoBId, cajaBId, ventasBId, '2026-01-15', { importe: 9999 });
+      const {
+        cajaId: cajaBId,
+        ventasId: ventasBId,
+        periodoEneroId: periodoBId,
+      } = await seedCuentaBase(orgBId);
+      await crearAsientoContabilizado(orgBId, periodoBId, cajaBId, ventasBId, '2026-01-15', {
+        importe: 9999,
+      });
 
       // Tenant A consulta su balance
       const resA = await request(app.getHttpServer())
