@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
+import { CuentasReaderModule } from '@/cuentas/cuentas-reader.module';
 import { PeriodosReaderModule } from '@/periodos-fiscales/periodos-reader.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
@@ -30,6 +31,10 @@ import { ReportesController } from './reportes.controller';
     // PeriodosReaderModule expone PERIODOS_READER_PORT sin traer el módulo completo
     // (mismo patrón que ComprobantesModule — evita ciclos de carga CJS en prod).
     PeriodosReaderModule,
+    // CuentasReaderModule expone CUENTAS_READER_LOOKUP_PORT para validar la cuenta
+    // del filtro del Libro Diario. Leaf module — NO importar CuentasModule (riesgo
+    // de ciclo CJS prod, memoria prod-build-crash-ciclos).
+    CuentasReaderModule,
   ],
   controllers: [ReportesController],
   providers: [

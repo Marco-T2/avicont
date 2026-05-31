@@ -12,6 +12,7 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsUUID, Matches } from 'class-validator';
 
+
 export class LibroDiarioQueryDto {
   /**
    * UUID del período fiscal. Si se pasa, el service lo resuelve a un rango
@@ -54,4 +55,13 @@ export class LibroDiarioQueryDto {
   })
   @IsBoolean()
   incluirAnulados?: boolean;
+
+  /**
+   * UUID de la cuenta de detalle. Si se pasa, solo asientos con al menos una línea
+   * en esa cuenta (Opción A: asiento completo con todas sus líneas — REQ-LD-12).
+   * La validación de negocio (cuenta existe, esDetalle=true) ocurre en el service.
+   */
+  @IsOptional()
+  @IsUUID('4')
+  cuentaId?: string;
 }
