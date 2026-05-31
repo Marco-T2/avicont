@@ -264,6 +264,22 @@ describe('Balance General (e2e)', () => {
       // El ValidationPipe rechaza el DTO antes de llegar al service
       expect(res.status).toBe(400);
     });
+
+    it('400 con fecha semánticamente inválida (pasa regex pero no existe) → code REPORTES_BALANCE_FECHA_INVALIDA', async () => {
+      // 2026-02-30 pasa el regex \d{4}-\d{2}-\d{2} pero no es una fecha real.
+      // El ValidationPipe no la rechaza (solo valida el patrón); la validación
+      // semántica ocurre en parseFechaContable() dentro del service,
+      // que lanza FechaCorteInvalidaError con code REPORTES_BALANCE_FECHA_INVALIDA.
+      const { token } = await seedTenant('org-bg-400c');
+
+      const res = await request(app.getHttpServer())
+        .get('/api/eeff/balance')
+        .set('Authorization', `Bearer ${token}`)
+        .query({ fecha: '2026-02-30' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error?.code).toBe('REPORTES_BALANCE_FECHA_INVALIDA');
+    });
   });
 
   // ============================================================
