@@ -2,11 +2,17 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import {
+  CUENTAS_READER_LOOKUP_PORT,
+  CuentasReaderLookupPort,
+} from '@/cuentas/ports/cuentas-reader-lookup.port';
+import {
   PERIODOS_READER_PORT,
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
 
 import {
+  CuentaNoDetalleError,
+  CuentaNoEncontradaError,
   FiltroRequeridoError,
   PeriodoNoEncontradoError,
   RangoExcedeLimiteError,
@@ -31,6 +37,8 @@ export class LibroDiarioService {
     private readonly comprobantesReader: ComprobantesReaderPort,
     @Inject(PERIODOS_READER_PORT)
     private readonly periodosReader: PeriodosReaderPort,
+    @Inject(CUENTAS_READER_LOOKUP_PORT)
+    private readonly cuentasReader: CuentasReaderLookupPort,
     private readonly config: ConfigService,
   ) {
     // REQ-LD-10: umbral configurable via env LIBRO_DIARIO_MAX_ASIENTOS (default 5000).
@@ -60,6 +68,7 @@ export class LibroDiarioService {
       fechaDesde?: string;
       fechaHasta?: string;
       incluirAnulados: boolean;
+      cuentaId?: string;
     },
   ): Promise<LibroDiarioResponseDto> {
     // ── 1. Validación de forma (design decisión #6) ───────────────────────
@@ -100,10 +109,19 @@ export class LibroDiarioService {
       }
     }
 
+    // ── 2.5. Validación de cuenta (REQ-LD-12..14) ───────────────────────────
+    if (query.cuentaId !== undefined) {
+      const cuenta = await this.cuentasReader.obtenerCuentaDetalle(tenantId, query.cuentaId);
+      if (cuenta === null) throw new CuentaNoEncontradaError(query.cuentaId);
+      // Código de Comercio art. 36: solo cuentas de detalle tienen movimientos directos.
+      if (!cuenta.esDetalle) throw new CuentaNoDetalleError(query.cuentaId);
+    }
+
     const filtros = {
       fechaDesde,
       fechaHasta,
       incluirAnulados: query.incluirAnulados,
+      ...(query.cuentaId !== undefined ? { cuentaId: query.cuentaId } : {}),
     };
 
     // ── 3. Tope defensivo por count previo (design decisión #5, REQ-LD-10) ─
