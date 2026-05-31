@@ -10,6 +10,7 @@ import { PrismaEeffSaldosReaderAdapter } from './adapters/prisma-eeff-saldos-rea
 import { PrismaComprobantesReaderAdapter } from './adapters/prisma-comprobantes-reader.adapter';
 import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-reader.adapter';
 import { BalanceGeneralService } from './balance-general.service';
+import { EstadoResultadosService } from './estado-resultados.service';
 import { EeffController } from './eeff.controller';
 import { LibroDiarioService } from './libro-diario.service';
 import { LibroMayorService } from './libro-mayor.service';
@@ -19,7 +20,7 @@ import { LIBRO_MAYOR_READER_PORT } from './ports/libro-mayor-reader.port';
 import { ReportesController } from './reportes.controller';
 
 /**
- * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General (EEFF).
+ * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General + Estado de Resultados (EEFF).
  *
  * DI:
  *   - `ComprobantesReaderPort` → `PrismaComprobantesReaderAdapter` (Diario)
@@ -64,6 +65,7 @@ import { ReportesController } from './reportes.controller';
 
     // Service + Adapter EEFF (Balance + Estado Resultados): $queryRaw GROUP BY saldos + findMany estructura.
     BalanceGeneralService,
+    EstadoResultadosService,
     PrismaEeffSaldosReaderAdapter,
     {
       provide: EEFF_SALDOS_READER_PORT,
