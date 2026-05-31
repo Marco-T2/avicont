@@ -12,6 +12,9 @@ import { switchTenant } from '../api/switch-tenant';
 //   3. Invalidar TODO el cache — la data del tenant anterior no sirve.
 //      El próximo render de cualquier página vuelve a pedir con el nuevo
 //      Bearer token.
+//   4. Invalidar me-permissions explícitamente para forzar re-fetch inmediato
+//      sin esperar el staleTime de 5min (aunque la invalidación global ya lo cubre,
+//      la explícita es más semántica y garantiza el caso de staleTime largo).
 export function useSwitchTenant() {
   const setToken = useAuthStore((s) => s.setToken);
   const qc = useQueryClient();
@@ -20,7 +23,13 @@ export function useSwitchTenant() {
     onSuccess: (data) => {
       setToken(data.accessToken);
       // Cache nuclear-reset: data del tenant viejo es inválida.
+      // Incluye me-permissions (REQ-FPG-02: permisos stale por cambio de tenant).
       void qc.invalidateQueries();
+      // Invalidación explícita de me-permissions como documentación de intención:
+      // al cambiar de tenant los permisos DEBEN re-fetchearse antes de cualquier
+      // gating de UI. La invalidación global ya la cubre, pero esta hace explícita
+      // la dependencia para futuros refactors que ajusten el scope de la global.
+      void qc.invalidateQueries({ queryKey: ['me-permissions'] });
     },
   });
 }

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
+import { RequirePermission } from '@/components/shared/require-permission';
 import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
 import { LoginPage } from '@/features/auth/login-page';
@@ -21,6 +22,7 @@ import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodo
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
+import { PERMISSIONS } from '@/lib/permissions';
 
 import { ProtectedRoute } from './protected-route';
 
@@ -45,10 +47,38 @@ export const router = createBrowserRouter([
           { path: '/comprobantes/nuevo', element: <EditarComprobantePage /> },
           { path: '/comprobantes/:id', element: <ComprobanteDetailPage /> },
           { path: '/comprobantes/:id/editar', element: <EditarComprobantePage /> },
-          { path: '/libros/diario', element: <LibroDiarioPage /> },
-          { path: '/libros/mayor', element: <LibroMayorPage /> },
-          { path: '/eeff/balance', element: <BalanceGeneralPage /> },
-          { path: '/eeff/resultados', element: <EstadoResultadosPage /> },
+          {
+            path: '/libros/diario',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.libroDiario.read}>
+                <LibroDiarioPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/libros/mayor',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.libroMayor.read}>
+                <LibroMayorPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/eeff/balance',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
+                <BalanceGeneralPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/eeff/resultados',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
+                <EstadoResultadosPage />
+              </RequirePermission>
+            ),
+          },
           { path: '/contactos', element: <ContactosPage /> },
           { path: '/tipos-documento-fisico', element: <TiposDocumentoFisicoPage /> },
           { path: '/documentos-fisicos', element: <DocumentosFisicosPage /> },
