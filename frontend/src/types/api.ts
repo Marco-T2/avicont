@@ -1010,6 +1010,22 @@ export interface BalanceGeneralResponse {
 }
 
 // ============================================================
+// Permisos efectivos del usuario — GET /me/permissions
+// Espejo de MePermissionsResponseDto del backend (backend/src/me/dto/).
+// `permissions` son PATRONES de wildcards (ej. "contabilidad.*"),
+// NO la lista expandida. El frontend usa permission-matcher.ts para evaluarlos.
+// ============================================================
+
+export interface MePermissionsResponse {
+  /** Patrones de wildcards asignados al usuario (ej. ["contabilidad.*"]). */
+  permissions: string[];
+  /** true si el usuario es OWNER o ADMIN (tiene acceso total). */
+  isOwner: boolean;
+  /** ID del tenant activo en el JWT en el momento de la consulta. */
+  activeTenantId: string;
+}
+
+// ============================================================
 // Estado de Resultados (Income Statement) — GET /api/eeff/resultados
 // Espejo del EstadoResultadosResponseDto del backend (montos string §4.5,
 // rango fechaDesde/fechaHasta YYYY-MM-DD §4.6). Reporte de FLUJO del período.

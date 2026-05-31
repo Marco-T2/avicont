@@ -1,5 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
+
 import { useAuthStore } from '@/stores/auth-store';
 import type { SystemRole } from '@/types/api';
+
+import { getMePermissions } from './me-permissions';
+import { matchesPermission } from './permission-matcher';
 
 // Helpers de autorización en el cliente. NO reemplazan el RBAC del backend
 // — son solo hints de UX para ocultar/mostrar acciones que el backend igual
@@ -30,3 +35,48 @@ export function usePuedeReabrir(): boolean {
 
 // Re-export para que las features no tengan que importar desde rutas internas.
 export { usePuedeEditarContabilizado } from '@/features/comprobantes/hooks/use-puede-editar-contabilizado';
+
+/**
+ * Hook para consultar los permisos efectivos del usuario autenticado en el
+ * tenant activo. Usa TanStack Query con cache aislado por `activeTenantId`
+ * (D-F1 del design) — al cambiar de tenant la query key cambia y se refetcha.
+ *
+ * `has(permission)` implementa fail-closed:
+ *   - Sin data (loading/error) → false
+ *   - isOwner true → true para cualquier permiso
+ *   - Si no → matching de wildcards (matchesPermission), NO Array.includes()
+ *
+ * El archivo existente (useHasSystemRole, usePuedeReabrir) NO se toca:
+ * esos hooks leen SystemRole del JWT (sincrónico), fuente distinta.
+ */
+export function usePermissions() {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const activeTenantId = useAuthStore((s) => s.user?.activeTenantId);
+
+  const query = useQuery({
+    queryKey: ['me-permissions', activeTenantId],
+    queryFn: getMePermissions,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    // Deshabilitada si no hay token o no hay tenant activo.
+    // Esto evita el 403 de /me/permissions durante el bootstrap/switch.
+    enabled: Boolean(accessToken) && Boolean(activeTenantId),
+  });
+
+  const has = (permission: string): boolean => {
+    const data = query.data;
+    // fail-closed: sin data → false (nunca muestra acción que daría 403)
+    if (data === undefined) return false;
+    // owner/admin → acceso total
+    if (data.isOwner) return true;
+    // matching de wildcards — NUNCA includes() directo (los permisos son patrones)
+    return data.permissions.some((w) => matchesPermission(w, permission));
+  };
+
+  return {
+    ...query,
+    has,
+    isOwner: query.data?.isOwner ?? false,
+    permissions: query.data?.permissions ?? [],
+  };
+}
