@@ -705,8 +705,8 @@ describe('Libro Diario (e2e)', () => {
       });
 
       it('cuenta sin movimientos en el rango → 200 con asientos vacíos', async () => {
-        const { token, periodoEneroId, bancoId } = await seedTenant('org-ld-cx-vac')
-          .then(async (base) => {
+        const { token, periodoEneroId, bancoId } = await seedTenant('org-ld-cx-vac').then(
+          async (base) => {
             const banco = await prisma.cuenta.create({
               data: {
                 organizationId: base.orgId,
@@ -719,7 +719,8 @@ describe('Libro Diario (e2e)', () => {
               },
             });
             return { ...base, bancoId: banco.id };
-          });
+          },
+        );
 
         const res = await request(app.getHttpServer())
           .get('/api/libros/diario')
@@ -939,6 +940,154 @@ describe('Libro Diario (e2e)', () => {
 
       expect(res.status).toBe(422);
       expect(res.body.error?.code).toBe('LIBRO_DIARIO_RANGO_EXCEDIDO');
+    });
+
+    describe('el filtro por cuentaId se aplica al tope (REQ-LD-16)', () => {
+      // El tope cuenta lo mismo que lista (buildWhere único). Con el filtro de
+      // cuenta, el count se reduce a los asientos que tocan esa cuenta: una cuenta
+      // que aparece en más asientos que el tope da 422; una bajo el tope da 200,
+      // aunque el rango completo lo supere.
+      // El cleanup (beforeEach) borra la BD antes de cada test, así que la siembra
+      // va DENTRO de cada `it` (no en beforeAll). Slug distinto por test.
+      async function seedTopePorCuenta(slug: string): Promise<{
+        token: string;
+        cajaId: string;
+        bancoId: string;
+      }> {
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const owner = await prismaTope.user.create({
+          data: { email: `owner+${slug}@ld.bo`, hashedPassword, isEmailVerified: true },
+        });
+        const org = await prismaTope.organization.create({
+          data: {
+            slug,
+            name: `Org ${slug}`,
+            memberships: { create: { userId: owner.id, systemRole: SystemRole.OWNER } },
+          },
+        });
+
+        const loginRes = await request(appTope.getHttpServer())
+          .post('/api/auth/login')
+          .send({ email: `owner+${slug}@ld.bo`, password: 'password123' });
+        const token = loginRes.body.accessToken as string;
+
+        await request(appTope.getHttpServer())
+          .post('/api/gestiones')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ year: 2026 });
+
+        const [caja, ventas, banco] = await Promise.all([
+          prismaTope.cuenta.create({
+            data: {
+              organizationId: org.id,
+              codigoInterno: '1.1.1.010',
+              nombre: 'Caja MN',
+              claseCuenta: ClaseCuenta.ACTIVO,
+              naturaleza: NaturalezaCuenta.DEUDORA,
+              nivel: 4,
+              esDetalle: true,
+            },
+          }),
+          prismaTope.cuenta.create({
+            data: {
+              organizationId: org.id,
+              codigoInterno: '4.1.1.010',
+              nombre: 'Ventas',
+              claseCuenta: ClaseCuenta.INGRESO,
+              naturaleza: NaturalezaCuenta.ACREEDORA,
+              nivel: 4,
+              esDetalle: true,
+            },
+          }),
+          prismaTope.cuenta.create({
+            data: {
+              organizationId: org.id,
+              codigoInterno: '1.1.2.010',
+              nombre: 'Banco MN',
+              claseCuenta: ClaseCuenta.ACTIVO,
+              naturaleza: NaturalezaCuenta.DEUDORA,
+              nivel: 4,
+              esDetalle: true,
+            },
+          }),
+        ]);
+        const periodo = await prismaTope.periodoFiscal.findFirstOrThrow({
+          where: { organizationId: org.id, year: 2026, month: 1 },
+        });
+
+        // Asiento 1: caja + ventas. Asiento 2: caja + banco.
+        // → caja toca 2 asientos (supera tope=1); ventas y banco tocan 1 (bajo tope).
+        const contraCuentas = [ventas.id, banco.id];
+        for (let i = 1; i <= 2; i++) {
+          const comp = await prismaTope.comprobante.create({
+            data: {
+              organizationId: org.id,
+              tipo: TipoComprobante.DIARIO,
+              estado: EstadoComprobante.CONTABILIZADO,
+              numero: `D2601-00001${i}`,
+              fechaContable: new Date(`2026-01-0${i}T00:00:00Z`),
+              periodoFiscalId: periodo.id,
+              glosa: 'Asiento tope por cuenta',
+              totalDebitoBob: 1000,
+              totalCreditoBob: 1000,
+              createdByUserId: 'e2e-tope-cta',
+            },
+          });
+          await prismaTope.lineaComprobante.createMany({
+            data: [
+              {
+                organizationId: org.id,
+                comprobanteId: comp.id,
+                orden: 1,
+                cuentaId: caja.id,
+                moneda: Moneda.BOB,
+                debito: 1000,
+                credito: 0,
+                debitoBob: 1000,
+                creditoBob: 0,
+              },
+              {
+                organizationId: org.id,
+                comprobanteId: comp.id,
+                orden: 2,
+                cuentaId: contraCuentas[i - 1]!,
+                moneda: Moneda.BOB,
+                debito: 0,
+                credito: 1000,
+                debitoBob: 0,
+                creditoBob: 1000,
+              },
+            ],
+          });
+        }
+
+        return { token, cajaId: caja.id, bancoId: banco.id };
+      }
+
+      it('422 cuando la cuenta filtrada aparece en más asientos que el tope', async () => {
+        // cuentaId=caja → 2 asientos > límite 1 → 422.
+        const { token, cajaId } = await seedTopePorCuenta('org-ld-tope-caja');
+        const res = await request(appTope.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31', cuentaId: cajaId });
+
+        expect(res.status).toBe(422);
+        expect(res.body.error?.code).toBe('LIBRO_DIARIO_RANGO_EXCEDIDO');
+      });
+
+      it('200 cuando la cuenta filtrada queda bajo el tope aunque el rango total lo supere', async () => {
+        // cuentaId=banco → 1 asiento = límite 1, no lo supera → 200, pese a que el
+        // rango completo (2 asientos) sí superaría el tope sin el filtro.
+        const { token, bancoId } = await seedTopePorCuenta('org-ld-tope-banco');
+        const res = await request(appTope.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-01-31', cuentaId: bancoId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(1);
+      });
     });
   });
 });
