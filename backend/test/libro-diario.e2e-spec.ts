@@ -492,6 +492,310 @@ describe('Libro Diario (e2e)', () => {
   });
 
   // ============================================================
+  // REQ-LD-12..16: filtro por cuentaId
+  // ============================================================
+
+  describe('filtro por cuentaId (REQ-LD-12..16)', () => {
+    /** Extiende seedTenant con: cuenta agrupadora + 3er cuenta de detalle + 3 asientos */
+    async function seedTenantConFiltro(slug: string) {
+      const base = await seedTenant(slug);
+
+      // Cuenta agrupadora (esDetalle=false)
+      const agrupadora = await prisma.cuenta.create({
+        data: {
+          organizationId: base.orgId,
+          codigoInterno: '1.1',
+          nombre: 'Caja y Bancos (agrupadora)',
+          claseCuenta: ClaseCuenta.ACTIVO,
+          naturaleza: NaturalezaCuenta.DEUDORA,
+          nivel: 2,
+          esDetalle: false,
+        },
+      });
+
+      // 3ra cuenta de detalle (para asiento 3 — sin cajaId)
+      const banco = await prisma.cuenta.create({
+        data: {
+          organizationId: base.orgId,
+          codigoInterno: '1.1.2.001',
+          nombre: 'Banco MN',
+          claseCuenta: ClaseCuenta.ACTIVO,
+          naturaleza: NaturalezaCuenta.DEUDORA,
+          nivel: 4,
+          esDetalle: true,
+        },
+      });
+
+      // Asiento 1: cajaId + ventasId
+      const a1 = await crearAsientoContabilizado(
+        base.orgId,
+        base.periodoEneroId,
+        base.cajaId,
+        base.ventasId,
+        '2026-01-05',
+      );
+      // Asiento 2: cajaId + bancoId
+      const a2 = await prisma.comprobante.create({
+        data: {
+          organizationId: base.orgId,
+          tipo: TipoComprobante.DIARIO,
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: `D2601-000002`,
+          fechaContable: new Date('2026-01-06T00:00:00Z'),
+          periodoFiscalId: base.periodoEneroId,
+          glosa: 'Asiento 2 caja+banco',
+          totalDebitoBob: 500,
+          totalCreditoBob: 500,
+          createdByUserId: 'e2e-filtro',
+        },
+      });
+      await prisma.lineaComprobante.createMany({
+        data: [
+          {
+            organizationId: base.orgId,
+            comprobanteId: a2.id,
+            orden: 1,
+            cuentaId: base.cajaId,
+            moneda: Moneda.BOB,
+            debito: 500,
+            credito: 0,
+            debitoBob: 500,
+            creditoBob: 0,
+          },
+          {
+            organizationId: base.orgId,
+            comprobanteId: a2.id,
+            orden: 2,
+            cuentaId: banco.id,
+            moneda: Moneda.BOB,
+            debito: 0,
+            credito: 500,
+            debitoBob: 0,
+            creditoBob: 500,
+          },
+        ],
+      });
+      // Asiento 3: ventasId + bancoId (sin cajaId)
+      const a3 = await prisma.comprobante.create({
+        data: {
+          organizationId: base.orgId,
+          tipo: TipoComprobante.DIARIO,
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: `D2601-000003`,
+          fechaContable: new Date('2026-01-07T00:00:00Z'),
+          periodoFiscalId: base.periodoEneroId,
+          glosa: 'Asiento 3 ventas+banco',
+          totalDebitoBob: 300,
+          totalCreditoBob: 300,
+          createdByUserId: 'e2e-filtro',
+        },
+      });
+      await prisma.lineaComprobante.createMany({
+        data: [
+          {
+            organizationId: base.orgId,
+            comprobanteId: a3.id,
+            orden: 1,
+            cuentaId: base.ventasId,
+            moneda: Moneda.BOB,
+            debito: 300,
+            credito: 0,
+            debitoBob: 300,
+            creditoBob: 0,
+          },
+          {
+            organizationId: base.orgId,
+            comprobanteId: a3.id,
+            orden: 2,
+            cuentaId: banco.id,
+            moneda: Moneda.BOB,
+            debito: 0,
+            credito: 300,
+            debitoBob: 0,
+            creditoBob: 300,
+          },
+        ],
+      });
+
+      return {
+        ...base,
+        agrupadoraId: agrupadora.id,
+        bancoId: banco.id,
+        a1Id: a1.id,
+        a2Id: a2.id,
+        a3Id: a3.id,
+      };
+    }
+
+    describe('validación de cuenta (REQ-LD-13, REQ-LD-14)', () => {
+      it('404 con LIBRO_DIARIO_CUENTA_NO_ENCONTRADA si el cuentaId no existe', async () => {
+        const { token, periodoEneroId } = await seedTenant('org-ld-cx-404');
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({
+            periodoFiscalId: periodoEneroId,
+            cuentaId: 'a1b2c3d4-e5f6-4a7b-8c9d-000000000000',
+          });
+
+        expect(res.status).toBe(404);
+        expect(res.body.error?.code).toBe('LIBRO_DIARIO_CUENTA_NO_ENCONTRADA');
+      });
+
+      it('400 con LIBRO_DIARIO_CUENTA_NO_DETALLE si la cuenta es agrupadora (esDetalle=false)', async () => {
+        const { token, periodoEneroId, agrupadoraId } = await seedTenantConFiltro('org-ld-cx-400');
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId, cuentaId: agrupadoraId });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error?.code).toBe('LIBRO_DIARIO_CUENTA_NO_DETALLE');
+      });
+
+      it('404 con LIBRO_DIARIO_CUENTA_NO_ENCONTRADA si el cuentaId pertenece a otro tenant (no fuga cross-tenant)', async () => {
+        const tenantA = await seedTenant('org-ld-cx-ta');
+        const tenantB = await seedTenant('org-ld-cx-tb');
+
+        // Token de A, cuentaId de B → 404 (mismo que inexistente)
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${tenantA.token}`)
+          .query({
+            periodoFiscalId: tenantA.periodoEneroId,
+            cuentaId: tenantB.cajaId, // cuenta de otro tenant
+          });
+
+        expect(res.status).toBe(404);
+        expect(res.body.error?.code).toBe('LIBRO_DIARIO_CUENTA_NO_ENCONTRADA');
+      });
+    });
+
+    describe('happy path (REQ-LD-12, REQ-LD-15)', () => {
+      it('200 con 2 asientos al filtrar por cajaId (asientos 1 y 2)', async () => {
+        const { token, periodoEneroId, cajaId, a1Id, a2Id } =
+          await seedTenantConFiltro('org-ld-cx-hp2');
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId, cuentaId: cajaId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(2);
+        const ids = res.body.asientos.map((a: { id: string }) => a.id);
+        expect(ids).toContain(a1Id);
+        expect(ids).toContain(a2Id);
+      });
+
+      it('cada asiento retornado tiene TODAS sus líneas (Opción A — REQ-LD-15)', async () => {
+        const { token, periodoEneroId, cajaId } = await seedTenantConFiltro('org-ld-cx-opa');
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId, cuentaId: cajaId });
+
+        expect(res.status).toBe(200);
+        // Asiento 1 tiene 2 líneas (caja + ventas) — NO solo la de caja
+        const asiento1 = res.body.asientos[0];
+        expect(asiento1.lineas.length).toBeGreaterThanOrEqual(2);
+      });
+
+      it('cuenta sin movimientos en el rango → 200 con asientos vacíos', async () => {
+        const { token, periodoEneroId, bancoId } = await seedTenant('org-ld-cx-vac')
+          .then(async (base) => {
+            const banco = await prisma.cuenta.create({
+              data: {
+                organizationId: base.orgId,
+                codigoInterno: '1.1.2.001',
+                nombre: 'Banco MN sin movimientos',
+                claseCuenta: ClaseCuenta.ACTIVO,
+                naturaleza: NaturalezaCuenta.DEUDORA,
+                nivel: 4,
+                esDetalle: true,
+              },
+            });
+            return { ...base, bancoId: banco.id };
+          });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId, cuentaId: bancoId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(0);
+        expect(res.body.totalDebeBob).toBe('0.00');
+        expect(res.body.totalHaberBob).toBe('0.00');
+      });
+    });
+
+    describe('regresión — sin cuentaId comportamiento idéntico (REQ-LD-12)', () => {
+      it('sin cuentaId → retorna los 3 asientos del seed', async () => {
+        const { token, periodoEneroId } = await seedTenantConFiltro('org-ld-cx-reg');
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(3);
+      });
+    });
+
+    describe('incluirAnulados + cuentaId', () => {
+      it('asiento anulado con cajaId excluido por default', async () => {
+        const { token, periodoEneroId, cajaId, ventasId, orgId } =
+          await seedTenant('org-ld-cx-anul');
+
+        // Asiento normal
+        await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-05');
+        // Asiento anulado
+        await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-06', {
+          anulado: true,
+          numero: 'D2601-000099',
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({ periodoFiscalId: periodoEneroId, cuentaId: cajaId });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(1);
+        expect(res.body.asientos[0].anulado).toBe(false);
+      });
+
+      it('con incluirAnulados=true → asiento anulado con cajaId incluido', async () => {
+        const { token, periodoEneroId, cajaId, ventasId, orgId } =
+          await seedTenant('org-ld-cx-ainc');
+
+        await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-05');
+        await crearAsientoContabilizado(orgId, periodoEneroId, cajaId, ventasId, '2026-01-06', {
+          anulado: true,
+          numero: 'D2601-000099',
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/libros/diario')
+          .set('Authorization', `Bearer ${token}`)
+          .query({
+            periodoFiscalId: periodoEneroId,
+            cuentaId: cajaId,
+            incluirAnulados: 'true',
+          });
+
+        expect(res.status).toBe(200);
+        expect(res.body.asientos).toHaveLength(2);
+      });
+    });
+  });
+
+  // ============================================================
   // REQ-LD-10: tope defensivo 422
   // ============================================================
 
