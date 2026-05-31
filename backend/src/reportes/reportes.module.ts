@@ -6,20 +6,25 @@ import { CuentasReaderModule } from '@/cuentas/cuentas-reader.module';
 import { PeriodosReaderModule } from '@/periodos-fiscales/periodos-reader.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
+import { PrismaBalanceReaderAdapter } from './adapters/prisma-balance-reader.adapter';
 import { PrismaComprobantesReaderAdapter } from './adapters/prisma-comprobantes-reader.adapter';
 import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-reader.adapter';
+import { BalanceGeneralService } from './balance-general.service';
+import { EeffController } from './eeff.controller';
 import { LibroDiarioService } from './libro-diario.service';
 import { LibroMayorService } from './libro-mayor.service';
+import { BALANCE_READER_PORT } from './ports/balance-reader.port';
 import { COMPROBANTES_READER_PORT } from './ports/comprobantes-reader.port';
 import { LIBRO_MAYOR_READER_PORT } from './ports/libro-mayor-reader.port';
 import { ReportesController } from './reportes.controller';
 
 /**
- * Módulo `reportes` — capabilities Libro Diario + Libro Mayor.
+ * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General (EEFF).
  *
  * DI:
  *   - `ComprobantesReaderPort` → `PrismaComprobantesReaderAdapter` (Diario)
  *   - `LibroMayorReaderPort` → `PrismaLibroMayorReaderAdapter` (Mayor, $queryRaw JOIN)
+ *   - `BalanceReaderPort` → `PrismaBalanceReaderAdapter` (Balance, $queryRaw GROUP BY + findMany)
  *   - `PeriodosReaderPort` → importado de `PeriodosReaderModule` (leaf module §3.7)
  *   - `RbacModule` → guards de permisos
  *
@@ -36,7 +41,7 @@ import { ReportesController } from './reportes.controller';
     // de ciclo CJS prod, memoria prod-build-crash-ciclos).
     CuentasReaderModule,
   ],
-  controllers: [ReportesController],
+  controllers: [ReportesController, EeffController],
   providers: [
     PrismaService,
     TenantContextService,
@@ -55,6 +60,14 @@ import { ReportesController } from './reportes.controller';
     {
       provide: LIBRO_MAYOR_READER_PORT,
       useExisting: PrismaLibroMayorReaderAdapter,
+    },
+
+    // Service + Adapter Balance General: $queryRaw GROUP BY saldos + findMany estructura.
+    BalanceGeneralService,
+    PrismaBalanceReaderAdapter,
+    {
+      provide: BALANCE_READER_PORT,
+      useExisting: PrismaBalanceReaderAdapter,
     },
   ],
 })
