@@ -115,6 +115,22 @@ describe('CuentaAutocomplete', () => {
     expect(screen.getByText('Caja Chica')).toBeInTheDocument();
   });
 
+  it('muestra el nombre antes que el código en el trigger (el nombre es prioritario)', () => {
+    setupMock();
+    render(<CuentaAutocomplete value="uuid-1" onChange={vi.fn()} />);
+    const trigger = screen.getByRole('combobox');
+    const texto = trigger.textContent ?? '';
+    // El dominio habla el idioma del negocio: el contador lee "Caja Chica",
+    // no "1.1.01". El nombre va primero; el código pasa a sufijo atenuado.
+    expect(texto.indexOf('Caja Chica')).toBeLessThan(texto.indexOf('1.1.01'));
+  });
+
+  it('también muestra el código de la cuenta seleccionada en el trigger', () => {
+    setupMock();
+    render(<CuentaAutocomplete value="uuid-1" onChange={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('1.1.01');
+  });
+
   it('expone código y nombre completos en el title del trigger (tooltip al hover)', () => {
     setupMock();
     render(<CuentaAutocomplete value="uuid-1" onChange={vi.fn()} />);

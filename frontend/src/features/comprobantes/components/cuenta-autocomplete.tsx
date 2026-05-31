@@ -86,10 +86,13 @@ export function CuentaAutocomplete({
           <span className="truncate text-left min-w-0 flex-1">
             {selected !== undefined ? (
               <>
-                <span className="font-mono text-xs mr-2 text-muted-foreground">
+                {/* El dominio habla el idioma del negocio: el contador lee el
+                    nombre, no el código. El nombre va primero y, si algo se
+                    trunca, se trunca el código (que el tooltip completa). */}
+                {selected.nombre}
+                <span className="font-mono text-xs ml-2 text-muted-foreground">
                   {selected.codigoInterno}
                 </span>
-                {selected.nombre}
               </>
             ) : (
               placeholder
@@ -99,7 +102,10 @@ export function CuentaAutocomplete({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="p-0 w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)]"
+        // Ancho mínimo propio (no hereda el del trigger): en celdas/filtros
+        // angostos el trigger es chico, pero al elegir necesitamos leer el
+        // nombre completo. min-w-[20rem] da aire; max-w evita desbordar mobile.
+        className="p-0 min-w-[20rem] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)]"
         align="start"
       >
         <Command
@@ -138,7 +144,9 @@ export function CuentaAutocomplete({
                     <span className="font-mono text-xs mr-2 text-muted-foreground shrink-0">
                       {cuenta.codigoInterno}
                     </span>
-                    <span className="truncate">{cuenta.nombre}</span>
+                    {/* line-clamp-2: el nombre envuelve hasta 2 líneas en vez
+                        de truncarse — el usuario lee el nombre completo al elegir. */}
+                    <span className="line-clamp-2">{cuenta.nombre}</span>
                   </CommandItem>
                 );
               })}
