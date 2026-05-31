@@ -83,9 +83,14 @@ export class PrismaComprobantesReaderAdapter extends ComprobantesReaderPort {
   }
 
   private buildWhere(tenantId: string, filtros: LibroDiarioFiltros) {
-    // Defense in depth (CLAUDE.md §4.2): organizationId SIEMPRE en el where.
+    // Defense in depth (CLAUDE.md §4.2): organizationId SIEMPRE primer predicado.
     // No confiamos en que el caller ya lo filtró.
     const anulados = filtros.incluirAnulados ? {} : { anulado: false };
+    // Opción A (REQ-LD-12, REQ-LD-15): el asiento entra si ALGUNA de sus líneas toca la
+    // cuenta filtrada. El select/include de líneas NO se poda por este filtro `some` —
+    // Prisma retorna el asiento COMPLETO con todas sus líneas.
+    const filtroCuenta =
+      filtros.cuentaId !== undefined ? { lineas: { some: { cuentaId: filtros.cuentaId } } } : {};
 
     return {
       organizationId: tenantId,
@@ -95,6 +100,7 @@ export class PrismaComprobantesReaderAdapter extends ComprobantesReaderPort {
         lte: filtros.fechaHasta,
       },
       ...anulados,
+      ...filtroCuenta,
     };
   }
 }

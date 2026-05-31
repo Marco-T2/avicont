@@ -57,6 +57,7 @@ export class ReportesController {
       ...(query.fechaDesde !== undefined ? { fechaDesde: query.fechaDesde } : {}),
       ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
+      ...(query.cuentaId !== undefined ? { cuentaId: query.cuentaId } : {}),
     });
   }
 

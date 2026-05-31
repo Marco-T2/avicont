@@ -28,6 +28,8 @@ export interface LibroDiarioFiltros {
   fechaHasta: Date;
   /** Si true, incluye comprobantes con anulado=true. Default false. */
   incluirAnulados: boolean;
+  /** Si presente, solo asientos con ≥1 línea en esta cuenta (Opción A — REQ-LD-12). */
+  cuentaId?: string;
 }
 
 /**

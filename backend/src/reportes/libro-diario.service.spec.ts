@@ -3,8 +3,11 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { ConfigService } from '@nestjs/config';
 
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
+import type { CuentasReaderLookupPort } from '@/cuentas/ports/cuentas-reader-lookup.port';
 
 import {
+  CuentaNoDetalleError,
+  CuentaNoEncontradaError,
   FiltroRequeridoError,
   PeriodoNoEncontradoError,
   RangoExcedeLimiteError,
@@ -23,6 +26,7 @@ type MockComprobantesReader = {
 type MockPeriodosReader = {
   [K in keyof Pick<PeriodosReaderPort, 'obtenerRangoFechas'>]: jest.Mock;
 };
+type MockCuentasReaderLookup = jest.Mocked<CuentasReaderLookupPort>;
 
 function makeComprobantesReaderMock(): MockComprobantesReader {
   return {
@@ -35,6 +39,16 @@ function makePeriodosReaderMock(): MockPeriodosReader {
   return {
     obtenerRangoFechas: jest.fn(),
   };
+}
+
+function makeCuentasReaderLookupMock(): MockCuentasReaderLookup {
+  return {
+    obtenerCuentaDetalle: jest.fn(),
+  } as unknown as MockCuentasReaderLookup;
+}
+
+function makeCuentaDetalle(overrides: Partial<{ id: string; esDetalle: boolean }> = {}) {
+  return { id: 'cuenta-detalle-1', esDetalle: true, ...overrides };
 }
 
 // ============================================================
@@ -92,13 +106,16 @@ describe('LibroDiarioService (unit)', () => {
   let service: LibroDiarioService;
   let comprobantesReader: MockComprobantesReader;
   let periodosReader: MockPeriodosReader;
+  let cuentasReaderLookup: MockCuentasReaderLookup;
 
   beforeEach(() => {
     comprobantesReader = makeComprobantesReaderMock();
     periodosReader = makePeriodosReaderMock();
+    cuentasReaderLookup = makeCuentasReaderLookupMock();
     service = new LibroDiarioService(
       comprobantesReader as unknown as ComprobantesReaderPort,
       periodosReader as unknown as PeriodosReaderPort,
+      cuentasReaderLookup as unknown as CuentasReaderLookupPort,
       makeConfigService(),
     );
   });
@@ -228,6 +245,136 @@ describe('LibroDiarioService (unit)', () => {
           fechaDesde: '2026-01-01',
           fechaHasta: '2026-12-31',
           incluirAnulados: false,
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  // ============================================================
+  // Validación de cuenta (REQ-LD-12..16)
+  // ============================================================
+
+  describe('validación de cuenta (REQ-LD-12..16)', () => {
+    it('sin cuentaId → obtenerCuentaDetalle NO es llamado, filtros sin cuentaId', async () => {
+      comprobantesReader.contarAsientos.mockResolvedValue(1);
+      comprobantesReader.obtenerAsientosParaLibroDiario.mockResolvedValue([makeRowAsiento()]);
+
+      await service.consultarLibroDiario(TENANT_ID, {
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-01-31',
+        incluirAnulados: false,
+      });
+
+      expect(cuentasReaderLookup.obtenerCuentaDetalle).not.toHaveBeenCalled();
+      expect(comprobantesReader.contarAsientos).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.not.objectContaining({ cuentaId: expect.anything() }),
+      );
+    });
+
+    it('cuentaId + cuenta inexistente (lookup null) → CuentaNoEncontradaError, contarAsientos NO llamado', async () => {
+      cuentasReaderLookup.obtenerCuentaDetalle.mockResolvedValue(null);
+
+      await expect(
+        service.consultarLibroDiario(TENANT_ID, {
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-01-31',
+          incluirAnulados: false,
+          cuentaId: 'cuenta-inexistente-uuid',
+        }),
+      ).rejects.toThrow(CuentaNoEncontradaError);
+
+      expect(comprobantesReader.contarAsientos).not.toHaveBeenCalled();
+    });
+
+    it('cuentaId + cuenta agrupadora (esDetalle=false) → CuentaNoDetalleError, contarAsientos NO llamado', async () => {
+      cuentasReaderLookup.obtenerCuentaDetalle.mockResolvedValue(
+        makeCuentaDetalle({ esDetalle: false }),
+      );
+
+      await expect(
+        service.consultarLibroDiario(TENANT_ID, {
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-01-31',
+          incluirAnulados: false,
+          cuentaId: 'cuenta-agrupadora-uuid',
+        }),
+      ).rejects.toThrow(CuentaNoDetalleError);
+
+      expect(comprobantesReader.contarAsientos).not.toHaveBeenCalled();
+    });
+
+    it('cuentaId + cuenta de detalle válida → contarAsientos con filtros que incluyen cuentaId', async () => {
+      const cuentaId = 'cuenta-detalle-uuid';
+      cuentasReaderLookup.obtenerCuentaDetalle.mockResolvedValue(
+        makeCuentaDetalle({ id: cuentaId, esDetalle: true }),
+      );
+      comprobantesReader.contarAsientos.mockResolvedValue(1);
+      comprobantesReader.obtenerAsientosParaLibroDiario.mockResolvedValue([makeRowAsiento()]);
+
+      await service.consultarLibroDiario(TENANT_ID, {
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-01-31',
+        incluirAnulados: false,
+        cuentaId,
+      });
+
+      expect(cuentasReaderLookup.obtenerCuentaDetalle).toHaveBeenCalledWith(TENANT_ID, cuentaId);
+      expect(comprobantesReader.contarAsientos).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ cuentaId }),
+      );
+      expect(comprobantesReader.obtenerAsientosParaLibroDiario).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ cuentaId }),
+      );
+    });
+
+    it('tope defensivo con cuentaId: cuenta filtrada supera tope → RangoExcedeLimiteError (REQ-LD-16)', async () => {
+      const cuentaId = 'cuenta-detalle-uuid';
+      const serviceConTope = new LibroDiarioService(
+        comprobantesReader as unknown as ComprobantesReaderPort,
+        periodosReader as unknown as PeriodosReaderPort,
+        cuentasReaderLookup as unknown as CuentasReaderLookupPort,
+        makeConfigService(2),
+      );
+
+      cuentasReaderLookup.obtenerCuentaDetalle.mockResolvedValue(
+        makeCuentaDetalle({ id: cuentaId }),
+      );
+      comprobantesReader.contarAsientos.mockResolvedValue(3); // supera tope de 2
+
+      await expect(
+        serviceConTope.consultarLibroDiario(TENANT_ID, {
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-01-31',
+          incluirAnulados: false,
+          cuentaId,
+        }),
+      ).rejects.toThrow(RangoExcedeLimiteError);
+    });
+
+    it('tope defensivo con cuentaId: cuenta filtrada por debajo del tope → 200 (REQ-LD-16)', async () => {
+      const cuentaId = 'cuenta-detalle-uuid';
+      const serviceConTope = new LibroDiarioService(
+        comprobantesReader as unknown as ComprobantesReaderPort,
+        periodosReader as unknown as PeriodosReaderPort,
+        cuentasReaderLookup as unknown as CuentasReaderLookupPort,
+        makeConfigService(5),
+      );
+
+      cuentasReaderLookup.obtenerCuentaDetalle.mockResolvedValue(
+        makeCuentaDetalle({ id: cuentaId }),
+      );
+      comprobantesReader.contarAsientos.mockResolvedValue(3); // bajo tope de 5
+      comprobantesReader.obtenerAsientosParaLibroDiario.mockResolvedValue([makeRowAsiento()]);
+
+      await expect(
+        serviceConTope.consultarLibroDiario(TENANT_ID, {
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-01-31',
+          incluirAnulados: false,
+          cuentaId,
         }),
       ).resolves.toBeDefined();
     });
