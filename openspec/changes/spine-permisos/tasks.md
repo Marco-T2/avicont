@@ -153,7 +153,7 @@ Owner: backend-lead
 
 ---
 
-- [ ] **3.1** Agregar `MePermissionsResponse` a `frontend/src/types/api.ts`
+- [x] **3.1** Agregar `MePermissionsResponse` a `frontend/src/types/api.ts`
   - Cubre REQ-MP-01 (shape del DTO)
   - Agregar interfaz al final del archivo:
     ```ts
@@ -165,14 +165,14 @@ Owner: backend-lead
     ```
   - **Recordatorio G-4**: verificar con grep
 
-- [ ] **3.2** RED — Tests del objeto `PERMISSIONS` y de la función api
+- [x] **3.2** RED — Tests del objeto `PERMISSIONS` y de la función api
   - Archivo nuevo: `frontend/src/features/permissions/lib/permissions.test.ts`
   - Tests en español (funciones puras, sin render):
     - `describe('PERMISSIONS')`: los keys de EEFF, libro-diario, libro-mayor están definidos correctamente (exactamente `contabilidad.eeff.read`, `contabilidad.libro-diario.read`, `contabilidad.libro-mayor.read`)
     - Confirmar que los strings coinciden con el catálogo del backend (`CATALOGO_PERMISOS` en `backend/src/common/permisos/catalogo.ts`)
   - Ejecutar: `cd frontend && pnpm exec vitest run src/features/permissions/lib/permissions.test.ts` → **RED**
 
-- [ ] **3.3** GREEN — Crear `frontend/src/features/permissions/lib/permissions.ts`
+- [x] **3.3** GREEN — Crear `frontend/src/features/permissions/lib/permissions.ts`
   - Cubre REQ-FPG-01 (objeto central de constantes)
   - Objeto `PERMISSIONS` con claves semánticas:
     ```ts
@@ -186,12 +186,12 @@ Owner: backend-lead
     ```
   - Verificar: `cd frontend && pnpm exec vitest run src/features/permissions/lib/permissions.test.ts` → **GREEN**
 
-- [ ] **3.4** Crear `frontend/src/features/permissions/api/get-me-permissions.ts`
+- [x] **3.4** Crear `frontend/src/features/permissions/api/get-me-permissions.ts`
   - Cubre REQ-MP-03 (fuente única)
   - Función pura que llama a `api.get<MePermissionsResponse>('/api/me/permissions')` y devuelve `res.data`
   - Sin lógica adicional — la función es solo el fetcher
 
-- [ ] **3.5** RED — Tests del hook `usePermissions` en `frontend/src/features/permissions/hooks/use-permissions.test.tsx`
+- [x] **3.5** RED — Tests del hook `usePermissions` en `frontend/src/features/permissions/hooks/use-permissions.test.tsx`
   - Cubre REQ-FPG-01, REQ-FPG-02 (invalidación por tenant)
   - Tests en español con `renderHook` + QueryClientProvider wrapper:
     - Si `activeTenantId` no está en el store → la query está deshabilitada (`{ enabled: false }`)
@@ -203,7 +203,7 @@ Owner: backend-lead
   - **Recordatorio G-7**: no usar `useWatch` ni hooks inline en JSX — los helpers van en `const` dentro de `renderHook`
   - Ejecutar: `cd frontend && pnpm exec vitest run src/features/permissions/hooks/use-permissions.test.tsx` → **RED**
 
-- [ ] **3.6** GREEN — Crear `frontend/src/features/permissions/hooks/use-permissions.ts`
+- [x] **3.6** GREEN — Crear `frontend/src/features/permissions/hooks/use-permissions.ts`
   - Cubre REQ-FPG-01, REQ-FPG-02
   - Importa `useAuthStore` para leer `activeTenantId`
   - `useQuery`:
@@ -231,7 +231,7 @@ Owner: backend-lead
 
 ---
 
-- [ ] **4.1** RED — Tests de `<Can>` en `frontend/src/features/permissions/components/can.test.tsx`
+- [x] **4.1** RED — Tests de `<Can>` en `frontend/src/features/permissions/components/can.test.tsx`
   - Cubre REQ-FPG-03 (ocultar sin permiso)
   - Tests en español:
     - Con `isOwner: true` → renderiza children
@@ -241,7 +241,7 @@ Owner: backend-lead
   - Mockear `use-permissions` hook para inyectar el estado deseado
   - Ejecutar: `cd frontend && pnpm exec vitest run src/features/permissions/components/can.test.tsx` → **RED**
 
-- [ ] **4.2** GREEN — Crear `frontend/src/features/permissions/components/can.tsx`
+- [x] **4.2** GREEN — Crear `frontend/src/features/permissions/components/can.tsx`
   - Cubre REQ-FPG-03
   - Props: `permission: string`, `children: React.ReactNode`
   - Llama a `usePermissions().has(permission)` — si no tiene permiso retorna `null`
@@ -249,7 +249,7 @@ Owner: backend-lead
   - **NO** tiene modo "disable" — ese es responsabilidad de `<PermissionButton>`
   - Ejecutar: verde en el test anterior
 
-- [ ] **4.3** RED — Tests de `<PermissionButton>` en `frontend/src/features/permissions/components/permission-button.test.tsx`
+- [x] **4.3** RED — Tests de `<PermissionButton>` en `frontend/src/features/permissions/components/permission-button.test.tsx` (implementado como render-prop de Can en su lugar — ver D-F2)
   - Cubre REQ-FPG-04 (deshabilitar con tooltip)
   - Tests en español:
     - Con permiso → renderiza `<Button>` habilitado, sin tooltip wrapper
@@ -258,7 +258,7 @@ Owner: backend-lead
     - Con `isOwner: true` → button habilitado aunque se pase cualquier permiso
   - Ejecutar: `cd frontend && pnpm exec vitest run src/features/permissions/components/permission-button.test.tsx` → **RED**
 
-- [ ] **4.4** GREEN — Crear `frontend/src/features/permissions/components/permission-button.tsx`
+- [x] **4.4** GREEN — Crear `frontend/src/features/permissions/components/permission-button.tsx` (cubierto por render-prop de Can — design D-F2 descartó PermissionButton)
   - Cubre REQ-FPG-04
   - Props: extiende props de `Button` de shadcn + `permission: string`
   - Llama a `usePermissions().has(permission)`
@@ -268,11 +268,11 @@ Owner: backend-lead
   - **Recordatorio G-7**: `const { has } = usePermissions()` declarado como const antes del return, nunca inline en JSX
   - Ejecutar: verde en el test anterior
 
-- [ ] **4.5** Crear barrel export `frontend/src/features/permissions/index.ts`
+- [x] **4.5** Crear barrel export `frontend/src/features/permissions/index.ts` (no creado — design usó src/lib/ y src/components/shared/ como ubicación final; componentes exportados desde sus paths canónicos)
   - Re-exporta: `PERMISSIONS`, `usePermissions`, `Can`, `PermissionButton`
   - Facilita imports cross-feature: `import { Can, PermissionButton } from '@/features/permissions'`
 
-- [ ] **4.6** Typecheck frontend
+- [x] **4.6** Typecheck frontend
   - `cd frontend && pnpm exec tsc -b` → 0 errores
   - `cd frontend && pnpm exec vitest run src/features/permissions/` → todos los tests de la feature GREEN
 
@@ -286,7 +286,7 @@ Owner: backend-lead
 
 ---
 
-- [ ] **5.1** RED — Tests de `NavList` con filtrado por permiso en `frontend/src/components/nav-list.test.tsx`
+- [x] **5.1** RED — Tests de `NavList` con filtrado por permiso en `frontend/src/components/nav-list.test.tsx`
   - Cubre REQ-FPG-05 (filtrado de nav)
   - Tests en español:
     - Ítem sin `requiredPermission` → siempre visible
@@ -296,7 +296,7 @@ Owner: backend-lead
   - Mockear `use-permissions` para controlar el retorno de `has()`
   - Ejecutar: `cd frontend && pnpm exec vitest run src/components/nav-list.test.tsx` → **RED**
 
-- [ ] **5.2** GREEN — Extender `NavItem` con `requiredPermission?`
+- [x] **5.2** GREEN — Extender `NavItem` con `requiredPermission?`
   - Archivo: `frontend/src/components/nav-items.ts`
   - Agregar campo opcional `requiredPermission?: string` a la interfaz `NavItem`
   - Agregar `requiredPermission` a los ítems pertinentes del array `NAV_ITEMS`:
@@ -306,18 +306,18 @@ Owner: backend-lead
     - Estado de Resultados → `requiredPermission: PERMISSIONS.contabilidad.eeff.read`
   - **Recordatorio G-4**: verificar con `grep 'requiredPermission' frontend/src/components/nav-items.ts`
 
-- [ ] **5.3** GREEN — Filtrar `NavList` por permisos
+- [x] **5.3** GREEN — Filtrar `NavList` por permisos
   - Archivo: `frontend/src/components/nav-list.tsx`
   - Importar `usePermissions` del barrel `@/features/permissions`
   - Llamar `const { has } = usePermissions()` al inicio de `NavList` (**Recordatorio G-7**: const antes del return)
   - En el map: si `item.requiredPermission && !has(item.requiredPermission)` → no renderizar el item
   - Ejecutar el test de la tarea 5.1 → **GREEN**
 
-- [ ] **5.4** Verificar que `NavList` en estado loading no flashea ítems que luego desaparecen
+- [x] **5.4** Verificar que `NavList` en estado loading no flashea ítems que luego desaparecen
   - Durante carga de `usePermissions` (`isLoading: true`), `has()` devuelve `false` → los ítems con `requiredPermission` permanecen ocultos hasta que cargue
   - Confirmar en test que si `isLoading: true`, los ítems con permiso requerido NO se muestran
 
-- [ ] **5.5** Typecheck + vitest frontend
+- [x] **5.5** Typecheck + vitest frontend
   - `cd frontend && pnpm exec tsc -b` → 0 errores
   - `cd frontend && pnpm exec vitest run` → suite completa verde
 
@@ -331,7 +331,7 @@ Owner: backend-lead
 
 ---
 
-- [ ] **6.1** RED — Tests de `<RequirePermission>` en `frontend/src/features/permissions/components/require-permission.test.tsx`
+- [x] **6.1** RED — Tests de `<RequirePermission>` en `frontend/src/features/permissions/components/require-permission.test.tsx`
   - Cubre REQ-FPG-06 (wrapper de ruta con vista inline)
   - Tests en español:
     - Con permiso → renderiza `children`
@@ -341,7 +341,7 @@ Owner: backend-lead
     - En loading → NO renderiza children NI vista de error (muestra skeleton/spinner)
   - Ejecutar: `cd frontend && pnpm exec vitest run src/features/permissions/components/require-permission.test.tsx` → **RED**
 
-- [ ] **6.2** GREEN — Crear `frontend/src/features/permissions/components/require-permission.tsx`
+- [x] **6.2** GREEN — Crear `frontend/src/features/permissions/components/require-permission.tsx`
   - Cubre REQ-FPG-06
   - Props: `permission: string`, `children: React.ReactNode`
   - Llama a `const { has, isLoading } = usePermissions()`
@@ -359,7 +359,7 @@ Owner: backend-lead
   - Agregar a barrel export de `@/features/permissions`
   - Ejecutar: verde en el test anterior
 
-- [ ] **6.3** Wrappear páginas de reportes en el router con `<RequirePermission>`
+- [x] **6.3** Wrappear páginas de reportes en el router con `<RequirePermission>`
   - Archivo: `frontend/src/routes/router.tsx`
   - Cuatro rutas afectadas:
     - `/eeff/balance` → envolver `<BalanceGeneralPage />` con `<RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>`
@@ -369,17 +369,17 @@ Owner: backend-lead
   - **Recordatorio G-4**: verificar con `grep 'RequirePermission' frontend/src/routes/router.tsx`
   - Los componentes de página no cambian internamente — el gate es en el wrapper del router
 
-- [ ] **6.4** Invalidar la query `me-permissions` al hacer switch de tenant
+- [x] **6.4** Invalidar la query `me-permissions` al hacer switch de tenant
   - Archivo: wherever el switch-tenant se ejecuta (`features/tenants/` o `stores/`)
   - Buscar dónde se llama al endpoint `POST /api/auth/switch-tenant` → en el callback de éxito, llamar `queryClient.invalidateQueries({ queryKey: ['me-permissions'] })`
   - Cubre REQ-FPG-02 (riesgo de permisos stale por cambio de tenant)
   - **Recordatorio G-4**: verificar con grep que el `invalidateQueries` quedó en el archivo correcto
 
-- [ ] **6.5** Tests de regresión sidebar: los ítems sin `requiredPermission` siguen visibles
+- [x] **6.5** Tests de regresión sidebar: los ítems sin `requiredPermission` siguen visibles
   - Verificar que `NAV_ITEMS` sin `requiredPermission` (Panel, Plan de cuentas, Comprobantes, etc.) nunca se filtran, independientemente del estado del hook
   - Test en `nav-list.test.tsx` si no estaba cubierto ya en 5.1
 
-- [ ] **6.6** Verificación final — typecheck + lint + vitest + tsc
+- [x] **6.6** Verificación final — typecheck + lint + vitest + tsc
   - `cd frontend && pnpm exec tsc -b` → 0 errores (typechequea project refs incluyendo tests)
   - `cd frontend && pnpm exec vitest run` → toda la suite verde
   - `cd backend && pnpm run lint && pnpm exec tsc --noEmit -p tsconfig.json` → limpio
