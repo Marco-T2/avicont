@@ -202,3 +202,27 @@ El spec acepta el 403 genérico como alternativa. La implementación eligió ser
 3. **Post-merge (drift docs):** Actualizar spec REQ-FG-06 y design D-F1 con el queryKey real `['me-permissions', activeTenantId]`.
 4. **Siguiente iteración:** Corregir `PERMISSIONS.contabilidad.comprobantes.*` → `contabilidad.asientos.*` y `contabilidad.cuentas.read` → `contabilidad.plan-cuentas.read` antes de usar en gating real.
 5. **Deuda futura:** Agregar test de disable+tooltip con render-prop de `<Can>` para REQ-FG-03.
+
+---
+
+## Corrección post-verify (orquestador, 2026-05-31)
+
+**WARNING-1 era INCORRECTO en parte.** El sub-hallazgo "`TenantContextService` es
+dead code, removerlo" se intentó y **rompió el e2e (7/7 fail)**: Nest no podía
+resolver `PrismaService (MetricsService, ?)`. `TenantContextService` es el segundo
+parámetro (opcional) del constructor de `PrismaService`; al declarar `PrismaService`
+como provider propio de `MeModule`, Nest necesita ese token en el contexto del
+módulo para instanciarlo. **NO es dead code** — se restauró (commit `fix(me): restore
+TenantContextService provider`). El resto de WARNING-1 (deviación Prisma en el
+controller para distinguir membresía inactiva) sigue siendo ACEPTABLE.
+
+**SUGGESTION-2 (strings inexistentes en el catálogo) SÍ era correcto y se corrigió:**
+`PERMISSIONS.contabilidad.comprobantes.*` (no existe; el catálogo usa `asientos.*`)
+eliminado, y `cuentas.read` → `planCuentas.read` (`contabilidad.plan-cuentas.read`).
+Verificado que los 3 permisos realmente gateados (`libro-diario.read`,
+`libro-mayor.read`, `eeff.read`) SÍ existen en el catálogo.
+
+**SUGGESTION-1 (JSDoc "wildcards") corregido:** el backend devuelve strings exactos
+expandidos; JSDoc de `api.ts` y `me-permissions.ts` actualizado.
+
+Verde final: backend tsc 0 / lint 0 / me e2e 7/7; frontend tsc -b 0 / lint 0 / vitest 742/742.
