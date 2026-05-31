@@ -960,3 +960,51 @@ export interface LibroMayorResponse {
   /** Suma de todos los haberBob del rango, de todas las cuentas. */
   totalHaberBob: string;
 }
+
+// ============================================================
+// Balance General (Estado de Situación Financiera) — GET /api/eeff/balance
+// Espejo del BalanceResponseDto del backend (montos string §4.5,
+// fechaCorte YYYY-MM-DD §4.6). Las ramas vacías ya vienen podadas (REQ-BG-15).
+// ============================================================
+
+export interface CuentaBalance {
+  /** null en la línea sintética del Resultado del Ejercicio. */
+  cuentaId: string | null;
+  /** null en la línea sintética. */
+  codigoInterno: string | null;
+  nombre: string;
+  nivel: number;
+  esContraria: boolean;
+  /** true solo para "Resultado del Ejercicio (en curso)". */
+  esSintetica: boolean;
+  saldoBob: string;
+}
+
+export interface SubseccionBalance {
+  subClaseCuenta: string;
+  titulo: string;
+  cuentas: CuentaBalance[];
+  totalBob: string;
+}
+
+export interface SeccionBalance {
+  claseCuenta: string;
+  titulo: string;
+  subsecciones: SubseccionBalance[];
+  totalBob: string;
+}
+
+export interface BalanceGeneralResponse {
+  fechaCorte: string;
+  gestionId: string;
+  activo: SeccionBalance;
+  pasivo: SeccionBalance;
+  patrimonio: SeccionBalance;
+  resultadoEjercicioBob: string;
+  totalActivoBob: string;
+  totalPasivoBob: string;
+  totalPatrimonioBob: string;
+  /** true si |Activo − (Pasivo + Patrimonio)| ≤ ±Bs 0.01 (REQ-BG-11). */
+  cuadra: boolean;
+  diferenciaBob: string;
+}
