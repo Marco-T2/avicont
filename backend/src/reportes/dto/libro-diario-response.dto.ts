@@ -7,6 +7,7 @@
 
 import { Decimal } from '@prisma/client/runtime/library';
 
+import { formatFechaContable } from '../fecha-contable';
 import type { ComprobanteLibroDiarioRow } from '../ports/comprobantes-reader.port';
 
 // ============================================================
@@ -53,18 +54,6 @@ export interface LibroDiarioResponseDto {
 // ============================================================
 // Mapper: filas Prisma → DTO (design decisión #1)
 // ============================================================
-
-/**
- * Formatea una fecha Date a "YYYY-MM-DD" usando UTC para evitar desfases de TZ.
- * FechaContable es @db.Date → Prisma lo devuelve como Date UTC con hora 00:00:00Z.
- * (CLAUDE.md §4.6)
- */
-function formatFechaContable(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 /**
  * Convierte un Decimal de Prisma a string con 2 decimales fijos.

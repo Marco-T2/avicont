@@ -29,6 +29,7 @@ import {
   MovimientoMayorRow,
   SaldoInicialRow,
 } from './ports/libro-mayor-reader.port';
+import { parseFechaContable } from './fecha-contable';
 
 /** Nombre de la variable de entorno para el tope de movimientos (REQ-LM-12). */
 export const LIBRO_MAYOR_MAX_MOVIMIENTOS_ENV = 'LIBRO_MAYOR_MAX_MOVIMIENTOS';
@@ -110,8 +111,15 @@ export class LibroMayorService {
       fechaDesde = rangoResu.desde;
       fechaHasta = rangoResu.hasta;
     } else {
-      fechaDesde = parseFechaContable(query.fechaDesde!);
-      fechaHasta = parseFechaContable(query.fechaHasta!);
+      // parseFechaContable devuelve null ante fechas calendario imposibles
+      // (ej. 2026-02-30, que el @Matches del DTO deja pasar por solo validar forma).
+      const desdeParsed = parseFechaContable(query.fechaDesde!);
+      const hastaParsed = parseFechaContable(query.fechaHasta!);
+      if (!desdeParsed || !hastaParsed) {
+        throw new RangoInvalidoError(query.fechaDesde!, query.fechaHasta!);
+      }
+      fechaDesde = desdeParsed;
+      fechaHasta = hastaParsed;
 
       // REQ-LM-01: fechaDesde ≤ fechaHasta
       if (fechaDesde > fechaHasta) {
@@ -318,20 +326,4 @@ export class LibroMayorService {
       totalHaberBob,
     };
   }
-}
-
-/**
- * Parsea "YYYY-MM-DD" a Date UTC (§4.6 CLAUDE.md — FechaContable calendario puro).
- * No usa `new Date(string)` directamente — el parse de ISO sin hora es implementation-defined.
- * Construimos explícitamente en UTC.
- *
- * PROHIBIDO en domain/service: `new Date()` para fecha hoy (§4.6); este helper
- * parsea fechas provistas por el cliente, no genera "hoy".
- */
-function parseFechaContable(fecha: string): Date {
-  const [yearStr, monthStr, dayStr] = fecha.split('-');
-  const year = parseInt(yearStr ?? '0', 10);
-  const month = parseInt(monthStr ?? '0', 10) - 1; // 0-indexed
-  const day = parseInt(dayStr ?? '0', 10);
-  return new Date(Date.UTC(year, month, day));
 }

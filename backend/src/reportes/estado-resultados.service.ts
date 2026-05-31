@@ -14,33 +14,7 @@ import { construirEstadoResultados } from './domain/resultados-arbol';
 import type { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
 import { toEstadoResultadosResponse } from './dto/eeff-resultados-response.dto';
 import { EEFF_SALDOS_READER_PORT, EeffSaldosReaderPort } from './ports/eeff-saldos-reader.port';
-
-/**
- * Parsea "YYYY-MM-DD" a Date UTC (§4.6 CLAUDE.md — FechaContable calendario puro).
- * Construimos explícitamente en UTC para evitar parse implementation-defined.
- * PROHIBIDO usar new Date(string) directamente en domain/service (§4.6).
- * Este helper parsea fechas provistas por el cliente, no genera "hoy".
- *
- * Retorna null si la cadena no tiene el formato esperado o los valores no son válidos.
- */
-function parseFechaContable(fecha: string): Date | null {
-  if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
-
-  const parts = fecha.split('-');
-  const year = parseInt(parts[0] ?? '0', 10);
-  const month = parseInt(parts[1] ?? '0', 10) - 1; // 0-indexed
-  const day = parseInt(parts[2] ?? '0', 10);
-
-  if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
-
-  const date = new Date(Date.UTC(year, month, day));
-  // Validar que la fecha resultante tiene los mismos valores (evita fechas como 2026-02-30)
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
-    return null;
-  }
-
-  return date;
-}
+import { parseFechaContable } from './fecha-contable';
 
 @Injectable()
 export class EstadoResultadosService {
