@@ -1,8 +1,8 @@
 # Design — Libros: filtro por cuenta (Diario + Mayor)
 
 <!--
-Última edición: 2026-05-30
-Última revisión contra core: 2026-05-30
+Última edición: 2026-05-31
+Última revisión contra core: 2026-05-31
 Owner: backend-lead
 -->
 
@@ -60,55 +60,166 @@ y (2) completa el cableado del filtro de cuenta del Libro Mayor en el frontend (
 
 ## Decisiones
 
-### D1 — Lookup de cuenta en el Diario: reutilizar `LibroMayorReaderPort.obtenerCuentaDetalle` (NO importar `CuentasModule`, NO crear port nuevo)
+### D1 — Lookup de cuenta en el Diario: crear un leaf `CuentasReaderModule` propio del dominio Cuenta (opción c)
 
 El `LibroDiarioService` necesita validar la cuenta (existe en tenant + `esDetalle`) antes de
-filtrar. Tres opciones reales (no asumidas — el código las habilita a todas):
+filtrar. Cuatro opciones reales (el código las habilita a todas):
 
-- **(a) Consumir `CuentasReaderPort`** del módulo `cuentas` (el dueño del dominio Cuenta, ya
-  exporta el port) vía `obtenerBatch([cuentaId])`. `reportes.module.ts` importaría `CuentasModule`.
+- **(a) Consumir `CuentasReaderPort`** del módulo `cuentas` vía `obtenerBatch([cuentaId])`.
+  `reportes.module.ts` importaría `CuentasModule` entero.
 - **(b) Reutilizar `LibroMayorReaderPort.obtenerCuentaDetalle`** (vive en `reportes`, mismo
-  bounded context, ya devuelve `{ id, esDetalle } | null` — justo lo que el Diario necesita).
-- **(c) Crear un leaf `CuentasReaderModule`** (espejo de `PeriodosReaderModule`) que exporte solo
-  el port sin arrastrar `CuentasService`/repo/seeder, e importarlo en `reportes`.
+  bounded context, ya devuelve `{ id, esDetalle } | null`). El Diario inyectaría el port del Mayor.
+- **(c) Crear un leaf `CuentasReaderModule`** (espejo exacto de `PeriodosReaderModule`) que exporte
+  SOLO un `CuentasReaderPort` de lookup por id (`obtenerCuentaDetalle`) sin arrastrar
+  `CuentasService`/repo/seeder/movimientos. Lo importan los reportes que lo necesiten.
+- **(d) Agregar `obtenerCuentaDetalle` al propio `ComprobantesReaderPort`** del Diario y
+  reimplementar el `findFirst` en `PrismaComprobantesReaderAdapter`.
 
-**Decisión: (b)** para ESTE change, con (c) anotada como deuda recomendada.
+**Decisión: (c).** El Diario consume un `CuentasReaderPort` honesto desde un leaf
+`CuentasReaderModule` nuevo; en ESTE change solo se cablea el Diario (el Mayor NO se migra —
+queda como deuda con disparador explícito).
 
 **Tradeoffs:**
 
-- **(a)** es la opción "de libro" (consumir al dueño del dominio, §3.7) PERO arrastra problemas:
-  primero, el contrato no encaja — `obtenerBatch` devuelve un `Map` pensado para validar lotes de
-  líneas, no un lookup por id (encaje forzado). Segundo, `CuentasModule` registra `CuentasService`,
-  `CUENTA_REPOSITORY_PORT`, `CUENTA_READER_PORT`, `PLAN_CUENTAS_SEEDER_PORT`, `MOVIMIENTOS_READER_PORT`
-  y más. Importarlo entero a `reportes` infla el grafo de DI y reintroduce exactamente el riesgo de
-  **ciclo de carga CJS en prod** que la memoria `prod-build-crash-ciclos` documenta (los e2e no lo
-  agarran; crashea en `node dist/main.js`). El patrón vigente en `reportes` evita importar módulos
-  pesados — usa leaf modules (`PeriodosReaderModule`).
-- **(c)** resuelve el acople de (a) limpiamente (leaf module = solo el port, sin servicios — espejo
-  exacto de `PeriodosReaderModule`: `providers: [PrismaService, TenantContextService, adapter, {provide: PORT, useExisting: adapter}]`,
-  `exports: [PORT]`), y es la solución correcta a mediano plazo. Cuesta un archivo nuevo + un binding
-  + un método de lookup por id en el port/adapter. NO se elige ahora porque el Mayor YA reimplementó
-  el lookup por id en su propio adapter (hallazgo #2) y replicar la validación con (b) es **cero
-  código de infraestructura nuevo**. Introducir (c) en este change mezclaría un refactor de acceso a
-  cuentas con el feature de filtro — scope creep.
-- **(b)** es pragmática y barata: el `LibroDiarioService` inyecta `LibroMayorReaderPort` y llama
-  `obtenerCuentaDetalle(tenantId, cuentaId)`. Cero infraestructura nueva, cero riesgo de ciclo.
+- **(a) descartada.** El contrato no encaja: `obtenerBatch` devuelve un `Map` pensado para validar
+  LOTES de líneas de comprobante, no un lookup puntual por id (encaje forzado). Peor: `CuentasModule`
+  registra `CuentasService`, `CUENTA_REPOSITORY_PORT`, `CUENTA_READER_PORT`, `PLAN_CUENTAS_SEEDER_PORT`,
+  `MOVIMIENTOS_READER_PORT` y más. Importarlo entero a `reportes` infla el grafo de DI y reintroduce
+  exactamente el riesgo de **ciclo de carga CJS en prod** que la memoria `prod-build-crash-ciclos`
+  documenta (los e2e NO lo agarran; crashea en `node dist/main.js`). El patrón vigente en `reportes`
+  es justamente evitar módulos pesados usando leaf modules.
 
-**Por qué (b) NO viola hexagonal (§3.7):** el Diario consume un **port abstracto**, no Prisma ni
-un adapter. Que el port viva en `reportes` y se llame "Mayor" es deuda de naming, no de
-arquitectura — ambos reportes están en el **mismo bounded context** (`reportes`), y §3.7 habilita
-inyección directa / port compartido dentro del mismo módulo.
+- **(b) descartada — miente en el boundary de DI.** Pragmática y barata en código, pero el
+  `LibroDiarioService` terminaría inyectando `LIBRO_MAYOR_READER_PORT` bajo una propiedad
+  `cuentasReader` con un comentario que pide disculpas (ver el constructor que proponía D2 en la
+  versión anterior). El TIPO dice "Mayor reader", el uso dice "cuentas reader": **mentira semántica
+  en el grafo de inyección**. Esto no es deuda de naming cosmética — es el contrato de DI mintiendo
+  sobre qué consume el Diario. Síntoma concreto: cuando se fue a implementar, `tasks.md` se desvió
+  SILENCIOSAMENTE a (d) en vez de (b) — señal de que (b) no sobrevive al contacto con el código.
+  Además acopla la capability Diario a la capability Mayor sin razón de dominio: si mañana el Mayor
+  cambia la firma de `obtenerCuentaDetalle`, rompe el Diario sin que nada en el dominio lo justifique.
 
-**Deuda registrada (no bloqueante, anotar en `docs/deudas-arquitecturales.md`):** consolidar el
-acceso a Cuenta en `reportes`. Opción preferida: crear `CuentasReaderModule` leaf (c) y migrar
-AMBOS reportes (Mayor y Diario) a consumir `CuentasReaderPort` del dueño del dominio, eliminando el
-`obtenerCuentaDetalle` reimplementado en el adapter del Mayor. Disparador: tercer consumidor de
-lectura de cuenta en `reportes`, o el primer refactor que toque el adapter del Mayor.
+- **(d) descartada — duplica y contamina.** Reimplementar `prisma.cuenta.findFirst({ where: { id,
+  organizationId }, select: { id, esDetalle } })` en `PrismaComprobantesReaderAdapter` DUPLICA
+  byte-por-byte el mismo lookup que ya vive en el adapter del Mayor (verificado en
+  `prisma-libro-mayor-reader.adapter.ts:329-347`) — dos `findFirst` idénticos en dos adapters del
+  MISMO módulo. Y obliga a que `ComprobantesReaderPort` — cuyo header documenta que su razón de ser
+  es "lee comprobantes" — pase a leer también cuentas. Dos smells (duplicación + port con doble
+  responsabilidad) para esquivar un archivo nuevo.
 
-### D2 — Inyección y naming en el service del Diario
+- **(c) elegida.** Es un leaf module de ~2 archivos que ESPEJA `PeriodosReaderModule`
+  (`providers: [PrismaService, TenantContextService, adapter, {provide: PORT, useExisting: adapter}]`,
+  `exports: [PORT]`) — un patrón ya bendecido en este repo precisamente para consumir un dominio
+  ajeno sin arrastrar su módulo pesado ni cerrar ciclos CJS. Da un `CuentasReaderPort` HONESTO: el
+  Diario inyecta algo que dice "cuentas" y ES cuentas. Cero duplicación nueva respecto del Diario,
+  cero mentira semántica, cero riesgo de ciclo. **El esfuerzo es comparable a (d)** — ambas agregan
+  un método de lookup con su `findFirst`; la diferencia es que (c) lo pone en un port honesto del
+  dominio Cuenta en vez de duplicarlo dentro del port de comprobantes. **No es scope creep:** en este
+  change el Mayor NO se toca (sigue con su `obtenerCuentaDetalle` propio); solo se crea el leaf y se
+  cablea el Diario.
 
-El `LibroDiarioService` recibe `LibroMayorReaderPort` con un nombre de propiedad que documenta la
-intención y un comentario que justifica el préstamo:
+**Por qué (c) respeta hexagonal (§3.2, §3.7):** cruzar la frontera de módulo (`reportes` lee del
+dominio `Cuenta`) se hace vía **port abstracto**, no Prisma ni adapter concreto. El leaf
+`CuentasReaderModule` vive junto al dominio que expone (`cuentas/`) y publica un contrato mínimo de
+solo-lectura — el dueño del dominio controla su superficie pública (§3.7). Es el MISMO patrón con que
+`reportes` consume períodos hoy.
+
+**Deuda registrada (no bloqueante, anotar en `docs/deudas-arquitecturales.md`):** migrar el Libro
+Mayor a consumir el nuevo `CuentasReaderPort` del leaf, eliminando el `obtenerCuentaDetalle`
+reimplementado en `PrismaLibroMayorReaderAdapter` (líneas 329-347). Disparador: el primer refactor
+que toque ese adapter del Mayor, o cuando se quiera unificar el contrato de lectura de cuenta entre
+ambos reportes. Tras esa migración, `CuentaDetalleResult` puede moverse del port del Mayor al port
+del leaf y el Mayor lo importa desde ahí.
+
+### D2 — El leaf `CuentasReaderModule`, el port honesto y la inyección en el Diario
+
+**Nuevo leaf module** `backend/src/cuentas/cuentas-reader.module.ts` — espejo EXACTO de
+`PeriodosReaderModule`. Vive junto al dominio Cuenta (`cuentas/`), expone solo el binding del port:
+
+```typescript
+import { Module } from '@nestjs/common';
+
+import { PrismaService } from '@/common/prisma.service';
+import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
+
+import { PrismaCuentasReaderLookupAdapter } from './adapters/prisma-cuentas-reader-lookup.adapter';
+import { CUENTAS_READER_LOOKUP_PORT } from './ports/cuentas-reader-lookup.port';
+
+// Módulo-puerto cross-módulo: expone SOLO el lookup de cuenta por id (consumido
+// por `reportes` para validar la cuenta del filtro). Vive separado de `CuentasModule`
+// para que `reportes` lo importe sin tirar del require de `cuentas.module.ts` —
+// evita el ciclo de carga CJS en prod (mismo patrón que PeriodosReaderModule).
+@Module({
+  providers: [
+    PrismaService,
+    TenantContextService,
+    PrismaCuentasReaderLookupAdapter,
+    { provide: CUENTAS_READER_LOOKUP_PORT, useExisting: PrismaCuentasReaderLookupAdapter },
+  ],
+  exports: [CUENTAS_READER_LOOKUP_PORT],
+})
+export class CuentasReaderModule {}
+```
+
+**Nuevo port** `backend/src/cuentas/ports/cuentas-reader-lookup.port.ts` — contrato honesto del
+dominio Cuenta para lookup por id. JSDoc obligatorio (port = contrato público, §2.3):
+
+```typescript
+export const CUENTAS_READER_LOOKUP_PORT = Symbol('CUENTAS_READER_LOOKUP_PORT');
+
+/** Resultado del lookup puntual de cuenta por id (existencia + esDetalle). */
+export interface CuentaLookupResult {
+  id: string;
+  esDetalle: boolean;
+}
+
+export abstract class CuentasReaderLookupPort {
+  /**
+   * Busca una cuenta por id dentro del tenant (defense in depth §4.2).
+   * Filtra por organizationId — una cuenta de otro tenant devuelve `null`,
+   * misma respuesta que inexistente (Anti-31: no enumera ids ajenos).
+   *
+   * @param tenantId - organizationId del JWT activo
+   * @param cuentaId - UUID de la cuenta a verificar
+   */
+  abstract obtenerCuentaDetalle(
+    tenantId: string,
+    cuentaId: string,
+  ): Promise<CuentaLookupResult | null>;
+}
+```
+
+> **Naming (§1):** se usa `CuentasReaderLookupPort` / `CUENTAS_READER_LOOKUP_PORT` (con sufijo
+> `Lookup`) para NO colisionar con el `CuentasReaderPort` / `CUENTAS_READER_PORT` ya existente en
+> `cuentas/ports/cuentas-reader.port.ts` (el del `obtenerBatch`, opción a). Son dos contratos
+> distintos del mismo dominio con propósitos distintos; conviven sin ambigüedad de símbolo.
+
+**Nuevo adapter** `backend/src/cuentas/adapters/prisma-cuentas-reader-lookup.adapter.ts` — el
+`findFirst` scoped por tenant (idéntico en forma al del Mayor, pero ahora ÚNICO y en su lugar
+correcto, dueño del dominio):
+
+```typescript
+@Injectable()
+export class PrismaCuentasReaderLookupAdapter extends CuentasReaderLookupPort {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  override async obtenerCuentaDetalle(
+    tenantId: string,
+    cuentaId: string,
+  ): Promise<CuentaLookupResult | null> {
+    // Defense in depth (§4.2): organizationId en el where. Otro tenant → null.
+    return this.prisma.cuenta.findFirst({
+      where: { id: cuentaId, organizationId: tenantId },
+      select: { id: true, esDetalle: true },
+    });
+  }
+}
+```
+
+**Inyección en el Diario** — el `LibroDiarioService` inyecta un port que dice "cuentas" y ES
+cuentas (sin comentario de disculpa, sin mentira de tipo):
 
 ```typescript
 constructor(
@@ -116,19 +227,17 @@ constructor(
   private readonly comprobantesReader: ComprobantesReaderPort,
   @Inject(PERIODOS_READER_PORT)
   private readonly periodosReader: PeriodosReaderPort,
-  // Reutiliza la validación de cuenta del Mayor (mismo bounded context, design D1).
-  // Deuda: migrar a un CuentasReaderModule leaf compartido.
-  @Inject(LIBRO_MAYOR_READER_PORT)
-  private readonly cuentasReader: LibroMayorReaderPort,
+  @Inject(CUENTAS_READER_LOOKUP_PORT)
+  private readonly cuentasReader: CuentasReaderLookupPort,
   private readonly config: ConfigService,
 ) { ... }
 ```
 
 Llamada: `await this.cuentasReader.obtenerCuentaDetalle(tenantId, query.cuentaId)`.
 
-`reportes.module.ts`: **sin cambios estructurales** — `LIBRO_MAYOR_READER_PORT` ya está registrado
-en el módulo (lo provee `PrismaLibroMayorReaderAdapter`), así que el Diario puede inyectarlo sin
-tocar imports ni providers.
+**`reportes.module.ts`:** agregar `CuentasReaderModule` a `imports` (junto a `PeriodosReaderModule`
+y `RbacModule`). NO se importa `CuentasModule`. El `ComprobantesReaderPort` NO se toca — sigue
+leyendo solo comprobantes. El `LibroMayorReaderPort.obtenerCuentaDetalle` queda intacto (deuda D1).
 
 ### D3 — Semántica del filtro en el Diario: Opción A (asiento completo)
 
@@ -315,17 +424,23 @@ exported `libroDiarioFiltroSchema` discriminatedUnion). Cambios:
 
 ## Archivos afectados
 
-### Backend (`backend/src/reportes/`)
+### Backend (`backend/src/` — paths relativos a `src/`)
 
 | Archivo | Cambio |
 |---------|--------|
-| `ports/comprobantes-reader.port.ts` | + `cuentaId?: string` en `LibroDiarioFiltros` |
-| `adapters/prisma-comprobantes-reader.adapter.ts` | `buildWhere` → `lineas: { some: { cuentaId } }` condicional (afecta count + findMany) |
-| `dto/libro-diario-query.dto.ts` | + `cuentaId?` con `@IsOptional() @IsUUID('4')` |
-| `libro-diario.service.ts` | inyectar `LibroMayorReaderPort`; aceptar `cuentaId?` en `query`; validar cuenta; spread al filtro |
-| `domain/libro-diario-errors.ts` | + `CuentaNoEncontradaError` (404) + `CuentaNoDetalleError` (400) |
+| `cuentas/ports/cuentas-reader-lookup.port.ts` | **NUEVO** — `CuentasReaderLookupPort` + `CUENTAS_READER_LOOKUP_PORT` + `CuentaLookupResult` |
+| `cuentas/adapters/prisma-cuentas-reader-lookup.adapter.ts` | **NUEVO** — `findFirst` scoped por tenant (`id`, `esDetalle`) |
+| `cuentas/cuentas-reader.module.ts` | **NUEVO** — leaf module (espejo de `PeriodosReaderModule`), exporta el port |
+| `reportes/reportes.module.ts` | + `CuentasReaderModule` en `imports` (NO `CuentasModule`) |
+| `reportes/ports/comprobantes-reader.port.ts` | + `cuentaId?: string` en `LibroDiarioFiltros` (NO se agrega método de lookup — sigue leyendo solo comprobantes) |
+| `reportes/adapters/prisma-comprobantes-reader.adapter.ts` | `buildWhere` → `lineas: { some: { cuentaId } }` condicional (afecta count + findMany) |
+| `reportes/dto/libro-diario-query.dto.ts` | + `cuentaId?` con `@IsOptional() @IsUUID('4')` |
+| `reportes/libro-diario.service.ts` | inyectar `CuentasReaderLookupPort`; aceptar `cuentaId?` en `query`; validar cuenta; spread al filtro |
+| `reportes/domain/libro-diario-errors.ts` | + `CuentaNoEncontradaError` (404) + `CuentaNoDetalleError` (400) |
 
-> `reportes.module.ts` **sin cambios** (LIBRO_MAYOR_READER_PORT ya registrado). **Sin migración.**
+> **Sin migración** (índice `@@index([organizationId, cuentaId])` ya existe).
+> `PrismaComprobantesReaderAdapter` **NO** gana un `obtenerCuentaDetalle` — el lookup vive en el
+> nuevo leaf de `cuentas`, no duplicado en el adapter de comprobantes (decisión D1, descarta opción d).
 > `libro-diario.controller.ts`: el `cuentaId` del DTO se propaga vía el spread existente del query
 > al service — verificar en apply que el controller pase `cuentaId` (probable spread condicional ya
 > presente; si arma el objeto campo por campo, agregar `cuentaId`).
@@ -348,8 +463,8 @@ Coverage objetivo dominio contable: **95%** (§7.5). Invariantes con caso positi
 
 ### Backend — unit del service (`libro-diario.service.spec.ts`, sin DB)
 
-Mockear `ComprobantesReaderPort`, `PeriodosReaderPort`, `LibroMayorReaderPort` (NUNCA Prisma, §7.8).
-Casos nuevos (los existentes son regresión):
+Mockear `ComprobantesReaderPort`, `PeriodosReaderPort`, `CuentasReaderLookupPort` (NUNCA Prisma,
+§7.8). Casos nuevos (los existentes son regresión):
 
 - `cuentaId` ausente → NO se llama `obtenerCuentaDetalle`; `filtros` sin `cuentaId`.
 - `cuentaId` presente + cuenta existe + `esDetalle=true` → se llama lookup; `filtros` incluye `cuentaId`.
@@ -357,10 +472,10 @@ Casos nuevos (los existentes son regresión):
 - `cuentaId` presente + `esDetalle=false` → `CuentaNoDetalleError` (400); NO se llama listado.
 - orden: rango inválido + `cuentaId` → falla por rango ANTES de validar cuenta.
 
-### Backend — integration del adapter (Postgres real, TX por test)
+### Backend — integration del adapter de comprobantes (Postgres real, TX por test)
 
-Crear `adapters/prisma-comprobantes-reader.adapter.integration.spec.ts` (hoy no existe, hallazgo #5).
-Verifica el `where` real:
+Crear `reportes/adapters/prisma-comprobantes-reader.adapter.integration.spec.ts` (hoy no existe,
+hallazgo #5). Verifica el `where` real del FILTRO (no el lookup de cuenta — ese vive en el leaf):
 
 - asiento que toca la cuenta filtrada → devuelto con **todas** sus líneas (Opción A, anti-poda).
 - asiento que NO toca la cuenta → excluido.
@@ -368,6 +483,17 @@ Verifica el `where` real:
 - **multi-tenant (§4.2, obligatorio caso + y −):** asiento de OTRO `organizationId` con la misma
   `cuentaId` → excluido.
 - combinación `cuentaId` + rango + anulados → AND correcto.
+
+### Backend — integration del adapter del leaf de cuentas (Postgres real, TX por test)
+
+Crear `cuentas/adapters/prisma-cuentas-reader-lookup.adapter.integration.spec.ts`. Verifica el
+lookup por id scoped al tenant (la pieza que antes la opción d hubiera duplicado en el adapter de
+comprobantes):
+
+- cuenta de detalle del tenant → `{ id, esDetalle: true }`.
+- cuenta agrupadora del tenant → `{ id, esDetalle: false }`.
+- UUID inexistente → `null`.
+- **multi-tenant (§4.2):** cuenta de OTRO tenant → `null` (Anti-31, no enumera ids ajenos).
 
 ### Backend — e2e (`test/libro-diario.e2e-spec.ts`, HTTP real)
 
@@ -397,15 +523,18 @@ Verifica el `where` real:
 | Fuga multi-tenant vía `cuentaId` de otro tenant | Alto (seguridad §4.2) | `organizationId` primer predicado en `buildWhere` Y en `obtenerCuentaDetalle`; integration + e2e de aislamiento |
 | `lineas: { some }` podara líneas del select | Bajo | Prisma NO poda relaciones seleccionadas por `some`; integration spec lo verifica explícitamente |
 | `total` (count) ≠ página si el `where` difiere | Medio | `buildWhere` única fuente; integration compara count vs list |
-| Importar `CuentasModule` reintroduce ciclo CJS prod | Evitado | D1 elige reutilizar el port del mismo módulo; NO se importa `CuentasModule` |
-| Naming confuso: Diario inyecta `LibroMayorReaderPort` | Bajo | Comentario en constructor + deuda registrada (D1) |
+| Importar `CuentasModule` reintroduce ciclo CJS prod | Evitado | D1 elige leaf `CuentasReaderModule` (espejo `PeriodosReaderModule`); NO se importa `CuentasModule` |
+| Lookup de cuenta duplicado entre Mayor y leaf nuevo | Bajo (transitorio) | En este change el Mayor NO se migra; el `findFirst` queda duplicado a propósito hasta la deuda D1 (disparador: refactor del adapter del Mayor). El leaf es la fuente única a futuro |
+| Colisión de símbolo con `CUENTAS_READER_PORT` existente | Bajo | Nombre nuevo `CUENTAS_READER_LOOKUP_PORT` + `CuentasReaderLookupPort` (sufijo `Lookup`) — sin colisión |
 | UX del Mayor: ¿cuenta obligatoria u opcional? | Bajo | Diseño deja `cuentaId` opcional (no rompe backend); confirmar UX en apply si se quiere forzar |
 | Brief desactualizado (schema Mayor "ya tiene cuentaId") | Resuelto | Verificado: schema Mayor NO tiene cuentaId; D6 lo agrega |
 
 ## Notas anti-drift contra el core
 
-- §3.7 (cross-module → port): respetado — el Diario consume un port abstracto del mismo bounded
-  context; se evita conscientemente importar `CuentasModule` (riesgo de ciclo, memoria prod-crash).
+- §3.2 / §3.7 (cross-module → port): respetado — el Diario consume un port abstracto del dominio
+  Cuenta (`CuentasReaderLookupPort`) vía un leaf module (`CuentasReaderModule`), patrón ya
+  establecido con `PeriodosReaderModule`. Se evita conscientemente importar `CuentasModule` (riesgo
+  de ciclo CJS, memoria prod-crash) y se evita la mentira semántica de inyectar el port del Mayor.
 - §4.2 (multi-tenant): `organizationId` primer predicado en todas las queries nuevas; lookup de
   cuenta scoped por tenant.
 - §6.3 (códigos de error): namespace `LIBRO_DIARIO_CUENTA_*` estable y propio.
