@@ -47,7 +47,7 @@ function makeSubseccion(
 
 describe('toEstadoResultadosResponse', () => {
   const rango = {
-    desde: new Date(Date.UTC(2026, 4, 1)),  // 2026-05-01
+    desde: new Date(Date.UTC(2026, 4, 1)), // 2026-05-01
     hasta: new Date(Date.UTC(2026, 4, 31)), // 2026-05-31
   };
 

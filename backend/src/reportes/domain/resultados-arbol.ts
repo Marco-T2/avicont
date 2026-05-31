@@ -73,8 +73,18 @@ export function construirEstadoResultados(
 
   if (cuentasResultado.length === 0) {
     return {
-      ingreso: { claseCuenta: ClaseCuenta.INGRESO, titulo: 'Ingresos', subsecciones: [], totalBob: Money.ZERO },
-      egreso: { claseCuenta: ClaseCuenta.EGRESO, titulo: 'Egresos', subsecciones: [], totalBob: Money.ZERO },
+      ingreso: {
+        claseCuenta: ClaseCuenta.INGRESO,
+        titulo: 'Ingresos',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
+      egreso: {
+        claseCuenta: ClaseCuenta.EGRESO,
+        titulo: 'Egresos',
+        subsecciones: [],
+        totalBob: Money.ZERO,
+      },
       resultadoEjercicioBob: Money.ZERO,
     };
   }

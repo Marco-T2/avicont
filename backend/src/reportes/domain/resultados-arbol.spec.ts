@@ -8,8 +8,6 @@
 import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
-import { Money } from '@/common/domain/money';
-
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
 import { construirEstadoResultados } from './resultados-arbol';
 
@@ -147,7 +145,7 @@ describe('construirEstadoResultados — propagación jerárquica', () => {
 
     const saldos = [
       makeSaldoRango('ing-4101', 0, 20000), // haber 20000
-      makeSaldoRango('ing-4102', 0, 5000),  // haber 5000
+      makeSaldoRango('ing-4102', 0, 5000), // haber 5000
     ];
 
     const arbol = construirEstadoResultados({
@@ -228,7 +226,7 @@ describe('construirEstadoResultados — propagación jerárquica', () => {
       parentId: 'ing-41',
       nivel: 2,
       esDetalle: true,
-      esContraria: true,  // CRÍTICO: devoluciones restan del ingreso
+      esContraria: true, // CRÍTICO: devoluciones restan del ingreso
       claseCuenta: ClaseCuenta.INGRESO,
       subClaseCuenta: SubClaseCuenta.INGRESO_OPERATIVO,
       naturaleza: NaturalezaCuenta.ACREEDORA,
@@ -290,10 +288,7 @@ describe('construirEstadoResultados — propagación jerárquica', () => {
       codigoInterno: '5.1.02',
     });
 
-    const saldos = [
-      makeSaldoRango('egr-costo', 15000, 0),
-      makeSaldoRango('egr-adm', 8000, 0),
-    ];
+    const saldos = [makeSaldoRango('egr-costo', 15000, 0), makeSaldoRango('egr-adm', 8000, 0)];
 
     const arbol = construirEstadoResultados({
       estructura: [agrupador, costoVentas, gastosAdm],
@@ -426,8 +421,8 @@ describe('construirEstadoResultados — Resultado del Ejercicio (REQ-ER-08)', ()
     });
 
     const saldos = [
-      makeSaldoRango('ventas', 0, 50000),  // ACREEDORA: 50000
-      makeSaldoRango('costos', 35000, 0),  // DEUDORA: 35000
+      makeSaldoRango('ventas', 0, 50000), // ACREEDORA: 50000
+      makeSaldoRango('costos', 35000, 0), // DEUDORA: 35000
     ];
 
     const arbol = construirEstadoResultados({
@@ -456,8 +451,8 @@ describe('construirEstadoResultados — Resultado del Ejercicio (REQ-ER-08)', ()
     });
 
     const saldos = [
-      makeSaldoRango('ventas', 0, 20000),  // ACREEDORA: 20000
-      makeSaldoRango('costos', 30000, 0),  // DEUDORA: 30000
+      makeSaldoRango('ventas', 0, 20000), // ACREEDORA: 20000
+      makeSaldoRango('costos', 30000, 0), // DEUDORA: 30000
     ];
 
     const arbol = construirEstadoResultados({
@@ -486,7 +481,7 @@ describe('construirEstadoResultados — Resultado del Ejercicio (REQ-ER-08)', ()
 
     const saldos = [
       makeSaldoRango('activo-caja', 5000, 0), // ACTIVO — debe ignorarse
-      makeSaldoRango('ventas', 0, 10000),      // INGRESO
+      makeSaldoRango('ventas', 0, 10000), // INGRESO
     ];
 
     const arbol = construirEstadoResultados({
@@ -562,10 +557,7 @@ describe('construirEstadoResultados — estructura árbol Ingreso/Egreso (REQ-ER
       codigoInterno: '4.1.01',
     });
 
-    const saldos = [
-      makeSaldoRango('ing-4102', 0, 3000),
-      makeSaldoRango('ing-4101', 0, 7000),
-    ];
+    const saldos = [makeSaldoRango('ing-4102', 0, 3000), makeSaldoRango('ing-4101', 0, 7000)];
 
     const arbol = construirEstadoResultados({
       estructura: [ventas2, ventas1], // orden inverso

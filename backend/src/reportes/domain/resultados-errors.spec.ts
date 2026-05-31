@@ -1,4 +1,8 @@
-import { RangoInvalidoError, PeriodoNoEncontradoError, GestionNoEncontradaError } from './resultados-errors';
+import {
+  RangoInvalidoError,
+  PeriodoNoEncontradoError,
+  GestionNoEncontradaError,
+} from './resultados-errors';
 
 // ============================================================
 // Tests: errores de dominio del Estado de Resultados

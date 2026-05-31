@@ -1,6 +1,10 @@
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
-import { GestionNoEncontradaError, PeriodoNoEncontradoError, RangoInvalidoError } from './domain/resultados-errors';
+import {
+  GestionNoEncontradaError,
+  PeriodoNoEncontradoError,
+  RangoInvalidoError,
+} from './domain/resultados-errors';
 import { EstadoResultadosService } from './estado-resultados.service';
 import type { EeffSaldosReaderPort } from './ports/eeff-saldos-reader.port';
 
@@ -39,7 +43,7 @@ function makePeriodosReaderMock(): MockPeriodosReader {
 const TENANT_ID = 'org-test-1';
 const PERIODO_ID = 'periodo-uuid-1';
 const GESTION_ID = 'gestion-uuid-1';
-const DESDE = new Date(Date.UTC(2026, 4, 1));  // 2026-05-01
+const DESDE = new Date(Date.UTC(2026, 4, 1)); // 2026-05-01
 const HASTA = new Date(Date.UTC(2026, 4, 31)); // 2026-05-31
 
 // ============================================================
@@ -72,9 +76,9 @@ describe('EstadoResultadosService (unit)', () => {
 
   describe('resolución de rango', () => {
     it('sin ninguna forma → RangoInvalidoError (400, REPORTES_RESULTADOS_RANGO_INVALIDO)', async () => {
-      await expect(
-        service.consultarEstadoResultados(TENANT_ID, {}),
-      ).rejects.toThrow(RangoInvalidoError);
+      await expect(service.consultarEstadoResultados(TENANT_ID, {})).rejects.toThrow(
+        RangoInvalidoError,
+      );
     });
 
     it('fechaDesde sin fechaHasta → RangoInvalidoError', async () => {

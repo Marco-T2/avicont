@@ -533,12 +533,26 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
       // Comprobante DENTRO del rango (mayo 2026)
       const fechaDentro = new Date(Date.UTC(2026, 4, 10)); // 2026-05-10
 
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fechaFuera, 10000);
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fechaDentro, 5000);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaFuera,
+        10000,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDentro,
+        5000,
+      );
 
       const saldos = await adapter.obtenerSaldosEnRango(
         tenantA,
-        new Date(Date.UTC(2026, 4, 1)),  // desde 2026-05-01
+        new Date(Date.UTC(2026, 4, 1)), // desde 2026-05-01
         new Date(Date.UTC(2026, 4, 31)), // hasta 2026-05-31
         false,
       );
@@ -552,7 +566,14 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
 
     it('comprobante con fechaContable = fechaDesde SÍ aparece (inclusive desde)', async () => {
       const fechaDesde = new Date(Date.UTC(2026, 4, 1)); // 2026-05-01
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fechaDesde, 3000);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDesde,
+        3000,
+      );
 
       const saldos = await adapter.obtenerSaldosEnRango(
         tenantA,
@@ -568,10 +589,24 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
 
     it('comprobante con fechaContable > fechaHasta NO aparece (flujo puro)', async () => {
       const fechaDentro = new Date(Date.UTC(2026, 4, 10)); // 2026-05-10
-      const fechaFuera = new Date(Date.UTC(2026, 5, 1));  // 2026-06-01 (junio)
+      const fechaFuera = new Date(Date.UTC(2026, 5, 1)); // 2026-06-01 (junio)
 
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fechaDentro, 2000);
-      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fechaFuera, 9000);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaDentro,
+        2000,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fechaFuera,
+        9000,
+      );
 
       const saldos = await adapter.obtenerSaldosEnRango(
         tenantA,

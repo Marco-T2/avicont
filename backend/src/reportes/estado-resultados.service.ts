@@ -5,7 +5,11 @@ import {
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
 
-import { GestionNoEncontradaError, PeriodoNoEncontradoError, RangoInvalidoError } from './domain/resultados-errors';
+import {
+  GestionNoEncontradaError,
+  PeriodoNoEncontradoError,
+  RangoInvalidoError,
+} from './domain/resultados-errors';
 import { construirEstadoResultados } from './domain/resultados-arbol';
 import type { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
 import { toEstadoResultadosResponse } from './dto/eeff-resultados-response.dto';
