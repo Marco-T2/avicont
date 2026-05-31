@@ -1012,12 +1012,12 @@ export interface BalanceGeneralResponse {
 // ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
 // Espejo de MePermissionsResponseDto del backend (backend/src/me/dto/).
-// `permissions` son PATRONES de wildcards (ej. "contabilidad.*"),
-// NO la lista expandida. El frontend usa permission-matcher.ts para evaluarlos.
+// `permissions` son strings de permiso EXACTOS, ya expandidos contra el catálogo
+// por el backend (NO patrones de wildcards).
 // ============================================================
 
 export interface MePermissionsResponse {
-  /** Patrones de wildcards asignados al usuario (ej. ["contabilidad.*"]). */
+  /** Permisos efectivos exactos del usuario (ej. ["contabilidad.eeff.read"]). */
   permissions: string[];
   /** true si el usuario es OWNER o ADMIN (tiene acceso total). */
   isOwner: boolean;
