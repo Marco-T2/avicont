@@ -2,7 +2,7 @@
 
 **Archivado**: 2026-05-31
 **Merge**: PR #75, squash commit `999c38e`
-**Artifact store**: openspec
+**Artifact store**: hybrid
 
 ## Resumen
 
@@ -15,8 +15,9 @@ en Patrimonio, y verificación de ecuación contable.
 ## Lo entregado
 
 - Endpoint `GET /api/eeff/balance?fecha=YYYY-MM-DD` con RBAC (`contabilidad.eeff.read`).
-- Módulo `eeff` con port `BalanceReaderPort`, service `BalanceService`, adapter Prisma
-  `PrismaBalanceReader`, controller `EeffController` y DTO de respuesta `BalanceResponseDto`.
+- Dentro del módulo `reportes`: port `BalanceReaderPort`, service `BalanceGeneralService`,
+  adapter Prisma `PrismaBalanceReaderAdapter`, controller `EeffController` y DTO de
+  respuesta `BalanceResponseDto`.
 - Helper compartido `reportes/domain/saldo-naturaleza.ts` extraído desde el Libro Mayor:
   garantiza que Balance y Mayor usen la misma fórmula de naturaleza (REQ-BG-16).
 - Poda de ramas vacías: hojas con saldo 0, agrupadoras sin descendientes con saldo y
@@ -27,7 +28,7 @@ en Patrimonio, y verificación de ecuación contable.
 
 ## Spec canónica generada
 
-`openspec/specs/reportes/balance-general/spec.md`
+`openspec/specs/balance-general/spec.md`
 
 La spec canónica refleja la implementación real:
 - Codes de error: `REPORTES_BALANCE_FECHA_INVALIDA` y `REPORTES_BALANCE_SIN_GESTION`
@@ -39,7 +40,7 @@ La spec canónica refleja la implementación real:
 
 ## Verify report
 
-`openspec/changes/reportes-balance-general/verify-report.md`
+`openspec/changes/archive/2026-05-31-reportes-balance-general/verify-report.md`
 
 Estado final: **APROBADO_CON_WARNINGS**.
 
@@ -74,5 +75,5 @@ Estado final: **APROBADO_CON_WARNINGS**.
 ## Estado
 
 Implementación completa y verificada en `main` (commit `999c38e`). La spec canónica
-vive en `openspec/specs/reportes/balance-general/spec.md` como fuente de verdad del
+vive en `openspec/specs/balance-general/spec.md` como fuente de verdad del
 contrato API del Balance General.
