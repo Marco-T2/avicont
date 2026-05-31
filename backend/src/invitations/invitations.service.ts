@@ -27,7 +27,9 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
+import { RbacService } from '@/rbac/rbac.service';
 
+import { InvitacionAsignacionOwnerNoPermitidaError } from './domain/invitation-errors';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import {
   INVITATION_REPOSITORY_PORT,
@@ -51,6 +53,7 @@ export class InvitationsService {
     private readonly rbac: PermissionsCacheInvalidationPort,
     @Inject(CUSTOM_ROLES_READER_PORT)
     private readonly customRoles: CustomRolesReaderPort,
+    private readonly rbacService: RbacService,
     private readonly config: ConfigService,
   ) {}
 
@@ -61,6 +64,17 @@ export class InvitationsService {
     dto: CreateInvitationDto,
   ): Promise<{ invitation: Invitation; token: string }> {
     this.assertExactlyOneRoleAssignment(dto.systemRole, dto.customRoleId);
+
+    // Solo un OWNER puede invitar a alguien como OWNER — evita escalada de privilegios.
+    if (dto.systemRole === SystemRole.OWNER) {
+      const { isOwner } = await this.rbacService.resolverPermisosConContexto(
+        inviterId,
+        organizationId,
+      );
+      if (!isOwner) {
+        throw new InvitacionAsignacionOwnerNoPermitidaError();
+      }
+    }
 
     const email = dto.email.toLowerCase().trim();
 
