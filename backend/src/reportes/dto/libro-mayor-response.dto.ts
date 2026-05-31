@@ -12,6 +12,8 @@ import { NaturalezaCuenta } from '@prisma/client';
 
 import { Money } from '@/common/domain/money';
 
+import { formatFechaContable } from '../fecha-contable';
+
 // ============================================================
 // Tipos del DTO de respuesta
 // ============================================================
@@ -103,18 +105,6 @@ export interface CuentaMayorCalculada {
 // ============================================================
 // Helpers de serialización
 // ============================================================
-
-/**
- * Formatea una fecha Date a "YYYY-MM-DD" usando UTC para evitar desfases de TZ.
- * FechaContable es @db.Date → Prisma lo devuelve como Date UTC con hora 00:00:00Z.
- * (CLAUDE.md §4.6)
- */
-export function formatFechaContable(date: Date): string {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 // ============================================================
 // Mapper: CuentaMayorCalculada[] → DTO de respuesta

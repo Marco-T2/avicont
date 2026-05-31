@@ -21,6 +21,7 @@ import {
 import { toLibroDiarioResponse } from './dto/libro-diario-response.dto';
 import type { LibroDiarioResponseDto } from './dto/libro-diario-response.dto';
 import { COMPROBANTES_READER_PORT, ComprobantesReaderPort } from './ports/comprobantes-reader.port';
+import { parseFechaContable } from './fecha-contable';
 
 /** Nombre de la variable de entorno para el tope de asientos (REQ-LD-10). */
 export const LIBRO_DIARIO_MAX_ASIENTOS_ENV = 'LIBRO_DIARIO_MAX_ASIENTOS';
@@ -99,9 +100,16 @@ export class LibroDiarioService {
       fechaDesde = rangoResu.desde;
       fechaHasta = rangoResu.hasta;
     } else {
-      // Parsear fechas string YYYY-MM-DD a Date UTC (FechaContable §4.6)
-      fechaDesde = parseFechaContable(query.fechaDesde!);
-      fechaHasta = parseFechaContable(query.fechaHasta!);
+      // Parsear fechas string YYYY-MM-DD a Date UTC (FechaContable §4.6).
+      // parseFechaContable devuelve null ante fechas calendario imposibles
+      // (ej. 2026-02-30, que el @Matches del DTO deja pasar por solo validar forma).
+      const desdeParsed = parseFechaContable(query.fechaDesde!);
+      const hastaParsed = parseFechaContable(query.fechaHasta!);
+      if (!desdeParsed || !hastaParsed) {
+        throw new RangoInvalidoError(query.fechaDesde!, query.fechaHasta!);
+      }
+      fechaDesde = desdeParsed;
+      fechaHasta = hastaParsed;
 
       // REQ-LD-01: fechaDesde ≤ fechaHasta
       if (fechaDesde > fechaHasta) {
@@ -134,21 +142,4 @@ export class LibroDiarioService {
     const rows = await this.comprobantesReader.obtenerAsientosParaLibroDiario(tenantId, filtros);
     return toLibroDiarioResponse(rows, { desde: fechaDesde, hasta: fechaHasta });
   }
-}
-
-/**
- * Parsea "YYYY-MM-DD" a Date UTC (§4.6 CLAUDE.md — FechaContable calendario puro).
- * No usa `new Date(string)` directamente — el parse de ISO sin hora es implementation-defined
- * en algunos motores (local vs UTC). Construimos explícitamente en UTC.
- *
- * PROHIBIDO en domain/service: `new Date()` para fecha hoy (§4.6); este helper
- * parsea fechas provistas por el cliente, no genera "hoy".
- */
-function parseFechaContable(fecha: string): Date {
-  // "YYYY-MM-DD" → year, month (0-indexed), day
-  const [yearStr, monthStr, dayStr] = fecha.split('-');
-  const year = parseInt(yearStr ?? '0', 10);
-  const month = parseInt(monthStr ?? '0', 10) - 1; // 0-indexed
-  const day = parseInt(dayStr ?? '0', 10);
-  return new Date(Date.UTC(year, month, day));
 }

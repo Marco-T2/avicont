@@ -15,7 +15,7 @@ import type { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
 
 import { Money } from '@/common/domain/money';
 
-import { formatFechaContable } from './balance-response.dto';
+import { formatFechaContable } from '../fecha-contable';
 
 // ============================================================
 // Tipos internos (Money — antes de serializar)

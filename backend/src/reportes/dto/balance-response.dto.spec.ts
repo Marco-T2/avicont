@@ -7,7 +7,7 @@ import type {
   CuentaBalanceCalculada,
   SubseccionCalculada,
 } from './balance-response.dto';
-import { toBalanceResponse, formatFechaContable } from './balance-response.dto';
+import { toBalanceResponse } from './balance-response.dto';
 
 // ============================================================
 // Tests: mapper balance-response.dto
@@ -36,18 +36,6 @@ function makeSubseccion(
 ): SubseccionCalculada {
   return { subClaseCuenta, titulo: subClaseCuenta, cuentas, totalBob: total };
 }
-
-describe('formatFechaContable', () => {
-  it('formatea Date UTC a "YYYY-MM-DD"', () => {
-    const date = new Date(Date.UTC(2026, 4, 31)); // 31-mayo-2026
-    expect(formatFechaContable(date)).toBe('2026-05-31');
-  });
-
-  it('incluye padding de ceros en mes y día', () => {
-    const date = new Date(Date.UTC(2026, 0, 5)); // 05-enero-2026
-    expect(formatFechaContable(date)).toBe('2026-01-05');
-  });
-});
 
 describe('toBalanceResponse', () => {
   const fechaCorte = new Date(Date.UTC(2026, 4, 31)); // 2026-05-31
