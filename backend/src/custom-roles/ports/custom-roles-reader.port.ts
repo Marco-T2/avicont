@@ -24,4 +24,12 @@ export abstract class CustomRolesReaderPort {
    * existencia de IDs cross-tenant.
    */
   abstract belongsToTenant(customRoleId: string, tenantId: string): Promise<boolean>;
+
+  /**
+   * Devuelve los custom roles de la organización ordenados por nombre ASC.
+   * Filtrado en la query del adapter — nunca post-filtrado en el servicio consumidor.
+   */
+  abstract listarAsignablesPorOrg(
+    orgId: string,
+  ): Promise<{ id: string; name: string; slug: string }[]>;
 }

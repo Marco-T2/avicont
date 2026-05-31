@@ -10,6 +10,7 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   type PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
+import { RbacService } from '@/rbac/rbac.service';
 import { USERS_READER_PORT, type UsersReaderPort } from '@/users/ports/users-reader.port';
 
 import {
@@ -22,6 +23,7 @@ import {
   UsuarioNoRegistradoParaInviteError,
   UsuarioYaEsMiembroError,
 } from './domain/membership-errors';
+import { AssignableRoleDto } from './dto/assignable-role.dto';
 import { MembershipsService } from './memberships.service';
 import {
   MEMBERSHIP_REPOSITORY_PORT,
@@ -43,6 +45,7 @@ describe('MembershipsService (unit)', () => {
 
   type RepoMock = jest.Mocked<MembershipRepositoryPort>;
   type RbacMock = jest.Mocked<PermissionsCacheInvalidationPort>;
+  type RbacServiceMock = jest.Mocked<Pick<RbacService, 'resolverPermisosConContexto'>>;
   type CustomRolesMock = jest.Mocked<CustomRolesReaderPort>;
   type UsersReaderMock = jest.Mocked<UsersReaderPort>;
 
@@ -50,6 +53,7 @@ describe('MembershipsService (unit)', () => {
   let repo: RepoMock;
   let tenantContext: { getTenantId: jest.Mock };
   let rbac: RbacMock;
+  let rbacService: RbacServiceMock;
   let customRoles: CustomRolesMock;
   let users: UsersReaderMock;
 
@@ -68,8 +72,12 @@ describe('MembershipsService (unit)', () => {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
       invalidateUsersByCustomRole: jest.fn().mockResolvedValue(undefined),
     } as unknown as RbacMock;
+    rbacService = {
+      resolverPermisosConContexto: jest.fn(),
+    } as unknown as RbacServiceMock;
     customRoles = {
       belongsToTenant: jest.fn(),
+      listarAsignablesPorOrg: jest.fn(),
     } as unknown as CustomRolesMock;
     users = {
       findByEmail: jest.fn(),
@@ -84,6 +92,7 @@ describe('MembershipsService (unit)', () => {
         { provide: USERS_READER_PORT, useValue: users },
         { provide: TenantContextService, useValue: tenantContext },
         { provide: PERMISSIONS_CACHE_INVALIDATION_PORT, useValue: rbac },
+        { provide: RbacService, useValue: rbacService },
       ],
     }).compile();
 
@@ -438,6 +447,106 @@ describe('MembershipsService (unit)', () => {
       await expect(service.leave(TENANT_ID, USER_ID)).rejects.toBeInstanceOf(
         MembershipNoEncontradoError,
       );
+    });
+  });
+
+  // ==========================================================
+  // listarRolesAsignables
+  // ==========================================================
+
+  describe('listarRolesAsignables', () => {
+    const CUSTOM_ROLE_A = { id: 'uuid-a', name: 'Auditor', slug: 'auditor' };
+    const CUSTOM_ROLE_B = { id: 'uuid-b', name: 'Contador', slug: 'contador' };
+
+    it('OWNER consulta — respuesta incluye OWNER + ADMIN + custom roles del tenant', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: [],
+        isOwner: true,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([CUSTOM_ROLE_A, CUSTOM_ROLE_B]);
+
+      const result = await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      expect(result).toHaveLength(4);
+      expect(result[0]).toMatchObject({ id: 'OWNER', kind: 'system' });
+      expect(result[1]).toMatchObject({ id: 'ADMIN', kind: 'system' });
+      expect(result[2]).toMatchObject({ id: 'uuid-a', kind: 'custom' });
+      expect(result[3]).toMatchObject({ id: 'uuid-b', kind: 'custom' });
+      expect(customRoles.listarAsignablesPorOrg).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it('ADMIN consulta — respuesta NO incluye OWNER, SÍ incluye ADMIN y custom roles', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: [],
+        isOwner: false,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([CUSTOM_ROLE_A]);
+
+      const result = await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      expect(result.find((r) => r.id === 'OWNER')).toBeUndefined();
+      expect(result.find((r) => r.id === 'ADMIN')).toBeDefined();
+      expect(result.find((r) => r.id === 'uuid-a')).toBeDefined();
+    });
+
+    it('MEMBER con permiso pero sin ser owner — sin OWNER, con ADMIN y custom roles', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: ['organizacion.miembros.invite'],
+        isOwner: false,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([CUSTOM_ROLE_B]);
+
+      const result = await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      expect(result.find((r) => r.id === 'OWNER')).toBeUndefined();
+      expect(result.find((r) => r.id === 'ADMIN')).toBeDefined();
+      expect(result.find((r) => r.id === 'uuid-b')).toBeDefined();
+    });
+
+    it('system roles aparecen primero, luego custom roles (orden REQ-RA-01)', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: [],
+        isOwner: false,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([CUSTOM_ROLE_A, CUSTOM_ROLE_B]);
+
+      const result = await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      const systemItems = result.filter((r: AssignableRoleDto) => r.kind === 'system');
+      const customItems = result.filter((r: AssignableRoleDto) => r.kind === 'custom');
+      const lastSystemItem = systemItems[systemItems.length - 1];
+      const lastSystemIndex = result.findIndex(
+        (r: AssignableRoleDto) => r.id === lastSystemItem?.id,
+      );
+      const firstCustomIndex = result.findIndex(
+        (r: AssignableRoleDto) => r.id === customItems[0]?.id,
+      );
+      expect(lastSystemIndex).toBeLessThan(firstCustomIndex);
+    });
+
+    it('custom roles se consultan con el orgId correcto — REQ-RA-04', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: [],
+        isOwner: false,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([]);
+
+      await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      expect(customRoles.listarAsignablesPorOrg).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it('seam filtrarPorVerticalYPacks no filtra ningún rol (no-op hoy — REQ-RA-05)', async () => {
+      rbacService.resolverPermisosConContexto.mockResolvedValue({
+        permissions: [],
+        isOwner: true,
+      });
+      customRoles.listarAsignablesPorOrg.mockResolvedValue([CUSTOM_ROLE_A, CUSTOM_ROLE_B]);
+
+      const result = await service.listarRolesAsignables(TENANT_ID, USER_ID);
+
+      // Con OWNER: OWNER + ADMIN + 2 custom = 4 ítems; el seam no filtra ninguno.
+      expect(result).toHaveLength(4);
     });
   });
 });

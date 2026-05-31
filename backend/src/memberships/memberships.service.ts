@@ -9,6 +9,7 @@ import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
+import { RbacService } from '@/rbac/rbac.service';
 import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
 
 import { toDominioSystemRole, toPrismaSystemRole } from './adapters/enum-mappers';
@@ -22,6 +23,7 @@ import {
   UsuarioYaEsMiembroError,
 } from './domain/membership-errors';
 import { MembershipRole } from './domain/membership-role';
+import { AssignableRoleDto } from './dto/assignable-role.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import {
@@ -41,6 +43,7 @@ export class MembershipsService {
     private readonly tenantContext: TenantContextService,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
     private readonly rbac: PermissionsCacheInvalidationPort,
+    private readonly rbacService: RbacService,
   ) {}
 
   async invite(dto: InviteUserDto) {
@@ -140,6 +143,35 @@ export class MembershipsService {
     return deleted;
   }
 
+  async listarRolesAsignables(orgId: string, userId: string): Promise<AssignableRoleDto[]> {
+    const { isOwner } = await this.rbacService.resolverPermisosConContexto(userId, orgId);
+    const systemRoles: AssignableRoleDto[] = [
+      ...(isOwner
+        ? [
+            {
+              id: 'OWNER',
+              name: 'Propietario',
+              kind: 'system' as const,
+              description: 'Control total — puede agregar/quitar owners',
+            },
+          ]
+        : []),
+      {
+        id: 'ADMIN',
+        name: 'Administrador',
+        kind: 'system' as const,
+        description: 'Todos los permisos excepto transferir ownership',
+      },
+    ];
+    const rawCustom = await this.customRoles.listarAsignablesPorOrg(orgId);
+    const customRoles: AssignableRoleDto[] = rawCustom.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: 'custom' as const,
+    }));
+    return this.filtrarPorVerticalYPacks([...systemRoles, ...customRoles]);
+  }
+
   // ---------- helpers privados ----------
 
   private getTenantId(): string {
@@ -162,5 +194,11 @@ export class MembershipsService {
     if (ownerCount <= 1) {
       throw new UltimoOwnerError(tenantId);
     }
+  }
+
+  private filtrarPorVerticalYPacks(roles: AssignableRoleDto[]): AssignableRoleDto[] {
+    // Seam para filtro por vertical + packs cuando llegue módulo Granja.
+    // Hoy solo existe el vertical Contabilidad — retorna sin filtrar.
+    return roles;
   }
 }

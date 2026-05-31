@@ -17,4 +17,14 @@ export class PrismaCustomRolesReaderAdapter extends CustomRolesReaderPort {
     });
     return row !== null;
   }
+
+  async listarAsignablesPorOrg(
+    orgId: string,
+  ): Promise<{ id: string; name: string; slug: string }[]> {
+    return this.prisma.customRole.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: 'asc' },
+    });
+  }
 }

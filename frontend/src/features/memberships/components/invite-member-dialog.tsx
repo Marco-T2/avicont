@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -17,13 +17,16 @@ import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateInvitation } from '@/features/invitations/hooks/use-invitations';
 import { backendErrorMessage } from '@/lib/error-messages';
 
+import { useAssignableRoles } from '../hooks/use-assignable-roles';
 import {
   type InviteFormValues,
   inviteFormSchema,
@@ -38,20 +41,21 @@ interface InviteMemberDialogProps {
 // POST /api/invitations (envía email con token). El flujo de aceptación
 // vive en la página pública /accept-invite.
 //
-// Para simplificar el slice, solo exponemos los 2 systemRoles (OWNER, ADMIN).
-// Los custom roles se manejarán cuando exista /settings/roles — acá se
-// ampliará el select con las opciones dinámicas.
+// Los roles se cargan dinámicamente desde GET /api/memberships/roles-asignables
+// cuando el dialog está abierto. Se muestran en dos grupos: Sistema y Personalizados.
 export function InviteMemberDialog({
   open,
   onOpenChange,
 }: InviteMemberDialogProps): React.JSX.Element {
   const mutation = useCreateInvitation();
 
+  // G-9: hooks se azan a const top-level, nunca inline en JSX.
+  const { data: roles = [], isLoading: rolesLoading, isError: rolesError } = useAssignableRoles(open);
+
   const {
     register,
     handleSubmit,
     setValue,
-    control,
     reset,
     formState: { errors },
   } = useForm<InviteFormValues>({
@@ -64,7 +68,25 @@ export function InviteMemberDialog({
     },
   });
 
-  const systemRole = useWatch({ control, name: 'systemRole' });
+  // Valor compuesto para el select: `${kind}:${id}` (ej. "system:ADMIN", "custom:uuid-1").
+  // Los UUIDs v4 no contienen ':', por lo que el split(':') es seguro.
+  const selectDefaultValue = 'system:ADMIN';
+
+  function handleRoleChange(v: string): void {
+    const colonIdx = v.indexOf(':');
+    const kind = v.slice(0, colonIdx);
+    const id = v.slice(colonIdx + 1);
+
+    if (kind === 'system') {
+      setValue('roleKind', 'system');
+      setValue('systemRole', id as 'OWNER' | 'ADMIN');
+      setValue('customRoleId', undefined);
+    } else {
+      setValue('roleKind', 'custom');
+      setValue('customRoleId', id);
+      setValue('systemRole', undefined);
+    }
+  }
 
   function onSubmit(values: InviteFormValues): void {
     const body = {
@@ -88,6 +110,9 @@ export function InviteMemberDialog({
       },
     });
   }
+
+  const systemRoles = roles.filter((r) => r.kind === 'system');
+  const customRoles = roles.filter((r) => r.kind === 'custom');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,38 +148,59 @@ export function InviteMemberDialog({
 
           <div className="space-y-1.5">
             <Label>Rol</Label>
+            {/* Anti-F-13: error de query como texto inline, nunca toast fuera de handler */}
+            {rolesError ? (
+              <p className="text-xs text-destructive">
+                No se pudieron cargar los roles. Intentá de nuevo.
+              </p>
+            ) : null}
             <Select
-              value={systemRole}
-              onValueChange={(v) => {
-                setValue('roleKind', 'system');
-                setValue('systemRole', v as 'OWNER' | 'ADMIN');
-              }}
+              disabled={rolesLoading}
+              defaultValue={selectDefaultValue}
+              onValueChange={handleRoleChange}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue
+                  placeholder={rolesLoading ? 'Cargando roles…' : 'Seleccioná un rol'}
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ADMIN">
-                  <div>
-                    <p className="font-medium">Admin</p>
-                    <p className="text-xs text-muted-foreground">
-                      Todos los permisos excepto transferir ownership
-                    </p>
-                  </div>
-                </SelectItem>
-                <SelectItem value="OWNER">
-                  <div>
-                    <p className="font-medium">Owner</p>
-                    <p className="text-xs text-muted-foreground">
-                      Control total — puede agregar/quitar owners
-                    </p>
-                  </div>
-                </SelectItem>
+                {systemRoles.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>Sistema</SelectLabel>
+                    {systemRoles.map((role) => (
+                      <SelectItem key={role.id} value={`system:${role.id}`}>
+                        <div>
+                          <p className="font-medium">{role.name}</p>
+                          {role.description !== undefined ? (
+                            <p className="text-xs text-muted-foreground">
+                              {role.description}
+                            </p>
+                          ) : null}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : null}
+                {customRoles.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>Personalizados</SelectLabel>
+                    {customRoles.map((role) => (
+                      <SelectItem key={role.id} value={`custom:${role.id}`}>
+                        <div>
+                          <p className="font-medium">{role.name}</p>
+                          {role.description !== undefined ? (
+                            <p className="text-xs text-muted-foreground">
+                              {role.description}
+                            </p>
+                          ) : null}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : null}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Los roles personalizados llegan en Configuración → Roles.
-            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -180,7 +226,7 @@ export function InviteMemberDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || rolesLoading}>
               {mutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
