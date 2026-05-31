@@ -90,9 +90,7 @@ export class PrismaComprobantesReaderAdapter extends ComprobantesReaderPort {
     // cuenta filtrada. El select/include de líneas NO se poda por este filtro `some` —
     // Prisma retorna el asiento COMPLETO con todas sus líneas.
     const filtroCuenta =
-      filtros.cuentaId !== undefined
-        ? { lineas: { some: { cuentaId: filtros.cuentaId } } }
-        : {};
+      filtros.cuentaId !== undefined ? { lineas: { some: { cuentaId: filtros.cuentaId } } } : {};
 
     return {
       organizationId: tenantId,

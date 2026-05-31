@@ -12,7 +12,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsUUID, Matches } from 'class-validator';
 
-
 export class LibroDiarioQueryDto {
   /**
    * UUID del período fiscal. Si se pasa, el service lo resuelve a un rango
