@@ -12,7 +12,7 @@ import { LibroMayorTabla } from '../components/libro-mayor-tabla';
  * Página contenedora del Libro Mayor.
  *
  * Orquesta:
- * - LibroMayorFiltros: filtros (período O rango + toggles anulados / solo con movimiento)
+ * - LibroMayorFiltros: filtros (período O rango + toggles anulados / solo con movimiento + cuenta opcional)
  * - useLibroMayor: hook TanStack Query (solo se activa cuando hay rango válido)
  * - LibroMayorTabla: lista de cuentas expandibles con movimientos y saldo corriente
  *
@@ -20,10 +20,6 @@ import { LibroMayorTabla } from '../components/libro-mayor-tabla';
  * granular por permiso contabilidad.libro-mayor.read es deuda aceptada (GET
  * /me/permissions no implementado en el frontend aún) — mismo criterio que el
  * Libro Diario.
- *
- * Deuda: filtro por cuenta única (cuentaId, soportado por el backend) diferido
- * a un follow-up — requiere un autocomplete de cuentas (las cuentas de detalle
- * pueden ser 100+). El toggle "solo con movimiento" ya acota la lista.
  */
 export function LibroMayorPage(): React.JSX.Element {
   const [params, setParams] = useState<LibroMayorParams>({});
@@ -36,6 +32,7 @@ export function LibroMayorPage(): React.JSX.Element {
         periodoFiscalId: values.periodoFiscalId,
         incluirAnulados: values.incluirAnulados,
         soloConMovimiento: values.soloConMovimiento,
+        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
       });
     } else {
       setParams({
@@ -43,6 +40,7 @@ export function LibroMayorPage(): React.JSX.Element {
         fechaHasta: values.fechaHasta,
         incluirAnulados: values.incluirAnulados,
         soloConMovimiento: values.soloConMovimiento,
+        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
       });
     }
   }

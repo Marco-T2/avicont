@@ -14,6 +14,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+// Cross-feature: reutilizamos CuentaAutocomplete de comprobantes — filtra
+// cuentas de detalle activas con pageSize 100.
+import { CuentaAutocomplete } from '@/features/comprobantes/components/cuenta-autocomplete';
 // Cross-feature: períodos del tenant para el selector de período fiscal.
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
 import { formatPeriodoCorto } from '@/lib/meses';
@@ -35,6 +38,7 @@ const formSchema = z.object({
   fechaHasta: z.string(),
   incluirAnulados: z.boolean(),
   soloConMovimiento: z.boolean(),
+  cuentaId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -93,12 +97,14 @@ export function LibroMayorFiltros({
       fechaHasta: '',
       incluirAnulados: false,
       soloConMovimiento: true,
+      cuentaId: '',
     },
   });
 
   const modo = watch('modo');
   const incluirAnulados = watch('incluirAnulados');
   const soloConMovimiento = watch('soloConMovimiento');
+  const cuentaId = watch('cuentaId');
 
   function handleModoChange(nuevoModo: 'periodo' | 'rango'): void {
     setValue('modo', nuevoModo);
@@ -115,6 +121,7 @@ export function LibroMayorFiltros({
         periodoFiscalId: raw.periodoFiscalId,
         incluirAnulados: raw.incluirAnulados,
         soloConMovimiento: raw.soloConMovimiento,
+        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
       });
     } else {
       if (!FECHA_REGEX.test(raw.fechaDesde)) {
@@ -137,6 +144,7 @@ export function LibroMayorFiltros({
         fechaHasta: raw.fechaHasta,
         incluirAnulados: raw.incluirAnulados,
         soloConMovimiento: raw.soloConMovimiento,
+        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
       });
     }
   }
@@ -235,6 +243,22 @@ export function LibroMayorFiltros({
             </div>
           </>
         )}
+
+        {/* Filtro por cuenta (opcional) */}
+        <div className="space-y-1">
+          <Label htmlFor="mayor-cuenta" className="text-xs text-muted-foreground">
+            Cuenta (opcional)
+          </Label>
+          {/* Cross-feature: reutilizamos CuentaAutocomplete de comprobantes — filtra
+              cuentas de detalle activas con pageSize 100. Ver frontend CLAUDE.md §14.6. */}
+          <div className="w-56">
+            <CuentaAutocomplete
+              value={cuentaId}
+              onChange={(id) => setValue('cuentaId', id)}
+              placeholder="Todas las cuentas"
+            />
+          </div>
+        </div>
 
         {/* Toggle solo con movimiento */}
         <div className="flex items-center gap-2 pb-0.5">
