@@ -115,6 +115,9 @@ function makePeriodosMock(): MockPeriodos {
     // Ampliado en Fase reportes-libro-diario (§3.7): no lo usa comprobantes,
     // pero el tipo lo requiere por ser parte del port.
     obtenerRangoFechas: jest.fn().mockResolvedValue(null),
+    // Ampliado en Fase reportes-balance-general: no lo usa comprobantes.
+    obtenerRangoGestionPorFecha: jest.fn().mockResolvedValue(null),
+    obtenerRangoGestion: jest.fn().mockResolvedValue(null),
   };
 }
 

@@ -16,6 +16,7 @@ import {
   PeriodoNoEncontradoError,
   RangoInvalidoError,
 } from './domain/libro-mayor-errors';
+import { calcularSaldoNeto } from './domain/saldo-naturaleza';
 import type {
   CuentaMayorCalculada,
   LibroMayorResponseDto,
@@ -191,7 +192,7 @@ export class LibroMayorService {
         ? []
         : [...saldosMap.keys()].filter((id) => {
             const s = saldosMap.get(id)!;
-            return !calcularSaldoInicial(s).isZero();
+            return !calcularSaldoNeto(s.totalDebitoBob, s.totalCreditoBob, s.naturaleza).isZero();
           })),
     ]);
 
@@ -227,7 +228,9 @@ export class LibroMayorService {
       if (!meta) continue;
 
       const saldoRow = saldosMap.get(cuentaId);
-      const saldoInicial = saldoRow ? calcularSaldoInicial(saldoRow) : Money.ZERO;
+      const saldoInicial = saldoRow
+        ? calcularSaldoNeto(saldoRow.totalDebitoBob, saldoRow.totalCreditoBob, saldoRow.naturaleza)
+        : Money.ZERO;
 
       const movRows = movimientosMap.get(cuentaId) ?? [];
 
@@ -315,25 +318,6 @@ export class LibroMayorService {
       totalHaberBob,
     };
   }
-}
-
-/**
- * Calcula el saldo inicial de una cuenta según su naturaleza contable.
- *
- * DEUDORA: saldo = totalDebitoBob − totalCreditoBob (activos/egresos)
- * ACREEDORA: saldo = totalCreditoBob − totalDebitoBob (pasivos/patrimonio/ingresos)
- *
- * Código Tributario art. 47: la naturaleza determina el signo del saldo.
- * Un saldo negativo es válido (ej. descubierto bancario en cuenta DEUDORA).
- */
-function calcularSaldoInicial(row: SaldoInicialRow): Money {
-  const debe = Money.of(row.totalDebitoBob);
-  const haber = Money.of(row.totalCreditoBob);
-
-  if (row.naturaleza === NaturalezaCuenta.DEUDORA) {
-    return debe.minus(haber);
-  }
-  return haber.minus(debe);
 }
 
 /**

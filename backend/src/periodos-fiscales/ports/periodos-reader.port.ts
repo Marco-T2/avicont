@@ -96,4 +96,34 @@ export abstract class PeriodosReaderPort {
     periodoId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ReaperturaActiva | null>;
+
+  /**
+   * Rango calendario [desde, hasta] de la GESTIÓN fiscal (año fiscal completo)
+   * que contiene la fecha dada. Deriva de GestionFiscal.year + mesInicio +
+   * períodos asociados. Retorna null si el tenant no tiene gestión que cubra
+   * esa fecha.
+   *
+   * Consumido por `reportes` para acotar el Resultado del Ejercicio del Balance
+   * (REQ-BG-02, REQ-BG-09). Defense in depth (§4.2): organizationId primer
+   * predicado — una fecha de otro tenant nunca retorna gestión ajena.
+   */
+  abstract obtenerRangoGestionPorFecha(
+    tenantId: string,
+    fecha: Date,
+  ): Promise<{ gestionId: string; desde: Date; hasta: Date } | null>;
+
+  /**
+   * Rango calendario [desde, hasta] de la gestión fiscal indicada por ID,
+   * scoped al tenant (defense in depth §4.2 CLAUDE.md).
+   *
+   * Retorna null si el gestionId no existe o no pertenece al tenant
+   * (no distingue — evita enumeración de ids ajenos).
+   *
+   * Consumido por `reportes` cuando el cliente pasa gestionId explícito
+   * en el query del Balance General (REQ-BG-02).
+   */
+  abstract obtenerRangoGestion(
+    tenantId: string,
+    gestionId: string,
+  ): Promise<{ desde: Date; hasta: Date } | null>;
 }

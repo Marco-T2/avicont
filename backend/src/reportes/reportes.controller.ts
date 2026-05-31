@@ -3,7 +3,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
-import { ForbiddenError } from '@/common/errors';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
@@ -12,23 +11,8 @@ import { LibroDiarioQueryDto } from './dto/libro-diario-query.dto';
 import { LibroMayorQueryDto } from './dto/libro-mayor-query.dto';
 import { LibroDiarioService } from './libro-diario.service';
 import { LibroMayorService } from './libro-mayor.service';
-
-// ---- Resolución de tenantId desde JWT + header opcional (mismo patrón que comprobantes) ----
-
-interface AuthenticatedRequest {
-  user: { sub: string; activeTenantId?: string };
-  headers: Record<string, string | string[] | undefined>;
-}
-
-function resolveTenantId(req: AuthenticatedRequest): string {
-  const fromHeader = req.headers['x-tenant-id'];
-  const tenantId =
-    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
-  if (tenantId === undefined || tenantId === '') {
-    throw new ForbiddenError('TENANT_CONTEXT_REQUIRED', 'Se requiere contexto de organización');
-  }
-  return tenantId;
-}
+import { resolveTenantId } from './tenant-id';
+import type { AuthenticatedRequest } from './tenant-id';
 
 @ApiTags('Libros contables')
 @ApiBearerAuth('JWT-auth')
