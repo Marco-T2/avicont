@@ -10,26 +10,26 @@ import {
 
 import type { PrismaService } from '@/common/prisma.service';
 
-import { PrismaBalanceReaderAdapter } from './prisma-balance-reader.adapter';
+import { PrismaEeffSaldosReaderAdapter } from './prisma-eeff-saldos-reader.adapter';
 
 /**
- * Integration spec del adapter `PrismaBalanceReaderAdapter` contra Postgres real.
+ * Integration spec del adapter `PrismaEeffSaldosReaderAdapter` contra Postgres real.
  *
  * Valida:
  *   - aislamiento multi-tenant CRÍTICO (2 tenants, §4.2 CLAUDE.md, Anti-31)
- *   - exclusión de BORRADOR siempre (REQ-BG-03)
- *   - toggle de anulados (REQ-BG-04)
+ *   - exclusión de BORRADOR siempre (REQ-BG-03, REQ-ER-03)
+ *   - toggle de anulados (REQ-BG-04, REQ-ER-04)
  *   - corte de fecha: ≤ fechaCorte incluido, > fechaCorte excluido
- *   - obtenerSaldosEnRango: solo el rango indicado
+ *   - obtenerSaldosEnRango: solo el rango indicado (flujo — REQ-ER-02)
  *   - obtenerEstructuraCuentas: agrupadoras sin movimiento; activa=false excluida;
  *     cuenta esContraria=true presente con el flag correcto
  */
-describe('PrismaBalanceReaderAdapter (integration)', () => {
+describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
   const SLUG_A = 'org-balance-reader-a';
   const SLUG_B = 'org-balance-reader-b';
 
   let prisma: PrismaClient;
-  let adapter: PrismaBalanceReaderAdapter;
+  let adapter: PrismaEeffSaldosReaderAdapter;
   let tenantA: string;
   let tenantB: string;
 
@@ -49,7 +49,7 @@ describe('PrismaBalanceReaderAdapter (integration)', () => {
   beforeAll(async () => {
     prisma = new PrismaClient();
     await prisma.$connect();
-    adapter = new PrismaBalanceReaderAdapter(prisma as unknown as PrismaService);
+    adapter = new PrismaEeffSaldosReaderAdapter(prisma as unknown as PrismaService);
   });
 
   afterAll(async () => {

@@ -6,14 +6,14 @@ import { CuentasReaderModule } from '@/cuentas/cuentas-reader.module';
 import { PeriodosReaderModule } from '@/periodos-fiscales/periodos-reader.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
-import { PrismaBalanceReaderAdapter } from './adapters/prisma-balance-reader.adapter';
+import { PrismaEeffSaldosReaderAdapter } from './adapters/prisma-eeff-saldos-reader.adapter';
 import { PrismaComprobantesReaderAdapter } from './adapters/prisma-comprobantes-reader.adapter';
 import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-reader.adapter';
 import { BalanceGeneralService } from './balance-general.service';
 import { EeffController } from './eeff.controller';
 import { LibroDiarioService } from './libro-diario.service';
 import { LibroMayorService } from './libro-mayor.service';
-import { BALANCE_READER_PORT } from './ports/balance-reader.port';
+import { EEFF_SALDOS_READER_PORT } from './ports/eeff-saldos-reader.port';
 import { COMPROBANTES_READER_PORT } from './ports/comprobantes-reader.port';
 import { LIBRO_MAYOR_READER_PORT } from './ports/libro-mayor-reader.port';
 import { ReportesController } from './reportes.controller';
@@ -24,7 +24,7 @@ import { ReportesController } from './reportes.controller';
  * DI:
  *   - `ComprobantesReaderPort` → `PrismaComprobantesReaderAdapter` (Diario)
  *   - `LibroMayorReaderPort` → `PrismaLibroMayorReaderAdapter` (Mayor, $queryRaw JOIN)
- *   - `BalanceReaderPort` → `PrismaBalanceReaderAdapter` (Balance, $queryRaw GROUP BY + findMany)
+ *   - `EeffSaldosReaderPort` → `PrismaEeffSaldosReaderAdapter` (Balance + Estado Resultados, $queryRaw GROUP BY + findMany)
  *   - `PeriodosReaderPort` → importado de `PeriodosReaderModule` (leaf module §3.7)
  *   - `RbacModule` → guards de permisos
  *
@@ -62,12 +62,12 @@ import { ReportesController } from './reportes.controller';
       useExisting: PrismaLibroMayorReaderAdapter,
     },
 
-    // Service + Adapter Balance General: $queryRaw GROUP BY saldos + findMany estructura.
+    // Service + Adapter EEFF (Balance + Estado Resultados): $queryRaw GROUP BY saldos + findMany estructura.
     BalanceGeneralService,
-    PrismaBalanceReaderAdapter,
+    PrismaEeffSaldosReaderAdapter,
     {
-      provide: BALANCE_READER_PORT,
-      useExisting: PrismaBalanceReaderAdapter,
+      provide: EEFF_SALDOS_READER_PORT,
+      useExisting: PrismaEeffSaldosReaderAdapter,
     },
   ],
 })

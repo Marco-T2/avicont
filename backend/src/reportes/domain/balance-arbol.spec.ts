@@ -2,7 +2,7 @@ import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { construirBalance } from './balance-arbol';
-import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/balance-reader.port';
+import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
 
 // ============================================================
 // Fixtures

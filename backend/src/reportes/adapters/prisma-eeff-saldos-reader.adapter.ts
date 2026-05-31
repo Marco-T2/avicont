@@ -8,14 +8,17 @@ import type {
   BalanceFiltros,
   CuentaEstructuraRow,
   SaldoCuentaRow,
-} from '../ports/balance-reader.port';
-import { BalanceReaderPort } from '../ports/balance-reader.port';
+} from '../ports/eeff-saldos-reader.port';
+import { EeffSaldosReaderPort } from '../ports/eeff-saldos-reader.port';
 
 /**
- * Adapter Prisma para `BalanceReaderPort`.
+ * Adapter Prisma para `EeffSaldosReaderPort`.
+ *
+ * Sirve a Balance General (obtenerSaldosHasta + obtenerSaldosEnRango para Resultado)
+ * y al Estado de Resultados (obtenerSaldosEnRango para el flujo del período).
  *
  * Design decisión: $queryRaw para obtenerSaldosHasta y obtenerSaldosEnRango porque:
- *   - El Balance necesita GROUP BY cuentaId de las líneas, filtrando por la fecha
+ *   - Los EEFF necesitan GROUP BY cuentaId de las líneas, filtrando por la fecha
  *     de la CABECERA del comprobante.
  *   - Prisma groupBy NO soporta filtros sobre relaciones.
  *
@@ -24,10 +27,10 @@ import { BalanceReaderPort } from '../ports/balance-reader.port';
  *   No confiamos en que el caller ya filtró.
  *
  * Estado FIJO: `c.estado IN ('CONTABILIZADO','BLOQUEADO')` nunca parametrizable.
- * BORRADOR NUNCA incluido (REQ-BG-03).
+ * BORRADOR NUNCA incluido (REQ-BG-03, REQ-ER-03).
  */
 @Injectable()
-export class PrismaBalanceReaderAdapter extends BalanceReaderPort {
+export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
   constructor(private readonly prisma: PrismaService) {
     super();
   }
@@ -80,7 +83,8 @@ export class PrismaBalanceReaderAdapter extends BalanceReaderPort {
     incluirAnulados: boolean,
   ): Promise<SaldoCuentaRow[]> {
     // Defense in depth (CLAUDE.md §4.2): primer predicado siempre.
-    // Mismo patrón que obtenerSaldosHasta pero con rango [desde, hasta] (ambos inclusive).
+    // NCB / NIC 1: Estado de Resultados de flujo del período, sin arrastre histórico.
+    // Solo líneas con fechaContable en [desde, hasta] — garantía de flujo (REQ-ER-02).
     type RawRow = { cuentaId: string; totalDebitoBob: string; totalCreditoBob: string };
 
     const rows: RawRow[] = incluirAnulados
