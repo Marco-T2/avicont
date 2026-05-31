@@ -1,6 +1,7 @@
-import { Controller, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { MembershipsService } from './memberships.service';
+import { AssignableRoleDto } from './dto/assignable-role.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { UpdateMembershipDto } from './dto/update-membership.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -17,6 +18,22 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class MembershipsController {
   constructor(private readonly membershipsService: MembershipsService) {}
+
+  @Get('roles-asignables')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('organizacion.miembros.invite')
+  @ApiOperation({ summary: 'Listar roles asignables al invitar un miembro' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de roles asignables (system + custom del tenant)',
+  })
+  @ApiResponse({ status: 403, description: 'Sin permiso organizacion.miembros.invite' })
+  async rolesAsignables(
+    @CurrentTenant() orgId: string,
+    @CurrentUser() user: { sub: string },
+  ): Promise<AssignableRoleDto[]> {
+    return this.membershipsService.listarRolesAsignables(orgId, user.sub);
+  }
 
   @Post('invite')
   @UseGuards(PermissionsGuard)

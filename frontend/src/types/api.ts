@@ -1026,6 +1026,18 @@ export interface MePermissionsResponse {
 }
 
 // ============================================================
+// Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
+// Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.
+// ============================================================
+
+export interface AssignableRole {
+  id: string;
+  name: string;
+  kind: 'system' | 'custom';
+  description?: string;
+}
+
+// ============================================================
 // Estado de Resultados (Income Statement) — GET /api/eeff/resultados
 // Espejo del EstadoResultadosResponseDto del backend (montos string §4.5,
 // rango fechaDesde/fechaHasta YYYY-MM-DD §4.6). Reporte de FLUJO del período.
