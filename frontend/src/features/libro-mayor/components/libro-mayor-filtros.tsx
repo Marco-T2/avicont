@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,7 @@ export function LibroMayorFiltros({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     setError,
     formState: { errors },
@@ -101,10 +101,10 @@ export function LibroMayorFiltros({
     },
   });
 
-  const modo = watch('modo');
-  const incluirAnulados = watch('incluirAnulados');
-  const soloConMovimiento = watch('soloConMovimiento');
-  const cuentaId = watch('cuentaId');
+  const modo = useWatch({ control, name: 'modo' });
+  const incluirAnulados = useWatch({ control, name: 'incluirAnulados' });
+  const soloConMovimiento = useWatch({ control, name: 'soloConMovimiento' });
+  const cuentaId = useWatch({ control, name: 'cuentaId' });
 
   function handleModoChange(nuevoModo: 'periodo' | 'rango'): void {
     setValue('modo', nuevoModo);

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,7 @@ export function InviteMemberDialog({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm<InviteFormValues>({
@@ -63,6 +63,8 @@ export function InviteMemberDialog({
       expiresInDays: 7,
     },
   });
+
+  const systemRole = useWatch({ control, name: 'systemRole' });
 
   function onSubmit(values: InviteFormValues): void {
     const body = {
@@ -122,7 +124,7 @@ export function InviteMemberDialog({
           <div className="space-y-1.5">
             <Label>Rol</Label>
             <Select
-              value={watch('systemRole')}
+              value={systemRole}
               onValueChange={(v) => {
                 setValue('roleKind', 'system');
                 setValue('systemRole', v as 'OWNER' | 'ADMIN');

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ export function NuevaGestionDialog({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     reset,
     formState: { errors },
   } = useForm<NuevaGestionValues>({
@@ -55,7 +55,7 @@ export function NuevaGestionDialog({
     if (open) reset({ year: currentYear });
   }, [open, currentYear, reset]);
 
-  const yearValue = watch('year');
+  const yearValue = useWatch({ control, name: 'year' });
 
   function textoEducativo(): string {
     if (tipoEmpresa === null || typeof yearValue !== 'number' || Number.isNaN(yearValue)) {

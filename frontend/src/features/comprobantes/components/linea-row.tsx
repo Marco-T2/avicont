@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2 } from 'lucide-react';
-import { useFormContext, useFormState } from 'react-hook-form';
+import { useFormContext, useFormState, useWatch } from 'react-hook-form';
 
 import { ContactoCombobox } from '@/components/shared/contacto-combobox';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ export function LineaRow({
   'data-row-index': dataRowIndex,
   'data-field-id': dataFieldId,
 }: LineaRowProps): React.JSX.Element {
-  const { register, setValue, watch, control } = useFormContext();
+  const { register, setValue, control } = useFormContext();
 
   // El drag se aísla al handle (design §Decisión 1): los inputs Debe/Haber usan
   // las flechas del teclado para editar y no deben disparar el reorden.
@@ -67,8 +67,12 @@ export function LineaRow({
 
   // Resolver requiereContacto de la cuenta elegida en esta línea.
   // Derivado inline: design §Decisión 2 (validación blanda, no Zod required).
-  const cuentaId = watch(`lineas.${index}.cuentaId`) as string;
-  const contactoId = watch(`lineas.${index}.contactoId`) as string | undefined;
+  // useWatch aislado por nombre: solo re-renderiza esta fila cuando cambian
+  // SUS campos, no en cada tecleo de cualquier otra fila (como haría `watch`).
+  const cuentaId = useWatch({ control, name: `lineas.${index}.cuentaId` }) as string;
+  const contactoId = useWatch({ control, name: `lineas.${index}.contactoId` }) as
+    | string
+    | undefined;
   const cuentaSeleccionada = cuentas.find((c) => c.id === cuentaId);
   const requiereContacto = cuentaSeleccionada?.requiereContacto ?? false;
   // El aviso se muestra cuando la cuenta requiere contacto y no hay uno asignado.
@@ -103,7 +107,7 @@ export function LineaRow({
       {/* Cuenta — ancho lo fija el colgroup del LineasEditor (table-fixed). */}
       <td className="p-1">
         <CuentaAutocomplete
-          value={watch(`lineas.${index}.cuentaId`) as string}
+          value={cuentaId}
           onChange={(id) =>
             setValue(`lineas.${index}.cuentaId`, id, { shouldValidate: true })
           }

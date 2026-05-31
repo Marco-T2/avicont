@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { useMemo } from 'react';
 import type { Resolver } from 'react-hook-form';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,13 +62,13 @@ export function DocumentoFisicoForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = form;
 
-  const tipoIdSeleccionado = watch('tipoDocumentoFisicoId');
-  const contactoId = watch('contactoId');
+  const tipoIdSeleccionado = useWatch({ control, name: 'tipoDocumentoFisicoId' });
+  const contactoId = useWatch({ control, name: 'contactoId' });
 
   // Deriva esTributario del tipo seleccionado.
   const tipoSeleccionado = useMemo(
