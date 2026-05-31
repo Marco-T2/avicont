@@ -1,5 +1,11 @@
 # Libro Mayor — Especificación
 
+<!--
+Última edición: 2026-05-31
+Última revisión contra core: 2026-05-31
+Owner: backend-lead
+-->
+
 > Fecha: 2026-05-30
 > Fase: spec
 > Proyecto: avicont
