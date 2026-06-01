@@ -62,6 +62,10 @@ export async function createTestUserWithTenant(
 }
 
 export async function cleanupTestData() {
+  // Limpiar primero los registros de auditoría de plataforma para evitar
+  // conflictos de FK con users/orgs que se eliminan después.
+  // Se limpia también al final para capturar escrituras async tardías (void).
+  await prisma.platformAudit.deleteMany({}).catch(() => void 0);
   await prisma.refreshToken.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.impersonationAction.deleteMany({});
@@ -96,6 +100,11 @@ export async function cleanupTestData() {
   await prisma.periodoFiscal.deleteMany({});
   await prisma.gestionFiscal.deleteMany({});
   await prisma.organization.deleteMany({});
+  // Segunda limpieza de platform_audit justo antes de usuarios: atrapa escrituras
+  // async tardías (el interceptor usa void/fire-and-forget). La org ya fue borrada
+  // (targetOrganizationId → SET NULL en BD); ahora limpiamos antes de eliminar users
+  // para evitar la restricción actorUserId (ON DELETE RESTRICT → actorUser).
+  await prisma.platformAudit.deleteMany({}).catch(() => void 0);
   await prisma.user.deleteMany({});
 }
 
