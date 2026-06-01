@@ -135,6 +135,18 @@ async function main() {
     organization: asociacion.slug,
     templates: ['contador', 'granjero'],
   });
+
+  // Bootstrap del primer super-admin de plataforma (huevo-gallina, REQ-SA-10).
+  // Gateado por env: si SUPER_ADMIN_EMAIL apunta a un user existente, lo marca.
+  // Idempotente: segunda corrida deja UN solo super-admin (update no-op, sin audit duplicado).
+  // Si el email no existe en BD → lanza error descriptivo (no silencioso).
+  // Si la env no está definida → skip sin error (seed corre normalmente).
+  // design.md Decisión 8.
+  const superAdminEmail = process.env['SUPER_ADMIN_EMAIL'];
+  if (superAdminEmail) {
+    const { grantSuperAdmin } = await import('../src/auth/super-admin-bootstrap');
+    await grantSuperAdmin(prisma, superAdminEmail, 'seed');
+  }
 }
 
 main()
