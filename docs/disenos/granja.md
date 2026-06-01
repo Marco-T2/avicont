@@ -1,10 +1,11 @@
 # Granja — Diseño de dominio (vertical de engorde)
 
-> **Estado: BASES / EN DISEÑO** (2026-06-01) — Documento fundacional del vertical
-> **Granja**. Captura el modelo de dominio acordado para que las próximas sesiones
-> construyan "enchufando contra un riel diseñado", no re-arquitecturando. **No hay
-> código de granja todavía** (ni `backend/src/granja/`, ni `frontend/src/features/granja/`,
-> ni tablas en schema); este doc precede a la implementación.
+> **Estado: v1 IMPLEMENTADO** (act. 2026-06-01) — Documento fundacional del vertical
+> **Granja**. El **v1 (núcleo) está construido y mergeado**: `backend/src/granja/`
+> (hexagonal), `frontend/src/features/granja/` (mobile-first), las 4 tablas + 2 enums
+> en schema y el seed de `TipoRegistro`. Este doc describe el modelo y la dirección;
+> la **fuente de verdad de implementación es el código y `schema.prisma`**. v1.5+ sigue
+> pendiente (§8). El pulido de UI "personas mayores" (PRs #109–#111) está registrado en §2.1.
 >
 > Presupone el `CLAUDE.md` raíz (hexagonal §3, multi-tenant §4.2, dinero §4.5,
 > fechas §4.6, errores §6, testing §7), `docs/disenos/plataforma-multi-vertical.md`
@@ -64,6 +65,36 @@ entidades, campos y UI.
 | **Balanceado / Alimento** | El alimento de los pollos. Es el costo más grande de un engorde. |
 | **Chala** | Cama del galpón, base de cáscara/hojas de arroz sobre la que se crían los pollos. |
 | **Engorde / Parrillero** | Pollo criado para carne (a diferencia de ponedora, que es para huevo). |
+
+### 2.1 Vocabulario user-facing en la UI (v1)
+
+El dominio mantiene su naming (§4): `MovimientoInversion`, `MovimientoCantidad`,
+`TipoRegistro`, enum `NaturalezaRegistro = INVERSION | CANTIDAD`. Pero la UI del v1
+—pensada para el granjero mayor que opera desde el celular— usa **sinónimos
+user-facing** más cercanos, igual que "asiento" es el sinónimo de `Comprobante` en
+contabilidad (CLAUDE.md raíz §1):
+
+| Código / schema | UI (lo que ve el granjero) |
+|-----------------|----------------------------|
+| `MovimientoInversion` / `NaturalezaRegistro.INVERSION` | **Gasto** |
+| `MovimientoCantidad` / `NaturalezaRegistro.CANTIDAD` | **Mortalidad** |
+| `cantidad` (aves que salen) | **aves** |
+| `Lote` sin `nombre` | "Lote sin nombre" |
+
+**Regla**: en código, schema y tests → nombres del dominio; en UI, botones y textos
+al usuario → los sinónimos de arriba. La categoría `CANTIDAD` admite otros tipos
+además de mortalidad (ej. descarte, §6); si el descarte se vuelve común, el rótulo
+"Mortalidad" se reevalúa (es vocabulario user-facing, no el enum).
+
+**Otras decisiones de UI v1** (pulido "personas mayores", PRs #109–#111):
+- Las fechas de lote / gasto / mortalidad arrancan en **"hoy"** (La Paz) —
+  `features/granja/lib/hoy-en-la-paz.ts`.
+- Toda acción destructiva (cerrar lote, eliminar gasto/mortalidad/tipo) **confirma**
+  con un `AlertDialog` corto antes de mutar.
+- El detalle del lote **NO usa pestañas**: dos botones directos ("Registrar gasto" /
+  "Registrar mortalidad") + secciones apiladas siempre visibles.
+- **Editar un movimiento NO existe** (solo crear + borrar, §7). Para corregir, se
+  borra y se vuelve a cargar. (Decisión revisable si aparece la necesidad.)
 
 ---
 
