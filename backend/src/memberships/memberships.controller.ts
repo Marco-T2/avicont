@@ -37,7 +37,7 @@ export class MembershipsController {
 
   @Post('invite')
   @UseGuards(PermissionsGuard)
-  @RequirePermissions('users.invite')
+  @RequirePermissions('organizacion.miembros.invite')
   @ApiOperation({ summary: 'Invite a user to the current tenant' })
   @ApiResponse({ status: 201, description: 'Invitation created' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
@@ -48,7 +48,7 @@ export class MembershipsController {
 
   @Patch(':id')
   @UseGuards(PermissionsGuard)
-  @RequirePermissions('users.manage')
+  @RequirePermissions('organizacion.miembros.update')
   @ApiOperation({ summary: 'Update a member role' })
   @ApiResponse({ status: 200, description: 'Membership updated' })
   @ApiResponse({ status: 403, description: 'Cannot change owner role' })
@@ -62,7 +62,7 @@ export class MembershipsController {
 
   @Delete(':id')
   @UseGuards(PermissionsGuard)
-  @RequirePermissions('users.manage')
+  @RequirePermissions('organizacion.miembros.remove')
   @ApiOperation({ summary: 'Remove a member from the tenant' })
   @ApiResponse({ status: 200, description: 'Member removed' })
   @ApiResponse({ status: 403, description: 'Cannot remove owner' })

@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 import { InvitationsList } from '@/features/invitations/components/invitations-list';
 import { useInvitations } from '@/features/invitations/hooks/use-invitations';
 
@@ -35,10 +36,15 @@ export function MembersPage(): React.JSX.Element {
             Gestioná quién tiene acceso a esta organización y con qué rol.
           </p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.organizacion.miembros.invite}
+          deniedReason="No tenés permiso para invitar miembros"
+          onClick={() => setInviteOpen(true)}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Invitar miembro
-        </Button>
+        </PermissionButton>
       </div>
 
       <section className="space-y-3">

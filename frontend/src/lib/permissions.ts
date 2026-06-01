@@ -70,9 +70,15 @@ export const PERMISSIONS = {
   organizacion: {
     miembros: {
       read: 'organizacion.miembros.read',
+      invite: 'organizacion.miembros.invite',
+      update: 'organizacion.miembros.update',
+      remove: 'organizacion.miembros.remove',
     },
     roles: {
       read: 'organizacion.roles.read',
+      create: 'organizacion.roles.create',
+      update: 'organizacion.roles.update',
+      delete: 'organizacion.roles.delete',
     },
     features: {
       read: 'organizacion.features.read',

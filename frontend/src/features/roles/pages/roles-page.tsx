@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 
 import { RoleFormDialog } from '../components/role-form-dialog';
 import { RolesList } from '../components/roles-list';
@@ -29,10 +30,15 @@ export function RolesPage(): React.JSX.Element {
             ejemplo: "Contador Junior", "Auditor externo").
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.organizacion.roles.create}
+          deniedReason="No tenés permiso para crear roles"
+          onClick={() => setCreateOpen(true)}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo rol
-        </Button>
+        </PermissionButton>
       </div>
 
       <RolesList

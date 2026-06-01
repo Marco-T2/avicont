@@ -1,8 +1,8 @@
 import { XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { backendErrorMessage } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
 import type { Invitation } from '@/types/api';
 
 import { useRevokeInvitation } from '../hooks/use-invitations';
@@ -79,7 +80,9 @@ export function InvitationsList({
                 {formatFecha(inv.expiresAt)}
               </TableCell>
               <TableCell className="text-right">
-                <Button
+                <PermissionButton
+                  permission={PERMISSIONS.organizacion.miembros.invite}
+                  deniedReason="No tenés permiso para revocar invitaciones"
                   variant="ghost"
                   size="icon"
                   className="h-11 w-11 md:h-9 md:w-9"
@@ -88,7 +91,7 @@ export function InvitationsList({
                   disabled={revoke.isPending}
                 >
                   <XCircle className="h-4 w-4" />
-                </Button>
+                </PermissionButton>
               </TableCell>
             </TableRow>
           ))}

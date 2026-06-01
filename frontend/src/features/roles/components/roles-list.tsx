@@ -31,6 +31,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { backendErrorMessage } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
+import { usePermissions } from '@/lib/use-permissions';
 import type { CustomRole } from '@/types/api';
 
 import { useDeleteRole } from '../hooks/use-roles';
@@ -49,6 +51,13 @@ export function RolesList({
   const [editRole, setEditRole] = useState<CustomRole | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomRole | null>(null);
   const deleteMutation = useDeleteRole();
+
+  // Gating de permisos: los ítems de menú se deshabilitan (no se ocultan) cuando
+  // falta el permiso, sumándose a la condición de negocio `isEditable`. Sin
+  // tooltip porque un DropdownMenuItem deshabilitado no lo dispara de forma fiable.
+  const { has } = usePermissions();
+  const puedeActualizar = has(PERMISSIONS.organizacion.roles.update);
+  const puedeEliminar = has(PERMISSIONS.organizacion.roles.delete);
 
   if (loading && roles.length === 0) {
     return (
@@ -139,7 +148,7 @@ export function RolesList({
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem
                         onClick={() => setEditRole(role)}
-                        disabled={!role.isEditable}
+                        disabled={!role.isEditable || !puedeActualizar}
                       >
                         <Pencil className="h-4 w-4 mr-2" />
                         Editar
@@ -147,7 +156,7 @@ export function RolesList({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => setDeleteTarget(role)}
-                        disabled={!role.isEditable}
+                        disabled={!role.isEditable || !puedeEliminar}
                         className="text-destructive focus:text-destructive focus:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
