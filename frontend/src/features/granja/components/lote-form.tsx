@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import type { Resolver } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 
@@ -9,8 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { estimarFechaSaca } from '../lib/estimar-fecha-saca';
 import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { type LoteFormValues, loteSchema } from '../schemas/lote.schema';
+
+// Engorde típico de parrillero ~42-49 días; 45 es el default operativo.
+const DIAS_ENGORDE_DEFAULT = 45;
 
 interface LoteFormInitialData {
   cantidadInicial?: number;
@@ -29,14 +34,17 @@ interface LoteFormProps {
 }
 
 // Al crear, la fecha de ingreso arranca en "hoy" (La Paz): por defecto los
-// pollitos entraron el día que se carga el lote. El usuario la cambia solo si
-// difiere — un campo menos de fricción para usuarios mayores.
+// pollitos entraron el día que se carga el lote. La fecha estimada de saca se
+// estima a 45 días de ese ingreso. El usuario ajusta solo si difiere — un campo
+// menos de fricción para usuarios mayores.
 function buildCreateDefaults(): Partial<LoteFormValues> {
+  const fechaIngreso = hoyEnLaPaz();
   return {
     nombre: '',
     galpon: '',
     detalle: '',
-    fechaIngreso: hoyEnLaPaz(),
+    fechaIngreso,
+    fechaEstimadaSaca: estimarFechaSaca(fechaIngreso, DIAS_ENGORDE_DEFAULT),
   };
 }
 
@@ -55,6 +63,8 @@ export function LoteForm({ mode, initialData, onSubmit, isSubmitting }: LoteForm
   const {
     register,
     handleSubmit,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<LoteFormValues>({
     // Cast necesario: loteSchema usa .optional() y los valores por defecto
@@ -65,6 +75,28 @@ export function LoteForm({ mode, initialData, onSubmit, isSubmitting }: LoteForm
         ? mapInitialData(initialData)
         : buildCreateDefaults(),
   });
+
+  // Los "días de engorde" son un driver de UI (no se envían al backend): estiman
+  // la fecha de saca desde el ingreso. Solo aplica al crear; en edición el lote
+  // ya tiene su fecha y no la pisamos.
+  const [diasEngorde, setDiasEngorde] = useState(String(DIAS_ENGORDE_DEFAULT));
+
+  function recalcularSaca(fechaIngreso: string, dias: number): void {
+    if (!Number.isFinite(dias)) return;
+    setValue('fechaEstimadaSaca', estimarFechaSaca(fechaIngreso, dias));
+  }
+
+  function handleDiasChange(e: React.ChangeEvent<HTMLInputElement>): void {
+    const raw = e.target.value;
+    setDiasEngorde(raw);
+    if (raw === '') return;
+    recalcularSaca(getValues('fechaIngreso'), Number(raw));
+  }
+
+  function handleFechaIngresoChange(e: React.ChangeEvent<HTMLInputElement>): void {
+    if (mode !== 'create') return;
+    recalcularSaca(e.target.value, Number(diasEngorde));
+  }
 
   return (
     <form
@@ -121,7 +153,7 @@ export function LoteForm({ mode, initialData, onSubmit, isSubmitting }: LoteForm
           error={errors.fechaIngreso?.message}
         >
           <Input
-            {...register('fechaIngreso')}
+            {...register('fechaIngreso', { onChange: handleFechaIngresoChange })}
             id="fechaIngreso"
             type="date"
             className="text-base md:text-sm"
@@ -141,20 +173,53 @@ export function LoteForm({ mode, initialData, onSubmit, isSubmitting }: LoteForm
         />
       </Field>
 
-      {/* Fecha estimada de saca */}
-      <Field
-        label="Fecha estimada de saca"
-        htmlFor="fechaEstimadaSaca"
-        error={errors.fechaEstimadaSaca?.message}
-      >
-        <Input
-          {...register('fechaEstimadaSaca')}
-          id="fechaEstimadaSaca"
-          type="date"
-          className="text-base md:text-sm"
-          aria-invalid={errors.fechaEstimadaSaca !== undefined}
-        />
-      </Field>
+      {/* Fecha estimada de saca — al crear, se estima desde "días de engorde";
+          la fecha queda editable por si el usuario la conoce con exactitud. */}
+      {mode === 'create' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Días de engorde" htmlFor="diasEngorde">
+            <Input
+              id="diasEngorde"
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={diasEngorde}
+              onChange={handleDiasChange}
+              className="text-base md:text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Estima la fecha de saca desde el ingreso.
+            </p>
+          </Field>
+          <Field
+            label="Fecha estimada de saca"
+            htmlFor="fechaEstimadaSaca"
+            error={errors.fechaEstimadaSaca?.message}
+          >
+            <Input
+              {...register('fechaEstimadaSaca')}
+              id="fechaEstimadaSaca"
+              type="date"
+              className="text-base md:text-sm"
+              aria-invalid={errors.fechaEstimadaSaca !== undefined}
+            />
+          </Field>
+        </div>
+      ) : (
+        <Field
+          label="Fecha estimada de saca"
+          htmlFor="fechaEstimadaSaca"
+          error={errors.fechaEstimadaSaca?.message}
+        >
+          <Input
+            {...register('fechaEstimadaSaca')}
+            id="fechaEstimadaSaca"
+            type="date"
+            className="text-base md:text-sm"
+            aria-invalid={errors.fechaEstimadaSaca !== undefined}
+          />
+        </Field>
+      )}
 
       {/* Detalle */}
       <Field label="Detalle" htmlFor="detalle" error={errors.detalle?.message}>
