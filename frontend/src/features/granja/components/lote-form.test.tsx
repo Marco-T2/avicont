@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { estimarFechaSaca } from '../lib/estimar-fecha-saca';
 import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { LoteForm } from './lote-form';
 
@@ -92,6 +93,46 @@ describe('LoteForm — modo crear', () => {
     );
   });
 
+  it('pre-carga la fecha estimada de saca a 45 días del ingreso', () => {
+    render(
+      <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    expect(screen.getByLabelText(/días de engorde/i)).toHaveValue(45);
+    expect(screen.getByLabelText(/fecha estimada de saca/i)).toHaveValue(
+      estimarFechaSaca(hoyEnLaPaz(), 45),
+    );
+  });
+
+  it('recalcula la fecha estimada de saca al cambiar los días de engorde', async () => {
+    const user = userEvent.setup();
+    render(
+      <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    await user.clear(screen.getByLabelText(/días de engorde/i));
+    await user.type(screen.getByLabelText(/días de engorde/i), '30');
+
+    expect(screen.getByLabelText(/fecha estimada de saca/i)).toHaveValue(
+      estimarFechaSaca(hoyEnLaPaz(), 30),
+    );
+  });
+
+  it('recalcula la fecha estimada de saca al cambiar la fecha de ingreso', async () => {
+    const user = userEvent.setup();
+    render(
+      <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    await user.clear(screen.getByLabelText(/fecha de ingreso/i));
+    await user.type(screen.getByLabelText(/fecha de ingreso/i), '2026-06-01');
+
+    expect(screen.getByLabelText(/fecha estimada de saca/i)).toHaveValue('2026-07-16');
+  });
+
   it('el botón submit está deshabilitado mientras isSubmitting=true (Anti-F-07)', () => {
     render(
       <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={true} />,
@@ -127,6 +168,15 @@ describe('LoteForm — modo edición', () => {
 
     expect(screen.getByDisplayValue('Lote A')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Galpón 1')).toBeInTheDocument();
+  });
+
+  it('no muestra el campo "Días de engorde" en modo edición', () => {
+    render(
+      <LoteForm mode="edit" initialData={initialData} onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    expect(screen.queryByLabelText(/días de engorde/i)).not.toBeInTheDocument();
   });
 
   it('el botón submit muestra "Guardar cambios" en modo edición', () => {
