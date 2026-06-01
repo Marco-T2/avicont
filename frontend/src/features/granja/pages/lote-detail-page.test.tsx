@@ -156,9 +156,7 @@ describe('LoteDetailPage — eliminar movimiento con confirmación', () => {
     await user.click(screen.getByRole('button', { name: /eliminar movimiento/i }));
 
     expect(deleteMock).not.toHaveBeenCalled();
-    expect(
-      await screen.findByText(/se eliminará de forma permanente/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no se puede deshacer/i)).toBeInTheDocument();
   });
 
   it('elimina el movimiento correcto recién al confirmar', async () => {

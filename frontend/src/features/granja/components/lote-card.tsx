@@ -30,7 +30,7 @@ export function LoteCard({ lote, onRegistrarMovimiento, onCerrar, className }: L
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-lg leading-tight">
-            {lote.nombre ?? `Lote ${lote.id.slice(0, 8)}`}
+            {lote.nombre ?? 'Lote sin nombre'}
           </CardTitle>
           <Badge
             variant={estaActivo ? 'default' : 'secondary'}
@@ -101,7 +101,7 @@ export function LoteCard({ lote, onRegistrarMovimiento, onCerrar, className }: L
             className="w-full min-h-[44px] sm:flex-1"
             size="sm"
           >
-            Registrar movimiento
+            Registrar gasto o mortalidad
           </PermissionButton>
 
           <PermissionButton

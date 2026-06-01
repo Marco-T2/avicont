@@ -99,8 +99,7 @@ export function GranjaDashboardPage(): React.JSX.Element {
               ¿Cerrar {loteACerrar?.nombre ?? 'este lote'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Una vez cerrado, ya no podrás registrar gastos ni movimientos en
-              este lote. Esta acción no se puede deshacer.
+              El lote quedará cerrado. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
