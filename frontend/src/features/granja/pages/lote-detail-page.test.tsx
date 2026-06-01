@@ -11,7 +11,10 @@ import type {
 } from '../api/granja.types';
 import { LoteDetailPage } from './lote-detail-page';
 
-const { deleteMock } = vi.hoisted(() => ({ deleteMock: vi.fn() }));
+const { deleteMock, updateMock } = vi.hoisted(() => ({
+  deleteMock: vi.fn(),
+  updateMock: vi.fn(),
+}));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
@@ -25,6 +28,7 @@ vi.mock('../hooks/use-granja-queries', () => ({
 }));
 vi.mock('../hooks/use-granja-mutations', () => ({
   useCerrarLote: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateLote: () => ({ mutate: updateMock, isPending: false }),
   useCreateMovimientoInversion: () => ({ mutate: vi.fn(), isPending: false }),
   useCreateMovimientoCantidad: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteMovimiento: () => ({ mutate: deleteMock, isPending: false }),
@@ -102,6 +106,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 
 beforeEach(() => {
   deleteMock.mockClear();
+  updateMock.mockClear();
   vi.mocked(useLote).mockReturnValue({
     data: lote,
     isLoading: false,
@@ -169,6 +174,43 @@ describe('LoteDetailPage — eliminar movimiento con confirmación', () => {
 
     expect(deleteMock).toHaveBeenCalledWith(
       { tipo: 'inversion', movId: 'inv-1' },
+      expect.anything(),
+    );
+  });
+});
+
+describe('LoteDetailPage — editar lote', () => {
+  it('el botón "Editar lote" abre el formulario precargado con los datos del lote', async () => {
+    const user = userEvent.setup();
+    render(<LoteDetailPage />, { wrapper });
+
+    await user.click(screen.getByRole('button', { name: /editar lote/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/nombre/i)).toHaveValue('Lote Junio');
+    expect(within(dialog).getByLabelText(/galpón/i)).toHaveValue('El Alto');
+  });
+
+  it('la cantidad inicial no es editable en modo edición', async () => {
+    const user = userEvent.setup();
+    render(<LoteDetailPage />, { wrapper });
+
+    await user.click(screen.getByRole('button', { name: /editar lote/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/cantidad inicial/i)).toBeDisabled();
+  });
+
+  it('guarda los cambios llamando a la mutation de update', async () => {
+    const user = userEvent.setup();
+    render(<LoteDetailPage />, { wrapper });
+
+    await user.click(screen.getByRole('button', { name: /editar lote/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /guardar cambios/i }));
+
+    expect(updateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ nombre: 'Lote Junio', galpon: 'El Alto' }),
       expect.anything(),
     );
   });

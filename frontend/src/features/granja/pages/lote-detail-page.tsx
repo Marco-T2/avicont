@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import type { MovimientoCantidadResponse, MovimientoInversionResponse } from '../api/granja.types';
+import { LoteForm } from '../components/lote-form';
 import { MovimientoCantidadForm } from '../components/movimiento-cantidad-form';
 import { MovimientoInversionForm } from '../components/movimiento-inversion-form';
 import { useLote, useMovimientos, useTiposRegistro } from '../hooks/use-granja-queries';
@@ -36,12 +37,14 @@ import {
   useCreateMovimientoCantidad,
   useCreateMovimientoInversion,
   useDeleteMovimiento,
+  useUpdateLote,
 } from '../hooks/use-granja-mutations';
 import {
   formatCostoPorPollo,
   formatFechaGranja,
   formatPorcentajeMortalidad,
 } from '../lib/formatters';
+import type { LoteFormValues } from '../schemas/lote.schema';
 import type { MovimientoCantidadFormValues } from '../schemas/movimiento-cantidad.schema';
 import type { MovimientoInversionFormValues } from '../schemas/movimiento-inversion.schema';
 
@@ -62,11 +65,13 @@ export function LoteDetailPage(): React.JSX.Element {
   const { data: tiposRegistro } = useTiposRegistro();
 
   const cerrarLote = useCerrarLote();
+  const updateLote = useUpdateLote(id);
   const createInversion = useCreateMovimientoInversion(id);
   const createCantidad = useCreateMovimientoCantidad(id);
   const deleteMovimiento = useDeleteMovimiento(id);
 
   const [cerrarDialogOpen, setCerrarDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [addInversionOpen, setAddInversionOpen] = useState(false);
   const [addCantidadOpen, setAddCantidadOpen] = useState(false);
   // Borrar un movimiento confirma antes de mutar — un toque al tachito no debe
@@ -114,6 +119,30 @@ export function LoteDetailPage(): React.JSX.Element {
         toast.error('No se pudo cerrar el lote');
       },
     });
+  }
+
+  // La cantidad inicial es inmutable tras crear el lote (UpdateLoteRequest la
+  // excluye); el form la deshabilita y acá ni se envía. Campos vacíos se omiten,
+  // igual que al crear.
+  function handleEdit(values: LoteFormValues): void {
+    updateLote.mutate(
+      {
+        fechaIngreso: values.fechaIngreso,
+        ...(values.nombre !== undefined && values.nombre !== '' ? { nombre: values.nombre } : {}),
+        ...(values.galpon !== undefined && values.galpon !== '' ? { galpon: values.galpon } : {}),
+        ...(values.fechaEstimadaSaca !== undefined && values.fechaEstimadaSaca !== ''
+          ? { fechaEstimadaSaca: values.fechaEstimadaSaca }
+          : {}),
+        ...(values.detalle !== undefined && values.detalle !== '' ? { detalle: values.detalle } : {}),
+      },
+      {
+        onSuccess: () => {
+          toast.success('Lote actualizado correctamente');
+          setEditOpen(false);
+        },
+        onError: () => toast.error('No se pudo actualizar el lote'),
+      },
+    );
   }
 
   function handleAddInversion(values: MovimientoInversionFormValues): void {
@@ -208,15 +237,27 @@ export function LoteDetailPage(): React.JSX.Element {
         </div>
 
         {estaActivo ? (
-          <Can permission={PERMISSIONS.granja.lotes.update}>
-            <Button
+          <div className="flex flex-col gap-2 self-start sm:flex-row">
+            <PermissionButton
+              permission={PERMISSIONS.granja.lotes.update}
+              deniedReason="No tenés permiso para editar el lote"
               variant="outline"
-              className="self-start text-destructive hover:text-destructive min-h-[44px]"
-              onClick={() => setCerrarDialogOpen(true)}
+              className="min-h-[44px]"
+              onClick={() => setEditOpen(true)}
             >
-              Cerrar lote
-            </Button>
-          </Can>
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar lote
+            </PermissionButton>
+            <Can permission={PERMISSIONS.granja.lotes.update}>
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive min-h-[44px]"
+                onClick={() => setCerrarDialogOpen(true)}
+              >
+                Cerrar lote
+              </Button>
+            </Can>
+          </div>
         ) : null}
       </div>
 
@@ -393,6 +434,30 @@ export function LoteDetailPage(): React.JSX.Element {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog: editar lote */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-xl max-w-none h-full sm:h-auto overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar lote</DialogTitle>
+          </DialogHeader>
+          <div className="pb-4">
+            <LoteForm
+              mode="edit"
+              initialData={{
+                cantidadInicial: lote.cantidadInicial,
+                fechaIngreso: lote.fechaIngreso,
+                nombre: lote.nombre ?? undefined,
+                galpon: lote.galpon ?? undefined,
+                fechaEstimadaSaca: lote.fechaEstimadaSaca ?? undefined,
+                detalle: lote.detalle ?? undefined,
+              }}
+              onSubmit={handleEdit}
+              isSubmitting={updateLote.isPending}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog: nuevo movimiento de inversión */}
       <Dialog open={addInversionOpen} onOpenChange={setAddInversionOpen}>
