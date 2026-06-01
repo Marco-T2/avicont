@@ -1,10 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SystemRole } from '@prisma/client';
+
+import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import {
   MEMBERSHIPS_READER_PORT,
   MembershipsReaderPort,
 } from '@/memberships/ports/memberships-reader.port';
+
 import {
   IMPERSONATION_REPOSITORY_PORT,
   ImpersonationRepositoryPort,
@@ -37,6 +40,7 @@ export class ImpersonationService {
     @Inject(MEMBERSHIPS_READER_PORT)
     private readonly memberships: MembershipsReaderPort,
     private readonly jwt: JwtService,
+    @Inject(CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
   async start(
@@ -101,7 +105,7 @@ export class ImpersonationService {
       impersonationId: log.id,
     });
 
-    const now = new Date();
+    const now = this.clock.now();
     const expiresAt = this.window.expiresAt(now);
     const impersonationToken = this.jwt.sign(claims.toPayload(), {
       expiresIn: this.window.toExpiresIn(),

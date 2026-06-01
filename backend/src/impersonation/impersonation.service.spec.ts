@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { SystemRole } from '@prisma/client';
 
+import { CLOCK_PORT } from '@/common/clock/clock.port';
+import { FakeClockAdapter } from '@/common/clock/fake-clock.adapter';
 import {
   MEMBERSHIPS_READER_PORT,
   type MembershipsReaderPort,
@@ -43,6 +45,7 @@ describe('ImpersonationService (unit)', () => {
   let repo: RepoMock;
   let memberships: MembershipsMock;
   let jwt: { sign: jest.Mock };
+  let clock: FakeClockAdapter;
 
   beforeEach(async () => {
     repo = {
@@ -60,6 +63,7 @@ describe('ImpersonationService (unit)', () => {
       findAllByTenant: jest.fn(),
     } as unknown as MembershipsMock;
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
+    clock = new FakeClockAdapter();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -67,6 +71,7 @@ describe('ImpersonationService (unit)', () => {
         { provide: IMPERSONATION_REPOSITORY_PORT, useValue: repo },
         { provide: MEMBERSHIPS_READER_PORT, useValue: memberships },
         { provide: JwtService, useValue: jwt },
+        { provide: CLOCK_PORT, useValue: clock },
       ],
     }).compile();
 
@@ -249,6 +254,20 @@ describe('ImpersonationService (unit)', () => {
         service.start(ADMIN, TENANT, { targetUserId: TARGET, reason: 'corta' }),
       ).rejects.toThrow(ImpersonationReasonInvalidaError);
       expect(memberships.findForImpersonation).not.toHaveBeenCalled();
+    });
+
+    it('expiresAt proviene del clock (determinista: now + 30 min exacto)', async () => {
+      const frozenNow = new Date('2026-06-01T12:00:00.000Z');
+      clock.setTo(frozenNow);
+
+      memberships.findForImpersonation
+        .mockResolvedValueOnce(adminOwner())
+        .mockResolvedValueOnce(targetContador());
+
+      const result = await service.start(ADMIN, TENANT, validDto());
+
+      const expectedExpiresAt = new Date(frozenNow.getTime() + 30 * 60 * 1000);
+      expect(result.expiresAt).toEqual(expectedExpiresAt);
     });
   });
 
