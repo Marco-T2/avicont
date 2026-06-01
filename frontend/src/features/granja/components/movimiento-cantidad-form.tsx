@@ -138,7 +138,7 @@ export function MovimientoCantidadForm({
               Registrando…
             </>
           ) : (
-            'Registrar cantidad'
+            'Registrar mortalidad'
           )}
         </Button>
       </div>

@@ -119,6 +119,35 @@ beforeEach(() => {
   } as ReturnType<typeof useTiposRegistro>);
 });
 
+describe('LoteDetailPage — registro directo (sin pestañas)', () => {
+  it('el botón "Registrar gasto" abre el formulario de gasto', async () => {
+    const user = userEvent.setup();
+    render(<LoteDetailPage />, { wrapper });
+
+    await user.click(screen.getByRole('button', { name: /registrar gasto/i }));
+
+    // El form de gasto es el único con el campo "Monto".
+    expect(await screen.findByLabelText(/monto/i)).toBeInTheDocument();
+  });
+
+  it('el botón "Registrar mortalidad" abre el formulario de mortalidad', async () => {
+    const user = userEvent.setup();
+    render(<LoteDetailPage />, { wrapper });
+
+    await user.click(screen.getByRole('button', { name: /registrar mortalidad/i }));
+
+    // El form de mortalidad es el único con el campo "Cantidad".
+    expect(await screen.findByLabelText(/cantidad/i)).toBeInTheDocument();
+  });
+
+  it('muestra las secciones Gastos y Mortalidad sin pestañas que cambiar', () => {
+    render(<LoteDetailPage />, { wrapper });
+
+    expect(screen.getByRole('heading', { name: /^gastos$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^mortalidad$/i })).toBeInTheDocument();
+  });
+});
+
 describe('LoteDetailPage — eliminar movimiento con confirmación', () => {
   it('no elimina al primer clic; pide confirmación antes de mutar', async () => {
     const user = userEvent.setup();
