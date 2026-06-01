@@ -651,7 +651,7 @@ Owner: backend-lead
 
 ### S6-A — PERMISSIONS.granja (PRIMERO, antes de cualquier componente)
 
-- [ ] **S6.1** `[test]` RED — test en `frontend/src/lib/permissions.test.ts` (crear si no existe)
+- [x] **S6.1** `[test]` RED — test en `frontend/src/lib/permissions.test.ts` (crear si no existe)
   - `describe('PERMISSIONS.granja')`:
     - `PERMISSIONS.granja.dashboard.read === 'granja.dashboard.read'`
     - `PERMISSIONS.granja.lotes.create === 'granja.lotes.create'`
@@ -660,7 +660,7 @@ Owner: backend-lead
     - `PERMISSIONS.granja.movimientos.create === 'granja.movimientos.create'`
   - Ejecutar: `cd frontend && pnpm exec vitest run src/lib/permissions.test.ts` → **RED**
 
-- [ ] **S6.2** `[impl]` GREEN — Agregar bloque `granja` a `frontend/src/lib/permissions.ts`
+- [x] **S6.2** `[impl]` GREEN — Agregar bloque `granja` a `frontend/src/lib/permissions.ts`
   - Copiar el bloque exacto del design.md §11 (con `tiposRegistro` camel → string `granja.tipos-registro.*`)
   - **G-9**: `tiposRegistro: { read: 'granja.tipos-registro.read', create: 'granja.tipos-registro.create', update: 'granja.tipos-registro.update', delete: 'granja.tipos-registro.delete' }`
   - Ejecutar: verde
@@ -668,19 +668,19 @@ Owner: backend-lead
 
 ### S6-B — API layer
 
-- [ ] **S6.3** `[impl]` Crear `frontend/src/features/granja/api/granja.api.ts`
+- [x] **S6.3** `[impl]` Crear `frontend/src/features/granja/api/granja.api.ts`
   - Funciones de fetching para los 15 endpoints (getDashboard, createLote, getLotes, getLote, updateLote, cerrarLote, getTiposRegistro, createTipoRegistro, updateTipoRegistro, deleteTipoRegistro, createMovimientoInversion, createMovimientoCantidad, getMovimientos, deleteMovimientoInversion, deleteMovimientoCantidad)
   - Tipos TS para requests/responses en `frontend/src/features/granja/api/granja.types.ts`
   - `monto` como `string` en requests; `costoAcumulado`/`costoPorPolloVivo` como `string | null` en responses
 
-- [ ] **S6.4** `[test]` RED + `[impl]` GREEN — tests de la lógica pura en `frontend/src/features/granja/lib/`
+- [x] **S6.4** `[test]` RED + `[impl]` GREEN — tests de la lógica pura en `frontend/src/features/granja/lib/`
   - `describe('formatCostoPorPollo')`: `null` → `"—"`, `"15.31"` → `"Bs 15.31"`
   - `describe('formatPorcentajeMortalidad')`: `0.0512` → `"5.12%"`
   - Ejecutar: → RED → implementar → GREEN
 
 ### S6-C — Hooks
 
-- [ ] **S6.5** `[impl]` Crear hooks en `frontend/src/features/granja/hooks/`
+- [x] **S6.5** `[impl]` Crear hooks en `frontend/src/features/granja/hooks/`
   - `useDashboard()` — `useQuery` con `queryKey: ['granja-dashboard', activeTenantId]`
   - `useLotes(estado?)` — `useQuery` con `queryKey: ['granja-lotes', activeTenantId, estado]`
   - `useLote(id)` — `useQuery` con `queryKey: ['granja-lote', activeTenantId, id]`
@@ -691,7 +691,7 @@ Owner: backend-lead
 
 ### S6-D — Schemas Zod (validación de forms)
 
-- [ ] **S6.6** `[impl]` Crear `frontend/src/features/granja/schemas/`
+- [x] **S6.6** `[impl]` Crear `frontend/src/features/granja/schemas/`
   - `lote.schema.ts`: `cantidadInicial` min(1) int, `fechaIngreso` date string
   - `tipo-registro.schema.ts`: `nombre` min(1) max(100), `naturaleza` enum
   - `movimiento-inversion.schema.ts`: `monto` regex `/^\d+(\.\d{1,2})?$/`, `fecha` date, `tipoRegistroId` uuid, `detalle` optional max(500)
@@ -700,76 +700,76 @@ Owner: backend-lead
 
 ### S6-E — Componentes
 
-- [ ] **S6.7** `[test]` RED — `frontend/src/features/granja/components/costo-por-pollo-card.test.tsx`
+- [x] **S6.7** `[test]` RED — `frontend/src/features/granja/components/costo-por-pollo-card.test.tsx`
   - `describe('CostoPorPolloCard')`:
     - `costoPorPolloVivo = "15.31"` → muestra `Bs 15.31` como dato prominente
     - `costoPorPolloVivo = null` → muestra "—"
     - `avesVivas = 0` y costo alto → muestra mortalidad total con estilo visual diferente
 
-- [ ] **S6.8** `[impl]` GREEN — Crear `frontend/src/features/granja/components/costo-por-pollo-card.tsx`
+- [x] **S6.8** `[impl]` GREEN — Crear `frontend/src/features/granja/components/costo-por-pollo-card.tsx`
   - Mobile-first: costo/pollo como texto grande prominente (el norte del módulo)
   - Tap target ≥ 44px en acciones
 
-- [ ] **S6.9** `[test]` RED — `frontend/src/features/granja/components/lote-card.test.tsx`
+- [x] **S6.9** `[test]` RED — `frontend/src/features/granja/components/lote-card.test.tsx`
   - `describe('LoteCard')`:
     - muestra nombre, galpón, edad en días, aves vivas, porcentaje mortalidad, costo/pollo
     - `<PermissionButton>` "Registrar movimiento" solo visible con `granja.movimientos.create`
     - `<PermissionButton>` "Cerrar lote" solo visible con `granja.lotes.update`
     - lote CERRADO → no muestra botones de acción
 
-- [ ] **S6.10** `[impl]` GREEN — Crear `frontend/src/features/granja/components/lote-card.tsx`
+- [x] **S6.10** `[impl]` GREEN — Crear `frontend/src/features/granja/components/lote-card.tsx`
   - Usa `<Can permission={PERMISSIONS.granja.movimientos.create}>` para acciones
   - Mobile-first
 
-- [ ] **S6.11** `[test]` RED + `[impl]` GREEN — form de crear/editar lote
+- [x] **S6.11** `[test]` RED + `[impl]` GREEN — form de crear/editar lote
   - `frontend/src/features/granja/components/lote-form.tsx`
   - RHF + Zod (`lote.schema.ts`)
   - `cantidadInicial` deshabilitado en modo edición (NO en el form de creación)
   - Mensajes de error en español
 
-- [ ] **S6.12** `[test]` RED + `[impl]` GREEN — form de movimiento inversión
+- [x] **S6.12** `[test]` RED + `[impl]` GREEN — form de movimiento inversión
   - `frontend/src/features/granja/components/movimiento-inversion-form.tsx`
   - `monto` como input text (no number), validación del patrón `/^\d+(\.\d{1,2})?$/`
   - Selector de TipoRegistro filtrado por `naturaleza = INVERSION`
 
-- [ ] **S6.13** `[test]` RED + `[impl]` GREEN — form de movimiento cantidad
+- [x] **S6.13** `[test]` RED + `[impl]` GREEN — form de movimiento cantidad
   - `frontend/src/features/granja/components/movimiento-cantidad-form.tsx`
   - `cantidad` como input numérico int, min 1
   - Selector de TipoRegistro filtrado por `naturaleza = CANTIDAD`
 
 ### S6-F — Páginas
 
-- [ ] **S6.14** `[impl]` Crear `frontend/src/features/granja/pages/dashboard-page.tsx`
+- [x] **S6.14** `[impl]` Crear `frontend/src/features/granja/pages/dashboard-page.tsx`
   - Grid de `LoteCard` de lotes activos, mobile-first
   - Gating: `<RequirePermission permission={PERMISSIONS.granja.dashboard.read}>`
   - Empty state amigable
 
-- [ ] **S6.15** `[impl]` Crear `frontend/src/features/granja/pages/lotes-page.tsx`
+- [x] **S6.15** `[impl]` Crear `frontend/src/features/granja/pages/lotes-page.tsx`
   - Listado con filtro por estado (ACTIVO/CERRADO/todos)
   - `<Can permission={PERMISSIONS.granja.lotes.create}>` para el botón "Nuevo lote"
   - Gating: `<RequirePermission permission={PERMISSIONS.granja.lotes.read}>`
 
-- [ ] **S6.16** `[impl]` Crear `frontend/src/features/granja/pages/lote-detail-page.tsx`
+- [x] **S6.16** `[impl]` Crear `frontend/src/features/granja/pages/lote-detail-page.tsx`
   - Resumen del lote + desglose de costos por tipo + % mortalidad + edad + aves vivas + costo/pollo
   - Tabs o secciones para inversiones y cantidades
   - Formularios de registro de movimiento (inline o modal)
   - Botón "Cerrar lote" con confirmación
 
-- [ ] **S6.17** `[impl]` Crear `frontend/src/features/granja/pages/tipos-registro-page.tsx`
+- [x] **S6.17** `[impl]` Crear `frontend/src/features/granja/pages/tipos-registro-page.tsx`
   - Lista separada por naturaleza (INVERSION / CANTIDAD)
   - `<Can>` para crear/editar/eliminar según permisos
   - Toggle de `activo`
 
 ### S6-G — Routing y navegación
 
-- [ ] **S6.18** Agregar rutas granja en el router de frontend
+- [x] **S6.18** Agregar rutas granja en el router de frontend
   - `/granja` → `DashboardPage`
   - `/granja/lotes` → `LotesPage`
   - `/granja/lotes/:id` → `LoteDetailPage`
   - `/granja/tipos-registro` → `TiposRegistroPage`
   - Todas con `<RequirePermission>` apropiado
 
-- [ ] **S6.19** Agregar ítems de navegación para granja en `NAV_ITEMS`
+- [x] **S6.19** Agregar ítems de navegación para granja en `NAV_ITEMS`
   - "Dashboard" con `requiredPermission: PERMISSIONS.granja.dashboard.read`
   - "Mis Lotes" con `requiredPermission: PERMISSIONS.granja.lotes.read`
   - "Tipos de Registro" con `requiredPermission: PERMISSIONS.granja.tiposRegistro.read`
@@ -777,11 +777,11 @@ Owner: backend-lead
 
 ### S6-H — Verificación final frontend
 
-- [ ] **S6.20** `cd frontend && pnpm exec tsc -b` → 0 errores (**G-2**)
+- [x] **S6.20** `cd frontend && pnpm exec tsc -b` → 0 errores (**G-2**)
 
-- [ ] **S6.21** `cd frontend && pnpm exec vitest run src/features/granja/` → todos los tests verdes
+- [x] **S6.21** `cd frontend && pnpm exec vitest run src/features/granja/` → todos los tests verdes
 
-- [ ] **S6.22** Commit
+- [x] **S6.22** Commit
   - `feat(granja): frontend mobile-first (dashboard, lotes, movimientos, tipos-registro)`
 
 ---
