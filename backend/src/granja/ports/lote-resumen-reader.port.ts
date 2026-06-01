@@ -7,6 +7,7 @@
 
 import type { Prisma } from '@prisma/client';
 
+// Prisma.TransactionClient is used in the abstract method signature below
 export const LOTE_RESUMEN_READER_PORT = Symbol('LOTE_RESUMEN_READER_PORT');
 
 /**
@@ -16,8 +17,11 @@ export const LOTE_RESUMEN_READER_PORT = Symbol('LOTE_RESUMEN_READER_PORT');
  */
 export interface LoteAgregados {
   loteId: string;
-  /** Suma de movimientos_inversion.monto para el lote. */
-  totalInversionBob: Prisma.Decimal;
+  /**
+   * Suma de movimientos_inversion.monto para el lote, serializada como string.
+   * El service la envuelve en Money (diseño D5: el reader no conoce Money).
+   */
+  totalInversionBob: string;
   /** Suma de movimientos_cantidad.cantidad para el lote. */
   totalMuertes: number;
 }
