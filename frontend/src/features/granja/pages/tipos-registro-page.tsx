@@ -3,6 +3,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Can } from '@/components/shared/can';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -118,6 +128,7 @@ export function TiposRegistroPage(): React.JSX.Element {
 function TipoRow({ tipo }: { tipo: TipoRegistroResponse }): React.JSX.Element {
   const updateTipo = useUpdateTipoRegistro(tipo.id);
   const deleteTipo = useDeleteTipoRegistro();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function handleToggleActivo(checked: boolean): void {
     updateTipo.mutate(
@@ -128,9 +139,13 @@ function TipoRow({ tipo }: { tipo: TipoRegistroResponse }): React.JSX.Element {
     );
   }
 
-  function handleDelete(): void {
+  function handleDeleteConfirm(e: React.MouseEvent): void {
+    e.preventDefault();
     deleteTipo.mutate(tipo.id, {
-      onSuccess: () => toast.success('Tipo eliminado'),
+      onSuccess: () => {
+        toast.success('Tipo eliminado');
+        setConfirmOpen(false);
+      },
       onError: () => toast.error('No se pudo eliminar el tipo'),
     });
   }
@@ -173,7 +188,7 @@ function TipoRow({ tipo }: { tipo: TipoRegistroResponse }): React.JSX.Element {
         {!tipo.esSistema ? (
           <Can permission={PERMISSIONS.granja.tiposRegistro.delete}>
             <button
-              onClick={handleDelete}
+              onClick={() => setConfirmOpen(true)}
               disabled={deleteTipo.isPending}
               aria-label={`Eliminar ${tipo.nombre}`}
               className="text-muted-foreground hover:text-destructive disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center sm:min-h-[32px] sm:min-w-[32px]"
@@ -183,6 +198,29 @@ function TipoRow({ tipo }: { tipo: TipoRegistroResponse }): React.JSX.Element {
           </Can>
         ) : null}
       </div>
+
+      {/* Confirmación de borrado — acción permanente */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar &ldquo;{tipo.nombre}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este tipo de registro se eliminará de forma permanente. Esta acción
+              no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteTipo.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTipo.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

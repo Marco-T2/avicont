@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TipoRegistroResponse } from '../api/granja.types';
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { MovimientoInversionForm } from './movimiento-inversion-form';
 
 // Mock de useTiposRegistro para que no haga llamadas reales.
@@ -83,6 +84,15 @@ describe('MovimientoInversionForm', () => {
     expect(screen.getByLabelText(/fecha/i)).toBeInTheDocument();
   });
 
+  it('pre-carga la fecha con el día de hoy (La Paz)', () => {
+    render(
+      <MovimientoInversionForm onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    expect(screen.getByLabelText(/fecha/i)).toHaveValue(hoyEnLaPaz());
+  });
+
   it('muestra error de validación si monto tiene formato inválido', async () => {
     const user = userEvent.setup();
     render(
@@ -119,7 +129,8 @@ describe('MovimientoInversionForm', () => {
     );
 
     await user.type(screen.getByLabelText(/monto/i), '1250.50');
-    // user.type en inputs date funciona en jsdom con userEvent v14.
+    // La fecha viene pre-cargada con hoy; la limpiamos antes de tipear la nuestra.
+    await user.clear(screen.getByLabelText(/fecha/i));
     await user.type(screen.getByLabelText(/fecha/i), '2026-06-01');
 
     // Seleccionar el tipo de registro usando el select nativo.

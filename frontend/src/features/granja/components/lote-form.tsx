@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { type LoteFormValues, loteSchema } from '../schemas/lote.schema';
 
 interface LoteFormInitialData {
@@ -27,11 +28,17 @@ interface LoteFormProps {
   isSubmitting: boolean;
 }
 
-const DEFAULT_CREATE_VALUES: Partial<LoteFormValues> = {
-  nombre: '',
-  galpon: '',
-  detalle: '',
-};
+// Al crear, la fecha de ingreso arranca en "hoy" (La Paz): por defecto los
+// pollitos entraron el día que se carga el lote. El usuario la cambia solo si
+// difiere — un campo menos de fricción para usuarios mayores.
+function buildCreateDefaults(): Partial<LoteFormValues> {
+  return {
+    nombre: '',
+    galpon: '',
+    detalle: '',
+    fechaIngreso: hoyEnLaPaz(),
+  };
+}
 
 function mapInitialData(data: LoteFormInitialData): Partial<LoteFormValues> {
   return {
@@ -56,7 +63,7 @@ export function LoteForm({ mode, initialData, onSubmit, isSubmitting }: LoteForm
     defaultValues:
       mode === 'edit' && initialData !== undefined
         ? mapInitialData(initialData)
-        : DEFAULT_CREATE_VALUES,
+        : buildCreateDefaults(),
   });
 
   return (

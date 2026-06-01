@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { useTiposRegistro } from '../hooks/use-granja-queries';
 import {
   type MovimientoCantidadFormValues,
@@ -20,8 +21,9 @@ interface MovimientoCantidadFormProps {
   isSubmitting: boolean;
 }
 
-const DEFAULT_VALUES: Partial<MovimientoCantidadFormValues> = {
-  fecha: '',
+// La fecha arranca en "hoy" (La Paz): una baja se registra el día que ocurre.
+// Menos fricción para el usuario mayor — un campo menos que pelear.
+const DEFAULT_VALUES: Omit<Partial<MovimientoCantidadFormValues>, 'fecha'> = {
   tipoRegistroId: '',
   detalle: '',
 };
@@ -43,7 +45,7 @@ export function MovimientoCantidadForm({
     formState: { errors },
   } = useForm<MovimientoCantidadFormValues>({
     resolver: zodResolver(movimientoCantidadSchema) as Resolver<MovimientoCantidadFormValues>,
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: { ...DEFAULT_VALUES, fecha: hoyEnLaPaz() },
   });
 
   return (

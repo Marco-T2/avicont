@@ -69,6 +69,11 @@ export function LoteDetailPage(): React.JSX.Element {
   const [cerrarDialogOpen, setCerrarDialogOpen] = useState(false);
   const [addInversionOpen, setAddInversionOpen] = useState(false);
   const [addCantidadOpen, setAddCantidadOpen] = useState(false);
+  // Borrar un movimiento confirma antes de mutar — un toque al tachito no debe
+  // borrar un gasto/baja por accidente.
+  const [deleteTarget, setDeleteTarget] = useState<
+    { tipo: 'inversion' | 'cantidad'; movId: string } | null
+  >(null);
 
   // ─── Desglose de costos por tipo (CLIENT-SIDE) ────────────────────────────
   // Agrupar inversiones por tipoRegistroId, sumar monto (string math via Number),
@@ -139,14 +144,16 @@ export function LoteDetailPage(): React.JSX.Element {
     );
   }
 
-  function handleDeleteMovimiento(tipo: 'inversion' | 'cantidad', movId: string): void {
-    deleteMovimiento.mutate(
-      { tipo, movId },
-      {
-        onSuccess: () => toast.success('Movimiento eliminado'),
-        onError: () => toast.error('No se pudo eliminar el movimiento'),
+  function handleDeleteConfirm(e: React.MouseEvent): void {
+    e.preventDefault();
+    if (deleteTarget === null) return;
+    deleteMovimiento.mutate(deleteTarget, {
+      onSuccess: () => {
+        toast.success('Movimiento eliminado');
+        setDeleteTarget(null);
       },
-    );
+      onError: () => toast.error('No se pudo eliminar el movimiento'),
+    });
   }
 
   // ─── Loading / Error ──────────────────────────────────────────────────────
@@ -324,7 +331,7 @@ export function LoteDetailPage(): React.JSX.Element {
                     inversion={inv}
                     tipoNombre={tiposRegistro?.find((t) => t.id === inv.tipoRegistroId)?.nombre ?? '—'}
                     canDelete={estaActivo}
-                    onDelete={() => handleDeleteMovimiento('inversion', inv.id)}
+                    onDelete={() => setDeleteTarget({ tipo: 'inversion', movId: inv.id })}
                     isDeleting={deleteMovimiento.isPending}
                   />
                 ))}
@@ -373,7 +380,7 @@ export function LoteDetailPage(): React.JSX.Element {
                     cantidad={cant}
                     tipoNombre={tiposRegistro?.find((t) => t.id === cant.tipoRegistroId)?.nombre ?? '—'}
                     canDelete={estaActivo}
-                    onDelete={() => handleDeleteMovimiento('cantidad', cant.id)}
+                    onDelete={() => setDeleteTarget({ tipo: 'cantidad', movId: cant.id })}
                     isDeleting={deleteMovimiento.isPending}
                   />
                 ))}
@@ -419,6 +426,32 @@ export function LoteDetailPage(): React.JSX.Element {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog: confirmar borrado de un movimiento */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El registro se eliminará de forma permanente y el costo por pollo
+              se recalculará. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteMovimiento.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMovimiento.isPending ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog: nuevo movimiento de cantidad */}
       <Dialog open={addCantidadOpen} onOpenChange={setAddCantidadOpen}>
