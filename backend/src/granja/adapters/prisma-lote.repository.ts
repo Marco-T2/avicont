@@ -35,6 +35,8 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
         cantidadInicial: data.cantidadInicial,
         fechaIngreso: data.fechaIngreso,
         galpon: data.galpon ?? null,
+        ...(data.nombre !== undefined ? { nombre: data.nombre } : {}),
+        ...(data.detalle !== undefined ? { detalle: data.detalle } : {}),
         ...(data.fechaEstimadaSaca !== undefined
           ? { fechaEstimadaSaca: data.fechaEstimadaSaca }
           : {}),
@@ -70,18 +72,20 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
       Array<{
         id: string;
         organizationId: string;
+        nombre: string | null;
         cantidadInicial: number;
         fechaIngreso: Date;
         fechaEstimadaSaca: Date | null;
         fechaCierre: Date | null;
         galpon: string | null;
+        detalle: string | null;
         estado: string;
         createdAt: Date;
         updatedAt: Date;
       }>
     >`
-      SELECT id, "organizationId", "cantidadInicial", "fechaIngreso",
-             "fechaEstimadaSaca", "fechaCierre", galpon, estado, "createdAt", "updatedAt"
+      SELECT id, "organizationId", nombre, "cantidadInicial", "fechaIngreso",
+             "fechaEstimadaSaca", "fechaCierre", galpon, detalle, estado, "createdAt", "updatedAt"
       FROM lotes
       WHERE id = ${id}
         AND "organizationId" = ${organizationId}
@@ -92,11 +96,13 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
     return {
       id: row.id,
       organizationId: row.organizationId,
+      nombre: row.nombre,
       cantidadInicial: row.cantidadInicial,
       fechaIngreso: row.fechaIngreso,
       fechaEstimadaSaca: row.fechaEstimadaSaca,
       fechaCierre: row.fechaCierre,
       galpon: row.galpon,
+      detalle: row.detalle,
       estado: row.estado as EstadoLote,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -140,6 +146,9 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
     // exactOptionalPropertyTypes: spread condicional (CLAUDE.md §2.5.1).
     // cantidadInicial NO está en LoteUpdateData — es inmutable.
     const updateData: Prisma.LoteUpdateInput = {
+      ...(data.nombre !== undefined ? { nombre: data.nombre } : {}),
+      ...(data.detalle !== undefined ? { detalle: data.detalle } : {}),
+      ...(data.fechaIngreso !== undefined ? { fechaIngreso: data.fechaIngreso } : {}),
       ...(data.fechaEstimadaSaca !== undefined
         ? { fechaEstimadaSaca: data.fechaEstimadaSaca }
         : {}),
@@ -173,11 +182,13 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
   private toRow(row: {
     id: string;
     organizationId: string;
+    nombre: string | null;
     cantidadInicial: number;
     fechaIngreso: Date;
     fechaEstimadaSaca: Date | null;
     fechaCierre: Date | null;
     galpon: string | null;
+    detalle: string | null;
     estado: string;
     createdAt: Date;
     updatedAt: Date;
@@ -185,11 +196,13 @@ export class PrismaLoteRepository extends LoteRepositoryPort {
     return {
       id: row.id,
       organizationId: row.organizationId,
+      nombre: row.nombre,
       cantidadInicial: row.cantidadInicial,
       fechaIngreso: row.fechaIngreso,
       fechaEstimadaSaca: row.fechaEstimadaSaca,
       fechaCierre: row.fechaCierre,
       galpon: row.galpon,
+      detalle: row.detalle,
       estado: row.estado as EstadoLote,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

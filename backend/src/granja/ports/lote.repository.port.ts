@@ -11,11 +11,16 @@ export const LOTE_REPOSITORY_PORT = Symbol('LOTE_REPOSITORY_PORT');
 export interface LoteCreateData {
   cantidadInicial: number;
   fechaIngreso: Date;
+  nombre?: string | null;
+  detalle?: string | null;
   fechaEstimadaSaca?: Date | null;
   galpon?: string | null;
 }
 
 export interface LoteUpdateData {
+  nombre?: string | null;
+  detalle?: string | null;
+  fechaIngreso?: Date;
   fechaEstimadaSaca?: Date | null;
   galpon?: string | null;
 }
@@ -23,11 +28,13 @@ export interface LoteUpdateData {
 export interface LoteRow {
   id: string;
   organizationId: string;
+  nombre: string | null;
   cantidadInicial: number;
   fechaIngreso: Date;
   fechaEstimadaSaca: Date | null;
   fechaCierre: Date | null;
   galpon: string | null;
+  detalle: string | null;
   estado: EstadoLote;
   createdAt: Date;
   updatedAt: Date;

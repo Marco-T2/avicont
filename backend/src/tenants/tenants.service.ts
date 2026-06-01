@@ -17,6 +17,10 @@ import {
   TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
   TipoDocumentoFisicoSeederPort,
 } from '../tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
+import {
+  TIPO_REGISTRO_SEEDER_PORT,
+  TipoRegistroSeederPort,
+} from '../granja/ports/tipo-registro-seeder.port';
 import { PrismaService } from '../common/prisma.service';
 
 import { CreateTenantDto, ModuloOrganizacion } from './dto/create-tenant.dto';
@@ -47,6 +51,8 @@ export class TenantsService {
     private readonly planCuentasSeeder: PlanCuentasSeederPort,
     @Inject(TIPO_DOCUMENTO_FISICO_SEEDER_PORT)
     private readonly tiposDocSeeder: TipoDocumentoFisicoSeederPort,
+    @Inject(TIPO_REGISTRO_SEEDER_PORT)
+    private readonly tipoRegistroSeeder: TipoRegistroSeederPort,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -91,7 +97,9 @@ export class TenantsService {
           await this.tiposDocSeeder.seedDefaultsForTenant(org.id, tx);
           break;
         case ModuloOrganizacion.GRANJA:
-          // Placeholder: módulo granja sin código de seeding aún. Flags ya seteados arriba.
+          // Siembra los 12 tipos de registro fábrica dentro de la misma TX de
+          // creación: la org GRANJA nace con sus tipos o no nace (design.md §8).
+          await this.tipoRegistroSeeder.seedDefaultsForTenant(org.id, tx);
           break;
         case ModuloOrganizacion.OTROS:
           // no-op: sin módulo específico, sin seeding adicional
@@ -158,7 +166,17 @@ export class TenantsService {
       throw new VerticalNoExclusivoError(tenantId);
     }
 
+    // Solo la transición OFF→ON dispara el seed (design.md §8).
+    const seSembrarGranja = granjaEnabled && !current.granjaEnabled;
+
     const updated = await this.repo.updateFeatures(tenantId, dto);
+
+    // Seed-on-activation: fuera de TX. La org ya existe; la activación es
+    // incremental e idempotente (upsert por organizationId+nombre). Si fallara,
+    // el flag ya quedó ON y un re-trigger re-siembra sin duplicar (design.md §8).
+    if (seSembrarGranja) {
+      await this.tipoRegistroSeeder.seedDefaultsForTenant(tenantId);
+    }
 
     // Invalidar el cache que usa ModuleEnabledGuard.
     try {

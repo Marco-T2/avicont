@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 
 import { ClockModule } from '@/common/clock/clock.module';
 import { PrismaService } from '@/common/prisma.service';
+import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
+import { RbacModule } from '@/rbac/rbac.module';
 
 import { PrismaLoteRepository } from './adapters/prisma-lote.repository';
 import { PrismaLoteResumenReader } from './adapters/prisma-lote-resumen.reader';
@@ -13,24 +15,32 @@ import { LOTE_REPOSITORY_PORT } from './ports/lote.repository.port';
 import { MOVIMIENTO_REPOSITORY_PORT } from './ports/movimiento.repository.port';
 import { TIPO_REGISTRO_REPOSITORY_PORT } from './ports/tipo-registro.repository.port';
 import { TIPO_REGISTRO_SEEDER_PORT } from './ports/tipo-registro-seeder.port';
+import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
+import { LotesController } from './lotes.controller';
 import { LoteService } from './lote.service';
 import { MovimientoService } from './movimiento.service';
 import { TipoRegistroService } from './tipo-registro.service';
+import { TiposRegistroController } from './tipos-registro.controller';
 
 /**
  * Módulo Granja — vertical operativo para engorde de pollos parrilleros.
  *
- * Versión S4: contiene adapters CRUD + services + read-model + movimientos.
- * Controllers y seed wiring en TenantsService se agregan en S5.
+ * Versión S5: adapters CRUD + services + read-model + movimientos + los 3
+ * controllers HTTP (lotes, tipos-registro, dashboard) con gating de módulo
+ * (@RequireModule('granja')) y RBAC. Importa RbacModule para PermissionsGuard.
  *
  * Exporta TIPO_REGISTRO_SEEDER_PORT para que TenantsModule lo consuma
  * al activar el vertical Granja (S5, CLAUDE.md §3.7 y design.md §8).
  */
 @Module({
-  imports: [ClockModule],
+  imports: [ClockModule, RbacModule],
+  controllers: [LotesController, TiposRegistroController, DashboardController],
   providers: [
     PrismaService,
+    // PrismaService depende de TenantContextService (mismo patrón que el resto
+    // de módulos con controllers, ej. tipos-documento-fisico).
+    TenantContextService,
 
     // Adapter Lote
     PrismaLoteRepository,
