@@ -18,7 +18,7 @@
  *   8. Calcular cuadre: |Activo − (Pasivo + Patrimonio)| ≤ Money.TOLERANCIA_BOB.
  */
 
-import { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 

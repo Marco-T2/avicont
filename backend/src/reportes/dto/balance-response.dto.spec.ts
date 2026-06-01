@@ -1,4 +1,4 @@
-import { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
+import { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 

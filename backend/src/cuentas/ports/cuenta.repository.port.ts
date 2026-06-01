@@ -1,7 +1,6 @@
-import type { ClaseCuenta, Moneda } from '@/common/domain/enums';
+import type { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import type { Cuenta } from '../domain/cuenta';
-import type { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
 
 export const CUENTA_REPOSITORY_PORT = Symbol('CUENTA_REPOSITORY_PORT');
 

@@ -11,7 +11,7 @@
  * no se inserta en el árbol INGRESO/EGRESO.
  */
 
-import type { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
+import type { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 

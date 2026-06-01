@@ -11,10 +11,9 @@
 //      Ej: Depreciación Acumulada (ACTIVO, esContraria=true) → ACREEDORA.
 //   5. subClaseCuenta debe corresponder a la claseCuenta (tabla NIIF/PCGA).
 
-import { ClaseCuenta } from '@/common/domain/enums';
+import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { CuentaErrorCode, cuentaError, type CuentaErrorPayload } from './cuenta-errors';
-import { NaturalezaCuenta, SubClaseCuenta } from './enums';
 
 export const MAX_NIVELES_CODIGO_INTERNO = 8;
 const CODIGO_INTERNO_REGEX = /^[0-9]+(\.[0-9]+)*$/;

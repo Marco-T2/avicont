@@ -18,7 +18,7 @@
  * // Código Tributario art. 47: ResultadoEjercicio = Σ Ingresos − Σ Egresos del período.
  */
 
-import { ClaseCuenta } from '@prisma/client';
+import { ClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 

@@ -8,8 +8,7 @@
  * en service/domain (§4.6). Si se necesita en frontend, se agrega ahí.
  */
 
-import { NaturalezaCuenta } from '@prisma/client';
-
+import { NaturalezaCuenta } from '@/common/domain/enums';
 import { Money } from '@/common/domain/money';
 
 import { formatFechaContable } from '../fecha-contable';

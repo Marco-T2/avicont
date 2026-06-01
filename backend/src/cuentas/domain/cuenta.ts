@@ -5,9 +5,7 @@
 // El adapter `prisma-cuenta.repository.ts` mapea row Prisma ↔ `Cuenta` dominio
 // usando los enum mappers de `../adapters/enum-mappers.ts`.
 //
-import type { ClaseCuenta, Moneda } from '@/common/domain/enums';
-
-import type { NaturalezaCuenta, SubClaseCuenta } from './enums';
+import type { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 export interface Cuenta {
   id: string;

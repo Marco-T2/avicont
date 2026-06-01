@@ -2,9 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
-import { ClaseCuenta } from '@/common/domain/enums';
-
-import { SubClaseCuenta } from '../domain/enums';
+import { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 const toBool = ({ value }: { value: unknown }): boolean | undefined => {
   if (value === undefined || value === null || value === '') return undefined;

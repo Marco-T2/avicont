@@ -1,7 +1,6 @@
-import { ClaseCuenta } from '@/common/domain/enums';
+import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { CuentaErrorCode } from './cuenta-errors';
-import { NaturalezaCuenta, SubClaseCuenta } from './enums';
 import {
   calcularNivelDesdeCodigo,
   MAX_NIVELES_CODIGO_INTERNO,

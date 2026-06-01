@@ -14,9 +14,7 @@ import {
   SubClaseCuenta as PrismaSubClaseCuenta,
 } from '@prisma/client';
 
-import { ClaseCuenta, Moneda } from '@/common/domain/enums';
-
-import { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
+import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 // ------------------------------------------------------------
 // Moneda (cross-module: cuentas es dueño de monedaFuncional)

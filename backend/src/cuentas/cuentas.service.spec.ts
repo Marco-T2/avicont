@@ -1,11 +1,10 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ClaseCuenta, Moneda } from '@/common/domain/enums';
+import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { CuentasService } from './cuentas.service';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
 import type { Cuenta } from './domain/cuenta';
 import { CuentaErrorCode } from './domain/cuenta-errors';
-import { NaturalezaCuenta, SubClaseCuenta } from './domain/enums';
 import type { CuentaRepositoryPort } from './ports/cuenta.repository.port';
 import type { MovimientosReaderPort } from './ports/movimientos-reader.port';
 
