@@ -12,6 +12,10 @@ import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DocumentosFisicosPage } from '@/features/documentos-fisicos/pages/documentos-fisicos-page';
 import { TiposDocumentoFisicoPage } from '@/features/tipos-documento-fisico/pages/tipos-documento-fisico-page';
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
+import { GranjaDashboardPage } from '@/features/granja/pages/dashboard-page';
+import { LotesPage } from '@/features/granja/pages/lotes-page';
+import { LoteDetailPage } from '@/features/granja/pages/lote-detail-page';
+import { TiposRegistroPage } from '@/features/granja/pages/tipos-registro-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
 import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { LibroMayorPage } from '@/features/libro-mayor/pages/libro-mayor-page';
@@ -167,6 +171,39 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.organizacion.features.read}>
                 <FeaturesPage />
+              </RequirePermission>
+            ),
+          },
+          // ─── Granja ──────────────────────────────────────────────────────
+          {
+            path: '/granja',
+            element: (
+              <RequirePermission permission={PERMISSIONS.granja.dashboard.read}>
+                <GranjaDashboardPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/granja/lotes',
+            element: (
+              <RequirePermission permission={PERMISSIONS.granja.lotes.read}>
+                <LotesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/granja/lotes/:id',
+            element: (
+              <RequirePermission permission={PERMISSIONS.granja.lotes.read}>
+                <LoteDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/granja/tipos-registro',
+            element: (
+              <RequirePermission permission={PERMISSIONS.granja.tiposRegistro.read}>
+                <TiposRegistroPage />
               </RequirePermission>
             ),
           },

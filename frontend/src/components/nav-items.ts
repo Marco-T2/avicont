@@ -1,13 +1,16 @@
 import {
+  Bird,
   BookMarked,
   BookOpen,
   BookText,
   CalendarRange,
+  ClipboardList,
   Contact,
   FileBadge,
   FileStack,
   FileText,
   Home,
+  LayoutDashboard,
   Scale,
   Settings,
   Shield,
@@ -115,4 +118,25 @@ export const NAV_ITEMS: NavItem[] = [
     requiredPermission: PERMISSIONS.organizacion.features.read,
   },
   { to: '/configuracion', label: 'Configuración contable', icon: Settings, disabled: true },
+  // ─── Granja ────────────────────────────────────────────────────────────────
+  // Visibilidad: 100% RBAC. Si el tenant activó granja, el backend otorga
+  // granja.* y has('granja.X.read') da true. Sin flag granjaEnabled en store.
+  {
+    to: '/granja',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    requiredPermission: PERMISSIONS.granja.dashboard.read,
+  },
+  {
+    to: '/granja/lotes',
+    label: 'Mis Lotes',
+    icon: Bird,
+    requiredPermission: PERMISSIONS.granja.lotes.read,
+  },
+  {
+    to: '/granja/tipos-registro',
+    label: 'Tipos de Registro',
+    icon: ClipboardList,
+    requiredPermission: PERMISSIONS.granja.tiposRegistro.read,
+  },
 ];
