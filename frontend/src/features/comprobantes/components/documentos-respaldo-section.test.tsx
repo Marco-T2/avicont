@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Comprobante, DocumentoFisico } from '@/types/api';
 
 // Mocks de los hooks que la sección consume
@@ -15,14 +16,36 @@ vi.mock('../hooks/use-desasociar-documento', () => ({
 vi.mock('./documento-fisico-combobox', () => ({
   DocumentoFisicoCombobox: () => <div data-testid="combobox-mock">Combobox</div>,
 }));
+// La card (real) ahora gatea el botón desasociar con usePermissions vía
+// PermissionButton; lo mockeamos para controlar el gating.
+vi.mock('@/lib/use-permissions', () => ({
+  usePermissions: vi.fn(),
+}));
 
 import { useDocumentosAsociados } from '../hooks/use-documentos-asociados';
 import { useDesasociarDocumento } from '../hooks/use-desasociar-documento';
+import { usePermissions } from '@/lib/use-permissions';
 import { DocumentosRespaldoSection } from './documentos-respaldo-section';
 
 // Usamos `as unknown as` para satisfacer el tipo del mock sin import completo.
 const mockUseDocumentosAsociados = useDocumentosAsociados as unknown as ReturnType<typeof vi.fn>;
 const mockUseDesasociarDocumento = useDesasociarDocumento as unknown as ReturnType<typeof vi.fn>;
+const mockUsePermissions = usePermissions as unknown as ReturnType<typeof vi.fn>;
+
+function setPerms(granted: string[] | 'all'): void {
+  const has = (p: string): boolean => granted === 'all' || granted.includes(p);
+  mockUsePermissions.mockReturnValue({
+    has,
+    hasAll: (perms: string[]) => perms.every(has),
+    isOwner: granted === 'all',
+    permissions: granted === 'all' ? [] : granted,
+  } as unknown as ReturnType<typeof usePermissions>);
+}
+
+// Por default los tests preexistentes asumen permiso total.
+beforeEach(() => {
+  setPerms('all');
+});
 
 // Desasociar mutation mock base (vacío, sin estado pending)
 const desasociarMock = {
@@ -93,7 +116,9 @@ function renderSection(comprobante: Comprobante, editable: boolean): void {
   const qc = makeQc();
   render(
     <QueryClientProvider client={qc}>
-      <DocumentosRespaldoSection comprobante={comprobante} editable={editable} />
+      <TooltipProvider delayDuration={0}>
+        <DocumentosRespaldoSection comprobante={comprobante} editable={editable} />
+      </TooltipProvider>
     </QueryClientProvider>,
   );
 }
@@ -153,6 +178,32 @@ describe('DocumentosRespaldoSection — gating editable/read-only', () => {
 
     expect(screen.queryByTestId('combobox-mock')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /desasociar/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('DocumentosRespaldoSection — gating de permisos (desasociar)', () => {
+  it('editable=true CON permiso → botón desasociar habilitado', () => {
+    setPerms([
+      'contabilidad.documentos-fisicos.update',
+      'contabilidad.asientos.update',
+    ]);
+    mockUseDocumentosAsociados.mockReturnValue({ data: [doc1], isLoading: false });
+    mockUseDesasociarDocumento.mockReturnValue(desasociarMock);
+
+    renderSection(baseComprobante, true);
+
+    expect(screen.getByRole('button', { name: /desasociar/i })).toBeEnabled();
+  });
+
+  it('editable=true SIN permiso (falta asientos.update) → botón desasociar deshabilitado', () => {
+    setPerms(['contabilidad.documentos-fisicos.update']);
+    mockUseDocumentosAsociados.mockReturnValue({ data: [doc1], isLoading: false });
+    mockUseDesasociarDocumento.mockReturnValue(desasociarMock);
+
+    renderSection(baseComprobante, true);
+
+    // La affordance se ve (no se oculta) pero está deshabilitada — patrón #87.
+    expect(screen.getByRole('button', { name: /desasociar/i })).toBeDisabled();
   });
 });
 

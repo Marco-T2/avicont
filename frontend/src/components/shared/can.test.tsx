@@ -13,15 +13,17 @@ function mockPermissions(overrides: {
   permissions?: string[];
 }) {
   const { isOwner = false, isLoading = false, permissions = [] } = overrides;
+  const has = (p: string): boolean => {
+    if (isLoading) return false;
+    if (isOwner) return true;
+    return permissions.includes(p);
+  };
   vi.spyOn(usePermissionsModule, 'usePermissions').mockReturnValue({
     isOwner,
     isLoading,
     permissions,
-    has: (p: string) => {
-      if (isLoading) return false;
-      if (isOwner) return true;
-      return permissions.includes(p);
-    },
+    has,
+    hasAll: (perms: string[]) => perms.every(has),
   } as unknown as ReturnType<typeof usePermissionsModule.usePermissions>);
 }
 
@@ -114,5 +116,63 @@ describe('<Can>', () => {
     );
     expect(screen.queryByText('contenido protegido')).not.toBeInTheDocument();
     expect(screen.getByText('sin acceso')).toBeInTheDocument();
+  });
+
+  describe('con array de permisos (AND)', () => {
+    it('renderiza children solo si tiene TODOS los permisos', () => {
+      mockPermissions({
+        permissions: [
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.update',
+        ],
+      });
+      render(
+        <Wrapper>
+          <Can
+            permission={[
+              'contabilidad.documentos-fisicos.update',
+              'contabilidad.asientos.update',
+            ]}
+          >
+            <span>contenido protegido</span>
+          </Can>
+        </Wrapper>,
+      );
+      expect(screen.getByText('contenido protegido')).toBeInTheDocument();
+    });
+
+    it('NO renderiza children si falta alguno de los permisos', () => {
+      mockPermissions({ permissions: ['contabilidad.documentos-fisicos.update'] });
+      render(
+        <Wrapper>
+          <Can
+            permission={[
+              'contabilidad.documentos-fisicos.update',
+              'contabilidad.asientos.update',
+            ]}
+          >
+            <span>contenido protegido</span>
+          </Can>
+        </Wrapper>,
+      );
+      expect(screen.queryByText('contenido protegido')).not.toBeInTheDocument();
+    });
+
+    it('render-prop recibe allowed=false si falta alguno', () => {
+      mockPermissions({ permissions: ['contabilidad.asientos.update'] });
+      render(
+        <Wrapper>
+          <Can
+            permission={[
+              'contabilidad.documentos-fisicos.update',
+              'contabilidad.asientos.update',
+            ]}
+          >
+            {(allowed) => <span>allowed: {String(allowed)}</span>}
+          </Can>
+        </Wrapper>,
+      );
+      expect(screen.getByText('allowed: false')).toBeInTheDocument();
+    });
   });
 });

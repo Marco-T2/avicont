@@ -1,9 +1,17 @@
 import { Trash2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 import type { DocumentoFisico } from '@/types/api';
 
 import { formatearFechaContable } from '../lib/formatear-fecha-contable';
+
+// Desasociar exige AMBOS permisos (AND), igual que el backend:
+// comprobantes.controller.ts:200 → @RequirePermissions('documentos-fisicos.update','asientos.update').
+const PERMISOS_DESASOCIAR = [
+  PERMISSIONS.contabilidad.documentosFisicos.update,
+  PERMISSIONS.contabilidad.asientos.update,
+];
 
 interface DocumentoAsociadoCardProps {
   documento: DocumentoFisico;
@@ -44,7 +52,9 @@ export function DocumentoAsociadoCard({
         </div>
       </div>
       {editable ? (
-        <Button
+        <PermissionButton
+          permission={PERMISOS_DESASOCIAR}
+          deniedReason="No tenés permiso para desasociar documentos"
           type="button"
           variant="ghost"
           size="icon"
@@ -54,7 +64,7 @@ export function DocumentoAsociadoCard({
           className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" />
-        </Button>
+        </PermissionButton>
       ) : null}
     </div>
   );

@@ -73,9 +73,16 @@ export function usePermissions() {
     return data.permissions.some((w) => matchesPermission(w, permission));
   };
 
+  // AND de varios permisos: espeja el `hasAllPermissions` del backend
+  // (permissions.guard.ts) — un endpoint con `@RequirePermissions('a','b')`
+  // exige AMBOS. Acá NO hay variante OR a propósito: el backend tampoco la
+  // tiene para permisos finos. fail-closed via `has`. `[]` → true (sin gate).
+  const hasAll = (permissions: string[]): boolean => permissions.every(has);
+
   return {
     ...query,
     has,
+    hasAll,
     isOwner: query.data?.isOwner ?? false,
     permissions: query.data?.permissions ?? [],
   };

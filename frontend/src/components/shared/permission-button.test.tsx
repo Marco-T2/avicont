@@ -12,11 +12,13 @@ import { PermissionButton } from './permission-button';
 // controlar el estado sin tocar el backend ni el cache real.
 function mockPermissions(overrides: { isOwner?: boolean; permissions?: string[] }) {
   const { isOwner = false, permissions = [] } = overrides;
+  const has = (p: string): boolean => isOwner || permissions.includes(p);
   vi.spyOn(usePermissionsModule, 'usePermissions').mockReturnValue({
     isOwner,
     isLoading: false,
     permissions,
-    has: (p: string) => isOwner || permissions.includes(p),
+    has,
+    hasAll: (perms: string[]) => perms.every(has),
   } as unknown as ReturnType<typeof usePermissionsModule.usePermissions>);
 }
 
@@ -94,5 +96,46 @@ describe('<PermissionButton>', () => {
     // accesible oculta), por eso findAllByText en vez de findByText.
     const matches = await screen.findAllByText('No tenés permiso para contabilizar asientos');
     expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  describe('con array de permisos (AND)', () => {
+    it('habilitado solo si tiene TODOS los permisos', () => {
+      mockPermissions({
+        permissions: [
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.update',
+        ],
+      });
+      render(
+        <Wrapper>
+          <PermissionButton
+            permission={[
+              'contabilidad.documentos-fisicos.update',
+              'contabilidad.asientos.update',
+            ]}
+          >
+            Desasociar
+          </PermissionButton>
+        </Wrapper>,
+      );
+      expect(screen.getByRole('button', { name: /desasociar/i })).toBeEnabled();
+    });
+
+    it('deshabilitado si falta alguno de los permisos', () => {
+      mockPermissions({ permissions: ['contabilidad.documentos-fisicos.update'] });
+      render(
+        <Wrapper>
+          <PermissionButton
+            permission={[
+              'contabilidad.documentos-fisicos.update',
+              'contabilidad.asientos.update',
+            ]}
+          >
+            Desasociar
+          </PermissionButton>
+        </Wrapper>,
+      );
+      expect(screen.getByRole('button', { name: /desasociar/i })).toBeDisabled();
+    });
   });
 });

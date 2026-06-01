@@ -1,8 +1,12 @@
 import { usePermissions } from '@/lib/use-permissions';
 
 interface CanProps {
-  /** Permiso requerido para mostrar el contenido. */
-  permission: string;
+  /**
+   * Permiso requerido para mostrar el contenido.
+   * - `string` → un permiso.
+   * - `string[]` → AND de todos (espeja `@RequirePermissions('a','b')` del backend).
+   */
+  permission: string | string[];
   /**
    * Si children es función, se llama con `allowed: boolean` — patrón render-prop
    * útil para el caso deshabilitar (visible pero inerte):
@@ -35,8 +39,8 @@ interface CanProps {
  * Este componente es solo UX: no muestra acciones que darían 403.
  */
 export function Can({ permission, children, fallback = null }: CanProps): React.JSX.Element {
-  const { has } = usePermissions();
-  const allowed = has(permission);
+  const { has, hasAll } = usePermissions();
+  const allowed = Array.isArray(permission) ? hasAll(permission) : has(permission);
 
   if (typeof children === 'function') {
     return <>{children(allowed)}</>;
