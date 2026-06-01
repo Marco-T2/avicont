@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '@/common/prisma.service';
 
-import { UsersReaderPort, UsuarioMinimo, UsuarioParaAuth } from '../ports/users-reader.port';
+import {
+  UsersReaderPort,
+  UsuarioFlagsSeguridad,
+  UsuarioMinimo,
+  UsuarioParaAuth,
+} from '../ports/users-reader.port';
 
 @Injectable()
 export class PrismaUsersReaderAdapter extends UsersReaderPort {
@@ -18,6 +23,7 @@ export class PrismaUsersReaderAdapter extends UsersReaderPort {
         email: true,
         hashedPassword: true,
         isActive: true,
+        isSuperAdmin: true,
       },
     });
   }
@@ -30,6 +36,13 @@ export class PrismaUsersReaderAdapter extends UsersReaderPort {
         email: true,
         displayName: true,
       },
+    });
+  }
+
+  async findFlagsSeguridadById(id: string): Promise<UsuarioFlagsSeguridad | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: { isSuperAdmin: true },
     });
   }
 }

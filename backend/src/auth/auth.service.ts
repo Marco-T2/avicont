@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
+import { RedisService } from '@/cache/redis.service';
 import {
   MEMBERSHIPS_READER_PORT,
   type MembershipActivaParaAuth,
@@ -28,6 +29,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MetricsService } from '../metrics/metrics.service';
 
+/** TTL del epoch de revocación de super-admin en Redis. Debe coincidir con la
+ *  vida del access token (1h = 3600s) para que la marca se auto-limpie.
+ *  design.md Decisión 4.2. */
+const SUPER_ADMIN_REVOCATION_TTL_SECONDS = 3600;
+
 export type { JwtPayload };
 
 export interface TokenPair {
@@ -48,6 +54,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly metrics: MetricsService,
     @Inject(CLOCK_PORT) private readonly clock: ClockPort,
+    private readonly redis: RedisService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -97,6 +104,8 @@ export class AuthService {
       email: user.email,
       ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
+      // user.isSuperAdmin viene de UsuarioParaAuth (REQ-SA-02).
+      ...(user.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
     });
 
     const accessToken = this.jwtService.sign(claims.toPayload());
@@ -124,11 +133,16 @@ export class AuthService {
     const memberships = await this.memberships.findActivasByUserId(stored.userId);
     const roles = this.extractRolesForTenant(memberships, activeTenantId);
 
+    // refresh no carga el User completo; lookup mínimo para obtener isSuperAdmin
+    // (REQ-SA-02). Usando el port para no depender de Prisma directo en el servicio.
+    const flagsSeguridad = await this.usersReader.findFlagsSeguridadById(stored.userId);
+
     const claims = JwtClaims.forUser({
       userId: stored.userId,
       email: stored.userEmail,
       ...(activeTenantId !== undefined ? { activeTenantId } : {}),
       roles,
+      ...(flagsSeguridad?.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
     });
 
     const accessToken = this.jwtService.sign(claims.toPayload());
@@ -157,17 +171,39 @@ export class AuthService {
 
     const roles = this.extractRolesForTenant([membership], tenantId);
 
+    // Lookup mínimo para isSuperAdmin — switchTenant solo tiene membership, no el User.
+    // (REQ-SA-02).
+    const flagsSeguridad = await this.usersReader.findFlagsSeguridadById(userId);
+
     const claims = JwtClaims.forUser({
       userId,
       email: membership.userEmail,
       activeTenantId: tenantId,
       roles,
+      ...(flagsSeguridad?.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
     });
 
     const accessToken = this.jwtService.sign(claims.toPayload());
     const refreshToken = await this.createRefreshToken(userId, tenantId);
 
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Revoca inmediatamente todos los tokens de acceso activos de un super-admin
+   * escribiendo un epoch de revocación en Redis (REQ-SA-03, design.md Decisión 4.2).
+   *
+   * El mecanismo: escribe `superadmin:revoked:<userId>` con el timestamp actual en ms
+   * y TTL = 3600s (vida del access token). JwtStrategy.validate lo lee y rechaza
+   * cualquier token con iat anterior al epoch.
+   *
+   * Se llama standalone desde el CLI de revoke (Slice 5) y desde cualquier endpoint
+   * que revoque el flag isSuperAdmin.
+   */
+  async revocarTokensSuperAdmin(userId: string): Promise<void> {
+    const key = `superadmin:revoked:${userId}`;
+    const nowMs = this.clock.now().getTime();
+    await this.redis.set(key, String(nowMs), SUPER_ADMIN_REVOCATION_TTL_SECONDS);
   }
 
   // Extrae los "roles" del usuario en un tenant dado, como array de strings.

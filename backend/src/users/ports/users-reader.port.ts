@@ -14,6 +14,11 @@
 // `findById` no se expone — `switchTenant` y `refreshTokens` resuelven el
 // user vía membership/refreshToken include, no vía users. Si algún flujo
 // futuro lo necesita, se agrega acá.
+//
+// `findFlagsSeguridadById` se agrega para el flujo de refreshTokens del auth
+// que necesita `isSuperAdmin` pero no accede al User completo (CLAUDE.md §5.2,
+// REQ-SA-02). Superficie mínima: solo el flag de plataforma; si se agregan otros
+// flags de seguridad futuros, extender este shape.
 
 export const USERS_READER_PORT = Symbol('USERS_READER_PORT');
 
@@ -22,6 +27,7 @@ export interface UsuarioParaAuth {
   email: string;
   hashedPassword: string;
   isActive: boolean;
+  isSuperAdmin: boolean;
 }
 
 /**
@@ -36,6 +42,14 @@ export interface UsuarioMinimo {
   displayName: string | null;
 }
 
+/**
+ * Proyección mínima de seguridad para el flujo de renovación de tokens.
+ * Expone solo los flags de plataforma que deben reflectarse en el JWT.
+ */
+export interface UsuarioFlagsSeguridad {
+  isSuperAdmin: boolean;
+}
+
 export abstract class UsersReaderPort {
   abstract findByEmail(email: string): Promise<UsuarioParaAuth | null>;
 
@@ -46,4 +60,11 @@ export abstract class UsersReaderPort {
    * `findByEmail`.
    */
   abstract findMinimalByEmail(email: string): Promise<UsuarioMinimo | null>;
+
+  /**
+   * Devuelve los flags de seguridad del usuario por id. Usado en el flujo
+   * de refreshTokens para propagar `isSuperAdmin` sin un segundo round-trip
+   * al objeto User completo. Returns null si el usuario no existe.
+   */
+  abstract findFlagsSeguridadById(id: string): Promise<UsuarioFlagsSeguridad | null>;
 }

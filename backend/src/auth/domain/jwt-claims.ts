@@ -7,6 +7,8 @@ import { JwtClaimsInvalidosError } from './auth-errors';
  * - `activeTenantId` / `roles`: presentes en tokens de usuarios regulares.
  * - `impersonatedBy` / `impersonationId`: presentes SOLO en tokens de
  *   impersonation emitidos por ImpersonationService.
+ * - `isSuperAdmin`: identidad de plataforma; ausente/omitido en tokens normales.
+ *   Solo se incluye cuando es `true` (exactOptionalPropertyTypes — no se escribe `false`).
  */
 export interface JwtPayload {
   sub: string;
@@ -15,6 +17,9 @@ export interface JwtPayload {
   roles?: string[];
   impersonatedBy?: string;
   impersonationId?: string;
+  isSuperAdmin?: boolean;
+  /** Emitido automáticamente por la librería JWT al firmar. En segundos (Unix epoch). */
+  iat?: number;
 }
 
 /**
@@ -30,6 +35,7 @@ export class JwtClaims {
     email: string;
     activeTenantId?: string;
     roles?: string[];
+    isSuperAdmin?: boolean;
   }): JwtClaims {
     if (typeof params.userId !== 'string' || params.userId.length === 0) {
       throw new JwtClaimsInvalidosError('userId requerido');
@@ -46,6 +52,9 @@ export class JwtClaims {
       email: params.email,
       roles: params.roles ?? [],
       ...(params.activeTenantId !== undefined ? { activeTenantId: params.activeTenantId } : {}),
+      // Solo se incluye cuando es true — no se contamina el token de usuarios normales
+      // con isSuperAdmin: false (exactOptionalPropertyTypes: spread condicional obligatorio).
+      ...(params.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
     };
     return new JwtClaims(payload);
   }

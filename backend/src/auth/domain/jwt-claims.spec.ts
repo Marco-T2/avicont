@@ -1,7 +1,48 @@
 import { JwtClaims } from './jwt-claims';
 import { JwtClaimsInvalidosError } from './auth-errors';
+import { ImpersonationJwtClaims } from '../../impersonation/domain/impersonation-jwt-claims';
 
 describe('JwtClaims', () => {
+  describe('REQ-SA-02: claim isSuperAdmin en JWT', () => {
+    it('forUser incluye isSuperAdmin: true solo cuando se pasa true', () => {
+      const claims = JwtClaims.forUser({
+        userId: 'user-1',
+        email: 'a@b.com',
+        isSuperAdmin: true,
+      });
+      expect(claims.toPayload().isSuperAdmin).toBe(true);
+    });
+
+    it('forUser NO incluye isSuperAdmin cuando es false', () => {
+      const claims = JwtClaims.forUser({
+        userId: 'user-1',
+        email: 'a@b.com',
+        isSuperAdmin: false,
+      });
+      expect(claims.toPayload()).not.toHaveProperty('isSuperAdmin');
+    });
+
+    it('forUser NO incluye isSuperAdmin cuando está ausente', () => {
+      const claims = JwtClaims.forUser({
+        userId: 'user-1',
+        email: 'a@b.com',
+      });
+      expect(claims.toPayload()).not.toHaveProperty('isSuperAdmin');
+    });
+
+    it('token de impersonation no hereda isSuperAdmin (REQ-SA-04)', () => {
+      const payload = ImpersonationJwtClaims.forImpersonation({
+        targetUserId: 'target-uuid',
+        targetEmail: 'target@avicont.bo',
+        activeTenantId: 'tenant-uuid',
+        roles: [],
+        adminUserId: 'admin-uuid',
+        impersonationId: 'imp-uuid',
+      }).toPayload();
+      expect(payload).not.toHaveProperty('isSuperAdmin');
+    });
+  });
+
   describe('forUser — válidos', () => {
     it('construye payload mínimo con sub y email', () => {
       const claims = JwtClaims.forUser({
