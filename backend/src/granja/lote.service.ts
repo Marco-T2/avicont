@@ -21,11 +21,16 @@ import {
 export interface LoteCreateInput {
   cantidadInicial: number;
   fechaIngreso: Date;
+  nombre?: string | null;
+  detalle?: string | null;
   galpon?: string | null;
   fechaEstimadaSaca?: Date | null;
 }
 
 export interface LoteUpdateInput {
+  nombre?: string | null;
+  detalle?: string | null;
+  fechaIngreso?: Date;
   galpon?: string | null;
   fechaEstimadaSaca?: Date | null;
 }
@@ -64,6 +69,8 @@ export class LoteService {
     const data: LoteCreateData = {
       cantidadInicial: input.cantidadInicial,
       fechaIngreso: input.fechaIngreso,
+      ...(input.nombre !== undefined ? { nombre: input.nombre } : {}),
+      ...(input.detalle !== undefined ? { detalle: input.detalle } : {}),
       ...(input.galpon !== undefined ? { galpon: input.galpon } : {}),
       ...(input.fechaEstimadaSaca !== undefined
         ? { fechaEstimadaSaca: input.fechaEstimadaSaca }
@@ -104,6 +111,9 @@ export class LoteService {
     validarEdicionLote(lote, input);
 
     const data: LoteUpdateData = {
+      ...(input.nombre !== undefined ? { nombre: input.nombre as string | null } : {}),
+      ...(input.detalle !== undefined ? { detalle: input.detalle as string | null } : {}),
+      ...(input.fechaIngreso !== undefined ? { fechaIngreso: input.fechaIngreso as Date } : {}),
       ...(input.galpon !== undefined ? { galpon: input.galpon as string | null } : {}),
       ...(input.fechaEstimadaSaca !== undefined
         ? { fechaEstimadaSaca: input.fechaEstimadaSaca as Date | null }

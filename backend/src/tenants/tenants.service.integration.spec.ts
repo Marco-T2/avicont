@@ -5,6 +5,8 @@ import { PrismaPlanCuentasSeederAdapter } from '@/cuentas/adapters/prisma-plan-c
 import { PlanCuentasSeederPort } from '@/cuentas/ports/plan-cuentas-seeder.port';
 import { PrismaTiposDocumentoFisicoSeederAdapter } from '@/tipos-documento-fisico/adapters/prisma-tipos-documento-fisico-seeder.adapter';
 import { PrismaTipoDocumentoFisicoRepository } from '@/tipos-documento-fisico/adapters/prisma-tipo-documento-fisico.repository';
+import { PrismaTipoRegistroSeederAdapter } from '@/granja/adapters/prisma-tipo-registro-seeder.adapter';
+import { PrismaTipoRegistroRepository } from '@/granja/adapters/prisma-tipo-registro.repository';
 
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 import { ModuloOrganizacion } from './dto/create-tenant.dto';
@@ -42,6 +44,12 @@ describe('TenantsService.create (integration)', () => {
       new PrismaTipoDocumentoFisicoRepository(prisma as unknown as PrismaService),
     );
 
+    // Seeder real de tipos de registro de granja: la creación GRANJA siembra
+    // los 12 tipos fábrica de verdad dentro de la TX.
+    const tipoRegistroSeeder = new PrismaTipoRegistroSeederAdapter(
+      new PrismaTipoRegistroRepository(prisma as unknown as PrismaService),
+    );
+
     // TenantsService depende de ports que necesitamos mockear para la integración.
     // Usamos un cast mínimo — este test solo ejerce `create`, no los otros métodos.
     const mockGestiones = { existeAlgunaGestion: jest.fn() };
@@ -55,6 +63,7 @@ describe('TenantsService.create (integration)', () => {
       /* RedisService */ mockRedis as never,
       /* PLAN_CUENTAS_SEEDER_PORT */ seeder,
       /* TIPO_DOCUMENTO_FISICO_SEEDER_PORT */ tiposDocSeeder,
+      /* TIPO_REGISTRO_SEEDER_PORT */ tipoRegistroSeeder,
       /* PrismaService */ prisma as unknown as PrismaService,
     );
   }

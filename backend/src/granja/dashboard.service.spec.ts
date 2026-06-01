@@ -21,11 +21,13 @@ function makeLoteRow(id: string, overrides: Partial<LoteRow> = {}): LoteRow {
   return {
     id,
     organizationId: ORG_ID,
+    nombre: null,
     cantidadInicial: 5000,
     fechaIngreso: new Date('2026-06-01'),
     fechaEstimadaSaca: null,
     fechaCierre: null,
     galpon: null,
+    detalle: null,
     estado: EstadoLote.ACTIVO,
     createdAt: new Date(),
     updatedAt: new Date(),

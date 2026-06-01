@@ -40,6 +40,10 @@ import {
   TIPO_DOCUMENTO_FISICO_SEEDER_PORT,
   type TipoDocumentoFisicoSeederPort,
 } from '@/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
+import {
+  TIPO_REGISTRO_SEEDER_PORT,
+  type TipoRegistroSeederPort,
+} from '@/granja/ports/tipo-registro-seeder.port';
 import { PrismaService } from '@/common/prisma.service';
 
 /**
@@ -65,6 +69,7 @@ describe('TenantsService (unit)', () => {
   type PrismaMock = { $transaction: jest.Mock };
   type PlanCuentasSeederMock = jest.Mocked<PlanCuentasSeederPort>;
   type TiposDocSeederMock = jest.Mocked<TipoDocumentoFisicoSeederPort>;
+  type TipoRegistroSeederMock = jest.Mocked<TipoRegistroSeederPort>;
 
   let service: TenantsService;
   let repo: RepoMock;
@@ -74,6 +79,7 @@ describe('TenantsService (unit)', () => {
   let prismaMock: PrismaMock;
   let planCuentasSeeder: PlanCuentasSeederMock;
   let tiposDocSeeder: TiposDocSeederMock;
+  let tipoRegistroSeeder: TipoRegistroSeederMock;
 
   function mkOrg(overrides: Partial<Organization> = {}): Organization {
     return {
@@ -139,6 +145,10 @@ describe('TenantsService (unit)', () => {
       seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
     } as unknown as TiposDocSeederMock;
 
+    tipoRegistroSeeder = {
+      seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
+    } as unknown as TipoRegistroSeederMock;
+
     // $transaction ejecuta el callback con TX_MOCK y retorna lo que devuelve el callback
     prismaMock = {
       $transaction: jest
@@ -157,6 +167,7 @@ describe('TenantsService (unit)', () => {
         { provide: RedisService, useValue: redis },
         { provide: PLAN_CUENTAS_SEEDER_PORT, useValue: planCuentasSeeder },
         { provide: TIPO_DOCUMENTO_FISICO_SEEDER_PORT, useValue: tiposDocSeeder },
+        { provide: TIPO_REGISTRO_SEEDER_PORT, useValue: tipoRegistroSeeder },
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();
@@ -276,6 +287,29 @@ describe('TenantsService (unit)', () => {
       await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
 
       expect(planCuentasSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('GRANJA: invoca tipoRegistroSeeder.seedDefaultsForTenant con org.id y el mismo tx', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
+
+      // El seed corre DENTRO de la misma TX que crea la org: mismo TX_MOCK.
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).toHaveBeenCalledTimes(1);
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).toHaveBeenCalledWith(TENANT_ID, TX_MOCK);
+    });
+
+    it('CONTABILIDAD/OTROS: NO invoca tipoRegistroSeeder', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
     });
 
     it('OTROS: repo.create recibe ambos flags en false', async () => {
@@ -572,6 +606,60 @@ describe('TenantsService (unit)', () => {
       ).rejects.toBeInstanceOf(TenantNoEncontradoError);
 
       expect(repo.updateFeatures).not.toHaveBeenCalled();
+    });
+  });
+
+  // design.md §8: el seed de granja se dispara SOLO en la transición OFF→ON,
+  // fuera de TX (la org ya existe; la activación es incremental e idempotente).
+  describe('updateFeatures — seed granja (seed-on-activation)', () => {
+    it('OFF→ON: invoca tipoRegistroSeeder.seedDefaultsForTenant (sin tx)', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: false });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+
+      await service.updateFeatures(TENANT_ID, { granjaEnabled: true });
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).toHaveBeenCalledTimes(1);
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it('switch contabilidad→granja (OFF→ON de granja): invoca el seeder', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+
+      await service.updateFeatures(TENANT_ID, {
+        contabilidadEnabled: false,
+        granjaEnabled: true,
+      });
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).toHaveBeenCalledTimes(1);
+    });
+
+    it('ON→ON (granja ya activa): NO re-siembra (la idempotencia vive en el seeder)', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+
+      await service.updateFeatures(TENANT_ID, { granjaEnabled: true });
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('ON→OFF (apagar granja): NO invoca el seeder', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: false });
+
+      await service.updateFeatures(TENANT_ID, { granjaEnabled: false });
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
+    });
+
+    it('activar granja con contabilidad activa: VerticalNoExclusivoError y NO siembra', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
+
+      await expect(
+        service.updateFeatures(TENANT_ID, { granjaEnabled: true }),
+      ).rejects.toBeInstanceOf(VerticalNoExclusivoError);
+
+      expect(tipoRegistroSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
     });
   });
 });

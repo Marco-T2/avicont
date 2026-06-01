@@ -9,6 +9,7 @@ import { PeriodosFiscalesModule } from '../periodos-fiscales/periodos-fiscales.m
 import { MembershipsModule } from '../memberships/memberships.module';
 import { CuentasModule } from '../cuentas/cuentas.module';
 import { TiposDocumentoFisicoModule } from '../tipos-documento-fisico/tipos-documento-fisico.module';
+import { GranjaModule } from '../granja/granja.module';
 import { TENANT_REPOSITORY_PORT } from './ports/tenant.repository.port';
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 
@@ -25,6 +26,11 @@ import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 // TiposDocumentoFisicoModule provee TIPO_DOCUMENTO_FISICO_SEEDER_PORT para
 // sembrar los 8 tipos universales al crear una organización (design §D3, §7.2).
 // Dependencia unidireccional sin forwardRef: tenants → tipos-documento-fisico.
+//
+// GranjaModule provee TIPO_REGISTRO_SEEDER_PORT para sembrar los 12 tipos de
+// registro fábrica al activar el vertical granja (design granja-v1 §8).
+// Dependencia unidireccional sin forwardRef: tenants → granja. No hay ciclo:
+// GranjaModule no importa TenantsModule (verificado con grep).
 @Module({
   imports: [
     RbacModule,
@@ -32,6 +38,7 @@ import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
     MembershipsModule,
     CuentasModule,
     TiposDocumentoFisicoModule,
+    GranjaModule,
   ],
   controllers: [TenantsController],
   providers: [
