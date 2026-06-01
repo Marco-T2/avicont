@@ -67,6 +67,30 @@ export const PERMISSIONS = {
       update: 'contabilidad.tipos-documento-fisico.update',
     },
   },
+  granja: {
+    dashboard: { read: 'granja.dashboard.read' },
+    lotes: {
+      read: 'granja.lotes.read',
+      create: 'granja.lotes.create',
+      update: 'granja.lotes.update',
+      delete: 'granja.lotes.delete',
+    },
+    // G-9: asimetría intencional — key JS camelCase `tiposRegistro` ↔ string kebab
+    // `granja.tipos-registro.*`. Espeja `tiposDocumento` en contabilidad. NO corregir.
+    tiposRegistro: {
+      read: 'granja.tipos-registro.read',
+      create: 'granja.tipos-registro.create',
+      update: 'granja.tipos-registro.update',
+      delete: 'granja.tipos-registro.delete',
+    },
+    movimientos: {
+      read: 'granja.movimientos.read',
+      create: 'granja.movimientos.create',
+      update: 'granja.movimientos.update',
+      delete: 'granja.movimientos.delete',
+    },
+    chat: { interact: 'granja.chat.interact' },
+  },
   organizacion: {
     miembros: {
       read: 'organizacion.miembros.read',

@@ -1,0 +1,171 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
+import type { Resolver } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+
+import { useTiposRegistro } from '../hooks/use-granja-queries';
+import {
+  type MovimientoInversionFormValues,
+  movimientoInversionSchema,
+} from '../schemas/movimiento-inversion.schema';
+
+interface MovimientoInversionFormProps {
+  onSubmit: (values: MovimientoInversionFormValues) => void;
+  isSubmitting: boolean;
+}
+
+const DEFAULT_VALUES: Partial<MovimientoInversionFormValues> = {
+  monto: '',
+  fecha: '',
+  tipoRegistroId: '',
+  detalle: '',
+};
+
+/**
+ * Form para registrar un movimiento de inversión en un lote.
+ * - `monto` como input text (no number) — patrón dinero-string (§4.5 CLAUDE.md).
+ * - Selector de TipoRegistro filtrado por `naturaleza='INVERSION'`.
+ */
+export function MovimientoInversionForm({
+  onSubmit,
+  isSubmitting,
+}: MovimientoInversionFormProps): React.JSX.Element {
+  const { data: tipos, isLoading: cargandoTipos } = useTiposRegistro('INVERSION');
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<MovimientoInversionFormValues>({
+    resolver: zodResolver(movimientoInversionSchema) as Resolver<MovimientoInversionFormValues>,
+    defaultValues: DEFAULT_VALUES,
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(onSubmit)(e);
+      }}
+      className="space-y-5"
+      noValidate
+    >
+      {/* Monto — input text, NO number (F-05 dinero-string) */}
+      <Field label="Monto (Bs)" htmlFor="monto" required error={errors.monto?.message}>
+        <Input
+          {...register('monto')}
+          id="monto"
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          className="text-base md:text-sm"
+          aria-invalid={errors.monto !== undefined}
+        />
+      </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* Fecha */}
+        <Field label="Fecha" htmlFor="fecha" required error={errors.fecha?.message}>
+          <Input
+            {...register('fecha')}
+            id="fecha"
+            type="date"
+            className="text-base md:text-sm"
+            aria-invalid={errors.fecha !== undefined}
+          />
+        </Field>
+
+        {/* Tipo de registro — select nativo para máxima compatibilidad mobile */}
+        <Field
+          label="Tipo de registro"
+          htmlFor="tipoRegistroId"
+          required
+          error={errors.tipoRegistroId?.message}
+        >
+          <select
+            {...register('tipoRegistroId')}
+            id="tipoRegistroId"
+            disabled={cargandoTipos}
+            aria-invalid={errors.tipoRegistroId !== undefined}
+            className={cn(
+              'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2',
+              'text-base md:text-sm ring-offset-background',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'min-h-[44px]',
+            )}
+          >
+            <option value="">
+              {cargandoTipos ? 'Cargando tipos...' : 'Seleccionar tipo'}
+            </option>
+            {(tipos ?? []).map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>
+                {tipo.nombre}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* Detalle opcional (Anti-F-14: Textarea con [field-sizing:fixed]) */}
+      <Field label="Detalle" htmlFor="detalle" error={errors.detalle?.message}>
+        <Textarea
+          {...register('detalle')}
+          id="detalle"
+          placeholder="Notas opcionales sobre el gasto"
+          className="w-full max-w-full resize-y [field-sizing:fixed] min-h-[80px] text-base md:text-sm"
+          aria-invalid={errors.detalle !== undefined}
+        />
+      </Field>
+
+      {/* Submit */}
+      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full min-h-[44px] sm:w-auto"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Registrando…
+            </>
+          ) : (
+            'Registrar inversión'
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Subcomponente interno ────────────────────────────────────────────────────
+
+interface FieldProps {
+  label: string;
+  htmlFor?: string;
+  required?: boolean;
+  error?: string;
+  className?: string;
+  children: React.ReactNode;
+}
+
+function Field({ label, htmlFor, required, error, className, children }: FieldProps): React.JSX.Element {
+  return (
+    <div className={cn('space-y-1.5', className)}>
+      <Label htmlFor={htmlFor} className="flex items-center gap-1">
+        {label}
+        {required === true ? <span className="text-destructive">*</span> : null}
+      </Label>
+      {children}
+      {error !== undefined ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : null}
+    </div>
+  );
+}
