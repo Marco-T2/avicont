@@ -42,6 +42,10 @@ export function useSetFeatureFlag() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['feature-flags'] });
+      // Invalidar el cache de permisos para que useVerticalActivo refleje el
+      // nuevo vertical inmediatamente sin esperar el staleTime de 5 min.
+      // queryKey sin el segundo elemento → invalida todas las entradas ['me-permissions', *].
+      void qc.invalidateQueries({ queryKey: ['me-permissions'] });
     },
   });
 }

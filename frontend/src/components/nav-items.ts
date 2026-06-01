@@ -32,6 +32,12 @@ export interface NavItem {
    * Coincide con el permiso que gatéa la ruta correspondiente en router.tsx.
    */
   requiredPermission?: string;
+  /**
+   * Vertical al que pertenece el ítem. Si está ausente, el ítem es de
+   * ADMINISTRACIÓN (cross-vertical) y se muestra en ambos verticales.
+   * Items con permiso contabilidad.* → 'CONTABILIDAD'; granja.* → 'GRANJA'.
+   */
+  vertical?: 'CONTABILIDAD' | 'GRANJA';
 }
 
 // Única fuente de verdad del menú principal. Consumida por AppSidebar
@@ -44,61 +50,72 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Plan de cuentas',
     icon: BookOpen,
     requiredPermission: PERMISSIONS.contabilidad.planCuentas.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/comprobantes',
     label: 'Comprobantes',
     icon: FileText,
     requiredPermission: PERMISSIONS.contabilidad.asientos.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/libros/diario',
     label: 'Libro Diario',
     icon: BookText,
     requiredPermission: PERMISSIONS.contabilidad.libroDiario.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/libros/mayor',
     label: 'Libro Mayor',
     icon: BookMarked,
     requiredPermission: PERMISSIONS.contabilidad.libroMayor.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/eeff/balance',
     label: 'Balance General',
     icon: Scale,
     requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/eeff/resultados',
     label: 'Estado de Resultados',
     icon: TrendingUp,
     requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/contactos',
     label: 'Contactos',
     icon: Contact,
     requiredPermission: PERMISSIONS.contabilidad.contactos.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/tipos-documento-fisico',
     label: 'Tipos de documento',
     icon: FileBadge,
     requiredPermission: PERMISSIONS.contabilidad.tiposDocumento.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/documentos-fisicos',
     label: 'Documentos físicos',
     icon: FileStack,
     requiredPermission: PERMISSIONS.contabilidad.documentosFisicos.read,
+    vertical: 'CONTABILIDAD',
   },
   {
     to: '/periodos-fiscales',
     label: 'Períodos fiscales',
     icon: CalendarRange,
     requiredPermission: PERMISSIONS.contabilidad.periodos.read,
+    vertical: 'CONTABILIDAD',
   },
+  // ─── Administración (cross-vertical — sin campo vertical) ──────────────────
   {
     to: '/settings/members',
     label: 'Miembros',
@@ -117,26 +134,32 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ToggleRight,
     requiredPermission: PERMISSIONS.organizacion.features.read,
   },
-  { to: '/configuracion', label: 'Configuración contable', icon: Settings, disabled: true },
+  // Configuración contable: ítem deshabilitado, pertenece a CONTABILIDAD.
+  // Lleva vertical: 'CONTABILIDAD' para que el granjero no lo vea aunque esté disabled.
+  { to: '/configuracion', label: 'Configuración contable', icon: Settings, disabled: true, vertical: 'CONTABILIDAD' },
   // ─── Granja ────────────────────────────────────────────────────────────────
-  // Visibilidad: 100% RBAC. Si el tenant activó granja, el backend otorga
-  // granja.* y has('granja.X.read') da true. Sin flag granjaEnabled en store.
+  // Visibilidad: RBAC + vertical (gating aditivo). Si el tenant activó granja,
+  // el backend otorga granja.* y has('granja.X.read') da true. El filtro de
+  // vertical asegura que solo se muestran cuando vertical === 'GRANJA'.
   {
     to: '/granja',
     label: 'Dashboard',
     icon: LayoutDashboard,
     requiredPermission: PERMISSIONS.granja.dashboard.read,
+    vertical: 'GRANJA',
   },
   {
     to: '/granja/lotes',
     label: 'Mis Lotes',
     icon: Bird,
     requiredPermission: PERMISSIONS.granja.lotes.read,
+    vertical: 'GRANJA',
   },
   {
     to: '/granja/tipos-registro',
     label: 'Tipos de Registro',
     icon: ClipboardList,
     requiredPermission: PERMISSIONS.granja.tiposRegistro.read,
+    vertical: 'GRANJA',
   },
 ];

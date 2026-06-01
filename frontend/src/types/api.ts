@@ -1016,6 +1016,9 @@ export interface BalanceGeneralResponse {
 // por el backend (NO patrones de wildcards).
 // ============================================================
 
+/** Vertical activo de la organización, derivado de sus flags de módulo. */
+export type VerticalActivo = 'CONTABILIDAD' | 'GRANJA' | null;
+
 export interface MePermissionsResponse {
   /** Permisos efectivos exactos del usuario (ej. ["contabilidad.eeff.read"]). */
   permissions: string[];
@@ -1023,6 +1026,8 @@ export interface MePermissionsResponse {
   isOwner: boolean;
   /** ID del tenant activo en el JWT en el momento de la consulta. */
   activeTenantId: string;
+  /** Vertical de la org activa. null si la org no tiene módulo asignado. */
+  vertical: VerticalActivo;
 }
 
 // ============================================================

@@ -56,6 +56,7 @@ describe('usePermissions', () => {
         permissions: [],
         isOwner: false,
         activeTenantId: 'tenant-123',
+        vertical: null,
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -71,6 +72,7 @@ describe('usePermissions', () => {
         permissions: ['contabilidad.eeff.read'],
         isOwner: false,
         activeTenantId: 'tenant-123',
+        vertical: null,
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -85,6 +87,7 @@ describe('usePermissions', () => {
         permissions: ['contabilidad.eeff.read'],
         isOwner: false,
         activeTenantId: 'tenant-123',
+        vertical: null,
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -99,6 +102,7 @@ describe('usePermissions', () => {
         permissions: ['contabilidad.eeff.*'],
         isOwner: false,
         activeTenantId: 'tenant-123',
+        vertical: null,
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -113,6 +117,7 @@ describe('usePermissions', () => {
         permissions: [],
         isOwner: true,
         activeTenantId: 'tenant-123',
+        vertical: 'CONTABILIDAD',
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -142,6 +147,7 @@ describe('usePermissions', () => {
         ],
         isOwner: false,
         activeTenantId: 'tenant-123',
+        vertical: null,
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -168,6 +174,7 @@ describe('usePermissions', () => {
         permissions: [],
         isOwner: true,
         activeTenantId: 'tenant-123',
+        vertical: 'CONTABILIDAD',
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
