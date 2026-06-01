@@ -1,11 +1,8 @@
 // Puerto cross-módulo DEFINIDO por platform (consumidor) para escribir organizaciones.
 // El módulo `tenants` registra el adapter concreto y lo exporta vía este token
 // (CLAUDE.md §3.3 — no importación directa cross-module).
-//
-// Slice 6a: solo `create`. Los métodos `updateStatus` y `updateEntitlement`
-// se agregan en Slice 6b (PATCH /status y PATCH /entitlement).
 
-import type { Prisma } from '@prisma/client';
+import type { Organization, OrganizationStatus, Plan, Prisma } from '@prisma/client';
 
 import type { OrganizationConMemberships } from '@/tenants/ports/tenant.repository.port';
 
@@ -17,6 +14,12 @@ export interface OrgCreateData {
   ownerUserId: string;
   contabilidadEnabled: boolean;
   granjaEnabled: boolean;
+}
+
+export interface OrgEntitlementData {
+  plan?: Plan;
+  contabilidadEnabled?: boolean;
+  granjaEnabled?: boolean;
 }
 
 export abstract class OrgsWriterPort {
@@ -31,4 +34,17 @@ export abstract class OrgsWriterPort {
     data: OrgCreateData,
     tx?: Prisma.TransactionClient,
   ): Promise<OrganizationConMemberships>;
+
+  /**
+   * Actualiza el status de una organización (REQ-SA-14).
+   * Retorna null si la org no existe.
+   */
+  abstract updateStatus(id: string, status: OrganizationStatus): Promise<Organization | null>;
+
+  /**
+   * Actualiza el plan y/o verticales de una organización (REQ-SA-15).
+   * Retorna null si la org no existe.
+   * La validación de exclusividad de vertical la hace el service antes de llamar este método.
+   */
+  abstract updateEntitlement(id: string, data: OrgEntitlementData): Promise<Organization | null>;
 }

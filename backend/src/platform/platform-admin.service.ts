@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { OrganizationStatus } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
@@ -20,7 +21,12 @@ import { ORGS_READER_PORT, OrgsReaderPort } from './ports/orgs-reader.port';
 import { ORGS_WRITER_PORT, OrgsWriterPort } from './ports/orgs-writer.port';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
 import { CreateOrgDto } from './dto/create-org.dto';
-import { PlatformOrgOwnerNotFoundError } from './domain/platform-errors';
+import { UpdateEntitlementDto } from './dto/update-entitlement.dto';
+import {
+  PlatformOrgNoEncontradaError,
+  PlatformOrgOwnerNotFoundError,
+  PlatformVerticalNoExclusivoError,
+} from './domain/platform-errors';
 import { ModuloOrganizacion } from '@/tenants/dto/create-tenant.dto';
 
 @Injectable()
@@ -102,6 +108,55 @@ export class PlatformAdminService {
     this.logger.log(`Org '${org.name}' (${org.id}) creada por super-admin. OWNER: ${email}`);
 
     return PlatformOrgResponseDto.fromOrganization(org);
+  }
+
+  /**
+   * Actualiza el status (ACTIVE/SUSPENDED/ARCHIVED) de una organización (REQ-SA-14).
+   * El `:id` viene del path — el super-admin opera cross-tenant sin TenantGuard.
+   */
+  async actualizarStatus(orgId: string, status: OrganizationStatus): Promise<PlatformOrgResponseDto> {
+    const org = await this.orgsWriter.updateStatus(orgId, status);
+    if (!org) {
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+    this.logger.log(`Org '${org.name}' (${org.id}) status actualizado a ${status}`);
+    return PlatformOrgResponseDto.fromOrganization(org);
+  }
+
+  /**
+   * Actualiza el plan y/o verticales de una organización (REQ-SA-15).
+   * Valida exclusividad de vertical: no pueden estar ambos en true (§10.4).
+   * El reader se usa para obtener el estado actual cuando el patch es parcial.
+   */
+  async actualizarEntitlement(orgId: string, dto: UpdateEntitlementDto): Promise<PlatformOrgResponseDto> {
+    const current = await this.orgsReader.findById(orgId);
+    if (!current) {
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+
+    // Calcular estado resultante de las verticales para validar exclusividad.
+    // El patch es parcial: los campos no presentes conservan el valor actual.
+    const contabilidadEnabled = dto.contabilidadEnabled ?? current.contabilidadEnabled;
+    const granjaEnabled = dto.granjaEnabled ?? current.granjaEnabled;
+
+    // §10.4 (docs/disenos/plataforma-multi-vertical.md): vertical exclusivo.
+    // Defense in depth con el CHECK constraint `organizations_vertical_exclusivo_check`.
+    if (contabilidadEnabled && granjaEnabled) {
+      throw new PlatformVerticalNoExclusivoError(orgId);
+    }
+
+    const updated = await this.orgsWriter.updateEntitlement(orgId, {
+      ...(dto.plan !== undefined ? { plan: dto.plan } : {}),
+      ...(dto.contabilidadEnabled !== undefined ? { contabilidadEnabled: dto.contabilidadEnabled } : {}),
+      ...(dto.granjaEnabled !== undefined ? { granjaEnabled: dto.granjaEnabled } : {}),
+    });
+
+    if (!updated) {
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+
+    this.logger.log(`Org '${updated.name}' (${updated.id}) entitlement actualizado`);
+    return PlatformOrgResponseDto.fromOrganization(updated);
   }
 
   /**

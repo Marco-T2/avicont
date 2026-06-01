@@ -200,3 +200,237 @@ describe('Platform Admin — acceso super-admin (REQ-SA-12, REQ-SA-13)', () => {
     expect(res.body.error.code).toBe('PLATFORM_ORG_OWNER_NOT_FOUND');
   });
 });
+
+describe('Platform Admin — gating REQ-SA-14/15 (OWNER no puede)', () => {
+  let app: INestApplication;
+  let ownerToken: string;
+  let orgId: string;
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    await cleanupTestData();
+
+    const owner = await createTestUser({
+      email: 'owner-gating-6b@test.com',
+      password: 'pass12345',
+    });
+    const tenant = await createTestTenant({ name: `Org Gating 6b ${Date.now()}` });
+    await createTestMembership(owner.id, tenant.id);
+    orgId = tenant.id;
+    ownerToken = await login(app, 'owner-gating-6b@test.com', 'pass12345');
+  });
+
+  it('[-] OWNER hace PATCH /admin/platform/orgs/:id/status → 403 (REQ-SA-14)', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${orgId}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'SUSPENDED' });
+    expect(res.status).toBe(403);
+  });
+
+  it('[-] OWNER hace PATCH /admin/platform/orgs/:id/entitlement → 403 (REQ-SA-15)', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${orgId}/entitlement`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ plan: 'PRO' });
+    expect(res.status).toBe(403);
+  });
+
+  it('[-] OWNER hace GET /admin/feature-flags → 403 tras re-gating (REQ-SA-16)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/admin/feature-flags')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('X-Tenant-ID', orgId);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Platform Admin — PATCH status/entitlement super-admin (REQ-SA-14/15)', () => {
+  let app: INestApplication;
+  let superAdminToken: string;
+  let targetOrgId: string;
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    await cleanupTestData();
+
+    // Super-admin
+    const superAdminPassword = 'superpass123';
+    const hashedPassword = await bcrypt.hash(superAdminPassword, 10);
+    await prisma.user.create({
+      data: { email: 'superadmin@test.com', hashedPassword, isSuperAdmin: true },
+    });
+    superAdminToken = await login(app, 'superadmin@test.com', superAdminPassword);
+
+    // Org objetivo
+    const owner = await createTestUser({ email: 'owner-target@test.com', password: 'pass12345' });
+    const tenant = await createTestTenant({ name: `Org Target ${Date.now()}` });
+    await createTestMembership(owner.id, tenant.id);
+    targetOrgId = tenant.id;
+  });
+
+  // ---------- PATCH status ----------
+
+  it('[+] REQ-SA-14: PATCH /status SUSPENDED → 200 y status cambia en BD', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/status`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'SUSPENDED' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('SUSPENDED');
+
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
+    expect(org?.status).toBe('SUSPENDED');
+  });
+
+  it('[+] REQ-SA-14: PATCH /status ACTIVE revierte una suspensión', async () => {
+    // Primero suspender
+    await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/status`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'SUSPENDED' });
+
+    // Luego reactivar
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/status`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'ACTIVE' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ACTIVE');
+
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
+    expect(org?.status).toBe('ACTIVE');
+  });
+
+  it('[+] REQ-SA-14: PATCH /status deja fila en platform_audit con targetOrganizationId', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/status`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'ARCHIVED' });
+
+    expect(res.status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    const auditRow = await prisma.platformAudit.findFirst({
+      where: { targetOrganizationId: targetOrgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(auditRow).not.toBeNull();
+    expect(auditRow?.targetOrganizationId).toBe(targetOrgId);
+  });
+
+  it('[+] REQ-SA-14: org inexistente → 404', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/api/admin/platform/orgs/00000000-0000-0000-0000-000000000000/status')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'SUSPENDED' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('[-] status inválido → 400 (ValidationPipe)', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/status`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'INVALIDO' });
+
+    expect(res.status).toBe(400);
+  });
+
+  // ---------- PATCH entitlement ----------
+
+  it('[+] REQ-SA-15: PATCH /entitlement plan PRO → 200 y plan cambia en BD', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/entitlement`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ plan: 'PRO' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toBe('PRO');
+
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
+    expect(org?.plan).toBe('PRO');
+  });
+
+  it('[+] REQ-SA-15: PATCH /entitlement cambia verticales (granja → contabilidad)', async () => {
+    // La org default tiene contabilidadEnabled=true, granjaEnabled=false (createTestTenant).
+    // Cambiar a solo granja.
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/entitlement`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ contabilidadEnabled: false, granjaEnabled: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.contabilidadEnabled).toBe(false);
+    expect(res.body.granjaEnabled).toBe(true);
+
+    const org = await prisma.organization.findUnique({ where: { id: targetOrgId } });
+    expect(org?.contabilidadEnabled).toBe(false);
+    expect(org?.granjaEnabled).toBe(true);
+  });
+
+  it('[-] REQ-SA-15: ambos verticales true → 422 PLATFORM_VERTICAL_NO_EXCLUSIVO', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/entitlement`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ contabilidadEnabled: true, granjaEnabled: true });
+
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('PLATFORM_VERTICAL_NO_EXCLUSIVO');
+  });
+
+  it('[+] REQ-SA-15: PATCH /entitlement deja fila en platform_audit con targetOrganizationId', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/api/admin/platform/orgs/${targetOrgId}/entitlement`)
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ plan: 'PRO' });
+
+    expect(res.status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 150));
+
+    const auditRow = await prisma.platformAudit.findFirst({
+      where: { targetOrganizationId: targetOrgId },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(auditRow).not.toBeNull();
+    expect(auditRow?.targetOrganizationId).toBe(targetOrgId);
+  });
+
+  it('[+] REQ-SA-15: org inexistente → 404', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/api/admin/platform/orgs/00000000-0000-0000-0000-000000000000/entitlement')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ plan: 'PRO' });
+
+    expect(res.status).toBe(404);
+  });
+
+  // ---------- Feature flags admin re-gating (REQ-SA-16) ----------
+
+  it('[+] REQ-SA-16: super-admin accede a GET /admin/feature-flags sin X-Tenant-ID → 200', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/admin/feature-flags')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+});

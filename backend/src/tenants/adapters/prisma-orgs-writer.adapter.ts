@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { SystemRole, type Prisma } from '@prisma/client';
+import { type Organization, type OrganizationStatus, SystemRole, type Prisma, type Plan } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 import { OrganizationConMemberships } from '@/tenants/ports/tenant.repository.port';
-import { OrgCreateData, OrgsWriterPort } from '@/platform/ports/orgs-writer.port';
+import { OrgCreateData, OrgEntitlementData, OrgsWriterPort } from '@/platform/ports/orgs-writer.port';
 
 /**
  * Adapter que implementa OrgsWriterPort para el módulo platform.
@@ -38,4 +38,42 @@ export class PrismaOrgsWriterAdapter extends OrgsWriterPort {
       include: { memberships: true },
     });
   }
+
+  override async updateStatus(id: string, status: OrganizationStatus): Promise<Organization | null> {
+    try {
+      return await this.prisma.organization.update({
+        where: { id },
+        data: { status },
+      });
+    } catch (e) {
+      // P2025: registro no encontrado
+      if (isPrismaNotFound(e)) return null;
+      throw e;
+    }
+  }
+
+  override async updateEntitlement(id: string, data: OrgEntitlementData): Promise<Organization | null> {
+    try {
+      return await this.prisma.organization.update({
+        where: { id },
+        data: {
+          ...(data.plan !== undefined ? { plan: data.plan as Plan } : {}),
+          ...(data.contabilidadEnabled !== undefined ? { contabilidadEnabled: data.contabilidadEnabled } : {}),
+          ...(data.granjaEnabled !== undefined ? { granjaEnabled: data.granjaEnabled } : {}),
+        },
+      });
+    } catch (e) {
+      if (isPrismaNotFound(e)) return null;
+      throw e;
+    }
+  }
+}
+
+function isPrismaNotFound(e: unknown): boolean {
+  return (
+    typeof e === 'object' &&
+    e !== null &&
+    'code' in e &&
+    (e as { code: unknown }).code === 'P2025'
+  );
 }
