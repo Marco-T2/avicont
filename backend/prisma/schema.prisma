@@ -121,6 +121,11 @@ model User {
   displayName     String?
   isEmailVerified Boolean   @default(false)
   isActive        Boolean   @default(true)
+  // Identidad de plataforma: distingue operadores del SaaS de usuarios comunes.
+  // Ver docs/disenos/super-admin-plataforma.md §3 y CLAUDE.md §10.1.
+  // Decisión: Boolean v1 (YAGNI — enum platformRole se diferencia cuando
+  // aparezca un segundo nivel de operador, ver design.md §6).
+  isSuperAdmin    Boolean   @default(false)
   createdAt       DateTime  @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
 
@@ -132,6 +137,7 @@ model User {
   customRolesCreated      CustomRole[]         @relation("CustomRoleCreator")
   impersonationsAsAdmin   ImpersonationLog[]   @relation("ImpersonationAdmin")
   impersonationsAsTarget  ImpersonationLog[]   @relation("ImpersonationTarget")
+  platformAudits          PlatformAudit[]      @relation("PlatformAuditActor")
 }
 
 model Organization {
@@ -187,6 +193,10 @@ model Organization {
   tiposRegistro        TipoRegistro[]
   movimientosInversion MovimientoInversion[]
   movimientosCantidad  MovimientoCantidad[]
+
+  // Auditoría de acciones de plataforma sobre esta organización.
+  // Ver PlatformAudit y docs/disenos/super-admin-plataforma.md §6.
+  platformAudits       PlatformAudit[]
 
   @@map("organizations")
 }
@@ -1079,4 +1089,38 @@ model MovimientoCantidad {
 
   @@index([organizationId, loteId])
   @@map("movimientos_cantidad")
+}
+
+// =====================================================================
+// AUDITORÍA DE PLATAFORMA
+// =====================================================================
+//
+// Tabla separada de AuditLog (por-tenant, organizationId NOT NULL) para
+// registrar acciones del super-admin de plataforma, que pueden ser org-less
+// (listar todos los tenants) o cross-tenant (suspender org ajena).
+// Ver docs/disenos/super-admin-plataforma.md §6 y design.md §5.
+//
+// Decisión: tabla separada para no contaminar AuditLog (con su FK NOT NULL
+// a Organization) con filas sin org. Mezclarlas exigiría migración invasiva
+// sobre tabla central con triggers e índices que asumen organizationId NOT NULL.
+
+model PlatformAudit {
+  id                   String   @id @default(uuid())
+  // super-admin que ejecutó la acción
+  actorUserId          String
+  // ej: "POST /admin/platform/orgs", "platform.superadmin.grant"
+  action               String
+  // org afectada; null para acciones org-less (listar orgs) o grant/revoke
+  targetOrganizationId String?
+  // request body redactado de campos sensibles / metadata relevante
+  payload              Json?
+  // Timestamptz (UTC) — timestamp de auditoría, no fecha contable (CLAUDE.md §4.6)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  actor              User          @relation("PlatformAuditActor", fields: [actorUserId], references: [id])
+  targetOrganization Organization? @relation(fields: [targetOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([targetOrganizationId, createdAt])
+  @@map("platform_audit")
 }
