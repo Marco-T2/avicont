@@ -70,6 +70,13 @@ export class Money {
     return new Money(this.amount.mul(toDecimal(factor)));
   }
 
+  div(divisor: number): Money {
+    if (divisor === 0) {
+      throw new RangeError('Money: division por cero');
+    }
+    return new Money(this.amount.div(divisor).toDecimalPlaces(2));
+  }
+
   abs(): Money {
     return new Money(this.amount.abs());
   }
