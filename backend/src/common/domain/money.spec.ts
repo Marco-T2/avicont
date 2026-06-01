@@ -136,3 +136,33 @@ describe('Money constantes', () => {
     expect(Money.TOLERANCIA_BOB.toBob()).toBe('0.01');
   });
 });
+
+describe('Money.div', () => {
+  it('divide exactamente sin redondeo', () => {
+    expect(Money.of('75000').div(5000).toBob()).toBe('15.00');
+  });
+
+  it('divide con redondeo half-up a 2 decimales', () => {
+    expect(Money.of('75000').div(4900).toBob()).toBe('15.31');
+  });
+
+  it('divide número entero exacto', () => {
+    expect(Money.of('30').div(3).toBob()).toBe('10.00');
+  });
+
+  it('redondea hacia abajo cuando corresponde (1/3 → 0.33)', () => {
+    expect(Money.of('1').div(3).toBob()).toBe('0.33');
+  });
+
+  it('devuelve una nueva instancia (inmutabilidad)', () => {
+    const original = Money.of('100');
+    const resultado = original.div(4);
+    expect(original.toBob()).toBe('100.00');
+    expect(resultado.toBob()).toBe('25.00');
+  });
+
+  it('lanza RangeError al dividir por cero', () => {
+    expect(() => Money.of('100').div(0)).toThrow(RangeError);
+    expect(() => Money.of('100').div(0)).toThrow(/division por cero/);
+  });
+});
