@@ -1036,6 +1036,7 @@ Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
 | `trg_comprobantes_audit` | FUNCTION (plpgsql) | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
 | `trg_audit_comprobantes` | TRIGGER en `comprobantes` | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
 | `trg_audit_lineas_comprobante` | TRIGGER en `lineas_comprobante` | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
+| `lotes_cantidad_inicial_positiva_check` | CHECK `"cantidadInicial" > 0` en `lotes` | `20260601145425_granja_v1_schema` |
 
 **Nota especial sobre `comprobante_documento_fisico_unique_contabilizado`:** Este índice
 parcial usa `WHERE comprobanteEstado = 'CONTABILIZADO'::"EstadoComprobante"` — cuando se

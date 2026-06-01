@@ -182,6 +182,12 @@ model Organization {
   documentosFisicos             DocumentoFisico[]
   comprobantesDocumentosFisicos ComprobanteDocumentoFisico[]
 
+  // Relaciones del vertical Granja
+  lotes                Lote[]
+  tiposRegistro        TipoRegistro[]
+  movimientosInversion MovimientoInversion[]
+  movimientosCantidad  MovimientoCantidad[]
+
   @@map("organizations")
 }
 
@@ -962,4 +968,115 @@ model ComprobanteDocumentoFisico {
   @@index([comprobanteId])
   @@index([documentoFisicoId])
   @@map("comprobante_documento_fisico")
+}
+
+// =====================================================================
+// GRANJA (vertical de engorde — operativo, NO contable)
+// Ver docs/disenos/granja.md y openspec/changes/granja-v1/design.md.
+// Mundo separado de Contabilidad: sin partida doble, sin asientos.
+// =====================================================================
+
+enum EstadoLote {
+  ACTIVO
+  CERRADO
+}
+
+// Declara a qué tabla de movimiento pertenece un TipoRegistro.
+// Enum EXTENSIBLE: agregar VENTA en v2 es migración aditiva, no rediseño (riel v1.5/v2).
+enum NaturalezaRegistro {
+  INVERSION
+  CANTIDAD
+}
+
+model Lote {
+  id             String     @id @default(uuid())
+  organizationId String     // multi-tenant (§4.2) — NOT NULL, toda query filtra
+
+  nombre         String?    // etiqueta humana opcional
+  galpon         String?    // texto libre, sin unicidad (granja.md §5.1)
+  fechaIngreso   DateTime   @db.Date  // FechaContable (calendario puro, §4.6)
+  cantidadInicial Int       // pollitos BB. > 0 (CHECK). INMUTABLE post-create (service)
+  estado         EstadoLote @default(ACTIVO)
+
+  fechaEstimadaSaca DateTime? @db.Date  // FechaContable opcional
+  fechaCierre       DateTime? @db.Date  // se setea al cerrar
+  detalle           String?             // observaciones libres
+
+  // ----- RIEL ADITIVO v1.5 (NO se construye en v1; columnas futuras nullable) -----
+  // precioVentaFinal    Decimal? @db.Decimal(18,2)  // snapshot al cerrar (v1.5)
+  // costoPorPolloFinal  Decimal? @db.Decimal(18,2)  // snapshot derivado al cerrar (v1.5)
+  // mortalidadFinal     Decimal? @db.Decimal(5,4)   // snapshot % al cerrar (v1.5)
+  // Quedan documentadas, NO declaradas: agregarlas en v1.5 es ALTER ADD COLUMN nullable (no destructivo).
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  movimientosInversion MovimientoInversion[]
+  movimientosCantidad  MovimientoCantidad[]
+
+  @@index([organizationId, estado])  // dashboard: lotes ACTIVO por org
+  @@index([organizationId, fechaIngreso])
+  @@map("lotes")
+}
+
+model TipoRegistro {
+  id             String             @id @default(uuid())
+  organizationId String             // multi-tenant. Los esSistema se siembran por org al activar granja
+  nombre         String
+  naturaleza     NaturalezaRegistro
+  esSistema      Boolean            @default(false)  // true = seed, no eliminable
+  activo         Boolean            @default(true)   // soft-disable
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  movimientosInversion MovimientoInversion[]
+  movimientosCantidad  MovimientoCantidad[]
+
+  @@unique([organizationId, nombre])  // unicidad por org (defense in depth + upsert idempotente del seed)
+  @@index([organizationId, naturaleza])
+  @@map("tipos_registro")
+}
+
+model MovimientoInversion {
+  id             String   @id @default(uuid())
+  organizationId String   // denormalizado para queries sin JOIN (patrón LineaComprobante)
+  loteId         String
+  tipoRegistroId String
+  fecha          DateTime @db.Date  // FechaContable; PUEDE ser anterior a fechaIngreso (gastos previos)
+  monto          Decimal  @db.Decimal(18, 2)  // > 0 (service). Money, nunca number (§4.5)
+  detalle        String?  // @MaxLength(500) en DTO
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lote         Lote         @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  tipoRegistro TipoRegistro @relation(fields: [tipoRegistroId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, loteId])  // sirve también al read-model batch (WHERE loteId IN (...))
+  @@index([loteId, tipoRegistroId])  // desglose de costos por tipo (informe del lote)
+  @@map("movimientos_inversion")
+}
+
+model MovimientoCantidad {
+  id             String   @id @default(uuid())
+  organizationId String   // denormalizado
+  loteId         String
+  tipoRegistroId String
+  fecha          DateTime @db.Date  // FechaContable
+  cantidad       Int      // > 0 (service). Aves que SALEN (resta) — granja.md §5.4
+  detalle        String?  // @MaxLength(500) en DTO
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lote         Lote         @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  tipoRegistro TipoRegistro @relation(fields: [tipoRegistroId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, loteId])
+  @@map("movimientos_cantidad")
 }
