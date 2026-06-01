@@ -227,6 +227,32 @@ ALTER TABLE "lotes" ADD CONSTRAINT "lotes_cantidad_inicial_positiva_check" CHECK
 
 ## 4. Entidades de dominio puras (firmas TS)
 
+> **Nota de reconciliación — 2026-06-01 (S3-reconciliación)**
+>
+> El módulo granja NO usa entidades de dominio ricas con comportamiento.
+> Decisión del arquitecto: seguir el **patrón validator de `comprobantes`** —
+> validators puros (funciones sin side effects) + repos que devuelven rows planos
+> + services thin que orquestan (buscar → validar → persistir).
+>
+> Archivos de dominio resultantes en `granja/domain/`:
+> - `enums.ts` — enums propios (sin cambio)
+> - `granja-errors.ts` — errores de dominio (sin cambio)
+> - `lote-validator.ts` + `lote-validator.spec.ts` — invariantes puros de Lote
+> - `tipo-registro-validator.ts` + `tipo-registro-validator.spec.ts` — invariantes de TipoRegistro
+>
+> Las clases ricas `Lote`, `TipoRegistro`, `MovimientoInversion`, `MovimientoCantidad` (S2)
+> fueron eliminadas: eran código muerto que ningún service ni adapter importaba. Sus
+> invariantes migran íntegros a los validators. Los repos devuelven `LoteRow` / `TipoRegistroRow`
+> (interfaces planas del port). Patrón consistente con `comprobantes/` y `documentos-fisicos/`.
+>
+> Para S4 (movimientos): crear `movimiento-validator.ts` con los invariantes de
+> `MovimientoInversion` (monto > 0, naturaleza=INVERSION, detalle ≤ 500) y
+> `MovimientoCantidad` (cantidad entero > 0, naturaleza=CANTIDAD, detalle ≤ 500).
+> El invariante `avesVivas >= 0` sigue en el service bajo `SELECT FOR UPDATE` (P6).
+
+Las firmas TS a continuación son la referencia conceptual del diseño SDD original.
+La implementación usa validators puros, no clases con comportamiento (ver nota arriba).
+
 Las entidades viven en `granja/domain/`, sin NestJS ni Prisma. Reciben/exponen `Money` y `FechaContable`. El adapter mapea row Prisma → entidad de dominio en el boundary (siguiendo el criterio L2 "domain puro": las entidades son puras; el repo puede devolver la entidad mapeada).
 
 ### `enums.ts` (P2 — propios, espejan Prisma sin importarlo)
