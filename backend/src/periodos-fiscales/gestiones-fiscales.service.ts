@@ -107,7 +107,7 @@ export class GestionesFiscalesService {
         );
       }
 
-      return this.repo.cerrarGestion(tx, id, userId);
+      return this.repo.cerrarGestion(tx, id, tenantId, userId);
     });
   }
 
