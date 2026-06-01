@@ -58,21 +58,34 @@ describe('Feature Flags (e2e)', () => {
     expect(res.body).toEqual({ contabilidadEnabled: true, granjaEnabled: false });
   });
 
-  it('debe togglear features parcialmente', async () => {
+  it('debe togglear features parcialmente respetando la exclusividad de verticales', async () => {
+    // PATCH parcial: enviar solo un campo mantiene el otro. Se apaga contabilidad
+    // primero porque §10.4 (plataforma-multi-vertical) prohíbe ambos verticales activos.
     const res = await request(app.getHttpServer())
       .patch('/api/tenants/current/features')
       .set('Authorization', `Bearer ${ownerToken}`)
       .set('X-Tenant-ID', orgId)
-      .send({ granjaEnabled: true });
+      .send({ contabilidadEnabled: false });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ contabilidadEnabled: true, granjaEnabled: true });
+    expect(res.body).toEqual({ contabilidadEnabled: false, granjaEnabled: false });
 
     const res2 = await request(app.getHttpServer())
       .patch('/api/tenants/current/features')
       .set('Authorization', `Bearer ${ownerToken}`)
       .set('X-Tenant-ID', orgId)
-      .send({ contabilidadEnabled: false });
+      .send({ granjaEnabled: true });
+    expect(res2.status).toBe(200);
     expect(res2.body).toEqual({ contabilidadEnabled: false, granjaEnabled: true });
+  });
+
+  it('debe rechazar habilitar ambos verticales a la vez (vertical exclusivo)', async () => {
+    // §10.4 (plataforma-multi-vertical): contabilidad y granja son mutuamente exclusivos.
+    const res = await request(app.getHttpServer())
+      .patch('/api/tenants/current/features')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('X-Tenant-ID', orgId)
+      .send({ granjaEnabled: true });
+    expect(res.status).toBe(409);
   });
 
   it('debe rechazar PATCH sin permiso', async () => {
