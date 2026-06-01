@@ -2,6 +2,9 @@ import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+
+import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import {
   MEMBERSHIPS_READER_PORT,
   type MembershipActivaParaAuth,
@@ -25,8 +28,6 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MetricsService } from '../metrics/metrics.service';
 
-import * as crypto from 'crypto';
-
 export type { JwtPayload };
 
 export interface TokenPair {
@@ -46,6 +47,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly metrics: MetricsService,
+    @Inject(CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -192,7 +194,7 @@ export class AuthService {
     const raw = crypto.randomBytes(32).toString('hex');
     const hash = RefreshTokenHash.fromRaw(raw);
     const expiresIn = this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
-    const expiresAt = new Date(Date.now() + this.parseDuration(expiresIn));
+    const expiresAt = new Date(this.clock.now().getTime() + this.parseDuration(expiresIn));
     const tokenFamily = family ?? TokenFamily.generate();
 
     await this.credentials.create({

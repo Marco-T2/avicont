@@ -14,6 +14,7 @@ import { Invitation, InvitationStatus, SystemRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
+import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import { PrismaService } from '@/common/prisma.service';
 import {
   CUSTOM_ROLES_READER_PORT,
@@ -55,6 +56,7 @@ export class InvitationsService {
     private readonly customRoles: CustomRolesReaderPort,
     private readonly rbacService: RbacService,
     private readonly config: ConfigService,
+    @Inject(CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
   // ----- Crear invitación (admin) -----
@@ -124,7 +126,7 @@ export class InvitationsService {
     const token = crypto.randomBytes(TOKEN_BYTES).toString('hex');
     const tokenHash = this.hashToken(token);
     const expiresAt = new Date(
-      Date.now() + (dto.expiresInDays ?? DEFAULT_EXPIRY_DAYS) * 24 * 60 * 60 * 1000,
+      this.clock.now().getTime() + (dto.expiresInDays ?? DEFAULT_EXPIRY_DAYS) * 24 * 60 * 60 * 1000,
     );
 
     const invitation = await this.repo.create({
@@ -246,7 +248,7 @@ export class InvitationsService {
     if (!inv) throw new NotFoundException('Invitación no encontrada');
     if (inv.status === 'REVOKED') throw new GoneException('La invitación fue revocada');
     if (inv.status === 'ACCEPTED') throw new GoneException('La invitación ya fue aceptada');
-    if (inv.status === 'EXPIRED' || inv.expiresAt < new Date()) {
+    if (inv.status === 'EXPIRED' || inv.expiresAt < this.clock.now()) {
       throw new GoneException('La invitación expiró');
     }
     return inv;
@@ -297,7 +299,7 @@ export class InvitationsService {
       where: { id: inv.id },
       data: {
         status: 'ACCEPTED',
-        acceptedAt: new Date(),
+        acceptedAt: this.clock.now(),
         acceptedByUserId: userId,
       },
     });

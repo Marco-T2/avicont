@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
+import { CLOCK_PORT } from '@/common/clock/clock.port';
+import { FakeClockAdapter } from '@/common/clock/fake-clock.adapter';
 import {
   MEMBERSHIPS_READER_PORT,
   type MembershipsReaderPort,
@@ -36,6 +38,7 @@ describe('AuthService (unit)', () => {
   let usersWriter: jest.Mocked<UsersWriterPort>;
   let jwt: { sign: jest.Mock };
   let metrics: { recordLogin: jest.Mock; recordTokenRefresh: jest.Mock };
+  let clock: FakeClockAdapter;
 
   beforeEach(async () => {
     credentials = {
@@ -55,6 +58,7 @@ describe('AuthService (unit)', () => {
     usersWriter = { create: jest.fn() };
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
     metrics = { recordLogin: jest.fn(), recordTokenRefresh: jest.fn() };
+    clock = new FakeClockAdapter();
     const config = {
       get: jest.fn().mockReturnValue('30d'),
     } as unknown as ConfigService;
@@ -69,6 +73,7 @@ describe('AuthService (unit)', () => {
         { provide: JwtService, useValue: jwt },
         { provide: ConfigService, useValue: config },
         { provide: MetricsService, useValue: metrics },
+        { provide: CLOCK_PORT, useValue: clock },
       ],
     }).compile();
 
@@ -228,6 +233,29 @@ describe('AuthService (unit)', () => {
       expect(createArgs?.organizationId).toBe('org-1');
       expect(result.refreshToken).not.toBe('raw-token');
       expect(metrics.recordTokenRefresh).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('createRefreshToken — expiresAt determinista vía clock', () => {
+    it('expiresAt del refresh token = clock.now() + duración parseada (sin flakiness de ±ms)', async () => {
+      const frozenNow = new Date('2026-06-01T00:00:00.000Z');
+      clock.setTo(frozenNow);
+
+      const hashedPassword = await bcrypt.hash('pw', 10);
+      usersReader.findByEmail.mockResolvedValue({
+        id: 'u-1',
+        email: 'x@y.com',
+        hashedPassword,
+        isActive: true,
+      });
+      memberships.findActivasByUserId.mockResolvedValue([]);
+
+      await service.login({ email: 'x@y.com', password: 'pw' });
+
+      const createArgs = credentials.create.mock.calls[0]?.[0];
+      // 30d = 30 * 24 * 60 * 60 * 1000 ms
+      const expected = new Date(frozenNow.getTime() + 30 * 24 * 60 * 60 * 1000);
+      expect(createArgs?.expiresAt).toEqual(expected);
     });
   });
 
