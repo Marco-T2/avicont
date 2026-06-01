@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as usePermissionsModule from '@/lib/use-permissions';
 
+import { NAV_ITEMS } from './nav-items';
 import { NavList } from './nav-list';
 
 function mockPermissions(overrides: {
@@ -91,5 +92,45 @@ describe('NavList — filtrado por requiredPermission', () => {
     );
     expect(screen.queryByText('Balance General')).not.toBeInTheDocument();
     expect(screen.queryByText('Libro Diario')).not.toBeInTheDocument();
+  });
+
+  it('sin permisos, todo el menú de dominio queda gateado (solo Panel visible)', () => {
+    mockPermissions({ allowedPermissions: [] });
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Panel').length).toBeGreaterThan(0);
+    for (const label of [
+      'Plan de cuentas',
+      'Comprobantes',
+      'Contactos',
+      'Tipos de documento',
+      'Documentos físicos',
+      'Períodos fiscales',
+      'Miembros',
+      'Roles',
+      'Módulos activos',
+    ]) {
+      expect(screen.queryByText(label), `${label} debería estar gateado`).not.toBeInTheDocument();
+    }
+  });
+});
+
+// Guard anti-drift: un ítem de nav nuevo sin permiso queda visible para todos sin
+// que nadie lo note. Este test obliga a declarar requiredPermission salvo en los
+// ítems públicos (Panel) o deshabilitados.
+describe('NAV_ITEMS — cobertura de gating', () => {
+  const RUTAS_PUBLICAS = new Set(['/']);
+
+  it('todo ítem no-público y no-disabled declara requiredPermission', () => {
+    for (const item of NAV_ITEMS) {
+      if (RUTAS_PUBLICAS.has(item.to) || item.disabled === true) continue;
+      expect(
+        item.requiredPermission,
+        `"${item.label}" (${item.to}) debe declarar requiredPermission`,
+      ).toBeDefined();
+    }
   });
 });

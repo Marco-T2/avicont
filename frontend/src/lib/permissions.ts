@@ -38,6 +38,23 @@ export const PERMISSIONS = {
     periodos: {
       read: 'contabilidad.periodos.read',
     },
+    documentosFisicos: {
+      read: 'contabilidad.documentos-fisicos.read',
+    },
+    tiposDocumento: {
+      read: 'contabilidad.tipos-documento.read',
+    },
+  },
+  organizacion: {
+    miembros: {
+      read: 'organizacion.miembros.read',
+    },
+    roles: {
+      read: 'organizacion.roles.read',
+    },
+    features: {
+      read: 'organizacion.features.read',
+    },
   },
 } as const;
 
