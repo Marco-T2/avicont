@@ -11,7 +11,6 @@ import { EditarComprobantePage } from '@/features/comprobantes/pages/editar-comp
 import { ContactosPage } from '@/features/contactos/pages/contactos-page';
 import { DocumentosFisicosPage } from '@/features/documentos-fisicos/pages/documentos-fisicos-page';
 import { TiposDocumentoFisicoPage } from '@/features/tipos-documento-fisico/pages/tipos-documento-fisico-page';
-import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { GranjaDashboardPage } from '@/features/granja/pages/dashboard-page';
 import { LotesPage } from '@/features/granja/pages/lotes-page';
 import { LoteDetailPage } from '@/features/granja/pages/lote-detail-page';
@@ -28,6 +27,7 @@ import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
+import { IndexRedirect } from './index-redirect';
 import { ProtectedRoute } from './protected-route';
 
 export const router = createBrowserRouter([
@@ -45,7 +45,7 @@ export const router = createBrowserRouter([
       {
         element: <DashboardShell />,
         children: [
-          { path: '/', element: <DashboardPage /> },
+          { path: '/', element: <IndexRedirect /> },
           {
             path: '/plan-cuentas',
             element: (

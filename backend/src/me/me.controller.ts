@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ForbiddenError } from '@/common/errors/forbidden.error';
 import { RbacService } from '@/rbac/rbac.service';
 import { PrismaService } from '@/common/prisma.service';
-import { MePermissionsResponseDto } from './dto/me-permissions-response.dto';
+import { MePermissionsResponseDto, VerticalActivo } from './dto/me-permissions-response.dto';
 
 interface JwtUser {
   sub: string;
@@ -37,9 +37,15 @@ export class MeController {
     // de "membresía desactivada" (403). RbacService.getPermissions() devuelve EMPTY
     // para ambos casos; un lookup directo a la tabla de membresías es el costo mínimo
     // para hacer esa distinción correctamente.
+    // Los flags de la org se leen en el mismo select para derivar el vertical sin
+    // round-trip extra (invariante organizations_vertical_exclusivo_check garantiza
+    // que contabilidadEnabled y granjaEnabled no son true simultáneamente).
     const membresia = await this.prisma.membership.findUnique({
       where: { organizationId_userId: { organizationId: activeTenantId, userId: user.sub } },
-      select: { deactivatedAt: true },
+      select: {
+        deactivatedAt: true,
+        organization: { select: { contabilidadEnabled: true, granjaEnabled: true } },
+      },
     });
 
     if (!membresia) {
@@ -65,6 +71,17 @@ export class MeController {
       permissions: resolved.permissions,
       isOwner: resolved.isOwner,
       activeTenantId,
+      vertical: derivarVertical(membresia.organization),
     };
   }
+}
+
+function derivarVertical(org: {
+  contabilidadEnabled: boolean;
+  granjaEnabled: boolean;
+}): VerticalActivo {
+  // Invariante organizations_vertical_exclusivo_check: nunca ambos flags true.
+  if (org.contabilidadEnabled) return 'CONTABILIDAD';
+  if (org.granjaEnabled) return 'GRANJA';
+  return null;
 }
