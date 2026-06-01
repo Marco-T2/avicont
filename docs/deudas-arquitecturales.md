@@ -584,9 +584,13 @@ módulo va siendo tocado por trabajo de negocio.
 **Convención: dónde vive cada enum propio (Opción C)**:
 
 - **Cross-module** (usado en >1 módulo) → `backend/src/common/domain/enums.ts`.
-  Candidatos: `Moneda`, `SystemRole`, `TipoEmpresa`, `TipoComprobante`, `ClaseCuenta`.
+  Candidatos: `Moneda`, `SystemRole`, `TipoEmpresa`, `TipoComprobante`, `ClaseCuenta`,
+  `NaturalezaCuenta`, `SubClaseCuenta`.
 - **Single-module** (usado solo dentro del módulo dueño) → `<modulo>/domain/enums.ts`.
-  Candidatos: `NaturalezaCuenta`, `SubClaseCuenta` (cuentas).
+  Hoy ningún enum queda en esta categoría: `NaturalezaCuenta` y `SubClaseCuenta` se
+  promovieron a `common/` en el PR #96 cuando `reportes` empezó a consumirlos. Lección:
+  un enum "single-module" deja de serlo apenas un segundo módulo lo lee — al promoverlo,
+  borrá el barrel re-export del módulo original si queda sin consumidores (era dead code).
 
 Mismo criterio que rige para errores (`common/errors/` vs `<modulo>/domain/<modulo>-errors.ts`).
 
@@ -598,6 +602,13 @@ Mismo criterio que rige para errores (`common/errors/` vs `<modulo>/domain/<modu
 **Convención: mapper dominio ↔ Prisma**:
 - Vive en el adapter del módulo dueño del enum. NO en `common/adapters/` (eso
   acoplaría `common` a Prisma).
+- **Un módulo consumidor que lee Prisma en su propio boundary tiene su PROPIO
+  mapper; NO importa el del dueño.** Importar el adapter de otro módulo violaría
+  §3.3 (cruce de frontera sin port). Ej: `reportes/adapters/enum-mappers.ts`
+  (PR #96) mapea `ClaseCuenta`/`SubClaseCuenta`/`NaturalezaCuenta` Prisma→dominio
+  sin tocar `cuentas/adapters/enum-mappers.ts`. La duplicación del `Record` identity
+  es intencional y barata (es un guard de compile-time). El mapper expone solo el
+  sentido que ese boundary usa: `reportes` solo lee → solo `toDominio*`.
 - Naming: `toDominio<Enum>(p: PrismaEnum): Enum` y `toPrisma<Enum>(d: Enum): PrismaEnum`.
 - Si el adapter mapea 1 solo enum: inline en el archivo del repository.
 - Si el adapter mapea 2+: archivo separado `<modulo>/adapters/enum-mappers.ts`.
@@ -639,7 +650,7 @@ y el archivo sigue compilando, es type-only.
 | `decimal.js@^10.5.0` como dep directa explícita | ✅ acá |
 | L3 fix en `comprobante-validator.ts` | ✅ acá |
 | L2 política + convenciones (enum location, mapper naming) | ✅ acá (documentación) |
-| L2 migración de los 7 enums | 🔲 incremental, regla de oro al tocar cada módulo |
+| L2 migración de los 7 enums | 🟡 incremental, regla de oro al tocar cada módulo. Avance: `cuentas` (`NaturalezaCuenta`/`SubClaseCuenta` — PR #37 C/D), `reportes` + promoción de ambos a `common/` (PR #96) |
 | `Money` migrado a `Decimal` de `decimal.js` directo | 🔲 diferido (solo si cambia ORM o Prisma rompe semántica) |
 | ESLint rule custom para detectar value imports de Prisma en `domain/` | 🔲 fuera de scope (tooling) |
 
