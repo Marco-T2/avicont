@@ -27,6 +27,7 @@ import {
   TenantNoEncontradoError,
   TenantSlugDuplicadoError,
   TipoEmpresaInmutableError,
+  VerticalNoExclusivoError,
 } from './domain/tenant-errors';
 import { TENANT_REPOSITORY_PORT, TenantRepositoryPort } from './ports/tenant.repository.port';
 
@@ -143,6 +144,20 @@ export class TenantsService {
   }
 
   async updateFeatures(tenantId: string, dto: UpdateFeaturesDto) {
+    const current = await this.repo.findFeatures(tenantId);
+    if (!current) {
+      throw new TenantNoEncontradoError({ id: tenantId });
+    }
+
+    // §10.4 (docs/disenos/plataforma-multi-vertical.md): vertical exclusivo por
+    // org. El patch es parcial, así que se valida el estado RESULTANTE, no el dto
+    // suelto. Defense in depth con el CHECK constraint de la BD (§4.8).
+    const contabilidadEnabled = dto.contabilidadEnabled ?? current.contabilidadEnabled;
+    const granjaEnabled = dto.granjaEnabled ?? current.granjaEnabled;
+    if (contabilidadEnabled && granjaEnabled) {
+      throw new VerticalNoExclusivoError(tenantId);
+    }
+
     const updated = await this.repo.updateFeatures(tenantId, dto);
 
     // Invalidar el cache que usa ModuleEnabledGuard.

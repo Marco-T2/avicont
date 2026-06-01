@@ -145,6 +145,11 @@ model Organization {
 
   // Feature flags de módulos. Si está deshabilitado, los endpoints del
   // módulo retornan 404/403 incluso para OWNER. Ver CLAUDE.md §10.4 y §8.3.
+  //
+  // VERTICAL EXCLUSIVO (§10.4 docs/disenos/plataforma-multi-vertical.md): una
+  // org es de UN solo vertical. Invariante forzado por el CHECK constraint
+  // `organizations_vertical_exclusivo_check` (NOT both true) — raw SQL en la
+  // migration 20260531180000, no expresable en este schema. Ver CLAUDE.md §11.6.
   contabilidadEnabled Boolean @default(true)
   granjaEnabled       Boolean @default(false)
 

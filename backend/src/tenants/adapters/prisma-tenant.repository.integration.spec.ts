@@ -207,17 +207,36 @@ describe('PrismaTenantRepository (integration)', () => {
         granjaEnabled: false,
       });
 
+      // Apagar contabilidad (org queda sin vertical): patch parcial, granja intacto.
       const updated = await repo.updateFeatures(created.id, {
-        granjaEnabled: true,
-      });
-      expect(updated.granjaEnabled).toBe(true);
-      expect(updated.contabilidadEnabled).toBe(true); // no se tocó
-
-      const updated2 = await repo.updateFeatures(created.id, {
         contabilidadEnabled: false,
       });
-      expect(updated2.contabilidadEnabled).toBe(false);
+      expect(updated.contabilidadEnabled).toBe(false);
+      expect(updated.granjaEnabled).toBe(false); // no se tocó
+
+      // Switchear a granja: patch parcial, contabilidad intacto.
+      const updated2 = await repo.updateFeatures(created.id, {
+        granjaEnabled: true,
+      });
       expect(updated2.granjaEnabled).toBe(true);
+      expect(updated2.contabilidadEnabled).toBe(false);
+    });
+
+    // §10.4 (plataforma-multi-vertical): vertical exclusivo, invariante de BD.
+    // El CHECK constraint rechaza ambos verticales a la vez aunque el escritor
+    // (repo "tonto") no valide — defense in depth (CLAUDE.md §4.8).
+    it('el CHECK constraint rechaza prender ambos verticales a la vez', async () => {
+      const created = await repo.create({
+        slug: SLUG_A,
+        name: 'A',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+
+      await expect(repo.updateFeatures(created.id, { granjaEnabled: true })).rejects.toThrow(
+        /vertical_exclusivo|check constraint/i,
+      );
     });
   });
 });

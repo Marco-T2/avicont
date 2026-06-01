@@ -23,6 +23,7 @@ import {
   TenantSlugDuplicadoError,
   TenantSlugInvalidoError,
   TipoEmpresaInmutableError,
+  VerticalNoExclusivoError,
 } from './domain/tenant-errors';
 import {
   TENANT_REPOSITORY_PORT,
@@ -490,8 +491,10 @@ describe('TenantsService (unit)', () => {
 
   describe('updateFeatures', () => {
     it('aplica el patch e invalida la cache RBAC del tenant', async () => {
+      // Org sin vertical (caso OTROS) prende granja: switch válido, no viola exclusividad.
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: false });
       repo.updateFeatures.mockResolvedValue({
-        contabilidadEnabled: true,
+        contabilidadEnabled: false,
         granjaEnabled: true,
       });
 
@@ -499,10 +502,11 @@ describe('TenantsService (unit)', () => {
 
       expect(repo.updateFeatures).toHaveBeenCalledWith(TENANT_ID, { granjaEnabled: true });
       expect(redis.del).toHaveBeenCalledWith(`org-features:${TENANT_ID}`);
-      expect(result).toEqual({ contabilidadEnabled: true, granjaEnabled: true });
+      expect(result).toEqual({ contabilidadEnabled: false, granjaEnabled: true });
     });
 
     it('no rompe el flujo si la invalidación de cache falla', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
       repo.updateFeatures.mockResolvedValue({
         contabilidadEnabled: false,
         granjaEnabled: false,
@@ -514,6 +518,60 @@ describe('TenantsService (unit)', () => {
       });
 
       expect(result.contabilidadEnabled).toBe(false);
+    });
+
+    // §10.4 (plataforma-multi-vertical): vertical exclusivo por org.
+    it('rechaza prender granja cuando contabilidad ya está activa (vertical exclusivo)', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
+
+      await expect(
+        service.updateFeatures(TENANT_ID, { granjaEnabled: true }),
+      ).rejects.toBeInstanceOf(VerticalNoExclusivoError);
+
+      expect(repo.updateFeatures).not.toHaveBeenCalled();
+      expect(redis.del).not.toHaveBeenCalled();
+    });
+
+    it('rechaza prender ambos verticales en un mismo patch', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: false });
+
+      await expect(
+        service.updateFeatures(TENANT_ID, { contabilidadEnabled: true, granjaEnabled: true }),
+      ).rejects.toBeInstanceOf(VerticalNoExclusivoError);
+
+      expect(repo.updateFeatures).not.toHaveBeenCalled();
+    });
+
+    it('permite switchear de vertical en un solo patch (contab → granja)', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: true });
+
+      const result = await service.updateFeatures(TENANT_ID, {
+        contabilidadEnabled: false,
+        granjaEnabled: true,
+      });
+
+      expect(result).toEqual({ contabilidadEnabled: false, granjaEnabled: true });
+      expect(repo.updateFeatures).toHaveBeenCalled();
+    });
+
+    it('permite apagar el vertical activo (org queda sin vertical, caso OTROS)', async () => {
+      repo.findFeatures.mockResolvedValue({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.updateFeatures.mockResolvedValue({ contabilidadEnabled: false, granjaEnabled: false });
+
+      const result = await service.updateFeatures(TENANT_ID, { contabilidadEnabled: false });
+
+      expect(result).toEqual({ contabilidadEnabled: false, granjaEnabled: false });
+    });
+
+    it('lanza TenantNoEncontradoError si el tenant no existe', async () => {
+      repo.findFeatures.mockResolvedValue(null);
+
+      await expect(
+        service.updateFeatures(TENANT_ID, { granjaEnabled: true }),
+      ).rejects.toBeInstanceOf(TenantNoEncontradoError);
+
+      expect(repo.updateFeatures).not.toHaveBeenCalled();
     });
   });
 });
