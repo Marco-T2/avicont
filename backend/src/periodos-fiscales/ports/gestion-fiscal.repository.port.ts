@@ -44,6 +44,7 @@ export abstract class GestionFiscalRepositoryPort {
   abstract cerrarGestion(
     tx: Prisma.TransactionClient,
     id: string,
+    organizationId: string,
     userId: string,
   ): Promise<GestionFiscal>;
 }

@@ -21,22 +21,25 @@ export interface UpdateCustomRoleData {
 
 export interface CustomRoleRepositoryPort {
   list(organizationId: string): Promise<CustomRole[]>;
-  findById(id: string): Promise<CustomRole | null>;
+  findById(id: string, organizationId: string): Promise<CustomRole | null>;
   findBySlug(organizationId: string, slug: string): Promise<CustomRole | null>;
 
   create(data: CreateCustomRoleData): Promise<CustomRole>;
-  update(id: string, data: UpdateCustomRoleData): Promise<CustomRole>;
-  delete(id: string): Promise<void>;
+  update(id: string, organizationId: string, data: UpdateCustomRoleData): Promise<CustomRole>;
+  delete(id: string, organizationId: string): Promise<void>;
 
-  // Cuántos memberships ACTIVOS (deactivatedAt = null) usan este rol.
-  countActiveMembers(customRoleId: string): Promise<number>;
+  // Cuántos memberships ACTIVOS (deactivatedAt = null) usan este rol dentro del tenant.
+  countActiveMembers(customRoleId: string, organizationId: string): Promise<number>;
 
-  // Lista de userIds afectados por una invalidación de cache.
-  listAffectedUserIds(customRoleId: string): Promise<string[]>;
+  // Lista de userIds afectados por una invalidación de cache, scoped al tenant.
+  listAffectedUserIds(customRoleId: string, organizationId: string): Promise<string[]>;
 
   // Listado de members con datos básicos del user, para el endpoint
-  // GET /api/custom-roles/:id/members.
-  listMembersWithUsers(customRoleId: string): Promise<
+  // GET /api/custom-roles/:id/members, scoped al tenant.
+  listMembersWithUsers(
+    customRoleId: string,
+    organizationId: string,
+  ): Promise<
     Array<{
       membershipId: string;
       deactivatedAt: Date | null;

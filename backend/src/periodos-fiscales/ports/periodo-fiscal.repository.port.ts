@@ -20,11 +20,24 @@ export abstract class PeriodoFiscalRepositoryPort {
     filters?: { status?: PeriodoFiscalStatus },
   ): Promise<PeriodoFiscal[]>;
 
-  abstract cerrar(tx: Prisma.TransactionClient, id: string, userId: string): Promise<PeriodoFiscal>;
+  abstract cerrar(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<PeriodoFiscal>;
 
-  abstract reabrir(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal>;
+  abstract reabrir(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+  ): Promise<PeriodoFiscal>;
 
-  abstract marcarDefinitivo(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal>;
+  abstract marcarDefinitivo(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+  ): Promise<PeriodoFiscal>;
 
   abstract crearReapertura(
     tx: Prisma.TransactionClient,

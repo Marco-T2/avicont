@@ -85,16 +85,21 @@ export class PrismaGestionFiscalRepository
       })),
     });
 
-    const result = await tx.gestionFiscal.findUniqueOrThrow({
-      where: { id: created.id },
+    const result = await tx.gestionFiscal.findFirstOrThrow({
+      where: { id: created.id, organizationId: gestion.organizationId },
       include: { periodos: { orderBy: { ordenEnGestion: 'asc' } } },
     });
     return result;
   }
 
-  cerrarGestion(tx: Prisma.TransactionClient, id: string, userId: string): Promise<GestionFiscal> {
+  cerrarGestion(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<GestionFiscal> {
     return tx.gestionFiscal.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         status: 'CERRADA',
         closedAt: new Date(),

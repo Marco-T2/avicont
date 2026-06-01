@@ -161,14 +161,14 @@ export class InvitationsService {
 
   // ----- Revocar invitación pendiente (admin) -----
   async revoke(organizationId: string, id: string): Promise<Invitation> {
-    const inv = await this.repo.findById(id);
-    if (!inv || inv.organizationId !== organizationId) {
+    const inv = await this.repo.findById(id, organizationId);
+    if (!inv) {
       throw new NotFoundException('Invitación no encontrada');
     }
     if (inv.status !== 'PENDING') {
       throw new BadRequestException(`No se puede revocar una invitación en estado ${inv.status}`);
     }
-    return this.repo.markRevoked(id);
+    return this.repo.markRevoked(id, organizationId);
   }
 
   // ----- Preview público con token (para frontend antes del accept) -----

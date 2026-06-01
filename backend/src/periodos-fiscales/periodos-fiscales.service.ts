@@ -145,7 +145,7 @@ export class PeriodosFiscalesService {
       }
 
       await this.comprobantesLock.bloquearPorPeriodo(tx, id);
-      return this.repo.cerrar(tx, id, userId);
+      return this.repo.cerrar(tx, id, tenantId, userId);
     });
   }
 
@@ -178,7 +178,7 @@ export class PeriodosFiscalesService {
       });
 
       await this.comprobantesLock.desbloquearPorPeriodo(tx, id);
-      return this.repo.reabrir(tx, id);
+      return this.repo.reabrir(tx, id, tenantId);
     });
   }
 
@@ -191,7 +191,7 @@ export class PeriodosFiscalesService {
       if (periodo.status !== 'CERRADO') {
         throw new PeriodoNoCerradoError(id);
       }
-      return this.repo.marcarDefinitivo(tx, id);
+      return this.repo.marcarDefinitivo(tx, id, tenantId);
     });
   }
 }
