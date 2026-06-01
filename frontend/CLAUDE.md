@@ -572,6 +572,18 @@ Cada antipatrón: **Qué** (una línea), **Por qué duele** (con foco en un sist
   ```
   El `min-h` es libre por contexto (72/80/100 px). `[field-sizing:fixed]` desactiva el sizing automático, `w-full max-w-full` fuerza al input a respetar el ancho del padre, `resize-y` permite que el usuario lo agrande verticalmente. **El `text-base md:text-sm` se mantiene** por la regla de mobile auto-zoom (§7).
 
+### Anti-F-15: selector de Zustand que devuelve una referencia nueva
+- **Qué**: `useStore((s) => s.user?.roles ?? [])` — el `?? []` (o `?? {}`, `.filter(...)`, `.map(...)`, un objeto literal) corre **dentro** del selector.
+- **Por qué duele**: Zustand compara el resultado del selector con `Object.is`. Si devuelve una referencia nueva en cada render (un `[]` fresco cuando el valor real es `undefined`/`null`), el store cree que el snapshot cambió y fuerza otro render → **loop infinito** ("Maximum update depth exceeded"). Es invisible mientras el valor exista; explota justo cuando se vuelve nulo (ej. logout con el componente montado). Bug real cazado en `members-list`.
+- **Regla**: el selector devuelve **solo el valor crudo del store** (referencia estable); cualquier default/derivación va **fuera**:
+  ```tsx
+  // ❌ array nuevo dentro del selector
+  const roles = useAuthStore((s) => s.user?.roles ?? []);
+  // ✅ selector estable; el ?? va afuera
+  const roles = useAuthStore((s) => s.user?.roles) ?? [];
+  ```
+  Si necesitás derivar varios campos, usá `useMemo` sobre los valores crudos, o el selector con `shallow` de `zustand/shallow`.
+
 ---
 
 ## 13. Page chrome y componentes compartidos
@@ -820,6 +832,44 @@ Reglas:
 - **Importar SOLO del hook** (`@/features/<x>/hooks/use-<y>`). NO importar de `api/` ni de `components/` de otra feature.
 - **Comentario obligatorio** que empiece con `// Cross-feature:` explicando el motivo.
 - **Si la dependencia es un workaround** (ej. `pageSize` hardcodeado por límite del backend), anotar la deuda en el mismo comentario.
+
+### 14.7 Gating de permisos en acciones (UX honesta)
+
+El gating del frontend es **UX, no seguridad**: el candado real es el backend (RBAC → 403,
+ver `../CLAUDE.md §4.2/§5`). El frontend solo evita mostrar acciones habilitadas que el backend
+rechazaría. **Afordancia: deshabilitar + tooltip, NO ocultar** (el usuario ve que la acción
+existe pero entiende por qué no puede usarla). Para nav/rutas sí se oculta/bloquea (es navegación,
+no una acción puntual).
+
+**Herramientas (ya existen, NO reinventar):**
+- `usePermissions()` (`@/lib/use-permissions`) → `has(p)`, `hasAll([p1, p2])`, `isOwner`.
+  Fail-closed: sin data → `false`. Espeja el backend (`hasAllPermissions`); por eso `hasAll` es
+  AND y **no hay OR** (el backend tampoco lo tiene para permisos finos).
+- `<PermissionButton permission={…} deniedReason="…">` (`@/components/shared/permission-button`):
+  botón que se deshabilita + muestra tooltip si falta el permiso. `permission` acepta `string`
+  o `string[]` (AND). **Es el camino por defecto para un botón de acción.**
+- `<Can permission={…}>` para mostrar/ocultar bloques no-botón (o render-prop `{(allowed) => …}`).
+- Las keys viven en `@/lib/permissions.ts` (`PERMISSIONS.*`), que **espeja 1:1** el catálogo
+  backend (`backend/src/common/permisos/catalogo.ts`). Nunca strings sueltos.
+
+**Reglas por tipo de control:**
+- **Botón real** → `<PermissionButton>` (disable + tooltip).
+- **`DropdownMenuItem`** (acciones en menú "…") → NO es un botón: deshabilitar con
+  `disabled={!has(permiso) || <condiciones de negocio>}`. Sin tooltip (un menu-item Radix
+  deshabilitado no lo dispara de forma fiable; el gris ya es la señal).
+- **Acción que el backend exige por SystemRole** (OWNER/ADMIN, ej. reabrir período, impersonar)
+  → gatear con `useHasSystemRole(['OWNER','ADMIN'])` / `isOwner`, **no** con un permiso fino.
+- **Componente recursivo** (árbol): resolvé el permiso UNA vez en la raíz y propagalo por prop;
+  no llames `usePermissions()` por nodo.
+
+**Tests:** el mecanismo (`PermissionButton`/`Can`) ya está cubierto; testeá la **lógica custom**
+(menu-items, gating de árbol). Mockeá con `vi.mock('@/lib/use-permissions', async (o) => ({ ...(await o()), usePermissions: () => ({ has, hasAll, isOwner, permissions }) }))`
+— el `importOriginal` preserva `usePuedeReabrir`/`useHasSystemRole`. Para alternar permiso por test
+usá `vi.hoisted(() => ({ hasMock: vi.fn(() => true) }))`. Si el componente real entra al gate
+(fail-closed → tooltip), envolvé el render en `<TooltipProvider>`. Un `DropdownMenuItem`
+deshabilitado se assertea con `toHaveAttribute('data-disabled')` (no `toBeDisabled`).
+
+> Smoke manual end-to-end: `docs/smoke-gating.md` (Parte A nav/rutas, Parte B botones).
 
 ---
 
