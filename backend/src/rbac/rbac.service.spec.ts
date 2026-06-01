@@ -41,7 +41,7 @@ describe('RbacService', () => {
   describe('resolverPermisosConContexto()', () => {
     it('OWNER → isOwner: true y permissions contiene todos los keys del catálogo', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: true, esAdmin: false, wildcards: ['*'] },
+        resolvedResult: { esOwner: true, esAdmin: false, esSuperAdmin: false, wildcards: ['*'] },
       });
 
       const result = await service.resolverPermisosConContexto('user-1', 'org-1');
@@ -55,7 +55,7 @@ describe('RbacService', () => {
 
     it('ADMIN → isOwner: false y permissions contiene todos los keys del catálogo', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: true, wildcards: ['*'] },
+        resolvedResult: { esOwner: false, esAdmin: true, esSuperAdmin: false, wildcards: ['*'] },
       });
 
       const result = await service.resolverPermisosConContexto('user-2', 'org-1');
@@ -67,7 +67,7 @@ describe('RbacService', () => {
 
     it('MEMBER con CustomRole ["contabilidad.*"] → solo permisos con prefijo contabilidad', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: false, wildcards: ['contabilidad.*'] },
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: ['contabilidad.*'] },
       });
 
       const result = await service.resolverPermisosConContexto('user-3', 'org-1');
@@ -84,7 +84,7 @@ describe('RbacService', () => {
 
     it('MEMBER con CustomRole vacío → permissions: []', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: false, wildcards: [] },
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: [] },
       });
 
       const result = await service.resolverPermisosConContexto('user-4', 'org-1');
@@ -96,7 +96,7 @@ describe('RbacService', () => {
     it('MEMBER con permisos exactos → devuelve exactamente esos permisos sin duplicados', async () => {
       const permisosExactos = ['contabilidad.libro-diario.read', 'contabilidad.libro-mayor.read'];
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: false, wildcards: permisosExactos },
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: permisosExactos },
       });
 
       const result = await service.resolverPermisosConContexto('user-5', 'org-1');
@@ -122,6 +122,7 @@ describe('RbacService', () => {
       const permsEsperados: ResolvedPermissions = {
         esOwner: false,
         esAdmin: false,
+        esSuperAdmin: false,
         wildcards: ['contabilidad.*'],
       };
       const service = buildService({ resolvedResult: permsEsperados });
@@ -135,13 +136,49 @@ describe('RbacService', () => {
 
     it('OWNER → devuelve esOwner: true con wildcards ["*"]', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: true, esAdmin: false, wildcards: ['*'] },
+        resolvedResult: { esOwner: true, esAdmin: false, esSuperAdmin: false, wildcards: ['*'] },
       });
 
       const result = await service.getPermissions('owner-1', 'org-1');
 
       expect(result.esOwner).toBe(true);
       expect(result.wildcards).toEqual(['*']);
+    });
+  });
+
+  describe('REQ-SA-07: esSuperAdmin en ResolvedPermissions (defensa en profundidad)', () => {
+    it('esSuperAdmin: true en ResolvedPermissions → hasPermission retorna true para cualquier permiso', async () => {
+      const service = buildService({
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: true, wildcards: [] },
+      });
+
+      const result = await service.hasPermission('sa-1', 'org-1', 'cualquier.permiso.arbitrario');
+
+      expect(result).toBe(true);
+    });
+
+    it('esSuperAdmin: true → hasAllPermissions retorna true para cualquier lista de permisos', async () => {
+      const service = buildService({
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: true, wildcards: [] },
+      });
+
+      const result = await service.hasAllPermissions('sa-1', 'org-1', [
+        'permiso.uno',
+        'permiso.dos',
+        'permiso.tres',
+      ]);
+
+      expect(result).toBe(true);
+    });
+
+    it('esSuperAdmin: false → sigue el matcher normal (sin permisos → false)', async () => {
+      const service = buildService({
+        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: [] },
+      });
+
+      const result = await service.hasPermission('user-1', 'org-1', 'contabilidad.asientos.read');
+
+      expect(result).toBe(false);
     });
   });
 });

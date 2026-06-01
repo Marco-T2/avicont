@@ -4,6 +4,11 @@
 export interface ResolvedPermissions {
   esOwner: boolean;
   esAdmin: boolean;
+  // Identidad de plataforma: el resolver por-org siempre setea false.
+  // El super-admin no se resuelve por membership sino por JWT.
+  // Este campo existe como defensa en profundidad para callers directos
+  // de RbacService (docs/disenos/super-admin-plataforma.md §4.3).
+  esSuperAdmin: boolean;
   // Patrones tal como están en CustomRole.permissions o ['*'] para system roles.
   wildcards: string[];
 }
