@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/table';
 import { ImpersonateDialog } from '@/features/impersonation/components/impersonate-dialog';
 import { backendErrorMessage } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
+import { usePermissions } from '@/lib/use-permissions';
 import { useAuthStore } from '@/stores/auth-store';
 import type { Membership } from '@/types/api';
 
@@ -43,8 +45,15 @@ export function MembersList({
   loading = false,
 }: MembersListProps): React.JSX.Element {
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const currentRoles = useAuthStore((s) => s.user?.roles ?? []);
+  // El `?? []` va FUERA del selector: dentro devolvería un array nuevo en cada
+  // render → zustand lo ve como snapshot nuevo → loop infinito de re-render.
+  const currentRoles = useAuthStore((s) => s.user?.roles) ?? [];
   const isOwner = currentRoles.includes('OWNER');
+  // Gating de permisos: los ítems de menú se deshabilitan (no se ocultan) al
+  // faltar el permiso, sumándose a las condiciones de negocio (último OWNER, self).
+  const { has } = usePermissions();
+  const puedeActualizar = has(PERMISSIONS.organizacion.miembros.update);
+  const puedeRemover = has(PERMISSIONS.organizacion.miembros.remove);
   const changeRole = useChangeMembershipRole();
   const removeMember = useRemoveMembership();
   const [impersonateTarget, setImpersonateTarget] = useState<Membership | null>(
@@ -146,7 +155,7 @@ export function MembersList({
                     <DropdownMenuContent align="end" className="w-52">
                       <DropdownMenuItem
                         disabled={
-                          m.systemRole === 'ADMIN' || changeRole.isPending
+                          m.systemRole === 'ADMIN' || changeRole.isPending || !puedeActualizar
                         }
                         onClick={() => handleChangeRole(m, 'ADMIN')}
                       >
@@ -154,7 +163,7 @@ export function MembersList({
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         disabled={
-                          m.systemRole === 'OWNER' || changeRole.isPending
+                          m.systemRole === 'OWNER' || changeRole.isPending || !puedeActualizar
                         }
                         onClick={() => handleChangeRole(m, 'OWNER')}
                       >
@@ -173,7 +182,7 @@ export function MembersList({
                       ) : null}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        disabled={isSelf || removeMember.isPending}
+                        disabled={isSelf || removeMember.isPending || !puedeRemover}
                         onClick={() => handleRemove(m)}
                         className="text-destructive focus:text-destructive focus:bg-destructive/10"
                       >
