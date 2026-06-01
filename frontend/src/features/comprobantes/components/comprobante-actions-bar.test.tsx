@@ -1,9 +1,28 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
+import * as usePermissionsModule from '@/lib/use-permissions';
 import type { Comprobante } from '@/types/api';
 
 import { ComprobanteActionsBar } from './comprobante-actions-bar';
+
+// La barra usa <PermissionButton> (vía <Can> → usePermissions). Por default
+// concedemos todos los permisos para que los smoke tests de visibilidad sigan
+// asertando los botones habilitados; los tests de gating sobreescriben el mock.
+function mockPermissions(overrides: { isOwner?: boolean; permissions?: string[] } = {}) {
+  const { isOwner = true, permissions = [] } = overrides;
+  vi.spyOn(usePermissionsModule, 'usePermissions').mockReturnValue({
+    isOwner,
+    isLoading: false,
+    permissions,
+    has: (p: string) => isOwner || permissions.includes(p),
+  } as unknown as ReturnType<typeof usePermissionsModule.usePermissions>);
+}
+
+beforeEach(() => {
+  mockPermissions();
+});
 
 const baseComprobante: Comprobante = {
   id: 'comp-1',
@@ -90,5 +109,50 @@ describe('ComprobanteActionsBar (smoke)', () => {
     );
     expect(screen.getByRole('button', { name: /auditoría/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('ComprobanteActionsBar — gating de permisos', () => {
+  function renderConPermisos(
+    comprobante: Comprobante,
+    permissions: string[],
+  ) {
+    mockPermissions({ isOwner: false, permissions });
+    return render(
+      <TooltipProvider delayDuration={0}>
+        <ComprobanteActionsBar comprobante={comprobante} {...defaultProps} />
+      </TooltipProvider>,
+    );
+  }
+
+  it('BORRADOR sin permisos de escritura: Editar/Contabilizar/Eliminar deshabilitados', () => {
+    renderConPermisos(
+      { ...baseComprobante, estado: 'BORRADOR' },
+      ['contabilidad.asientos.read'],
+    );
+    expect(screen.getByRole('button', { name: /editar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /contabilizar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /eliminar/i })).toBeDisabled();
+    // "Ver auditoría" no se gatea — sigue habilitado.
+    expect(screen.getByRole('button', { name: /auditoría/i })).toBeEnabled();
+  });
+
+  it('BORRADOR con solo post: Contabilizar habilitado, Editar/Eliminar deshabilitados', () => {
+    renderConPermisos(
+      { ...baseComprobante, estado: 'BORRADOR' },
+      ['contabilidad.asientos.post'],
+    );
+    expect(screen.getByRole('button', { name: /contabilizar/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /editar/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /eliminar/i })).toBeDisabled();
+  });
+
+  it('CONTABILIZADO sin void: Anular deshabilitado; con update: Editar habilitado', () => {
+    renderConPermisos(
+      { ...baseComprobante, estado: 'CONTABILIZADO', numero: 'D2604-000042' },
+      ['contabilidad.asientos.update'],
+    );
+    expect(screen.getByRole('button', { name: /editar/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /anular/i })).toBeDisabled();
   });
 });

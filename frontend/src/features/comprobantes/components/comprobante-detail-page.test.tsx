@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import * as usePermissionsModule from '@/lib/use-permissions';
 import type { Comprobante, Contacto, Cuenta } from '@/types/api';
 
 vi.mock('../hooks/use-comprobante', () => ({
@@ -163,6 +164,18 @@ function renderPage(id = 'comp-1') {
     </MemoryRouter>,
   );
 }
+
+// La ComprobanteActionsBar usa <PermissionButton>. Concedemos todos los
+// permisos por default para que los smoke tests (incl. el click en Editar)
+// asertando botones habilitados sigan funcionando.
+beforeEach(() => {
+  vi.spyOn(usePermissionsModule, 'usePermissions').mockReturnValue({
+    isOwner: true,
+    isLoading: false,
+    permissions: [],
+    has: () => true,
+  } as unknown as ReturnType<typeof usePermissionsModule.usePermissions>);
+});
 
 describe('ComprobanteDetailPage (smoke)', () => {
   it('renderiza la glosa del comprobante', () => {

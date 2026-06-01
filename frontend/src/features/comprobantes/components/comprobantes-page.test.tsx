@@ -2,9 +2,28 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { TooltipProvider } from '@/components/ui/tooltip';
+import * as usePermissionsModule from '@/lib/use-permissions';
 
 import { ComprobantesPage } from './comprobantes-page';
+
+// "Nuevo comprobante" usa <PermissionButton>. Default: todos los permisos.
+function mockPermissions(overrides: { isOwner?: boolean; permissions?: string[] } = {}) {
+  const { isOwner = true, permissions = [] } = overrides;
+  vi.spyOn(usePermissionsModule, 'usePermissions').mockReturnValue({
+    isOwner,
+    isLoading: false,
+    permissions,
+    has: (p: string) => isOwner || permissions.includes(p),
+  } as unknown as ReturnType<typeof usePermissionsModule.usePermissions>);
+}
+
+beforeEach(() => {
+  mockNavigate.mockClear();
+  mockPermissions();
+});
 
 // Mock de useNavigate para verificar navegación sin montar el router completo.
 const mockNavigate = vi.fn();
@@ -30,7 +49,9 @@ function renderPage() {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <ComprobantesPage />
+        <TooltipProvider delayDuration={0}>
+          <ComprobantesPage />
+        </TooltipProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -61,5 +82,15 @@ describe('ComprobantesPage (smoke)', () => {
     renderPage();
     await user.click(screen.getByRole('button', { name: /nuevo comprobante/i }));
     expect(mockNavigate).toHaveBeenCalledWith('/comprobantes/nuevo');
+  });
+
+  it('sin permiso create: "Nuevo comprobante" deshabilitado y no navega', async () => {
+    mockPermissions({ isOwner: false, permissions: ['contabilidad.asientos.read'] });
+    const user = userEvent.setup();
+    renderPage();
+    const btn = screen.getByRole('button', { name: /nuevo comprobante/i });
+    expect(btn).toBeDisabled();
+    await user.click(btn);
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

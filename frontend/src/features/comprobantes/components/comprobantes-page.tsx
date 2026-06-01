@@ -1,10 +1,11 @@
 import { Plus } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
 import type { EstadoComprobante, TipoComprobante } from '@/types/api';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 
 import { useComprobantes } from '../hooks/use-comprobantes';
 
@@ -62,10 +63,15 @@ export function ComprobantesPage(): React.JSX.Element {
             Asientos contables del libro diario
           </p>
         </div>
-        <Button onClick={() => void navigate('/comprobantes/nuevo')} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.create}
+          deniedReason="No tenés permiso para crear asientos"
+          onClick={() => void navigate('/comprobantes/nuevo')}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo comprobante
-        </Button>
+        </PermissionButton>
       </div>
 
       {/* Filtros */}
