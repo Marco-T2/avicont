@@ -3,8 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PermissionButtonProps extends React.ComponentProps<typeof Button> {
-  /** Permiso requerido para habilitar el botón. */
-  permission: string;
+  /**
+   * Permiso requerido para habilitar el botón.
+   * - `string` → un permiso.
+   * - `string[]` → AND de todos (espeja `@RequirePermissions('a','b')` del backend).
+   */
+  permission: string | string[];
   /** Texto del tooltip cuando el usuario no tiene permiso. */
   deniedReason?: string;
 }

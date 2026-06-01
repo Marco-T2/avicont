@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Comprobante } from '@/types/api';
 
 // --- Mocks ---
@@ -98,7 +99,9 @@ function renderNuevo() {
           path="/comprobantes/nuevo"
           element={
             <QueryClientProvider client={qc}>
-              <EditarComprobantePage />
+              <TooltipProvider delayDuration={0}>
+                <EditarComprobantePage />
+              </TooltipProvider>
             </QueryClientProvider>
           }
         />
@@ -116,7 +119,9 @@ function renderEditar(id: string) {
           path="/comprobantes/:id/editar"
           element={
             <QueryClientProvider client={qc}>
-              <EditarComprobantePage />
+              <TooltipProvider delayDuration={0}>
+                <EditarComprobantePage />
+              </TooltipProvider>
             </QueryClientProvider>
           }
         />

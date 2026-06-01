@@ -4,9 +4,12 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { mensajeComprobantes } from '@/lib/error-messages';
 import { mensajeDocumentosFisicos } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { usePermissions } from '@/lib/use-permissions';
 // Cross-feature: hook de búsqueda de documentos físicos existentes (feature B).
 import { useDocumentosFisicos } from '@/features/documentos-fisicos/hooks/use-documentos-fisicos';
 // Cross-feature: hook de creación de documentos físicos (feature B).
@@ -48,6 +51,16 @@ export function DocumentoFisicoCombobox({
   const [view, setView] = useState<'search' | 'create-form'>('search');
 
   const debouncedSearch = useDebouncedValue(search, 350);
+
+  // Gating de permisos (afordancia honesta, espeja el backend):
+  // - asociar/crear-y-asociar exigen AMBOS (AND) — comprobantes.controller.ts:175.
+  // - crear el documento físico exige además su propio permiso de create.
+  const { has, hasAll } = usePermissions();
+  const puedeAsociar = hasAll([
+    PERMISSIONS.contabilidad.documentosFisicos.update,
+    PERMISSIONS.contabilidad.asientos.update,
+  ]);
+  const puedeCrear = has(PERMISSIONS.contabilidad.documentosFisicos.create);
 
   // Cross-feature: lista de tipos con sus tiposComprobanteAplicables para el pre-filtro (D8).
   const { data: tiposData } = useTiposDocumentoFisico({ pageSize: 100, activo: true });
@@ -123,6 +136,29 @@ export function DocumentoFisicoCombobox({
     });
   }
 
+  // Sin permiso para asociar → trigger deshabilitado con tooltip (no se abre el
+  // popover). Mismo patrón disable+tooltip que los botones de acción (#87).
+  if (!puedeAsociar) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex w-full">
+            <Button
+              type="button"
+              variant="outline"
+              disabled
+              className="w-full justify-between font-normal text-muted-foreground"
+            >
+              <span className="truncate text-left">Buscar o crear documento…</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>No tenés permiso para asociar documentos</TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
     <Popover
       open={open}
@@ -158,6 +194,7 @@ export function DocumentoFisicoCombobox({
             isLoading={isLoadingDocs}
             docsCompatibles={docsCompatibles}
             isAsociando={asociarMutation.isPending}
+            puedeCrear={puedeCrear}
             onSeleccionar={handleSeleccionarExistente}
             onCrearNuevo={() => setView('create-form')}
           />

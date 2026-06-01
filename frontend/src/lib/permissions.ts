@@ -40,6 +40,8 @@ export const PERMISSIONS = {
     },
     documentosFisicos: {
       read: 'contabilidad.documentos-fisicos.read',
+      create: 'contabilidad.documentos-fisicos.create',
+      update: 'contabilidad.documentos-fisicos.update',
     },
     tiposDocumento: {
       // El submódulo en el catálogo backend es `tipos-documento-fisico`

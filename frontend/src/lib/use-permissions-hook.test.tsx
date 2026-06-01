@@ -133,5 +133,57 @@ describe('usePermissions', () => {
       expect(result.current.isLoading).toBe(true);
       expect(result.current.has('contabilidad.eeff.read')).toBe(false);
     });
+
+    it('hasAll() devuelve true solo si tiene TODOS los permisos del array (AND)', async () => {
+      vi.spyOn(mePermissionsModule, 'getMePermissions').mockResolvedValue({
+        permissions: [
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.update',
+        ],
+        isOwner: false,
+        activeTenantId: 'tenant-123',
+      });
+      withAuthenticatedUser('tenant-123');
+      const { result } = renderHook(() => usePermissions(), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(
+        result.current.hasAll([
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.update',
+        ]),
+      ).toBe(true);
+      // Le falta uno → false
+      expect(
+        result.current.hasAll([
+          'contabilidad.documentos-fisicos.update',
+          'contabilidad.asientos.delete',
+        ]),
+      ).toBe(false);
+    });
+
+    it('hasAll() con isOwner true devuelve true para cualquier combinación', async () => {
+      vi.spyOn(mePermissionsModule, 'getMePermissions').mockResolvedValue({
+        permissions: [],
+        isOwner: true,
+        activeTenantId: 'tenant-123',
+      });
+      withAuthenticatedUser('tenant-123');
+      const { result } = renderHook(() => usePermissions(), {
+        wrapper: createWrapper(),
+      });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.hasAll(['a.b.c', 'd.e.f'])).toBe(true);
+    });
+
+    it('hasAll() devuelve false durante loading (fail-closed)', () => {
+      vi.spyOn(mePermissionsModule, 'getMePermissions').mockReturnValue(new Promise(() => {}));
+      withAuthenticatedUser('tenant-123');
+      const { result } = renderHook(() => usePermissions(), {
+        wrapper: createWrapper(),
+      });
+      expect(result.current.hasAll(['contabilidad.eeff.read'])).toBe(false);
+    });
   });
 });

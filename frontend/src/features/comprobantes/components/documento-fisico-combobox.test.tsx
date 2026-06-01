@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { DocumentoFisico, TipoDocumentoFisico } from '@/types/api';
 
 // sonner se mockea para poder assertar toast.error en los tests D3.
@@ -23,6 +24,10 @@ vi.mock('@/features/tipos-documento-fisico/hooks/use-tipos-documento-fisico', ()
 vi.mock('../hooks/use-asociar-documentos', () => ({
   useAsociarDocumentos: vi.fn(),
 }));
+// Mock del hook de permisos para controlar el gating sin auth store real.
+vi.mock('@/lib/use-permissions', () => ({
+  usePermissions: vi.fn(),
+}));
 
 import { toast } from 'sonner';
 import { useDocumentosFisicos } from '@/features/documentos-fisicos/hooks/use-documentos-fisicos';
@@ -30,6 +35,7 @@ import { useCreateDocumentoFisico } from '@/features/documentos-fisicos/hooks/us
 import { useTiposDocumentoFisico } from '@/features/tipos-documento-fisico/hooks/use-tipos-documento-fisico';
 import { useAsociarDocumentos } from '../hooks/use-asociar-documentos';
 import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
+import { usePermissions } from '@/lib/use-permissions';
 import { DocumentoFisicoCombobox } from './documento-fisico-combobox';
 
 const mockToastError = toast.error as unknown as ReturnType<typeof vi.fn>;
@@ -38,6 +44,23 @@ const mockUseDocumentosFisicos = useDocumentosFisicos as unknown as ReturnType<t
 const mockUseCreateDocumentoFisico = useCreateDocumentoFisico as unknown as ReturnType<typeof vi.fn>;
 const mockUseTiposDocumentoFisico = useTiposDocumentoFisico as unknown as ReturnType<typeof vi.fn>;
 const mockUseAsociarDocumentos = useAsociarDocumentos as unknown as ReturnType<typeof vi.fn>;
+const mockUsePermissions = usePermissions as unknown as ReturnType<typeof vi.fn>;
+
+// Configura el mock de permisos: por default concede TODO (los tests de
+// comportamiento no se ocupan del gating). Los tests de gating overridean.
+function setPerms(granted: string[] | 'all'): void {
+  const has = (p: string): boolean => granted === 'all' || granted.includes(p);
+  mockUsePermissions.mockReturnValue({
+    has,
+    hasAll: (perms: string[]) => perms.every(has),
+    isOwner: granted === 'all',
+    permissions: granted === 'all' ? [] : granted,
+  } as unknown as ReturnType<typeof usePermissions>);
+}
+
+const P_UPDATE = 'contabilidad.documentos-fisicos.update';
+const P_CREATE = 'contabilidad.documentos-fisicos.create';
+const P_ASIENTOS_UPDATE = 'contabilidad.asientos.update';
 
 // UUIDs de referencia para tipos (el schema Zod exige .uuid() — RFC 4122 estricto).
 // Formato requerido: versión [1-8] en nibble 13, variante [89abAB] en nibble 17.
@@ -141,13 +164,16 @@ function renderCombobox(tipoComprobante: 'EGRESO' | 'INGRESO' | 'DIARIO' = 'EGRE
   const qc = makeQc();
   render(
     <QueryClientProvider client={qc}>
-      <DocumentoFisicoCombobox comprobanteId="comp-1" tipoComprobante={tipoComprobante} />
+      <TooltipProvider delayDuration={0}>
+        <DocumentoFisicoCombobox comprobanteId="comp-1" tipoComprobante={tipoComprobante} />
+      </TooltipProvider>
     </QueryClientProvider>,
   );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setPerms('all');
   mockUseTiposDocumentoFisico.mockReturnValue({
     data: { items: [tipoEgreso, tipoIngreso, tipoNoTributario] },
   });
@@ -461,5 +487,57 @@ describe('DocumentoFisicoCombobox — D3: crear inline y asociar encadenado', ()
     expect(mockToastError).toHaveBeenCalledWith(
       expect.stringContaining('Documentos físicos'),
     );
+  });
+});
+
+describe('DocumentoFisicoCombobox — gating de permisos', () => {
+  it('sin permiso de asociar (falta asientos.update) → trigger deshabilitado, no abre', async () => {
+    setPerms([P_UPDATE]); // tiene documentos-fisicos.update pero NO asientos.update
+    renderCombobox('EGRESO');
+
+    const trigger = screen.getByRole('button', { name: /buscar o crear documento/i });
+    expect(trigger).toBeDisabled();
+
+    // No hay rol combobox (no es un combobox abrible), no aparece el input de búsqueda
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await userEvent.click(trigger);
+    expect(screen.queryByPlaceholderText(/buscar por número/i)).not.toBeInTheDocument();
+  });
+
+  it('sin permiso de asociar → muestra tooltip con el motivo al hacer hover', async () => {
+    setPerms([P_UPDATE]);
+    renderCombobox('EGRESO');
+
+    const trigger = screen.getByRole('button', { name: /buscar o crear documento/i });
+    await userEvent.hover(trigger.parentElement!);
+    const matches = await screen.findAllByText(/no tenés permiso para asociar documentos/i);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('con permiso de asociar pero SIN create → "Crear nuevo documento" deshabilitado', async () => {
+    setPerms([P_UPDATE, P_ASIENTOS_UPDATE]); // puede asociar, NO puede crear
+    renderCombobox('EGRESO');
+
+    await userEvent.click(screen.getByRole('combobox'));
+
+    // El ítem crear sigue visible pero deshabilitado, con la pista "Sin permiso".
+    expect(screen.getByText(/crear nuevo documento/i)).toBeInTheDocument();
+    expect(screen.getByText(/sin permiso/i)).toBeInTheDocument();
+
+    // Clic no abre el mini-form (sigue en la vista de búsqueda).
+    await userEvent.click(screen.getByText(/crear nuevo documento/i));
+    expect(screen.queryByLabelText(/fecha de emisión/i)).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/buscar por número/i)).toBeInTheDocument();
+  });
+
+  it('con permiso de asociar y create → "Crear nuevo documento" habilitado (abre mini-form)', async () => {
+    setPerms([P_UPDATE, P_ASIENTOS_UPDATE, P_CREATE]);
+    renderCombobox('EGRESO');
+
+    await userEvent.click(screen.getByRole('combobox'));
+    expect(screen.queryByText(/sin permiso/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText(/crear nuevo documento/i));
+    expect(screen.getByLabelText(/fecha de emisión/i)).toBeInTheDocument();
   });
 });

@@ -19,6 +19,8 @@ interface DocumentoFisicoSearchViewProps {
   docsCompatibles: DocumentoFisico[];
   /** Asociación en curso — deshabilita los ítems de selección. */
   isAsociando: boolean;
+  /** Si false, el ítem "Crear nuevo documento" se muestra deshabilitado (falta el permiso create). */
+  puedeCrear: boolean;
   onSeleccionar: (docId: string) => void;
   onCrearNuevo: () => void;
 }
@@ -34,6 +36,7 @@ export function DocumentoFisicoSearchView({
   isLoading,
   docsCompatibles,
   isAsociando,
+  puedeCrear,
   onSeleccionar,
   onCrearNuevo,
 }: DocumentoFisicoSearchViewProps): React.JSX.Element {
@@ -78,11 +81,14 @@ export function DocumentoFisicoSearchView({
                 ))}
               </CommandGroup>
             )}
-            {/* "Crear nuevo documento" siempre disponible — el combobox es "buscar O crear". */}
+            {/* "Crear nuevo documento": el combobox es "buscar O crear". Solo se
+                habilita con el permiso documentos-fisicos.create; sin él se muestra
+                deshabilitado con una pista (afordancia honesta, no engañosa). */}
             <CommandGroup>
               <CommandItem
                 value="__crear__"
-                onSelect={onCrearNuevo}
+                onSelect={puedeCrear ? onCrearNuevo : undefined}
+                disabled={!puedeCrear}
                 className={cn(
                   'gap-2 text-primary',
                   docsCompatibles.length > 0 && 'border-t mt-1 pt-1',
@@ -92,6 +98,9 @@ export function DocumentoFisicoSearchView({
                 Crear nuevo documento
                 {search.length > 0 ? (
                   <span className="font-mono font-semibold">«{search}»</span>
+                ) : null}
+                {!puedeCrear ? (
+                  <span className="ml-auto text-xs text-muted-foreground">Sin permiso</span>
                 ) : null}
               </CommandItem>
             </CommandGroup>
