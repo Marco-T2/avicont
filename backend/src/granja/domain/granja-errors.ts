@@ -30,6 +30,16 @@ export class TipoRegistroNoEncontradoError extends NotFoundError {
   }
 }
 
+export class MovimientoNoEncontradoError extends NotFoundError {
+  constructor(id: string) {
+    super(
+      'GRANJA_MOVIMIENTO_NO_ENCONTRADO',
+      'El movimiento no existe o no pertenece a la organización',
+      { id },
+    );
+  }
+}
+
 // ============================================================
 // 400 — validación de input
 // ============================================================
