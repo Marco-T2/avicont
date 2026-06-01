@@ -1,7 +1,18 @@
 import { Bird } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { LoteCard } from '../components/lote-card';
@@ -18,13 +29,27 @@ export function GranjaDashboardPage(): React.JSX.Element {
   const { data, isLoading, isError } = useDashboard();
   const cerrarLote = useCerrarLote();
 
+  // Cerrar un lote es IRREVERSIBLE (v1 no reabre); confirmamos antes de mutar
+  // para que un toque accidental no cierre la crianza.
+  const [cerrarTargetId, setCerrarTargetId] = useState<string | null>(null);
+  const loteACerrar = data?.find((l) => l.id === cerrarTargetId);
+
   function handleRegistrarMovimiento(loteId: string): void {
     void navigate(`/granja/lotes/${loteId}`);
   }
 
   function handleCerrar(loteId: string): void {
-    cerrarLote.mutate(loteId, {
-      onSuccess: () => toast.success('Lote cerrado correctamente'),
+    setCerrarTargetId(loteId);
+  }
+
+  function handleCerrarConfirm(e: React.MouseEvent): void {
+    e.preventDefault();
+    if (cerrarTargetId === null) return;
+    cerrarLote.mutate(cerrarTargetId, {
+      onSuccess: () => {
+        toast.success('Lote cerrado correctamente');
+        setCerrarTargetId(null);
+      },
       onError: () => toast.error('No se pudo cerrar el lote'),
     });
   }
@@ -62,6 +87,30 @@ export function GranjaDashboardPage(): React.JSX.Element {
           ))}
         </div>
       )}
+
+      {/* Confirmación de cierre — acción irreversible */}
+      <AlertDialog
+        open={cerrarTargetId !== null}
+        onOpenChange={(open) => { if (!open) setCerrarTargetId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Cerrar {loteACerrar?.nombre ?? 'este lote'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Una vez cerrado, ya no podrás registrar gastos ni movimientos en
+              este lote. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCerrarConfirm} disabled={cerrarLote.isPending}>
+              {cerrarLote.isPending ? 'Cerrando…' : 'Cerrar lote'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
