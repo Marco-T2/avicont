@@ -15,7 +15,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "super-admin": "ts-node prisma/scripts/super-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.12",
