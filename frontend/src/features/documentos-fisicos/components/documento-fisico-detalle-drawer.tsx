@@ -1,3 +1,4 @@
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { PERMISSIONS } from '@/lib/permissions';
 import type { DocumentoFisicoDetalle } from '@/types/api';
 
 import { useDocumentoFisicoDetalle } from '../hooks/use-documento-fisico-detalle';
@@ -67,16 +69,23 @@ export function DocumentoFisicoDetalleDrawer({
           </Button>
           {detalle !== undefined && (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={onEditar}>
+              <PermissionButton
+                permission={PERMISSIONS.contabilidad.documentosFisicos.update}
+                deniedReason="No tenés permiso para modificar documentos físicos"
+                variant="outline"
+                onClick={onEditar}
+              >
                 Editar
-              </Button>
-              <Button
+              </PermissionButton>
+              <PermissionButton
+                permission={PERMISSIONS.contabilidad.documentosFisicos.delete}
+                deniedReason="No tenés permiso para eliminar documentos físicos"
                 variant="outline"
                 className="text-destructive hover:text-destructive"
                 onClick={onEliminar}
               >
                 Eliminar
-              </Button>
+              </PermissionButton>
             </div>
           )}
         </SheetFooter>

@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { mensajePeriodosFiscales } from '@/lib/error-messages';
 import { usePuedeReabrir } from '@/lib/use-permissions';
+import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { BorradorPendiente, GestionFiscalStatus, ResumenPrecierre } from '@/types/api';
 
@@ -116,7 +118,9 @@ export function PeriodoDetailDrawer(
                   Reabrir período
                 </Button>
               ) : null}
-              <Button
+              <PermissionButton
+                permission={PERMISSIONS.contabilidad.periodos.cerrar}
+                deniedReason="No tenés permiso para cerrar períodos"
                 disabled={resumen === undefined || !resumen.puedeCerrar || cerrarPeriodo.isPending}
                 onClick={handleCerrarPeriodo}
               >
@@ -128,7 +132,7 @@ export function PeriodoDetailDrawer(
                 ) : (
                   'Cerrar período'
                 )}
-              </Button>
+              </PermissionButton>
             </div>
           </SheetFooter>
         </SheetContent>

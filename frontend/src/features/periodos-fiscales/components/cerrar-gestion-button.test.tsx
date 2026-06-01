@@ -14,6 +14,12 @@ vi.mock('../hooks/use-gestion-detalle', () => ({
 vi.mock('../hooks/use-cerrar-gestion', () => ({
   useCerrarGestion: vi.fn(),
 }));
+// El botón usa PermissionButton → usePermissions. Concedemos todo (estos tests
+// cubren el flujo de cierre, no el gating de permisos).
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({ has: () => true, hasAll: () => true, isOwner: true, permissions: [] }),
+}));
 
 import { useGestionDetalle } from '../hooks/use-gestion-detalle';
 import { useCerrarGestion } from '../hooks/use-cerrar-gestion';

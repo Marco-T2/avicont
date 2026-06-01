@@ -6,6 +6,13 @@ import type { TipoDocumentoFisico } from '@/types/api';
 
 import { TiposDocumentoFisicoListTable } from './tipos-documento-fisico-list-table';
 
+// Editar/Desactivar/Activar usan PermissionButton → usePermissions. Concedemos
+// todos los permisos (estos tests cubren la tabla, no el gating).
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({ has: () => true, hasAll: () => true, isOwner: true, permissions: [] }),
+}));
+
 const base: TipoDocumentoFisico = {
   id: 'tdf-1',
   nombre: 'Factura recibida',

@@ -17,6 +17,13 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+// Los botones Editar/Desactivar/Reactivar usan PermissionButton → usePermissions.
+// Concedemos todos los permisos (estos tests cubren el flujo, no el gating).
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({ has: () => true, hasAll: () => true, isOwner: true, permissions: [] }),
+}));
+
 const mockedGet = api.get as unknown as ReturnType<typeof vi.fn>;
 const mockedPost = api.post as unknown as ReturnType<typeof vi.fn>;
 

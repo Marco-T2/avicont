@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
 import { ContactoDetailDrawer } from '../components/contacto-detail-drawer';
@@ -57,10 +58,15 @@ export function ContactosPage(): React.JSX.Element {
             Directorio de clientes y proveedores del tenant.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.contactos.create}
+          deniedReason="No tenés permiso para crear contactos"
+          onClick={() => setCreateOpen(true)}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo contacto
-        </Button>
+        </PermissionButton>
       </div>
 
       <div className="space-y-4">

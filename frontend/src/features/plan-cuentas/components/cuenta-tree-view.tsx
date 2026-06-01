@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { PERMISSIONS } from '@/lib/permissions';
+import { usePermissions } from '@/lib/use-permissions';
 import { cn } from '@/lib/utils';
 import type { CuentaTreeNode } from '@/types/api';
 
@@ -25,6 +27,11 @@ export function CuentaTreeView({
   onCreateChild,
 }: CuentaTreeViewProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Permiso para crear cuentas: se resuelve una sola vez y se propaga por prop
+  // a las filas (evita N llamadas a usePermissions en un árbol recursivo).
+  const { has } = usePermissions();
+  const puedeCrear = has(PERMISSIONS.contabilidad.planCuentas.create);
 
   const toggle = (id: string): void => {
     setCollapsed((prev) => {
@@ -56,6 +63,7 @@ export function CuentaTreeView({
           onToggle={toggle}
           onSelect={onSelect}
           onCreateChild={onCreateChild}
+          puedeCrear={puedeCrear}
         />
       ))}
     </div>
@@ -69,6 +77,7 @@ interface TreeRowProps {
   onToggle: (id: string) => void;
   onSelect: (node: CuentaTreeNode) => void;
   onCreateChild?: (parent: CuentaTreeNode) => void;
+  puedeCrear: boolean;
 }
 
 function TreeRow({
@@ -78,6 +87,7 @@ function TreeRow({
   onToggle,
   onSelect,
   onCreateChild,
+  puedeCrear,
 }: TreeRowProps): React.JSX.Element {
   const hasChildren = node.hijas.length > 0;
   const isCollapsed = collapsed.has(node.id);
@@ -134,22 +144,29 @@ function TreeRow({
         {canCreateChild ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Crear sub-cuenta bajo ${node.codigoInterno} ${node.nombre}`}
-                // Tap target h-11/w-11 (44px) en mobile — Apple HIG (CLAUDE.md §7).
-                // Desktop h-8 con hover-visible para no ensuciar árboles densos.
-                className="h-11 w-11 shrink-0 md:h-8 md:w-8 md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100 md:transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCreateChild(node);
-                }}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+              {/* span wrapper: un button disabled tiene pointer-events:none y
+                  no dispararía el hover del tooltip. */}
+              <span className="inline-flex shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!puedeCrear}
+                  aria-label={`Crear sub-cuenta bajo ${node.codigoInterno} ${node.nombre}`}
+                  // Tap target h-11/w-11 (44px) en mobile — Apple HIG (CLAUDE.md §7).
+                  // Desktop h-8 con hover-visible para no ensuciar árboles densos.
+                  className="h-11 w-11 shrink-0 md:h-8 md:w-8 md:opacity-0 md:group-hover/row:opacity-100 md:focus-visible:opacity-100 md:transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateChild(node);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </span>
             </TooltipTrigger>
-            <TooltipContent side="left">Crear sub-cuenta</TooltipContent>
+            <TooltipContent side="left">
+              {puedeCrear ? 'Crear sub-cuenta' : 'No tenés permiso para crear cuentas'}
+            </TooltipContent>
           </Tooltip>
         ) : null}
       </div>
@@ -165,6 +182,7 @@ function TreeRow({
               onToggle={onToggle}
               onSelect={onSelect}
               onCreateChild={onCreateChild}
+              puedeCrear={puedeCrear}
             />
           ))}
         </div>

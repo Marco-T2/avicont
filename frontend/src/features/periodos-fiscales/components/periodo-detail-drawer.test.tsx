@@ -22,6 +22,14 @@ vi.mock('../hooks/use-gestion-detalle', () => ({
 }));
 vi.mock('@/lib/use-permissions', () => ({
   usePuedeReabrir: vi.fn(),
+  // El botón "Cerrar período" usa PermissionButton → usePermissions. Concedemos
+  // todo (estos tests no se ocupan del gating de permisos, sino del flujo).
+  usePermissions: () => ({
+    has: () => true,
+    hasAll: () => true,
+    isOwner: true,
+    permissions: [],
+  }),
 }));
 
 import { useResumenPrecierre } from '../hooks/use-resumen-precierre';
