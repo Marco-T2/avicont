@@ -351,14 +351,23 @@ Estas son **producto**, no técnica. Deben cerrarse antes de construir la pieza 
 cada una afecta. Se registran acá con recomendación; al decidirse, se documentan
 en su sección correspondiente.
 
-### 10.1 Super-admin de plataforma — quién opera el SaaS
+### 10.1 Super-admin de plataforma — ⏳ ENFOQUE DECIDIDO (a), NO construido (2026-06-01)
 
-Hoy **no hay** flag de plataforma en `User` (verificado: no existe `isSuperAdmin`
-ni equivalente). No está claro quién crea/suspende tenants ni quién tiene potestad
-cross-tenant. **Opciones**: (a) flag/rol de plataforma en `User`; (b) una
-org-plataforma especial; (c) resolverlo por billing/operación manual. **Recomendación**:
-modelar explícito (a) cuando se construya cualquier flujo de administración
-cross-tenant; mientras tanto, operación manual.
+**Decisión de enfoque: (a) identidad de plataforma en `User` (`isSuperAdmin`).** El
+super-admin es atributo de identidad de plataforma (coherente con §3.1: `User` no
+pertenece a un tenant), no un `SystemRole` (que es por-org). Descartados: (b)
+org-plataforma (obliga a tocar `ImpersonationService`, cadena confusa) y (c)
+manual/SQL (solo interino).
+
+Hoy **no hay** flag de plataforma en `User` (verificado: no existe `isSuperAdmin`).
+El super-admin del header `X-Tenant-ID` que describe `seguridad.md §5.4` nunca se
+implementó (es diseño sobre papel; deuda `docs/deudas-arquitecturales.md §3.3`).
+
+**Guía de diseño completa**: `docs/disenos/super-admin-plataforma.md` (modelo de
+datos, cadena de autorización, bootstrap, auditoría cross-tenant, secuencia de build,
+pre-requisito de seguridad bloqueante). Mientras no se construya, operación manual
+(c). Al implementar, mover esta decisión a "✅ CERRADA" y reconciliar §5.4 del doc de
+seguridad.
 
 ### 10.2 Profundidad de RBAC en Granja — ✅ CERRADA (2026-06-01, de facto)
 
