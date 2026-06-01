@@ -431,7 +431,15 @@ por onboarding, o compliance):
 Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
 - `sistema.feature-flags.admin`
 
-### 3.4 A8 — Drift de extensions Postgres no declaradas en `schema.prisma`
+### 3.4 A8 — Drift de extensions Postgres no declaradas en `schema.prisma` — ✅ FIX PARCIAL APLICADO (PR #27)
+
+> **Estado al 2026-06-01**: el fix parcial YA está en `schema.prisma`:
+> `previewFeatures = ["postgresqlExtensions"]` + `extensions = [pgTrgm(map: "pg_trgm")]`.
+> Esto cierra el drift de la EXTENSIÓN (`pg_trgm` ya no se dropea al regenerar).
+> Lo que NO se cierra (ni se puede, son inexpresables en schema): índices GIN
+> trigram, uniques/índices parciales con `WHERE` y CHECK multi-columna — siguen
+> como raw SQL y dependen del protocolo manual de CLAUDE.md §11.6. La deuda
+> residual es organizacional, no técnica.
 
 - **Problema**: `pg_trgm` + índices GIN trigram (módulo `contactos`), índices/uniques parciales con `WHERE` y CHECK constraints multi-columna viven como raw SQL al final de su migration de origen porque Prisma no los expresa nativamente. Cada vez que se regenera una migration nueva, Prisma los detecta como drift y mete `DROP INDEX`/`DROP EXTENSION` al inicio del `migration.sql` regenerado. Si se aplica tal cual, se destruyen los objetos. Detectado al regenerar la migration de `documento-fisico` (Fase 1.4 slice 2) — los DROP fueron eliminados manualmente del SQL antes de aplicar.
 - **Fix parcial**: activar `previewFeatures = ["postgresqlExtensions"]` en el `generator client` y declarar `extensions = [pgTrgm]` en `datasource db`. Resuelve el drift de la extensión; los índices GIN trigram, parciales y CHECK seguirán como raw SQL drift porque siguen sin ser expresables en schema.
@@ -441,7 +449,16 @@ Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
 
 ---
 
-### 3.5 A9 — Columnas de timestamp son `timestamp` (sin zona), no `timestamptz`
+### 3.5 A9 — Columnas de timestamp son `timestamp` (sin zona), no `timestamptz` — ✅ CERRADA (PR #25)
+
+> **Estado al 2026-06-01**: CERRADA en storage. Las columnas de timestamp se
+> migraron a `@db.Timestamptz(3)` (verificado: 54 columnas `Timestamptz`,
+> 0 `DateTime` planos fuera de `@db.Date`). La zona es explícita en el tipo,
+> ya no depende de la config del contenedor (defense in depth §4.6).
+> El pendiente de PRESENTACIÓN (frontend convierte UTC → `America/La_Paz` al
+> mostrar) está cubierto por los formateadores de cada feature
+> (`Intl.DateTimeFormat('es-BO', { timeZone: 'America/La_Paz' })`), incluido
+> `features/granja/lib/formatters.ts`.
 
 - **Problema**: CLAUDE.md §4.6 manda `timestamptz` en UTC para `createdAt`/`updatedAt`/`auditoria.timestamp`, pero el schema usa `DateTime` plano → Prisma genera `TIMESTAMP(3)` (sin time zone) con `DEFAULT CURRENT_TIMESTAMP`. El valor que se guarda depende de la zona de la sesión de Postgres, que no estaba pineada. Detectado al revisar el manejo de fechas (2026-05-20). `fechaContable` (`@db.Date`) está correcta y NO entra en esta deuda.
 - **Mitigación YA aplicada** (rama `chore/infra-tz-utc`): `TZ=UTC` + `PGTZ=UTC` + `-c timezone=UTC` en el contenedor `postgres`, y `TZ=UTC` en el contenedor `app` (Dockerfile + compose). Con esto `CURRENT_TIMESTAMP` evalúa en UTC → los valores se persisten en UTC. Cierra el riesgo operativo inmediato, **NO** cambia el tipo de columna.
@@ -681,12 +698,15 @@ Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
 
 ---
 
-**Última revisión**: 2026-04-25 (§1.1 + §1.2 + §2.1 A/B + §2.1
-remanente + §2.2 + §3.2.a + §3.2.b + §3.2.c + §3.2.d cerradas;
+**Última revisión**: 2026-06-01 (§3.4 (A8) fix parcial aplicado PR #27 +
+§3.5 (A9) cerrada PR #25 — reconciliado contra `schema.prisma` real durante
+el slice de frontend granja). Cierres previos (2026-04-25): §1.1 + §1.2 +
+§2.1 A/B + §2.1 remanente + §2.2 + §3.2.a + §3.2.b + §3.2.c + §3.2.d;
 CERO fugas cross-módulo documentadas activas, CERO módulos Fase 0
 sin hexagonalizar. Deuda viva: §3.3 super-admin global, §3.1 VOs
 oportunísticos (Email, Password, Token, Nit en más lugares),
-§3.4 (A8) drift de extensions Postgres no declaradas).
+§3.6 documento físico (items con trigger), migración L2 enums Prisma
+incremental (regla de oro §5.3).
 **Auditoría fuente**: 4 agentes de exploración sobre 13 módulos, grep de
 imports cross-module, verificación de Symbol + abstract class bindings,
 revisión de `@Inject` en services.
