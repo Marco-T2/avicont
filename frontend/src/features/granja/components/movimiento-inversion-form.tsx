@@ -139,7 +139,7 @@ export function MovimientoInversionForm({
               Registrando…
             </>
           ) : (
-            'Registrar inversión'
+            'Registrar gasto'
           )}
         </Button>
       </div>

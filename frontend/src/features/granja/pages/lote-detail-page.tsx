@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Can } from '@/components/shared/can';
+import { PermissionButton } from '@/components/shared/permission-button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import type { MovimientoCantidadResponse, MovimientoInversionResponse } from '../api/granja.types';
@@ -280,115 +280,98 @@ export function LoteDetailPage(): React.JSX.Element {
         </Card>
       ) : null}
 
-      {/* Tabs: Inversiones / Cantidades */}
-      <Tabs defaultValue="inversiones">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="inversiones" className="flex-1 sm:flex-none">
-            Inversiones
-          </TabsTrigger>
-          <TabsTrigger value="cantidades" className="flex-1 sm:flex-none">
-            Movimientos
-          </TabsTrigger>
-        </TabsList>
+      {/* Acciones de registro — directas, sin pestañas. Un modo oculto (tab)
+          es fricción para un usuario mayor en celular: dos botones grandes que
+          abren el formulario correcto al toque. */}
+      {estaActivo ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <PermissionButton
+            permission={PERMISSIONS.granja.movimientos.create}
+            deniedReason="No tenés permiso para registrar movimientos"
+            onClick={() => setAddInversionOpen(true)}
+            className="w-full min-h-[44px] sm:flex-1"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Registrar gasto
+          </PermissionButton>
+          <PermissionButton
+            permission={PERMISSIONS.granja.movimientos.create}
+            deniedReason="No tenés permiso para registrar movimientos"
+            variant="outline"
+            onClick={() => setAddCantidadOpen(true)}
+            className="w-full min-h-[44px] sm:flex-1"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Registrar mortalidad
+          </PermissionButton>
+        </div>
+      ) : null}
 
-        {/* Tab inversiones */}
-        <TabsContent value="inversiones" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Inversiones
-            </h2>
-            {estaActivo ? (
-              <Can permission={PERMISSIONS.granja.movimientos.create}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAddInversionOpen(true)}
-                  className="min-h-[44px] sm:min-h-[36px]"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Registrar
-                </Button>
-              </Can>
-            ) : null}
+      {/* Gastos */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Gastos
+        </h2>
+        {loadingMovimientos ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
           </div>
-
-          {loadingMovimientos ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+        ) : (movimientos?.inversiones ?? []).length === 0 ? (
+          <div className="flex h-32 items-center justify-center rounded-md border border-dashed">
+            <p className="text-sm text-muted-foreground">No hay gastos registrados.</p>
+          </div>
+        ) : (
+          <div className="space-y-1 overflow-x-auto">
+            <div className="min-w-[500px]">
+              {(movimientos?.inversiones ?? []).map((inv) => (
+                <InversionRow
+                  key={inv.id}
+                  inversion={inv}
+                  tipoNombre={tiposRegistro?.find((t) => t.id === inv.tipoRegistroId)?.nombre ?? '—'}
+                  canDelete={estaActivo}
+                  onDelete={() => setDeleteTarget({ tipo: 'inversion', movId: inv.id })}
+                  isDeleting={deleteMovimiento.isPending}
+                />
               ))}
             </div>
-          ) : (movimientos?.inversiones ?? []).length === 0 ? (
-            <div className="flex h-32 items-center justify-center rounded-md border border-dashed">
-              <p className="text-sm text-muted-foreground">No hay inversiones registradas.</p>
-            </div>
-          ) : (
-            <div className="space-y-1 overflow-x-auto">
-              <div className="min-w-[500px]">
-                {(movimientos?.inversiones ?? []).map((inv) => (
-                  <InversionRow
-                    key={inv.id}
-                    inversion={inv}
-                    tipoNombre={tiposRegistro?.find((t) => t.id === inv.tipoRegistroId)?.nombre ?? '—'}
-                    canDelete={estaActivo}
-                    onDelete={() => setDeleteTarget({ tipo: 'inversion', movId: inv.id })}
-                    isDeleting={deleteMovimiento.isPending}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab cantidades (movimientos) */}
-        <TabsContent value="cantidades" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Movimientos de cantidad
-            </h2>
-            {estaActivo ? (
-              <Can permission={PERMISSIONS.granja.movimientos.create}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAddCantidadOpen(true)}
-                  className="min-h-[44px] sm:min-h-[36px]"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Registrar
-                </Button>
-              </Can>
-            ) : null}
           </div>
+        )}
+      </section>
 
-          {loadingMovimientos ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+      {/* Mortalidad */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Mortalidad
+        </h2>
+        {loadingMovimientos ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : (movimientos?.cantidades ?? []).length === 0 ? (
+          <div className="flex h-32 items-center justify-center rounded-md border border-dashed">
+            <p className="text-sm text-muted-foreground">No hay registros de mortalidad.</p>
+          </div>
+        ) : (
+          <div className="space-y-1 overflow-x-auto">
+            <div className="min-w-[500px]">
+              {(movimientos?.cantidades ?? []).map((cant) => (
+                <CantidadRow
+                  key={cant.id}
+                  cantidad={cant}
+                  tipoNombre={tiposRegistro?.find((t) => t.id === cant.tipoRegistroId)?.nombre ?? '—'}
+                  canDelete={estaActivo}
+                  onDelete={() => setDeleteTarget({ tipo: 'cantidad', movId: cant.id })}
+                  isDeleting={deleteMovimiento.isPending}
+                />
               ))}
             </div>
-          ) : (movimientos?.cantidades ?? []).length === 0 ? (
-            <div className="flex h-32 items-center justify-center rounded-md border border-dashed">
-              <p className="text-sm text-muted-foreground">No hay movimientos registrados.</p>
-            </div>
-          ) : (
-            <div className="space-y-1 overflow-x-auto">
-              <div className="min-w-[500px]">
-                {(movimientos?.cantidades ?? []).map((cant) => (
-                  <CantidadRow
-                    key={cant.id}
-                    cantidad={cant}
-                    tipoNombre={tiposRegistro?.find((t) => t.id === cant.tipoRegistroId)?.nombre ?? '—'}
-                    canDelete={estaActivo}
-                    onDelete={() => setDeleteTarget({ tipo: 'cantidad', movId: cant.id })}
-                    isDeleting={deleteMovimiento.isPending}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </div>
+        )}
+      </section>
 
       {/* AlertDialog: confirmar cierre del lote */}
       <AlertDialog open={cerrarDialogOpen} onOpenChange={setCerrarDialogOpen}>
@@ -416,7 +399,7 @@ export function LoteDetailPage(): React.JSX.Element {
       <Dialog open={addInversionOpen} onOpenChange={setAddInversionOpen}>
         <DialogContent className="sm:max-w-xl max-w-none h-full sm:h-auto overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar inversión</DialogTitle>
+            <DialogTitle>Registrar gasto</DialogTitle>
           </DialogHeader>
           <div className="pb-4">
             <MovimientoInversionForm
@@ -457,7 +440,7 @@ export function LoteDetailPage(): React.JSX.Element {
       <Dialog open={addCantidadOpen} onOpenChange={setAddCantidadOpen}>
         <DialogContent className="sm:max-w-xl max-w-none h-full sm:h-auto overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar movimiento de cantidad</DialogTitle>
+            <DialogTitle>Registrar mortalidad</DialogTitle>
           </DialogHeader>
           <div className="pb-4">
             <MovimientoCantidadForm
@@ -580,7 +563,7 @@ function CantidadRow({ cantidad, tipoNombre, canDelete, onDelete, isDeleting }: 
       </div>
       <div className="flex items-center gap-3">
         <span className="font-medium tabular-nums whitespace-nowrap">
-          {cantidad.cantidad.toLocaleString()} uds
+          {cantidad.cantidad.toLocaleString()} aves
         </span>
         {canDelete ? (
           <Can permission={PERMISSIONS.granja.movimientos.delete}>
