@@ -1,6 +1,7 @@
 import { Pencil, Power } from 'lucide-react';
 import { useState } from 'react';
 
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -11,6 +12,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { Cuenta } from '@/types/api';
 
@@ -82,20 +84,27 @@ export function CuentaDetailDrawer({
             {cuenta !== null ? (
               <div className="flex gap-2 sm:justify-end">
                 {puedeDesactivar ? (
-                  <Button
+                  <PermissionButton
+                    permission={PERMISSIONS.contabilidad.planCuentas.delete}
+                    deniedReason="No tenés permiso para desactivar cuentas"
                     variant="outline"
                     onClick={() => setDeactivateOpen(true)}
                     className="flex-1 sm:flex-none text-destructive hover:text-destructive"
                   >
                     <Power className="h-4 w-4 mr-2" />
                     Desactivar
-                  </Button>
+                  </PermissionButton>
                 ) : null}
                 {cuenta.activa ? (
-                  <Button onClick={() => setEditOpen(true)} className="flex-1 sm:flex-none">
+                  <PermissionButton
+                    permission={PERMISSIONS.contabilidad.planCuentas.update}
+                    deniedReason="No tenés permiso para modificar cuentas"
+                    onClick={() => setEditOpen(true)}
+                    className="flex-1 sm:flex-none"
+                  >
                     <Pencil className="h-4 w-4 mr-2" />
                     Editar
-                  </Button>
+                  </PermissionButton>
                 ) : null}
               </div>
             ) : null}

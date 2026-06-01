@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import type { TipoDocumentoFisico } from '@/types/api';
 
@@ -88,10 +89,15 @@ export function TiposDocumentoFisicoPage(): React.JSX.Element {
             Catálogo de tipos de documento tributario y no tributario del tenant.
           </p>
         </div>
-        <Button onClick={handleNuevo} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.tiposDocumento.create}
+          deniedReason="No tenés permiso para crear tipos de documento"
+          onClick={handleNuevo}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo tipo
-        </Button>
+        </PermissionButton>
       </div>
 
       <div className="space-y-4">

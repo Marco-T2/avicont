@@ -1,5 +1,5 @@
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { TipoComprobante, TipoDocumentoFisico } from '@/types/api';
 
@@ -113,15 +114,19 @@ export function TiposDocumentoFisicoListTable({
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button
+                  <PermissionButton
+                    permission={PERMISSIONS.contabilidad.tiposDocumento.update}
+                    deniedReason="No tenés permiso para modificar tipos de documento"
                     variant="outline"
                     size="sm"
                     onClick={() => onEditar(tipo)}
                   >
                     Editar
-                  </Button>
+                  </PermissionButton>
                   {tipo.activo ? (
-                    <Button
+                    <PermissionButton
+                      permission={PERMISSIONS.contabilidad.tiposDocumento.update}
+                      deniedReason="No tenés permiso para modificar tipos de documento"
                       variant="outline"
                       size="sm"
                       className="text-destructive hover:text-destructive"
@@ -129,16 +134,18 @@ export function TiposDocumentoFisicoListTable({
                       onClick={() => onDesactivar(tipo)}
                     >
                       Desactivar
-                    </Button>
+                    </PermissionButton>
                   ) : (
-                    <Button
+                    <PermissionButton
+                      permission={PERMISSIONS.contabilidad.tiposDocumento.update}
+                      deniedReason="No tenés permiso para modificar tipos de documento"
                       variant="outline"
                       size="sm"
                       disabled={togglePendingId === tipo.id}
                       onClick={() => onActivar(tipo.id)}
                     >
                       Activar
-                    </Button>
+                    </PermissionButton>
                   )}
                 </div>
               </TableCell>

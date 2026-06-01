@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 // Cross-feature: tipos de documento para el filtro de tipo.
 import { useTiposDocumentoFisico } from '@/features/tipos-documento-fisico/hooks/use-tipos-documento-fisico';
@@ -147,10 +148,15 @@ export function DocumentosFisicosPage(): React.JSX.Element {
             Registros de documentos tributarios y no tributarios del tenant.
           </p>
         </div>
-        <Button onClick={handleNuevo} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.documentosFisicos.create}
+          deniedReason="No tenés permiso para crear documentos físicos"
+          onClick={handleNuevo}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nuevo documento
-        </Button>
+        </PermissionButton>
       </div>
 
       <div className="space-y-4">

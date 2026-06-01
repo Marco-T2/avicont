@@ -2,8 +2,9 @@ import { CalendarRange, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PERMISSIONS } from '@/lib/permissions';
 
 import { CerrarGestionButton } from '../components/cerrar-gestion-button';
 import { GestionSelector } from '../components/gestion-selector';
@@ -53,10 +54,15 @@ export function PeriodosFiscalesPage(): React.JSX.Element {
             Gestiones anuales y períodos mensuales del tenant.
           </p>
         </div>
-        <Button onClick={() => setNuevaGestionOpen(true)} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.gestiones.create}
+          deniedReason="No tenés permiso para crear gestiones"
+          onClick={() => setNuevaGestionOpen(true)}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nueva gestión
-        </Button>
+        </PermissionButton>
       </div>
 
       {isLoading ? <PageSkeleton /> : null}
@@ -122,10 +128,15 @@ function EmptyState({ onCrear }: { onCrear: () => void }): React.JSX.Element {
       <p className="mt-1 text-sm text-muted-foreground">
         Creá la primera gestión fiscal para empezar a registrar comprobantes.
       </p>
-      <Button onClick={onCrear} className="mt-4">
+      <PermissionButton
+        permission={PERMISSIONS.contabilidad.gestiones.create}
+        deniedReason="No tenés permiso para crear gestiones"
+        onClick={onCrear}
+        className="mt-4"
+      >
         <Plus className="h-4 w-4 mr-2" />
         Crear primera gestión
-      </Button>
+      </PermissionButton>
     </div>
   );
 }

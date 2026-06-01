@@ -1,10 +1,28 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { CuentaTreeNode } from '@/types/api';
 
 import { CuentaTreeView } from './cuenta-tree-view';
+
+// El botón "+" (crear sub-cuenta) se gatea con usePermissions. hasMock es
+// controlable por test (hoisted para poder referenciarlo dentro de vi.mock).
+const { hasMock } = vi.hoisted(() => ({ hasMock: vi.fn(() => true) }));
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({
+    has: hasMock,
+    hasAll: (ps: string[]) => ps.every(() => hasMock()),
+    isOwner: false,
+    permissions: [],
+  }),
+}));
+
+beforeEach(() => {
+  hasMock.mockReturnValue(true);
+});
 
 function makeNode(overrides: Partial<CuentaTreeNode> = {}): CuentaTreeNode {
   return {
@@ -87,5 +105,36 @@ describe('CuentaTreeView', () => {
   it('muestra empty state cuando nodes está vacío', () => {
     render(<CuentaTreeView nodes={[]} onSelect={vi.fn()} />);
     expect(screen.getByText(/no hay cuentas sembradas/i)).toBeInTheDocument();
+  });
+
+  describe('gating del botón "+" (crear sub-cuenta)', () => {
+    const agrupador = (): CuentaTreeNode[] => [
+      makeNode({ id: 'r1', nombre: 'ACTIVO', esDetalle: false, activa: true }),
+    ];
+
+    it('CON permiso create → botón "+" habilitado', () => {
+      hasMock.mockReturnValue(true);
+      render(
+        <TooltipProvider delayDuration={0}>
+          <CuentaTreeView nodes={agrupador()} onSelect={vi.fn()} onCreateChild={vi.fn()} />
+        </TooltipProvider>,
+      );
+      expect(screen.getByRole('button', { name: /crear sub-cuenta bajo/i })).toBeEnabled();
+    });
+
+    it('SIN permiso create → botón "+" deshabilitado, no invoca onCreateChild', async () => {
+      hasMock.mockReturnValue(false);
+      const onCreateChild = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <TooltipProvider delayDuration={0}>
+          <CuentaTreeView nodes={agrupador()} onSelect={vi.fn()} onCreateChild={onCreateChild} />
+        </TooltipProvider>,
+      );
+      const btn = screen.getByRole('button', { name: /crear sub-cuenta bajo/i });
+      expect(btn).toBeDisabled();
+      await user.click(btn);
+      expect(onCreateChild).not.toHaveBeenCalled();
+    });
   });
 });

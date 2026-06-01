@@ -32,6 +32,13 @@ vi.mock('../hooks/use-resumen-precierre', () => ({
   useResumenPrecierre: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
+// Los botones de acción (Nueva gestión, Cerrar gestión, Cerrar período) usan
+// PermissionButton → usePermissions. Smoke test: concedemos todo.
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({ has: () => true, hasAll: () => true, isOwner: true, permissions: [] }),
+}));
+
 const mockedUseGestiones = useGestiones as unknown as ReturnType<typeof vi.fn>;
 const mockedUseGestionDetalle = useGestionDetalle as unknown as ReturnType<typeof vi.fn>;
 

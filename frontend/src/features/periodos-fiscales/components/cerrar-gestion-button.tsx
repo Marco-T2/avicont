@@ -1,8 +1,9 @@
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
 import { mensajePeriodosFiscales } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
 
 import { useCerrarGestion } from '../hooks/use-cerrar-gestion';
 import { useGestionDetalle } from '../hooks/use-gestion-detalle';
@@ -42,7 +43,9 @@ export function CerrarGestionButton({
   }
 
   return (
-    <Button
+    <PermissionButton
+      permission={PERMISSIONS.contabilidad.gestiones.cerrar}
+      deniedReason="No tenés permiso para cerrar gestiones"
       variant="outline"
       disabled={mutation.isPending}
       onClick={handleCerrar}
@@ -55,6 +58,6 @@ export function CerrarGestionButton({
       ) : (
         'Cerrar gestión'
       )}
-    </Button>
+    </PermissionButton>
   );
 }

@@ -2,8 +2,10 @@ import { Loader2, Pencil, Power, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PERMISSIONS } from '@/lib/permissions';
 import {
   Sheet,
   SheetContent,
@@ -97,24 +99,30 @@ export function ContactoDetailDrawer({
               <div className="flex gap-2 sm:justify-end">
                 {contacto.activo ? (
                   <>
-                    <Button
+                    <PermissionButton
+                      permission={PERMISSIONS.contabilidad.contactos.update}
+                      deniedReason="No tenés permiso para modificar contactos"
                       variant="outline"
                       onClick={() => setDesactivarOpen(true)}
                       className="flex-1 sm:flex-none text-destructive hover:text-destructive"
                     >
                       <Power className="h-4 w-4 mr-2" />
                       Desactivar
-                    </Button>
-                    <Button
+                    </PermissionButton>
+                    <PermissionButton
+                      permission={PERMISSIONS.contabilidad.contactos.update}
+                      deniedReason="No tenés permiso para modificar contactos"
                       onClick={() => setEditOpen(true)}
                       className="flex-1 sm:flex-none"
                     >
                       <Pencil className="h-4 w-4 mr-2" />
                       Editar
-                    </Button>
+                    </PermissionButton>
                   </>
                 ) : (
-                  <Button
+                  <PermissionButton
+                    permission={PERMISSIONS.contabilidad.contactos.update}
+                    deniedReason="No tenés permiso para modificar contactos"
                     onClick={handleReactivar}
                     disabled={reactivarMutation.isPending}
                     className="flex-1 sm:flex-none"
@@ -125,7 +133,7 @@ export function ContactoDetailDrawer({
                       <RotateCcw className="h-4 w-4 mr-2" />
                     )}
                     Reactivar
-                  </Button>
+                  </PermissionButton>
                 )}
               </div>
             ) : null}

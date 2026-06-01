@@ -4,8 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
-import { Button } from '@/components/ui/button';
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PERMISSIONS } from '@/lib/permissions';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { type ClaseCuenta } from '@/types/api';
 
@@ -67,10 +68,15 @@ export function PlanCuentasPage(): React.JSX.Element {
             Catálogo contable del tenant — jerárquico por clase y nivel.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="self-start">
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.planCuentas.create}
+          deniedReason="No tenés permiso para crear cuentas"
+          onClick={() => setCreateOpen(true)}
+          className="self-start"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Nueva cuenta
-        </Button>
+        </PermissionButton>
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(parseView(v))}>

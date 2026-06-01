@@ -21,6 +21,10 @@ export const PERMISSIONS = {
     },
     planCuentas: {
       read: 'contabilidad.plan-cuentas.read',
+      create: 'contabilidad.plan-cuentas.create',
+      update: 'contabilidad.plan-cuentas.update',
+      // El endpoint es DELETE pero la operación es "desactivar" (soft-delete).
+      delete: 'contabilidad.plan-cuentas.delete',
     },
     /** Balance General + Estado de Resultados. */
     eeff: {
@@ -34,19 +38,33 @@ export const PERMISSIONS = {
     },
     contactos: {
       read: 'contabilidad.contactos.read',
+      create: 'contabilidad.contactos.create',
+      update: 'contabilidad.contactos.update',
+    },
+    gestiones: {
+      read: 'contabilidad.gestiones.read',
+      create: 'contabilidad.gestiones.create',
+      cerrar: 'contabilidad.gestiones.cerrar',
     },
     periodos: {
       read: 'contabilidad.periodos.read',
+      cerrar: 'contabilidad.periodos.cerrar',
+      // reabrir exige además SystemRole OWNER/ADMIN (requireOwnerOrAdmin) —
+      // por eso el botón reabrir sigue gateado con usePuedeReabrir, no acá.
+      reabrir: 'contabilidad.periodos.reabrir',
     },
     documentosFisicos: {
       read: 'contabilidad.documentos-fisicos.read',
       create: 'contabilidad.documentos-fisicos.create',
       update: 'contabilidad.documentos-fisicos.update',
+      delete: 'contabilidad.documentos-fisicos.delete',
     },
     tiposDocumento: {
       // El submódulo en el catálogo backend es `tipos-documento-fisico`
       // (catalogo.ts), NO `tipos-documento`. La key debe espejarlo exacto.
       read: 'contabilidad.tipos-documento-fisico.read',
+      create: 'contabilidad.tipos-documento-fisico.create',
+      update: 'contabilidad.tipos-documento-fisico.update',
     },
   },
   organizacion: {
