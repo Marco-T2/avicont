@@ -42,11 +42,46 @@ export const router = createBrowserRouter([
         element: <DashboardShell />,
         children: [
           { path: '/', element: <DashboardPage /> },
-          { path: '/plan-cuentas', element: <PlanCuentasPage /> },
-          { path: '/comprobantes', element: <ComprobantesPage /> },
-          { path: '/comprobantes/nuevo', element: <EditarComprobantePage /> },
-          { path: '/comprobantes/:id', element: <ComprobanteDetailPage /> },
-          { path: '/comprobantes/:id/editar', element: <EditarComprobantePage /> },
+          {
+            path: '/plan-cuentas',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.planCuentas.read}>
+                <PlanCuentasPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/comprobantes',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.asientos.read}>
+                <ComprobantesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/comprobantes/nuevo',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.asientos.read}>
+                <EditarComprobantePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/comprobantes/:id',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.asientos.read}>
+                <ComprobanteDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/comprobantes/:id/editar',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.asientos.read}>
+                <EditarComprobantePage />
+              </RequirePermission>
+            ),
+          },
           {
             path: '/libros/diario',
             element: (
@@ -79,13 +114,62 @@ export const router = createBrowserRouter([
               </RequirePermission>
             ),
           },
-          { path: '/contactos', element: <ContactosPage /> },
-          { path: '/tipos-documento-fisico', element: <TiposDocumentoFisicoPage /> },
-          { path: '/documentos-fisicos', element: <DocumentosFisicosPage /> },
-          { path: '/periodos-fiscales', element: <PeriodosFiscalesPage /> },
-          { path: '/settings/members', element: <MembersPage /> },
-          { path: '/settings/roles', element: <RolesPage /> },
-          { path: '/settings/features', element: <FeaturesPage /> },
+          {
+            path: '/contactos',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.contactos.read}>
+                <ContactosPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/tipos-documento-fisico',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.tiposDocumento.read}>
+                <TiposDocumentoFisicoPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/documentos-fisicos',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.documentosFisicos.read}>
+                <DocumentosFisicosPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/periodos-fiscales',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.periodos.read}>
+                <PeriodosFiscalesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/members',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.miembros.read}>
+                <MembersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/roles',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
+                <RolesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/features',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.features.read}>
+                <FeaturesPage />
+              </RequirePermission>
+            ),
+          },
         ],
       },
     ],
