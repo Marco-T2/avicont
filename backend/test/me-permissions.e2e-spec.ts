@@ -100,6 +100,8 @@ describe('GET /api/me/permissions (e2e)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('ME_PERMISSIONS_SIN_TENANT');
+      // El 403 NO debe exponer el campo vertical (no hay tenant resuelto)
+      expect(res.body.vertical).toBeUndefined();
     });
   });
 
@@ -189,6 +191,73 @@ describe('GET /api/me/permissions (e2e)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('ME_PERMISSIONS_MEMBRESIA_INACTIVA');
+    });
+
+    describe('campo vertical', () => {
+      it('org con contabilidadEnabled=true → vertical: "CONTABILIDAD"', async () => {
+        // La org del beforeEach externo se crea con contabilidadEnabled: true (default)
+        // y granjaEnabled: false (default). Solo verificamos que el campo esté presente.
+        const token = await crearUsuarioYToken('vertical-cont@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.vertical).toBe('CONTABILIDAD');
+        // Regresión: los demás campos siguen presentes
+        expect(res.body).toHaveProperty('permissions');
+        expect(res.body).toHaveProperty('isOwner');
+        expect(res.body).toHaveProperty('activeTenantId');
+      });
+
+      it('org con granjaEnabled=true → vertical: "GRANJA"', async () => {
+        // Crear org con vertical granja para este caso
+        const orgGranja = await prisma.organization.create({
+          data: {
+            slug: `org-granja-${Date.now()}`,
+            name: 'Org Granja Test',
+            contabilidadEnabled: false,
+            granjaEnabled: true,
+          },
+        });
+        orgId = orgGranja.id;
+        const token = await crearUsuarioYToken('vertical-granja@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.vertical).toBe('GRANJA');
+        expect(res.body).toHaveProperty('permissions');
+        expect(res.body).toHaveProperty('isOwner');
+        expect(res.body).toHaveProperty('activeTenantId');
+      });
+
+      it('org con ambos flags false → vertical: null', async () => {
+        // Crear org sin ningún vertical activo (caso OTROS del alta)
+        const orgSinVertical = await prisma.organization.create({
+          data: {
+            slug: `org-sin-vertical-${Date.now()}`,
+            name: 'Org Sin Vertical Test',
+            contabilidadEnabled: false,
+            granjaEnabled: false,
+          },
+        });
+        orgId = orgSinVertical.id;
+        const token = await crearUsuarioYToken('vertical-null@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.vertical).toBeNull();
+        expect(res.body).toHaveProperty('permissions');
+        expect(res.body).toHaveProperty('isOwner');
+        expect(res.body).toHaveProperty('activeTenantId');
+      });
     });
   });
 });
