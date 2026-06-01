@@ -35,8 +35,8 @@ export class PrismaInvitationRepository implements InvitationRepositoryPort {
     });
   }
 
-  findById(id: string): Promise<Invitation | null> {
-    return this.prisma.invitation.findUnique({ where: { id } });
+  findById(id: string, organizationId: string): Promise<Invitation | null> {
+    return this.prisma.invitation.findFirst({ where: { id, organizationId } });
   }
 
   listByOrganization(organizationId: string, status?: InvitationStatus): Promise<Invitation[]> {
@@ -60,9 +60,9 @@ export class PrismaInvitationRepository implements InvitationRepositoryPort {
     });
   }
 
-  markRevoked(id: string): Promise<Invitation> {
+  markRevoked(id: string, organizationId: string): Promise<Invitation> {
     return this.prisma.invitation.update({
-      where: { id },
+      where: { id, organizationId },
       data: { status: 'REVOKED' },
     });
   }
