@@ -3,35 +3,16 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 import { TipoEmpresa } from '@/common/domain/enums';
 
-const Plan = {
-  FREE: 'FREE',
-  PRO: 'PRO',
-} as const;
-
-const TenantStatus = {
-  ACTIVE: 'ACTIVE',
-  SUSPENDED: 'SUSPENDED',
-} as const;
-
-type PlanType = (typeof Plan)[keyof typeof Plan];
-type TenantStatusType = (typeof TenantStatus)[keyof typeof TenantStatus];
-
+// `plan` y `status` son entitlement: los administra la plataforma (super-admin),
+// nunca el Owner de la org. Por eso NO viven en este DTO — ver
+// docs/disenos/super-admin-plataforma.md §8. El Owner solo edita el perfil de
+// su organización (name, tipoEmpresaPrincipal).
 export class UpdateTenantDto {
   @ApiPropertyOptional({ example: 'New Name', maxLength: 100, description: 'Organization name' })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   name?: string;
-
-  @ApiPropertyOptional({ enum: ['FREE', 'PRO'], description: 'Subscription plan' })
-  @IsOptional()
-  @IsEnum(Plan)
-  plan?: PlanType;
-
-  @ApiPropertyOptional({ enum: ['ACTIVE', 'SUSPENDED'], description: 'Tenant status' })
-  @IsOptional()
-  @IsEnum(TenantStatus)
-  status?: TenantStatusType;
 
   @ApiPropertyOptional({
     enum: [

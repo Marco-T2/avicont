@@ -36,7 +36,8 @@ export class TenantsController {
   }
 
   @Patch('current')
-  @UseGuards(TenantGuard)
+  @UseGuards(TenantGuard, PermissionsGuard)
+  @RequirePermissions('organizacion.configuracion.update')
   @ApiSecurity('X-Tenant-ID')
   @ApiOperation({ summary: 'Update current tenant' })
   @ApiResponse({ status: 200, description: 'Tenant updated' })
