@@ -1,31 +1,26 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { RequirePermissions } from '../rbac/decorators/require-permissions.decorator';
-import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 
 import { CreateFeatureFlagDto, UpdateFeatureFlagDto } from './dto/feature-flag.dto';
 import { FeatureFlagsService } from './feature-flags.service';
 
 /**
- * Endpoints administrativos del catálogo GLOBAL de feature flags
- * (cross-tenant). Requieren `sistema.feature-flags.admin`.
+ * Endpoints administrativos del catálogo GLOBAL de feature flags (cross-tenant).
  *
- * Hoy cualquier OWNER o ADMIN matchea este permiso vía el wildcard '*'
- * del rbac resolver. El modelo de super-admin global está sin formalizar
- * — ver `docs/deudas-arquitecturales.md §3.3`. Hasta entonces el caller
- * debe pasar un `X-Tenant-ID` válido (donde tiene OWNER/ADMIN) aunque
- * la operación sea cross-tenant; es fricción aceptada para evitar dejar
- * el endpoint completamente abierto.
+ * Re-gateado en Slice 6b (REQ-SA-16): antes requería `sistema.feature-flags.admin`
+ * vía RBAC wildcard (cualquier OWNER/ADMIN lo matcheaba con X-Tenant-ID).
+ * Ahora requiere `isSuperAdmin === true` en el JWT — solo el super-admin de
+ * plataforma puede gestionar los feature flags globales del sistema.
+ *
+ * Sin TenantGuard: operación org-less, el catálogo global no pertenece a un tenant.
  */
 @ApiTags('Feature Flags (Admin)')
 @ApiBearerAuth('JWT-auth')
-@ApiSecurity('X-Tenant-ID')
 @Controller('admin/feature-flags')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionsGuard)
-@RequirePermissions('sistema.feature-flags.admin')
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class FeatureFlagsAdminController {
   constructor(private readonly featureFlagsService: FeatureFlagsService) {}
 
