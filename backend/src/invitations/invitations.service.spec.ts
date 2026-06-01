@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { SystemRole } from '@prisma/client';
 
+import { CLOCK_PORT } from '@/common/clock/clock.port';
+import { FakeClockAdapter } from '@/common/clock/fake-clock.adapter';
 import {
   CUSTOM_ROLES_READER_PORT,
   CustomRolesReaderPort,
@@ -15,6 +17,7 @@ import {
   PermissionsCacheInvalidationPort,
 } from '@/rbac/ports/permissions-cache-invalidation.port';
 import { RbacService } from '@/rbac/rbac.service';
+import { GoneException } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 
 import { InvitacionAsignacionOwnerNoPermitidaError } from './domain/invitation-errors';
@@ -51,6 +54,7 @@ describe('InvitationsService (unit)', () => {
     membership: { findUnique: jest.Mock };
   };
   let config: { get: jest.Mock };
+  let clock: FakeClockAdapter;
 
   beforeEach(async () => {
     repo = {
@@ -90,6 +94,7 @@ describe('InvitationsService (unit)', () => {
     config = {
       get: jest.fn().mockReturnValue('http://localhost:3000'),
     };
+    clock = new FakeClockAdapter();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -101,6 +106,7 @@ describe('InvitationsService (unit)', () => {
         { provide: RbacService, useValue: rbacService },
         { provide: PrismaService, useValue: prisma },
         { provide: ConfigService, useValue: config },
+        { provide: CLOCK_PORT, useValue: clock },
       ],
     }).compile();
 
@@ -213,6 +219,63 @@ describe('InvitationsService (unit)', () => {
       expect(repo.create).toHaveBeenCalled();
       // No se verifica isOwner para customRoleId
       expect(rbacService.resolverPermisosConContexto).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================
+  // Expiración de invitación — comportamiento determinista vía clock
+  // ============================================================
+
+  describe('lookupValidInvitation — expiración controlada por clock', () => {
+    const buildInvitacionExpirada = (expiresAt: Date) =>
+      ({
+        id: 'inv-expired',
+        organizationId: ORG_ID,
+        email: 'target@test.bo',
+        status: 'PENDING' as const,
+        expiresAt,
+        invitedById: ADMIN_ID,
+        systemRole: null,
+        customRoleId: null,
+        tokenHash: 'hash',
+        acceptedAt: null,
+        acceptedByUserId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organization: { id: ORG_ID, slug: 'org-slug', name: 'Org Test' },
+        invitedBy: { id: ADMIN_ID, email: 'admin@test.bo', displayName: 'Admin' },
+      }) as unknown as ReturnType<RepoMock['findByTokenHash']> extends Promise<infer R> ? R : never;
+
+    it('invitación con expiresAt en el pasado → aceptar lanza GoneException("La invitación expiró")', async () => {
+      const frozenNow = new Date('2026-06-15T12:00:00.000Z');
+      clock.setTo(frozenNow);
+
+      // expiresAt es un segundo antes que el "ahora" del reloj
+      const pastExpiry = new Date(frozenNow.getTime() - 1000);
+      repo.findByTokenHash.mockResolvedValue(buildInvitacionExpirada(pastExpiry));
+
+      await expect(service.acceptWithExistingUser('any-token', 'user-abc')).rejects.toBeInstanceOf(
+        GoneException,
+      );
+
+      await expect(service.acceptWithExistingUser('any-token', 'user-abc')).rejects.toThrow(
+        'La invitación expiró',
+      );
+    });
+
+    it('invitación con expiresAt en el futuro → no lanza GoneException por expiración', async () => {
+      const frozenNow = new Date('2026-06-15T12:00:00.000Z');
+      clock.setTo(frozenNow);
+
+      // expiresAt es un segundo después que el "ahora" del reloj
+      const futureExpiry = new Date(frozenNow.getTime() + 1000);
+      repo.findByTokenHash.mockResolvedValue(buildInvitacionExpirada(futureExpiry));
+
+      // El flujo sigue adelante (falla en otro punto — usuario no encontrado)
+      // Lo importante es que NO falla con el GoneException de expiración
+      await expect(service.acceptWithExistingUser('any-token', 'user-abc')).rejects.not.toThrow(
+        'La invitación expiró',
+      );
     });
   });
 });
