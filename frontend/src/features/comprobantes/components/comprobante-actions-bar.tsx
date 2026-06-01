@@ -1,6 +1,8 @@
 import { HistoryIcon, Pencil, Trash2, X } from 'lucide-react';
 
+import { PermissionButton } from '@/components/shared/permission-button';
 import { Button } from '@/components/ui/button';
+import { PERMISSIONS } from '@/lib/permissions';
 import type { Comprobante } from '@/types/api';
 
 interface ComprobanteActionsBarProps {
@@ -27,9 +29,11 @@ interface ComprobanteActionsBarProps {
  * - CONTABILIZADO (anulado): Ver auditoría (read-only)
  * - BLOQUEADO: solo Ver auditoría
  *
- * Nota: "Editar" en CONTABILIZADO se muestra siempre. Si el usuario no tiene
- * permiso, el backend rechaza con 403 y mensajeComprobantes() traduce el error
- * a toast legible. (design obs 247 §"Permission gating")
+ * Gating UX: cada acción de escritura usa <PermissionButton>. Si el usuario no
+ * tiene el permiso, el botón se muestra deshabilitado con un tooltip que explica
+ * por qué (afordancia honesta). La autoridad real sigue siendo el backend, que
+ * rechaza con 403 igual (CLAUDE.md §5 defense in depth). "Ver auditoría" no se
+ * gatea acá (es lectura, fuera del alcance de este slice).
  */
 export function ComprobanteActionsBar({
   comprobante,
@@ -44,14 +48,27 @@ export function ComprobanteActionsBar({
   if (estado === 'BORRADOR' && !anulado) {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.update}
+          deniedReason="No tenés permiso para editar asientos"
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+        >
           <Pencil className="h-3.5 w-3.5 mr-1.5" />
           Editar
-        </Button>
-        <Button size="sm" onClick={onContabilizar}>
+        </PermissionButton>
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.post}
+          deniedReason="No tenés permiso para contabilizar asientos"
+          size="sm"
+          onClick={onContabilizar}
+        >
           Contabilizar
-        </Button>
-        <Button
+        </PermissionButton>
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.delete}
+          deniedReason="No tenés permiso para eliminar asientos"
           variant="outline"
           size="sm"
           onClick={onEliminar}
@@ -59,7 +76,7 @@ export function ComprobanteActionsBar({
         >
           <Trash2 className="h-3.5 w-3.5 mr-1.5" />
           Eliminar
-        </Button>
+        </PermissionButton>
         <Button variant="ghost" size="sm" onClick={onVerAuditoria}>
           <HistoryIcon className="h-3.5 w-3.5 mr-1.5" />
           Ver auditoría
@@ -71,11 +88,19 @@ export function ComprobanteActionsBar({
   if (estado === 'CONTABILIZADO' && !anulado) {
     return (
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.update}
+          deniedReason="No tenés permiso para editar asientos"
+          variant="outline"
+          size="sm"
+          onClick={onEdit}
+        >
           <Pencil className="h-3.5 w-3.5 mr-1.5" />
           Editar
-        </Button>
-        <Button
+        </PermissionButton>
+        <PermissionButton
+          permission={PERMISSIONS.contabilidad.asientos.void}
+          deniedReason="No tenés permiso para anular asientos"
           variant="outline"
           size="sm"
           onClick={onAnular}
@@ -83,7 +108,7 @@ export function ComprobanteActionsBar({
         >
           <X className="h-3.5 w-3.5 mr-1.5" />
           Anular
-        </Button>
+        </PermissionButton>
         <Button variant="ghost" size="sm" onClick={onVerAuditoria}>
           <HistoryIcon className="h-3.5 w-3.5 mr-1.5" />
           Ver auditoría

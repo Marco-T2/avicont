@@ -42,7 +42,9 @@ export const PERMISSIONS = {
       read: 'contabilidad.documentos-fisicos.read',
     },
     tiposDocumento: {
-      read: 'contabilidad.tipos-documento.read',
+      // El submódulo en el catálogo backend es `tipos-documento-fisico`
+      // (catalogo.ts), NO `tipos-documento`. La key debe espejarlo exacto.
+      read: 'contabilidad.tipos-documento-fisico.read',
     },
   },
   organizacion: {
