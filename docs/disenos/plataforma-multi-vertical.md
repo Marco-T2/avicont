@@ -5,6 +5,10 @@
 > real del código al momento de escribirlo. Contiene **decisiones abiertas** (§10)
 > que deben cerrarse antes de construir cada pieza.
 >
+> **Última reconciliación contra el código: 2026-06-01.** Se actualizó el estado de
+> Granja (§6.2, §9: de "greenfield" a "construido v1") y se cerró §10.2 (RBAC de
+> Granja, de facto). Verticales construidos a la fecha: Contabilidad y Granja.
+>
 > Este doc **presupone** el `CLAUDE.md` raíz (multi-tenancy flat §4.2, seguridad
 > §5/§10.4, RBAC) y `docs/claude/seguridad.md`. Si algo acá contradice un
 > invariante del core → va al core primero, acá después (regla anti-drift §12 core).
@@ -232,15 +236,20 @@ dashboard, plan-cuentas, asientos, libro-diario, libro-mayor, ventas, compras,
 gestiones, periodos, cierre-mensual, eeff, configuracion, contactos,
 tipos-documento-fisico, documentos-fisicos.
 
-### 6.2 Granja (greenfield)
+### 6.2 Granja (construido — v1)
 
 Operativo avícola simple para socios/avicultores que quieren controlar su
 producción de forma fácil. **No comparte nada con Contabilidad** (otras tablas,
 otro usuario, otro propósito; el avicultor opera en el gallinero con el celular).
-Estado: **no existe** (ni backend `src/granja/`, ni frontend `features/granja/`,
-ni tablas en schema). Solo está el valor de enum, los permisos `granja.*` en el
-catálogo (dashboard, lotes, tipos-registro, movimientos) y la mención mobile-first
-estricta en `frontend/CLAUDE.md`.
+Estado: **construido (v1, 2026-06-01)** — backend `src/granja/` (lotes,
+movimientos, tipos-registro, dashboard; hexagonal completo con specs), frontend
+`features/granja/` (api, components, hooks, pages, schemas, mobile-first), y 4
+tablas en schema (`Lote`, `TipoRegistro`, `MovimientoInversion`,
+`MovimientoCantidad`, migration `20260601145425_granja_v1_schema`). Permisos
+`granja.*` en el catálogo y enforzados vía `@RequirePermissions`:
+`granja.{dashboard,lotes,movimientos,tipos-registro}.{read,create,update,delete}`.
+Pendiente respecto del plan original: no hay roles default de granja seedeados
+(el acceso depende de OWNER/ADMIN hardcoded + `CustomRole` por org — ver §10.2).
 
 ### 6.3 Qué comparten y qué no
 
@@ -326,7 +335,7 @@ El frontend conoce el vertical activo vía `vertical` en `GET /me/permissions`
 | `NavItem` extensible (requiredPermission/vertical/pack) | ⚠️ parcial (tiene `requiredPermission` + `vertical`; `pack` pendiente) |
 | Shell/navegación por vertical | ✅ existe (change `shell-por-vertical`: nav filtrado por vertical, ruta default por vertical, estado "sin módulo") |
 | Super-admin de plataforma explícito | ❌ no modelado (§10.1) |
-| Vertical Granja (dominio, tablas, UI) | ❌ greenfield |
+| Vertical Granja (dominio, tablas, UI) | ✅ construido (v1, 2026-06-01) |
 | Packs avícolas (compras/fletes/liquidaciones) | ❌ greenfield |
 | Frontera entitlement→activación explícita | ⚠️ implícita (§10.3) |
 
@@ -351,12 +360,17 @@ org-plataforma especial; (c) resolverlo por billing/operación manual. **Recomen
 modelar explícito (a) cuando se construya cualquier flujo de administración
 cross-tenant; mientras tanto, operación manual.
 
-### 10.2 Profundidad de RBAC en Granja
+### 10.2 Profundidad de RBAC en Granja — ✅ CERRADA (2026-06-01, de facto)
 
-El escenario del contador OBLIGA a que Granja tenga membership + roles (no es
-single-user). **Decisión**: ¿Granja usa el RBAC completo igual que Contabilidad, o
-arranca con 2-3 roles default simples (Dueño / Operario)? **Recomendación**: mismo
-motor RBAC (ya es de plataforma), con roles default simples para granja.
+Resuelta al construir Granja v1: usa el **mismo motor RBAC** que Contabilidad
+(`@RequirePermissions` + `PermissionsGuard`, ya de plataforma), con permisos
+namespaced `granja.{dashboard,lotes,movimientos,tipos-registro}.{read,create,update,delete}`.
+
+La parte de la recomendación que **no** se tomó: no se seedearon roles default
+simples (Dueño / Operario) para granja. Hoy el acceso depende de OWNER/ADMIN
+hardcoded + `CustomRole` creado por org. **Disparador para reabrir**: si aparece
+fricción de onboarding (un Owner de granja teniendo que armar roles a mano cada
+vez), seedear 2-3 roles default de granja.
 
 ### 10.3 Frontera entitlement → activación
 
@@ -379,8 +393,11 @@ Implementado con **defense in depth** (CLAUDE.md §4.8):
   el estado RESULTANTE del patch parcial. El `create` ya era exclusivo vía
   `flagsParaModulo`.
 
-> El shell-switching por vertical (§8) sigue diferido a cuando exista un segundo
-> vertical real (Granja); lo que esta decisión cierra es el **invariante**, no la UI.
+> Esta decisión cierra el **invariante** (exclusividad), no la UI. El
+> shell-switching por vertical a nivel de navegación **ya se construyó** (§8.2, §9,
+> §11 paso 2: nav filtrado por vertical + ruta default + estado "sin módulo",
+> change `shell-por-vertical`, #115). Lo que sigue diferido (YAGNI) es un
+> `GranjaShell` físicamente separado: el `DashboardShell` con nav filtrado alcanza.
 
 ### 10.5 Vista "portfolio" del contador (diferible)
 
