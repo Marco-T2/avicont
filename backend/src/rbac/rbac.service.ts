@@ -16,7 +16,7 @@ import {
 // Cuando el cache está vacío y el resolver dice "no es miembro", devolvemos
 // este objeto para fail-safe: cero permisos. NO se cachea para no dejar
 // "stuck" un usuario que aún se está terminando de aprovisionar.
-const EMPTY: ResolvedPermissions = { esOwner: false, esAdmin: false, wildcards: [] };
+const EMPTY: ResolvedPermissions = { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: [] };
 
 @Injectable()
 export class RbacService implements PermissionsCacheInvalidationPort {
@@ -43,8 +43,8 @@ export class RbacService implements PermissionsCacheInvalidationPort {
   ): Promise<{ permissions: string[]; isOwner: boolean }> {
     const resolved = await this.getPermissions(userId, organizationId);
 
-    if (resolved.esOwner || resolved.esAdmin) {
-      // Owner y Admin tienen acceso completo: expandir '*' contra el catálogo.
+    if (resolved.esOwner || resolved.esAdmin || resolved.esSuperAdmin) {
+      // Owner, Admin y SuperAdmin tienen acceso completo: expandir '*' contra el catálogo.
       const allKeys = CATALOGO_PERMISOS.map((p) => p.key);
       return { permissions: allKeys, isOwner: resolved.esOwner };
     }
@@ -72,7 +72,7 @@ export class RbacService implements PermissionsCacheInvalidationPort {
 
   async hasPermission(userId: string, organizationId: string, required: string): Promise<boolean> {
     const perms = await this.getPermissions(userId, organizationId);
-    if (perms.esOwner || perms.esAdmin) return true;
+    if (perms.esOwner || perms.esAdmin || perms.esSuperAdmin) return true;
     return perms.wildcards.some((g) => matchesPermission(g, required));
   }
 
@@ -82,7 +82,7 @@ export class RbacService implements PermissionsCacheInvalidationPort {
     required: string[],
   ): Promise<boolean> {
     const perms = await this.getPermissions(userId, organizationId);
-    if (perms.esOwner || perms.esAdmin) return true;
+    if (perms.esOwner || perms.esAdmin || perms.esSuperAdmin) return true;
     return hasAllPermissions(perms.wildcards, required);
   }
 
@@ -92,7 +92,7 @@ export class RbacService implements PermissionsCacheInvalidationPort {
     required: string[],
   ): Promise<boolean> {
     const perms = await this.getPermissions(userId, organizationId);
-    if (perms.esOwner || perms.esAdmin) return true;
+    if (perms.esOwner || perms.esAdmin || perms.esSuperAdmin) return true;
     return hasAnyPermission(perms.wildcards, required);
   }
 

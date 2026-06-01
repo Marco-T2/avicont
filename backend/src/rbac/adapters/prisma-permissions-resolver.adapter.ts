@@ -20,14 +20,17 @@ export class PrismaPermissionsResolver implements PermissionsResolverPort {
 
     // OWNER y ADMIN tienen wildcard total. Restricciones operativas
     // (transferir ownership, eliminar org) viven en el dominio.
+    // esSuperAdmin siempre es false en el resolver por-org: el super-admin
+    // no se resuelve por membership sino por JWT (docs/disenos/super-admin-plataforma.md §4.3).
     if (esOwner || esAdmin) {
-      return { esOwner, esAdmin, wildcards: ['*'] };
+      return { esOwner, esAdmin, esSuperAdmin: false, wildcards: ['*'] };
     }
 
     // Custom role: permisos crudos como están en BD.
     return {
       esOwner: false,
       esAdmin: false,
+      esSuperAdmin: false,
       wildcards: membership.customRole?.permissions ?? [],
     };
   }

@@ -27,10 +27,19 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user as { sub?: string; activeTenantId?: string } | undefined;
+    const user = request.user as
+      | { sub?: string; activeTenantId?: string; isSuperAdmin?: boolean }
+      | undefined;
     if (!user?.sub) {
       throw new UnauthorizedException('No autenticado');
     }
+
+    // Super-admin de plataforma: corto-circuita el matcher de permisos por-org.
+    // El flag viene del JWT (req.user), NO del cache RBAC por-org. Coherente con
+    // el short-circuit esOwner/esAdmin del resolver, pero a nivel de identidad de
+    // plataforma (docs/disenos/super-admin-plataforma.md §4.3).
+    // Comparación estricta === true: un valor truthy NO activa el short-circuit.
+    if (user.isSuperAdmin === true) return true;
 
     // tenantId puede venir del JWT (caso normal) o del header X-Tenant-ID
     // (caso super-admin con impersonation, validado en otro guard).
