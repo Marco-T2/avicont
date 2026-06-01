@@ -1029,6 +1029,7 @@ Ver deuda **§3.4 (A8)** en `docs/deudas-arquitecturales.md`.
 | `contactos_organizationId_documento_partial_key` | UNIQUE PARCIAL `WHERE documento IS NOT NULL` | `20260424020927_fase_1_4_contactos` |
 | CHECK `("esCliente" = true OR "esProveedor" = true)` en `contactos` | CHECK constraint | `20260424020927_fase_1_4_contactos` |
 | `comprobante_documento_fisico_unique_contabilizado` | UNIQUE PARCIAL `WHERE comprobanteEstado = 'CONTABILIZADO'` | `20260425163325_add_documento_fisico_and_tipo_and_asociacion` |
+| `organizations_vertical_exclusivo_check` | CHECK `NOT ("contabilidadEnabled" AND "granjaEnabled")` | `20260531180000_organization_vertical_exclusivo_check` |
 | `comprobantes_audit` | TABLE (audit raw) | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
 | `comprobantes_audit_comprobante_id_ts_idx` | INDEX | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |
 | `comprobantes_audit_organization_id_ts_idx` | INDEX | `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers` |

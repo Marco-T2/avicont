@@ -30,6 +30,27 @@ export class TenantSlugDuplicadoError extends ConflictError {
 }
 
 /**
+ * Una organización es de UN solo vertical (Contabilidad O Granja, no ambos).
+ * El alta ya garantiza exclusividad vía `flagsParaModulo`; este error protege
+ * el único camino que podría prender ambos a la vez: el PATCH parcial de
+ * features. Defense in depth con el CHECK constraint
+ * `organizations_vertical_exclusivo_check` de la BD (CLAUDE.md §4.8).
+ *
+ * Cierra la decisión §10.4 de `docs/disenos/plataforma-multi-vertical.md`:
+ * vertical exclusivo por org. Los packs (eje 2) cubren la necesidad de
+ * "extender" sin volver multi-vertical.
+ */
+export class VerticalNoExclusivoError extends ConflictError {
+  constructor(tenantId: string) {
+    super(
+      'TENANT_VERTICAL_NO_EXCLUSIVO',
+      'Una organización no puede tener más de un vertical activo a la vez (Contabilidad o Granja, no ambos)',
+      { tenantId },
+    );
+  }
+}
+
+/**
  * El `tipoEmpresaPrincipal` no se puede cambiar porque ya existe una
  * gestión fiscal — el cierre fiscal está derivado del tipo de empresa
  * (Ley 843 art. 46) y cambiar el tipo invalidaría la gestión existente.
