@@ -39,8 +39,8 @@ export class CustomRolesService {
   }
 
   async findById(organizationId: string, id: string): Promise<CustomRole> {
-    const role = await this.repo.findById(id);
-    if (!role || role.organizationId !== organizationId) {
+    const role = await this.repo.findById(id, organizationId);
+    if (!role) {
       throw new CustomRoleNoEncontradoError(id);
     }
     return role;
@@ -48,7 +48,7 @@ export class CustomRolesService {
 
   async listMembers(organizationId: string, id: string) {
     await this.findById(organizationId, id);
-    return this.repo.listMembersWithUsers(id);
+    return this.repo.listMembersWithUsers(id, organizationId);
   }
 
   async create(
@@ -109,7 +109,7 @@ export class CustomRolesService {
       this.validatePermissions(dto.permissions);
     }
 
-    const updated = await this.repo.update(id, {
+    const updated = await this.repo.update(id, organizationId, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.description !== undefined ? { description: dto.description } : {}),
       ...(dto.permissions !== undefined ? { permissions: dto.permissions } : {}),
@@ -130,13 +130,13 @@ export class CustomRolesService {
     if (role.isSystemDefault) {
       throw new CustomRoleDelSistemaError(id);
     }
-    const count = await this.repo.countActiveMembers(id);
+    const count = await this.repo.countActiveMembers(id, organizationId);
     if (count > 0) {
       throw new CustomRoleConMiembrosActivosError(id, count);
     }
     // Invalidamos cache ANTES del delete por si quedan memberships con FK SetNull.
     await this.rbac.invalidateUsersByCustomRole(id);
-    await this.repo.delete(id);
+    await this.repo.delete(id, organizationId);
   }
 
   // -------- helpers --------

@@ -18,8 +18,8 @@ export class PrismaCustomRoleRepository implements CustomRoleRepositoryPort {
     });
   }
 
-  findById(id: string): Promise<CustomRole | null> {
-    return this.prisma.customRole.findUnique({ where: { id } });
+  findById(id: string, organizationId: string): Promise<CustomRole | null> {
+    return this.prisma.customRole.findFirst({ where: { id, organizationId } });
   }
 
   findBySlug(organizationId: string, slug: string): Promise<CustomRole | null> {
@@ -43,9 +43,9 @@ export class PrismaCustomRoleRepository implements CustomRoleRepositoryPort {
     });
   }
 
-  update(id: string, data: UpdateCustomRoleData): Promise<CustomRole> {
+  update(id: string, organizationId: string, data: UpdateCustomRoleData): Promise<CustomRole> {
     return this.prisma.customRole.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
@@ -54,27 +54,27 @@ export class PrismaCustomRoleRepository implements CustomRoleRepositoryPort {
     });
   }
 
-  async delete(id: string): Promise<void> {
-    await this.prisma.customRole.delete({ where: { id } });
+  async delete(id: string, organizationId: string): Promise<void> {
+    await this.prisma.customRole.delete({ where: { id, organizationId } });
   }
 
-  countActiveMembers(customRoleId: string): Promise<number> {
+  countActiveMembers(customRoleId: string, organizationId: string): Promise<number> {
     return this.prisma.membership.count({
-      where: { customRoleId, deactivatedAt: null },
+      where: { customRoleId, organizationId, deactivatedAt: null },
     });
   }
 
-  async listAffectedUserIds(customRoleId: string): Promise<string[]> {
+  async listAffectedUserIds(customRoleId: string, organizationId: string): Promise<string[]> {
     const ms = await this.prisma.membership.findMany({
-      where: { customRoleId },
+      where: { customRoleId, organizationId },
       select: { userId: true },
     });
     return ms.map((m) => m.userId);
   }
 
-  async listMembersWithUsers(customRoleId: string) {
+  async listMembersWithUsers(customRoleId: string, organizationId: string) {
     const ms = await this.prisma.membership.findMany({
-      where: { customRoleId },
+      where: { customRoleId, organizationId },
       select: {
         id: true,
         deactivatedAt: true,

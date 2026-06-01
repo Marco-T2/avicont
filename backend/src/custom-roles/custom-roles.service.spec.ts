@@ -28,7 +28,6 @@ import {
  */
 describe('CustomRolesService (unit)', () => {
   const TENANT_ID = 'org-a';
-  const OTHER_TENANT_ID = 'org-b';
   const ROLE_ID = '550e8400-e29b-41d4-a716-446655440000';
   const ACTOR_USER_ID = 'user-actor';
 
@@ -99,11 +98,9 @@ describe('CustomRolesService (unit)', () => {
       );
     });
 
-    it('lanza CustomRoleNoEncontradoError si el rol vive en otro tenant', async () => {
-      repo.findById.mockResolvedValue({
-        ...baseRole(),
-        organizationId: OTHER_TENANT_ID,
-      } as Awaited<ReturnType<RepoMock['findById']>>);
+    it('lanza CustomRoleNoEncontradoError si el rol vive en otro tenant (repo devuelve null)', async () => {
+      // El repo ya filtra por organizationId; cuando el id no matchea la org, devuelve null.
+      repo.findById.mockResolvedValue(null);
       await expect(service.findById(TENANT_ID, ROLE_ID)).rejects.toBeInstanceOf(
         CustomRoleNoEncontradoError,
       );
@@ -230,7 +227,7 @@ describe('CustomRolesService (unit)', () => {
 
       await service.update(TENANT_ID, ROLE_ID, { name: 'Nuevo Nombre' });
 
-      expect(repo.update).toHaveBeenCalledWith(ROLE_ID, {
+      expect(repo.update).toHaveBeenCalledWith(ROLE_ID, TENANT_ID, {
         name: 'Nuevo Nombre',
       });
       expect(rbac.invalidateUsersByCustomRole).not.toHaveBeenCalled();
@@ -282,7 +279,7 @@ describe('CustomRolesService (unit)', () => {
       await service.delete(TENANT_ID, ROLE_ID);
 
       expect(rbac.invalidateUsersByCustomRole).toHaveBeenCalledWith(ROLE_ID);
-      expect(repo.delete).toHaveBeenCalledWith(ROLE_ID);
+      expect(repo.delete).toHaveBeenCalledWith(ROLE_ID, TENANT_ID);
     });
 
     it('lanza CustomRoleDelSistemaError si es rol del sistema', async () => {
