@@ -1,5 +1,6 @@
-import type { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+import type { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 // ============================================================
 // Símbolo de inyección

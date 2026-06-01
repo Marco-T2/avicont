@@ -8,8 +8,9 @@
  * BORRADOR NUNCA incluido (REQ-LM-02).
  */
 
-import type { NaturalezaCuenta } from '@prisma/client';
 import type { Decimal } from '@prisma/client/runtime/library';
+
+import type { NaturalezaCuenta } from '@/common/domain/enums';
 
 export const LIBRO_MAYOR_READER_PORT = Symbol('LIBRO_MAYOR_READER_PORT');
 

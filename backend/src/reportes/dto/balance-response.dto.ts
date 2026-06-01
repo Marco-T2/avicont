@@ -8,7 +8,7 @@
  * igual que el Mayor. El mapper serializa Money → string y Date → "YYYY-MM-DD".
  */
 
-import type { ClaseCuenta, SubClaseCuenta } from '@prisma/client';
+import type { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 

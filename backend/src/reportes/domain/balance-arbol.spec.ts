@@ -1,5 +1,6 @@
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { construirBalance } from './balance-arbol';
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';

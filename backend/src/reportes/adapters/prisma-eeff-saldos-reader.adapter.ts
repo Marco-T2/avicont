@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
+import type {
+  ClaseCuenta as PrismaClaseCuenta,
+  SubClaseCuenta as PrismaSubClaseCuenta,
+} from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { PrismaService } from '@/common/prisma.service';
@@ -10,6 +13,11 @@ import type {
   SaldoCuentaRow,
 } from '../ports/eeff-saldos-reader.port';
 import { EeffSaldosReaderPort } from '../ports/eeff-saldos-reader.port';
+import {
+  toDominioClaseCuenta,
+  toDominioNaturalezaCuenta,
+  toDominioSubClaseCuenta,
+} from './enum-mappers';
 
 /**
  * Adapter Prisma para `EeffSaldosReaderPort`.
@@ -152,9 +160,12 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
       nivel: c.nivel,
       esDetalle: c.esDetalle,
       esContraria: c.esContraria,
-      claseCuenta: c.claseCuenta as ClaseCuenta,
-      subClaseCuenta: c.subClaseCuenta as SubClaseCuenta | null,
-      naturaleza: c.naturaleza as NaturalezaCuenta,
+      claseCuenta: toDominioClaseCuenta(c.claseCuenta as PrismaClaseCuenta),
+      subClaseCuenta:
+        c.subClaseCuenta !== null
+          ? toDominioSubClaseCuenta(c.subClaseCuenta as PrismaSubClaseCuenta)
+          : null,
+      naturaleza: toDominioNaturalezaCuenta(c.naturaleza),
       codigoInterno: c.codigoInterno,
       nombre: c.nombre,
     }));

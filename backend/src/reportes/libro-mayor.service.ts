@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NaturalezaCuenta } from '@prisma/client';
+
+import { NaturalezaCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 import {

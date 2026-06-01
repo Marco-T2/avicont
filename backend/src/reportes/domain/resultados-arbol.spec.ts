@@ -5,8 +5,9 @@
  * REQ cubiertos: REQ-ER-02, REQ-ER-05, REQ-ER-06, REQ-ER-07, REQ-ER-08, REQ-ER-09
  */
 
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
 import { construirEstadoResultados } from './resultados-arbol';

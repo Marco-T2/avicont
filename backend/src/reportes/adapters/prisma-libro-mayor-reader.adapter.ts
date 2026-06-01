@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { NaturalezaCuenta } from '@prisma/client';
+import { NaturalezaCuenta as PrismaNaturalezaCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { PrismaService } from '@/common/prisma.service';
@@ -11,6 +11,7 @@ import type {
   SaldoInicialRow,
 } from '../ports/libro-mayor-reader.port';
 import { LibroMayorReaderPort } from '../ports/libro-mayor-reader.port';
+import { toDominioNaturalezaCuenta } from './enum-mappers';
 
 /**
  * Adapter Prisma para `LibroMayorReaderPort`.
@@ -218,10 +219,11 @@ export class PrismaLibroMayorReaderAdapter extends LibroMayorReaderPort {
             ORDER BY cu.id, c."fechaContable" ASC, c.numero ASC NULLS LAST, c.id ASC, lc.orden ASC
           `;
 
-    // Postgres retorna `numeric` como string en $queryRaw — construir Decimal
+    // Postgres retorna `numeric` como string en $queryRaw — construir Decimal.
+    // naturaleza viene como string del raw query; el mapper lo convierte al enum de dominio.
     return rows.map((r) => ({
       ...r,
-      naturaleza: r.naturaleza as NaturalezaCuenta,
+      naturaleza: toDominioNaturalezaCuenta(r.naturaleza as PrismaNaturalezaCuenta),
       debitoBob: new Decimal(r.debitoBob),
       creditoBob: new Decimal(r.creditoBob),
     }));
@@ -317,10 +319,11 @@ export class PrismaLibroMayorReaderAdapter extends LibroMayorReaderPort {
             GROUP BY cu.id, cu."codigoInterno", cu.nombre, cu.naturaleza
           `;
 
-    // Postgres retorna `numeric` (y COALESCE result) como string en $queryRaw → Decimal
+    // Postgres retorna `numeric` (y COALESCE result) como string en $queryRaw → Decimal.
+    // naturaleza viene como string del raw query; el mapper lo convierte al enum de dominio.
     return rows.map((r) => ({
       ...r,
-      naturaleza: r.naturaleza as NaturalezaCuenta,
+      naturaleza: toDominioNaturalezaCuenta(r.naturaleza as PrismaNaturalezaCuenta),
       totalDebitoBob: new Decimal(r.totalDebitoBob),
       totalCreditoBob: new Decimal(r.totalCreditoBob),
     }));

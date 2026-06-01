@@ -1,5 +1,6 @@
-import { NaturalezaCuenta } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+
+import { NaturalezaCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
 
