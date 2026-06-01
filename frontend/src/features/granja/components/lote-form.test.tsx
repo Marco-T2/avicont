@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { LoteForm } from './lote-form';
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -42,13 +43,24 @@ describe('LoteForm — modo crear', () => {
     expect(await screen.findByText(/la cantidad inicial debe ser al menos 1/i)).toBeInTheDocument();
   });
 
-  it('muestra error si se envía sin fecha de ingreso', async () => {
+  it('pre-carga la fecha de ingreso con el día de hoy (La Paz)', () => {
+    render(
+      <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    expect(screen.getByLabelText(/fecha de ingreso/i)).toHaveValue(hoyEnLaPaz());
+  });
+
+  it('muestra error si se borra la fecha de ingreso y se envía', async () => {
     const user = userEvent.setup();
     render(
       <LoteForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
       { wrapper },
     );
 
+    // La fecha viene pre-cargada con hoy; el usuario la borra explícitamente.
+    await user.clear(screen.getByLabelText(/fecha de ingreso/i));
     await user.click(screen.getByRole('button', { name: /crear lote/i }));
 
     expect(await screen.findByText(/la fecha de ingreso es obligatoria/i)).toBeInTheDocument();
@@ -64,7 +76,8 @@ describe('LoteForm — modo crear', () => {
 
     // user.type en inputs number funciona en jsdom con userEvent v14.
     await user.type(screen.getByLabelText(/cantidad inicial/i), '5000');
-    // Para inputs date, usar user.type con el texto de la fecha en formato YYYY-MM-DD.
+    // La fecha viene pre-cargada con hoy; la limpiamos antes de tipear la nuestra.
+    await user.clear(screen.getByLabelText(/fecha de ingreso/i));
     await user.type(screen.getByLabelText(/fecha de ingreso/i), '2026-01-15');
 
     await user.click(screen.getByRole('button', { name: /crear lote/i }));

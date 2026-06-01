@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TipoRegistroResponse } from '../api/granja.types';
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { MovimientoCantidadForm } from './movimiento-cantidad-form';
 
 // Mock de useTiposRegistro para que no haga llamadas reales.
@@ -71,6 +72,15 @@ describe('MovimientoCantidadForm', () => {
     expect(screen.getByLabelText(/fecha/i)).toBeInTheDocument();
   });
 
+  it('pre-carga la fecha con el día de hoy (La Paz)', () => {
+    render(
+      <MovimientoCantidadForm onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper },
+    );
+
+    expect(screen.getByLabelText(/fecha/i)).toHaveValue(hoyEnLaPaz());
+  });
+
   it('muestra error si cantidad es 0 o negativa al enviar', async () => {
     const user = userEvent.setup();
     render(
@@ -108,7 +118,8 @@ describe('MovimientoCantidadForm', () => {
     );
 
     await user.type(screen.getByLabelText(/cantidad/i), '50');
-    // user.type en inputs date funciona en jsdom con userEvent v14.
+    // La fecha viene pre-cargada con hoy; la limpiamos antes de tipear la nuestra.
+    await user.clear(screen.getByLabelText(/fecha/i));
     await user.type(screen.getByLabelText(/fecha/i), '2026-06-01');
 
     // user.selectOptions dispara todos los eventos del usuario correctamente.

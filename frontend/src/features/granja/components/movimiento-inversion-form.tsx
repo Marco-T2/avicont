@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
 import { useTiposRegistro } from '../hooks/use-granja-queries';
 import {
   type MovimientoInversionFormValues,
@@ -20,9 +21,11 @@ interface MovimientoInversionFormProps {
   isSubmitting: boolean;
 }
 
-const DEFAULT_VALUES: Partial<MovimientoInversionFormValues> = {
+// La fecha arranca en "hoy" (La Paz): el 95% de los gastos se registran el día
+// que ocurren. Evita que el usuario tenga que abrir el calendario (fricción
+// clave para usuarios mayores que operan desde el celular).
+const DEFAULT_VALUES: Omit<Partial<MovimientoInversionFormValues>, 'fecha'> = {
   monto: '',
-  fecha: '',
   tipoRegistroId: '',
   detalle: '',
 };
@@ -44,7 +47,7 @@ export function MovimientoInversionForm({
     formState: { errors },
   } = useForm<MovimientoInversionFormValues>({
     resolver: zodResolver(movimientoInversionSchema) as Resolver<MovimientoInversionFormValues>,
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: { ...DEFAULT_VALUES, fecha: hoyEnLaPaz() },
   });
 
   return (
