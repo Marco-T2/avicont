@@ -1,9 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 
-import { ClaseCuenta, Moneda } from '@/common/domain/enums';
-
-import { NaturalezaCuenta, SubClaseCuenta } from '../domain/enums';
+import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 export class CreateCuentaDto {
   @ApiProperty({

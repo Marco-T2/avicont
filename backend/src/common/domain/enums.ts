@@ -48,6 +48,35 @@ export enum Moneda {
   USD = 'USD',
 }
 
+// Naturaleza contable de una cuenta (determina el signo del saldo — NCB plan analítico boliviano).
+// Dueño del dato: módulo `cuentas` (campo `Cuenta.naturaleza`).
+// Consumido por: `cuentas`, `reportes` (cálculo de saldo neto en EEFF y Libro Mayor).
+// Promovido a `common` porque `reportes` también lo consume (cross-module).
+export enum NaturalezaCuenta {
+  DEUDORA = 'DEUDORA',
+  ACREEDORA = 'ACREEDORA',
+}
+
+// Sub-clasificación contable de la cuenta (detalla la ClaseCuenta en categorías operativas).
+// Dueño del dato: módulo `cuentas` (campo `Cuenta.subClaseCuenta`).
+// Consumido por: `cuentas`, `reportes` (armar secciones del Balance y Estado de Resultados).
+// Promovido a `common` porque `reportes` también lo consume (cross-module).
+export enum SubClaseCuenta {
+  ACTIVO_CORRIENTE = 'ACTIVO_CORRIENTE',
+  ACTIVO_NO_CORRIENTE = 'ACTIVO_NO_CORRIENTE',
+  PASIVO_CORRIENTE = 'PASIVO_CORRIENTE',
+  PASIVO_NO_CORRIENTE = 'PASIVO_NO_CORRIENTE',
+  PATRIMONIO_CAPITAL = 'PATRIMONIO_CAPITAL',
+  PATRIMONIO_RESULTADOS = 'PATRIMONIO_RESULTADOS',
+  INGRESO_OPERATIVO = 'INGRESO_OPERATIVO',
+  INGRESO_NO_OPERATIVO = 'INGRESO_NO_OPERATIVO',
+  EGRESO_OPERATIVO = 'EGRESO_OPERATIVO',
+  EGRESO_ADMINISTRATIVO = 'EGRESO_ADMINISTRATIVO',
+  EGRESO_COMERCIALIZACION = 'EGRESO_COMERCIALIZACION',
+  EGRESO_FINANCIERO = 'EGRESO_FINANCIERO',
+  EGRESO_NO_OPERATIVO = 'EGRESO_NO_OPERATIVO',
+}
+
 // Tipo de comprobante contable (prefijo de 1 letra en el correlativo, §4.9).
 // Dueño del dato: módulo `comprobantes`. Consumido por el dominio puro de
 // numeración (`numeracion`, `numero-comprobante`). DTOs/ports/services de
