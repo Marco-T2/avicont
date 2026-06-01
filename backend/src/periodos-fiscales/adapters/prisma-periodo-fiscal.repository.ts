@@ -42,9 +42,14 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  cerrar(tx: Prisma.TransactionClient, id: string, userId: string): Promise<PeriodoFiscal> {
+  cerrar(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         status: 'CERRADO',
         closedAt: new Date(),
@@ -53,9 +58,13 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  reabrir(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal> {
+  reabrir(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+  ): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
-      where: { id },
+      where: { id, organizationId },
       data: {
         status: 'ABIERTO',
         closedAt: null,
@@ -64,9 +73,13 @@ export class PrismaPeriodoFiscalRepository extends PeriodoFiscalRepositoryPort {
     });
   }
 
-  marcarDefinitivo(tx: Prisma.TransactionClient, id: string): Promise<PeriodoFiscal> {
+  marcarDefinitivo(
+    tx: Prisma.TransactionClient,
+    id: string,
+    organizationId: string,
+  ): Promise<PeriodoFiscal> {
     return tx.periodoFiscal.update({
-      where: { id },
+      where: { id, organizationId },
       data: { esDefinitivo: true },
     });
   }
