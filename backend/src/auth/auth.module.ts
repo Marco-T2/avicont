@@ -11,6 +11,8 @@ import { MembershipsModule } from '../memberships/memberships.module';
 import { UsersModule } from '../users/users.module';
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
+// RedisService y ClockPort son @Global() — disponibles sin importar el módulo.
+// JwtStrategy los inyecta para el chequeo de epoch de revocación (REQ-SA-03).
 
 @Module({
   imports: [

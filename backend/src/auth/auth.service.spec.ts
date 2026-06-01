@@ -54,7 +54,11 @@ describe('AuthService (unit)', () => {
       findForImpersonation: jest.fn(),
       findAllByTenant: jest.fn().mockResolvedValue([]),
     };
-    usersReader = { findByEmail: jest.fn(), findMinimalByEmail: jest.fn() };
+    usersReader = {
+      findByEmail: jest.fn(),
+      findMinimalByEmail: jest.fn(),
+      findFlagsSeguridadById: jest.fn().mockResolvedValue({ isSuperAdmin: false }),
+    };
     usersWriter = { create: jest.fn() };
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
     metrics = { recordLogin: jest.fn(), recordTokenRefresh: jest.fn() };
@@ -62,6 +66,7 @@ describe('AuthService (unit)', () => {
     const config = {
       get: jest.fn().mockReturnValue('30d'),
     } as unknown as ConfigService;
+    const redis = { set: jest.fn(), get: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -74,6 +79,9 @@ describe('AuthService (unit)', () => {
         { provide: ConfigService, useValue: config },
         { provide: MetricsService, useValue: metrics },
         { provide: CLOCK_PORT, useValue: clock },
+        { provide: 'RedisService', useValue: redis },
+        // RedisService inyectado por clase (no por token), usamos useValue directo
+        { provide: require('@/cache/redis.service').RedisService, useValue: redis },
       ],
     }).compile();
 
@@ -95,6 +103,7 @@ describe('AuthService (unit)', () => {
         email: 'x@y.com',
         hashedPassword,
         isActive: true,
+        isSuperAdmin: false,
       });
       await expect(service.validateUser('x@y.com', 'mala')).rejects.toBeInstanceOf(
         CredencialesInvalidasError,
@@ -108,6 +117,7 @@ describe('AuthService (unit)', () => {
         email: 'x@y.com',
         hashedPassword,
         isActive: false,
+        isSuperAdmin: false,
       });
       await expect(service.validateUser('x@y.com', 'correcta')).rejects.toBeInstanceOf(
         CredencialesInvalidasError,
@@ -121,6 +131,7 @@ describe('AuthService (unit)', () => {
         email: 'x@y.com',
         hashedPassword,
         isActive: true,
+        isSuperAdmin: false,
       };
       usersReader.findByEmail.mockResolvedValue(user);
       await expect(service.validateUser('x@y.com', 'correcta')).resolves.toBe(user);
@@ -135,6 +146,7 @@ describe('AuthService (unit)', () => {
         email: 'x@y.com',
         hashedPassword,
         isActive: true,
+        isSuperAdmin: false,
       });
     };
 
@@ -247,6 +259,7 @@ describe('AuthService (unit)', () => {
         email: 'x@y.com',
         hashedPassword,
         isActive: true,
+        isSuperAdmin: false,
       });
       memberships.findActivasByUserId.mockResolvedValue([]);
 
