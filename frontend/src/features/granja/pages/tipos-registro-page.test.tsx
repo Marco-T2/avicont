@@ -62,9 +62,7 @@ describe('TiposRegistroPage — eliminar con confirmación', () => {
 
     // El primer clic abre el diálogo, NO dispara la mutación.
     expect(deleteMock).not.toHaveBeenCalled();
-    expect(
-      await screen.findByText(/se eliminará de forma permanente/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no se puede deshacer/i)).toBeInTheDocument();
   });
 
   it('elimina recién al confirmar en el diálogo', async () => {

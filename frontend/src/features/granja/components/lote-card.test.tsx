@@ -88,10 +88,10 @@ describe('LoteCard — datos visibles', () => {
 });
 
 describe('LoteCard — botones de acción con permiso', () => {
-  it('muestra el botón "Registrar movimiento" con permiso granja.movimientos.create', () => {
+  it('muestra el botón "Registrar gasto o mortalidad" con permiso granja.movimientos.create', () => {
     mockPermissions(['granja.movimientos.create', 'granja.lotes.update']);
     renderConTooltip(<LoteCard lote={loteActivo} onRegistrarMovimiento={vi.fn()} onCerrar={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /registrar movimiento/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /registrar gasto/i })).toBeInTheDocument();
   });
 
   it('muestra el botón "Cerrar lote" con permiso granja.lotes.update', () => {
@@ -102,10 +102,10 @@ describe('LoteCard — botones de acción con permiso', () => {
 });
 
 describe('LoteCard — gating de permisos', () => {
-  it('"Registrar movimiento" deshabilitado sin permiso granja.movimientos.create', () => {
+  it('"Registrar gasto o mortalidad" deshabilitado sin permiso granja.movimientos.create', () => {
     mockPermissions(['granja.lotes.update']);
     renderConTooltip(<LoteCard lote={loteActivo} onRegistrarMovimiento={vi.fn()} onCerrar={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /registrar movimiento/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /registrar gasto/i })).toBeDisabled();
   });
 
   it('"Cerrar lote" deshabilitado sin permiso granja.lotes.update', () => {
@@ -119,7 +119,7 @@ describe('LoteCard — lote CERRADO', () => {
   it('no muestra botones de acción cuando el lote está CERRADO', () => {
     mockPermissions(['granja.movimientos.create', 'granja.lotes.update']);
     renderConTooltip(<LoteCard lote={loteCerrado} onRegistrarMovimiento={vi.fn()} onCerrar={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: /registrar movimiento/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /registrar gasto/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /cerrar lote/i })).not.toBeInTheDocument();
   });
 

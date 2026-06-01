@@ -196,7 +196,7 @@ export function LoteDetailPage(): React.JSX.Element {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl md:text-3xl font-bold">
-              {lote.nombre ?? `Lote ${lote.id.slice(0, 8)}`}
+              {lote.nombre ?? 'Lote sin nombre'}
             </h1>
             <Badge variant={estaActivo ? 'default' : 'secondary'}>
               {estaActivo ? 'Activo' : 'Cerrado'}
@@ -379,8 +379,7 @@ export function LoteDetailPage(): React.JSX.Element {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cerrar este lote?</AlertDialogTitle>
             <AlertDialogDescription>
-              Una vez cerrado, ya no podrás registrar movimientos en este lote.
-              Esta acción no se puede deshacer.
+              El lote quedará cerrado. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -418,10 +417,7 @@ export function LoteDetailPage(): React.JSX.Element {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este registro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              El registro se eliminará de forma permanente y el costo por pollo
-              se recalculará. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogDescription>No se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

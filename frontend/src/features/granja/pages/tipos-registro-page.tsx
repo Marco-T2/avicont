@@ -53,7 +53,7 @@ export function TiposRegistroPage(): React.JSX.Element {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Tipos de registro</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Categorías para clasificar inversiones y movimientos de cantidad.
+            Categorías para clasificar tus gastos y la mortalidad.
           </p>
         </div>
         <Can permission={PERMISSIONS.granja.tiposRegistro.create}>
@@ -74,10 +74,10 @@ export function TiposRegistroPage(): React.JSX.Element {
         <LoadingSkeleton />
       ) : (
         <div className="space-y-8">
-          {/* Sección INVERSIÓN */}
+          {/* Sección INVERSIÓN (gastos) */}
           <section>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Inversión
+              Gastos
             </h2>
             {inversiones.length === 0 ? (
               <EmptySection />
@@ -90,10 +90,10 @@ export function TiposRegistroPage(): React.JSX.Element {
             )}
           </section>
 
-          {/* Sección CANTIDAD */}
+          {/* Sección CANTIDAD (mortalidad) */}
           <section>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Cantidad
+              Mortalidad
             </h2>
             {cantidades.length === 0 ? (
               <EmptySection />
@@ -204,10 +204,7 @@ function TipoRow({ tipo }: { tipo: TipoRegistroResponse }): React.JSX.Element {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar &ldquo;{tipo.nombre}&rdquo;?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Este tipo de registro se eliminará de forma permanente. Esta acción
-              no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogDescription>No se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -281,7 +278,7 @@ function CreateTipoRegistroForm({ onClose }: CreateFormProps): React.JSX.Element
       {/* Naturaleza */}
       <div className="space-y-1.5">
         <Label htmlFor="tipo-naturaleza" className="flex items-center gap-1">
-          Naturaleza <span className="text-destructive">*</span>
+          ¿Gasto o mortalidad? <span className="text-destructive">*</span>
         </Label>
         <select
           {...register('naturaleza')}
@@ -293,8 +290,8 @@ function CreateTipoRegistroForm({ onClose }: CreateFormProps): React.JSX.Element
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           ].join(' ')}
         >
-          <option value="INVERSION">Inversión</option>
-          <option value="CANTIDAD">Cantidad</option>
+          <option value="INVERSION">Gasto (dinero)</option>
+          <option value="CANTIDAD">Mortalidad (aves)</option>
         </select>
         {errors.naturaleza !== undefined ? (
           <p className="text-xs text-destructive">{errors.naturaleza.message}</p>
