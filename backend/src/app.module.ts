@@ -22,6 +22,7 @@ import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos
 import { ReportesModule } from './reportes/reportes.module';
 import { GranjaModule } from './granja/granja.module';
 import { MeModule } from './me/me.module';
+import { PlatformModule } from './platform/platform.module';
 import { ClockModule } from './common/clock';
 import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
 import { AuditModule } from './audit/audit.module';
@@ -82,6 +83,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     ReportesModule,
     GranjaModule,
     MeModule,
+    PlatformModule,
   ],
   controllers: [],
   providers: [

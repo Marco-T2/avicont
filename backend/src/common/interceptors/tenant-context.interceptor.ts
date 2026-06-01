@@ -57,8 +57,14 @@ export class TenantContextInterceptor implements NestInterceptor {
     if (parts.length < 3) {
       return undefined;
     }
-    // Ignore localhost with port
+    // Ignorar localhost con o sin puerto (ej: localhost:3000)
     if (host.includes('localhost')) {
+      return undefined;
+    }
+    // Ignorar IPs (ej: 127.0.0.1, 192.168.1.1) — no tienen subdominio real.
+    // El resolver de subdominios está descartado (CLAUDE.md §10.4) y esta función
+    // es dead code; este guard evita que IPs de tests queden como tenantId.
+    if (/^\d{1,3}(\.\d{1,3}){3}/.test(host)) {
       return undefined;
     }
     return parts[0];
