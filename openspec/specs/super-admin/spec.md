@@ -1,8 +1,8 @@
 # Delta Spec: super-admin de plataforma (pasos 2-9)
 
 <!--
-Última edición: 2026-06-01
-Última revisión contra core: 2026-06-01
+Última edición: 2026-06-02
+Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
 
@@ -508,40 +508,88 @@ actual (`esOwner || esAdmin` vía RBAC).
 ### REQ-SA-17: Super-admin puede impersonar en org donde no es miembro
 
 El `ImpersonationService.start()` DEBE incluir una rama aditiva `if (caller.isSuperAdmin)`
-que omite el requisito de `SystemRole.OWNER` en la org destino (verificado en
-`impersonation.service.ts:53-59`). El resto del flujo de impersonation (doble auditoría,
-ventana de 30 min, token de impersonation) permanece INTACTO.
+que omite el requisito de `SystemRole.OWNER` en la org destino. El resto del flujo de
+impersonation (doble auditoría, ventana de 30 min, token de impersonation) permanece INTACTO.
 
 La restricción `TargetEsOwnerError` (no impersonar a un OWNER) DEBE mantenerse también
 para el super-admin. Un super-admin NO puede impersonar a un OWNER.
 
-#### Escenario: super-admin impersona usuario no-OWNER en org donde no es miembro (caso positivo)
+`StartImpersonationDto` DEBE incluir el campo opcional `organizationId?: string`
+(`@IsOptional @IsUUID`). El controller DEBE resolver la org destino según el caller:
+
+```
+callerEsSuperAdmin && dto.organizationId !== undefined
+  ? dto.organizationId          // SA org-less: org explícita en body
+  : resolveTenantId(req)        // OWNER: header X-Tenant-ID o activeTenantId (intacto)
+```
+
+Si el SA no envía `organizationId` en el body y no tiene tenant activo, `resolveTenantId`
+lanza `ForbiddenException('Se requiere contexto de organización')` — ese es el error correcto.
+
+#### Escenario: SA impersona usuario no-OWNER en org ajena con `organizationId` (caso positivo)
 
 - DADO un super-admin sin membresía en `org-X`
-- Y un usuario `usuario-regular` en `org-X` con `SystemRole.ADMIN` o sin rol especial
-- CUANDO el super-admin ejecuta `POST /admin/impersonate` con el target `usuario-regular`
-- ENTONCES se genera el token de impersonation para `usuario-regular` en `org-X`
-- Y el token de impersonation NO contiene `isSuperAdmin: true` (REQ-SA-04)
-- Y se genera registro en el log de impersonation y en `platform_audit`
+- Y un usuario `usuario-regular` miembro no-OWNER de `org-X`
+- CUANDO el SA llama `POST /admin/impersonate` con `{ targetUserId, reason, organizationId: 'org-X' }`
+- ENTONCES recibe `201` con `{ impersonationToken, expiresAt, impersonationId }`
+- Y el token de impersonation NO contiene `isSuperAdmin: true` (REQ-SA-04 intacto)
+- Y se crea fila en `ImpersonationLog` y en `platform_audit` con `targetOrganizationId = 'org-X'`
 
-#### Escenario: super-admin NO puede impersonar a un OWNER (caso negativo — seguridad)
+#### Escenario: SA sin `organizationId` y sin tenant activo → error de contexto (caso negativo)
+
+- DADO un super-admin org-less (sin `activeTenantId` en JWT, sin `X-Tenant-ID`)
+- CUANDO llama `POST /admin/impersonate` sin `organizationId` en el body
+- ENTONCES recibe `403` con mensaje "Se requiere contexto de organización"
+- Y NO se genera token de impersonation
+
+#### Escenario: SA intenta impersonar a OWNER de org ajena → 403 (invariante de seguridad)
 
 - DADO un super-admin y un usuario OWNER de `org-X`
-- CUANDO el super-admin intenta impersonar al OWNER
-- ENTONCES la respuesta es error `TargetEsOwnerError` (mismo que hoy para OWNERs locales)
+- CUANDO el SA llama `POST /admin/impersonate` con `{ targetUserId: <owner-id>, organizationId: 'org-X' }`
+- ENTONCES recibe error `IMPERSONATION_TARGET_ES_OWNER` (403)
 - Y no se genera token de impersonation
+
+#### Escenario: SA no envía `organizationId` pero tiene tenant activo → path OWNER (retrocompat)
+
+- DADO un super-admin con `activeTenantId` en su JWT (o `X-Tenant-ID` en header)
+- CUANDO llama `POST /admin/impersonate` sin `organizationId` en el body
+- ENTONCES el controller resuelve org desde `resolveTenantId(req)` (path OWNER intacto)
+- Y el flujo procede como antes de este change
+
+#### Escenario: OWNER del tenant sin `organizationId` → comportamiento INTACTO (regresión)
+
+- DADO un OWNER de `org-Y` con `activeTenantId` en su JWT
+- Y un miembro no-OWNER de `org-Y`
+- CUANDO el OWNER llama `POST /admin/impersonate` con `{ targetUserId, reason }` (sin `organizationId`)
+- ENTONCES recibe `201` con el token de impersonation — exactamente como antes
+- Y el campo `organizationId` ausente no afecta el comportamiento del OWNER
+
+#### Escenario: super-admin impersona en org donde el target NO es miembro → 404
+
+- DADO un super-admin con `organizationId = 'org-X'` en el body
+- Y el `targetUserId` no tiene membresía en `org-X`
+- CUANDO llama `POST /admin/impersonate`
+- ENTONCES recibe error `IMPERSONATION_TARGET_NO_MIEMBRO` (404)
+- Y no se genera token de impersonation
+
+#### Escenario: super-admin no puede impersonarse a sí mismo (invariante intacto)
+
+- DADO un super-admin que envía su propio `sub` como `targetUserId`
+- CUANDO llama `POST /admin/impersonate`
+- ENTONCES recibe error `IMPERSONATION_SELF_NO_PERMITIDA` (400)
 
 #### Escenario: usuario regular no-miembro no puede impersonar (caso negativo — invariante §4.2)
 
-- DADO un usuario ADMIN de `org-A` (no super-admin, sin membresía en `org-B`)
-- CUANDO intenta impersonar a un usuario de `org-B`
-- ENTONCES la respuesta es 403 (la rama super-admin no se activa para él)
-- Y el bypass de membresía NO aplica
+- DADO un OWNER de `org-A` (sin `isSuperAdmin`) que envía `organizationId: 'org-B'`
+- CUANDO llama `POST /admin/impersonate`
+- ENTONCES `organizationId` en el body es ignorado (el caller no es SA)
+- Y `resolveTenantId(req)` resuelve la org desde el contexto del caller
+- Y el service rechaza la impersonation (target no es de `org-A` o caller no es OWNER de `org-B`)
 
 #### Escenario: impersonation cross-tenant queda en `platform_audit`
 
-- DADO un super-admin que impersona en `org-X`
-- CUANDO ejecuta `POST /admin/impersonate`
+- DADO un super-admin que impersona en `org-X` vía `organizationId`
+- CUANDO el service completa exitosamente
 - ENTONCES se crea una fila en `platform_audit` con `action = 'platform.impersonation.start'`,
   `targetOrganizationId = 'org-X'`, `actorUserId` del super-admin, y datos del usuario target en `payload`
 - Y también se crea el registro normal en `ImpersonationLog` (auditoría existente intacta)
@@ -553,9 +601,10 @@ para el super-admin. Un super-admin NO puede impersonar a un OWNER.
 Los siguientes requisitos están FUERA DE SCOPE de v1. Se documentan para evitar
 implementarlos por accidente:
 
-- **REQ-SA-UI-01** _(diferido)_: UI `/platform-admin` para operar la plataforma desde
-  el frontend. En v1 se opera por API/Swagger. Cuando se construya, extender
-  `/me/permissions` con `isSuperAdmin` (campo aditivo, identificado en proposal §3.2.4).
+- **REQ-SA-UI-01** _(entregado en v1.1)_: UI `/platform-admin` implementada en el change
+  `platform-admin-v1.1` (archivado 2026-06-02). Ver `openspec/specs/platform-admin-ui/spec.md`
+  y `openspec/specs/platform-members/spec.md` para la especificación completa. La extensión de
+  `/me/permissions` con `isSuperAdmin` se resolvió con `GET /me/platform` (org-less, REQ-PAUI-01).
 - **REQ-SA-SEC-01** _(diferido)_: MFA obligatorio para cuentas `isSuperAdmin`.
 - **REQ-SA-SEC-02** _(diferido)_: Allowlist de IP para super-admins.
 - **REQ-SA-SEC-03** _(diferido)_: Expiración/rotación automática del privilegio super-admin.
