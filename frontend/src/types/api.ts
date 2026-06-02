@@ -1037,6 +1037,30 @@ export interface MePlatformResponse {
 }
 
 // ============================================================
+// Administración de plataforma (super-admin) — /api/admin/platform/orgs
+// Espeja backend platform-org-response.dto.ts. status/plan vienen como string
+// en el DTO (proyección directa de los enums Prisma OrganizationStatus/Plan);
+// los tipamos con union literals para gating de UI, con render defensivo (R6)
+// si el backend agregara un valor nuevo. createdAt: Date serializa a ISO string
+// sobre HTTP.
+// ============================================================
+
+export type OrgStatus = 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+
+export type OrgPlan = 'FREE' | 'PRO';
+
+export interface PlatformOrg {
+  id: string;
+  name: string;
+  slug: string;
+  status: OrgStatus;
+  plan: OrgPlan;
+  contabilidadEnabled: boolean;
+  granjaEnabled: boolean;
+  createdAt: string;
+}
+
+// ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
 // Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.
 // ============================================================

@@ -81,13 +81,13 @@ Branch: `feat/platform-admin-enabler`. Cubre REQ-PAUI-01..05.
 
 Branch: `feat/platform-admin-orgs-list`. Depende de PR-0.
 
-- [ ] Tipos en `frontend/src/types/api.ts`: `OrgStatus = 'ACTIVE'|'SUSPENDED'|'ARCHIVED'`, `OrgPlan = 'FREE'|'PRO'`, `PlatformOrg = { id; name; slug; status: OrgStatus; plan: OrgPlan; contabilidadEnabled; granjaEnabled; createdAt: string }` (comentario `// Espeja backend platform-org-response.dto.ts`).
-- [ ] `api/get-orgs.ts`: `GET /admin/platform/orgs` → `PlatformOrg[]`.
-- [ ] `hooks/use-orgs.ts`: `useQuery(['platform-orgs'], getOrgs)`.
-- [ ] **Tests primero**: `components/org-status-badge.test.tsx` y `org-plan-badge.test.tsx` (valor conocido → variante; valor inesperado → badge neutro con string crudo, R6). Luego `org-status-badge.tsx` / `org-plan-badge.tsx`.
-- [ ] **Test primero**: `pages/orgs-page.test.tsx` (mock `use-orgs`): tabla con filas, badges, loading skeleton, empty state ("No hay organizaciones"), error en español. Luego `pages/orgs-page.tsx` (tabla `ui/table`, page chrome §13).
-- [ ] Conectar la ruta `/platform-admin/orgs` del router a `OrgsPage` real (reemplazar placeholder de PR-0).
-- [ ] Verificación PR-1:
+- [x] Tipos en `frontend/src/types/api.ts`: `OrgStatus = 'ACTIVE'|'SUSPENDED'|'ARCHIVED'`, `OrgPlan = 'FREE'|'PRO'`, `PlatformOrg = { id; name; slug; status: OrgStatus; plan: OrgPlan; contabilidadEnabled; granjaEnabled; createdAt: string }` (comentario `// Espeja backend platform-org-response.dto.ts`).
+- [x] `api/get-orgs.ts`: `GET /admin/platform/orgs` → `PlatformOrg[]`.
+- [x] `hooks/use-orgs.ts`: `useQuery(['platform-orgs'], getOrgs)`.
+- [x] **Tests primero**: `components/org-status-badge.test.tsx` y `org-plan-badge.test.tsx` (valor conocido → variante; valor inesperado → badge neutro con string crudo, R6). Luego `org-status-badge.tsx` / `org-plan-badge.tsx`.
+- [x] **Test primero**: `pages/orgs-page.test.tsx` (mock `use-orgs`): tabla con filas, badges, loading skeleton, empty state ("No hay organizaciones"), error en español. Luego `pages/orgs-page.tsx` (tabla `ui/table`, page chrome §13).
+- [x] Conectar la ruta `/platform-admin/orgs` del router a `OrgsPage` real (reemplazar placeholder de PR-0).
+- [x] Verificación PR-1:
   ```bash
   cd frontend
   pnpm exec tsc -b
