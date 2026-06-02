@@ -8,6 +8,7 @@ import {
   MEMBERSHIPS_READER_PORT,
   type MembershipsReaderPort,
 } from '@/memberships/ports/memberships-reader.port';
+import { PLATFORM_AUDIT_PORT, type PlatformAuditPort } from '@/platform/ports/platform-audit.port';
 
 import {
   ImpersonationActivaExistenteError,
@@ -40,10 +41,12 @@ describe('ImpersonationService (unit)', () => {
 
   type RepoMock = jest.Mocked<ImpersonationRepositoryPort>;
   type MembershipsMock = jest.Mocked<MembershipsReaderPort>;
+  type AuditMock = jest.Mocked<PlatformAuditPort>;
 
   let service: ImpersonationService;
   let repo: RepoMock;
   let memberships: MembershipsMock;
+  let platformAudit: AuditMock;
   let jwt: { sign: jest.Mock };
   let clock: FakeClockAdapter;
 
@@ -62,6 +65,9 @@ describe('ImpersonationService (unit)', () => {
       findForImpersonation: jest.fn(),
       findAllByTenant: jest.fn(),
     } as unknown as MembershipsMock;
+    platformAudit = {
+      record: jest.fn().mockResolvedValue(undefined),
+    } as unknown as AuditMock;
     jwt = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
     clock = new FakeClockAdapter();
 
@@ -70,6 +76,7 @@ describe('ImpersonationService (unit)', () => {
         ImpersonationService,
         { provide: IMPERSONATION_REPOSITORY_PORT, useValue: repo },
         { provide: MEMBERSHIPS_READER_PORT, useValue: memberships },
+        { provide: PLATFORM_AUDIT_PORT, useValue: platformAudit },
         { provide: JwtService, useValue: jwt },
         { provide: CLOCK_PORT, useValue: clock },
       ],
@@ -254,6 +261,76 @@ describe('ImpersonationService (unit)', () => {
         service.start(ADMIN, TENANT, { targetUserId: TARGET, reason: 'corta' }),
       ).rejects.toThrow(ImpersonationReasonInvalidaError);
       expect(memberships.findForImpersonation).not.toHaveBeenCalled();
+    });
+
+    // REQ-SA-17: rama aditiva callerEsSuperAdmin
+    describe('REQ-SA-17: rama aditiva callerEsSuperAdmin', () => {
+      it('[+] callerEsSuperAdmin = true sin adminMembership → no lanza SoloOwnerPuedeImpersonarError', async () => {
+        // super-admin no tiene membership en el org destino
+        memberships.findForImpersonation
+          .mockResolvedValueOnce(null) // adminMembership = null
+          .mockResolvedValueOnce(targetContador()); // targetMembership
+
+        const result = await service.start(ADMIN, TENANT, validDto(), true);
+
+        expect(result.impersonationToken).toBe('signed.jwt.token');
+        expect(result.impersonationId).toBe(LOG_ID);
+      });
+
+      it('[+] callerEsSuperAdmin = true → llama a platformAudit.record con action platform.impersonation.start', async () => {
+        memberships.findForImpersonation
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(targetContador());
+
+        await service.start(ADMIN, TENANT, validDto(), true);
+
+        expect(platformAudit.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actorUserId: ADMIN,
+            action: 'platform.impersonation.start',
+            targetOrganizationId: TENANT,
+          }),
+        );
+      });
+
+      it('[-] callerEsSuperAdmin = true pero target es OWNER → lanza TargetEsOwnerError', async () => {
+        memberships.findForImpersonation
+          .mockResolvedValueOnce(null) // super-admin sin membership
+          .mockResolvedValueOnce(mkMembership({ systemRole: SystemRole.OWNER, userEmail: 'owner@imp.bo' }));
+
+        await expect(service.start(ADMIN, TENANT, validDto(), true)).rejects.toThrow(
+          TargetEsOwnerError,
+        );
+        expect(platformAudit.record).not.toHaveBeenCalled();
+      });
+
+      it('[-] callerEsSuperAdmin = false sin adminMembership → lanza SoloOwnerPuedeImpersonarError (regresión)', async () => {
+        memberships.findForImpersonation.mockResolvedValueOnce(null);
+
+        await expect(service.start(ADMIN, TENANT, validDto(), false)).rejects.toThrow(
+          SoloOwnerPuedeImpersonarError,
+        );
+      });
+
+      it('[-] callerEsSuperAdmin default (no pasa el arg) → sigue comportamiento OWNER-only (regresión)', async () => {
+        memberships.findForImpersonation.mockResolvedValueOnce(null);
+
+        await expect(service.start(ADMIN, TENANT, validDto())).rejects.toThrow(
+          SoloOwnerPuedeImpersonarError,
+        );
+      });
+
+      it('[+] callerEsSuperAdmin = false con adminMembership OWNER → funciona normalmente (regresión positiva)', async () => {
+        memberships.findForImpersonation
+          .mockResolvedValueOnce(adminOwner())
+          .mockResolvedValueOnce(targetContador());
+
+        const result = await service.start(ADMIN, TENANT, validDto(), false);
+
+        expect(result.impersonationToken).toBe('signed.jwt.token');
+        // No llama a platformAudit cuando no es cross-tenant
+        expect(platformAudit.record).not.toHaveBeenCalled();
+      });
     });
 
     it('expiresAt proviene del clock (determinista: now + 30 min exacto)', async () => {

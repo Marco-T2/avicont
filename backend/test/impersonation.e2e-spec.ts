@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
+import { cleanupTestData } from './helpers/test-factory';
 
 describe('Impersonation (e2e)', () => {
   let app: INestApplication;
@@ -30,7 +31,7 @@ describe('Impersonation (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await cleanup(prisma);
+    await cleanupTestData();
     const hashedPassword = await bcrypt.hash('password123', 10);
 
     const owner = await prisma.user.create({
@@ -77,6 +78,19 @@ describe('Impersonation (e2e)', () => {
       .send({ email: 'owner@imp.bo', password: 'password123' });
     ownerToken = loginRes.body.accessToken;
   });
+
+  /** Ayudante: crear super-admin y obtener su token. */
+  async function setupSuperAdmin(email = 'superadmin@imp.bo', password = 'password123') {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await prisma.user.create({
+      data: { email, hashedPassword, isEmailVerified: true, isSuperAdmin: true },
+    });
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email, password });
+    expect(loginRes.status).toBe(200);
+    return loginRes.body.accessToken as string;
+  }
 
   it('debe iniciar impersonation, registrar acciones y cerrar', async () => {
     const startRes = await request(app.getHttpServer())
@@ -173,17 +187,151 @@ describe('Impersonation (e2e)', () => {
       .send({ targetUserId, reason: 'contador no puede impersonar' });
     expect(res.status).toBe(403);
   });
+
+  describe('REQ-SA-17: impersonation cross-tenant', () => {
+    it('[+] super-admin impersona MEMBER en org donde no es miembro → token emitido', async () => {
+      const superAdminToken = await setupSuperAdmin();
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'Soporte: super-admin revisa cuenta del cliente' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.impersonationToken).toBeTruthy();
+    });
+
+    it('[+] token de impersonation resultante NO contiene isSuperAdmin (REQ-SA-04)', async () => {
+      const superAdminToken = await setupSuperAdmin();
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'Soporte: super-admin revisa cuenta del cliente' });
+
+      expect(res.status).toBe(201);
+      const impToken = res.body.impersonationToken as string;
+      const payload = JSON.parse(
+        Buffer.from(impToken.split('.')[1] ?? '', 'base64').toString(),
+      ) as Record<string, unknown>;
+
+      // El token de impersonation NO debe llevar isSuperAdmin (REQ-SA-04)
+      expect(Object.prototype.hasOwnProperty.call(payload, 'isSuperAdmin')).toBe(false);
+      // Sí debe tener los claims de impersonation
+      expect(payload.sub).toBe(targetUserId);
+      expect(payload.impersonatedBy).toBeTruthy();
+    });
+
+    it('[+] impersonation cross-tenant deja fila en platform_audit con action platform.impersonation.start', async () => {
+      const superAdminToken = await setupSuperAdmin('sa-audit@imp.bo');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'Soporte: revisión de cuenta cross-tenant' });
+
+      expect(res.status).toBe(201);
+      const impId = res.body.impersonationId as string;
+
+      // Dar tiempo al void fire-and-forget del platformAudit.record
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const auditRow = await prisma.platformAudit.findFirst({
+        where: { action: 'platform.impersonation.start', targetOrganizationId: orgId },
+      });
+      expect(auditRow).not.toBeNull();
+      expect(auditRow?.payload).toMatchObject({ impersonationId: impId });
+    });
+
+    it('[+] impersonation cross-tenant también crea ImpersonationLog (auditoría existente intacta)', async () => {
+      const superAdminToken = await setupSuperAdmin('sa-log@imp.bo');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'Soporte: revisión doble auditoría' });
+
+      expect(res.status).toBe(201);
+      const impId = res.body.impersonationId as string;
+
+      const log = await prisma.impersonationLog.findUnique({ where: { id: impId } });
+      expect(log).not.toBeNull();
+      expect(log?.targetUserId).toBe(targetUserId);
+    });
+
+    it('[-] super-admin NO puede impersonar a un OWNER → 403', async () => {
+      const superAdminToken = await setupSuperAdmin('sa-noowner@imp.bo');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId: otherOwnerId, reason: 'no debería poder impersonar a un owner' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('[-] usuario no-super-admin sin OWNER en org destino → 403 (SoloOwnerPuedeImpersonarError, regresión)', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const nonMember = await prisma.user.create({
+        data: { email: 'nonmember@imp.bo', hashedPassword, isEmailVerified: true },
+      });
+      // nonMember tiene su propia org (OWNER) pero no es miembro de orgId
+      const otherOrg = await prisma.organization.create({
+        data: {
+          slug: 'other-org-imp',
+          name: 'Other Org',
+          memberships: { create: [{ userId: nonMember.id, systemRole: SystemRole.OWNER }] },
+        },
+      });
+
+      const loginRes = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'nonmember@imp.bo', password: 'password123' })
+        .set('X-Tenant-ID', otherOrg.id);
+      // Login standard — activeTenantId del JWT apunta a su propia org
+      const nonMemberToken = loginRes.body.accessToken as string;
+
+      // Intenta impersonar en orgId donde no tiene membresía ni es super-admin
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${nonMemberToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'no debería poder impersonar sin membership' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('[-] no-super-admin sin membresía en org destino → 403', async () => {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const stranger = await prisma.user.create({
+        data: { email: 'stranger@imp.bo', hashedPassword, isEmailVerified: true },
+      });
+      // Crear org propia para poder loguearse
+      const strangerOrg = await prisma.organization.create({
+        data: {
+          slug: 'stranger-org',
+          name: 'Stranger Org',
+          memberships: { create: [{ userId: stranger.id, systemRole: SystemRole.OWNER }] },
+        },
+      });
+      const loginRes = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'stranger@imp.bo', password: 'password123' });
+      const strangerToken = loginRes.body.accessToken as string;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${strangerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'extraño sin membresía no puede impersonar' });
+
+      expect(res.status).toBe(403);
+    });
+  });
 });
 
-async function cleanup(prisma: PrismaService) {
-  await prisma.refreshToken.deleteMany({});
-  await prisma.impersonationAction.deleteMany({});
-  await prisma.impersonationLog.deleteMany({});
-  await prisma.invitation.deleteMany({});
-  await prisma.auditLog.deleteMany({});
-  await prisma.membership.deleteMany({});
-  await prisma.customRole.deleteMany({});
-  await prisma.featureFlag.deleteMany({});
-  await prisma.organization.deleteMany({});
-  await prisma.user.deleteMany({});
-}

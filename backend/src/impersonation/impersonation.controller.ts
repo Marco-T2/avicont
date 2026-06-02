@@ -13,7 +13,7 @@ import { ImpersonationService } from './impersonation.service';
 import { StartImpersonationDto } from './dto/start-impersonation.dto';
 
 interface AuthenticatedRequest {
-  user: { sub: string; activeTenantId?: string; impersonationId?: string };
+  user: { sub: string; activeTenantId?: string; impersonationId?: string; isSuperAdmin?: boolean };
   headers: Record<string, string | string[] | undefined>;
 }
 
@@ -44,7 +44,10 @@ export class ImpersonationController {
         'No se puede iniciar impersonation mientras ya estás dentro de otra',
       );
     }
-    return this.service.start(req.user.sub, resolveTenantId(req), dto);
+    // REQ-SA-17: el super-admin puede impersonar en org donde no es miembro.
+    // isSuperAdmin viene del JWT validado por JwtStrategy (Slice 2).
+    const callerEsSuperAdmin = req.user.isSuperAdmin === true;
+    return this.service.start(req.user.sub, resolveTenantId(req), dto, callerEsSuperAdmin);
   }
 
   @Post('end')

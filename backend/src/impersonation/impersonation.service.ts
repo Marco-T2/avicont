@@ -7,6 +7,10 @@ import {
   MEMBERSHIPS_READER_PORT,
   MembershipsReaderPort,
 } from '@/memberships/ports/memberships-reader.port';
+import {
+  PLATFORM_AUDIT_PORT,
+  PlatformAuditPort,
+} from '@/platform/ports/platform-audit.port';
 
 import {
   IMPERSONATION_REPOSITORY_PORT,
@@ -41,12 +45,14 @@ export class ImpersonationService {
     private readonly memberships: MembershipsReaderPort,
     private readonly jwt: JwtService,
     @Inject(CLOCK_PORT) private readonly clock: ClockPort,
+    @Inject(PLATFORM_AUDIT_PORT) private readonly platformAudit: PlatformAuditPort,
   ) {}
 
   async start(
     adminUserId: string,
     organizationId: string,
     dto: StartImpersonationDto,
+    callerEsSuperAdmin = false,
   ): Promise<{ impersonationToken: string; expiresAt: Date; impersonationId: string }> {
     const reason = ImpersonationReason.of(dto.reason);
 
@@ -54,7 +60,9 @@ export class ImpersonationService {
       adminUserId,
       organizationId,
     );
-    if (!adminMembership || adminMembership.systemRole !== SystemRole.OWNER) {
+    // docs/disenos/super-admin-plataforma.md §4.3: un super-admin puede impersonar
+    // en cualquier org sin ser miembro. Un no-super-admin sigue necesitando ser OWNER.
+    if (!callerEsSuperAdmin && (!adminMembership || adminMembership.systemRole !== SystemRole.OWNER)) {
       throw new SoloOwnerPuedeImpersonarError(adminUserId, organizationId);
     }
 
@@ -114,6 +122,24 @@ export class ImpersonationService {
     this.logger.log(
       `Impersonation started: admin=${adminUserId} target=${dto.targetUserId} log=${log.id}`,
     );
+
+    // REQ-SA-17: auditoría cross-tenant en platform_audit cuando el caller es super-admin.
+    // El ImpersonationLog existente se crea siempre (línea anterior); esta fila adicional
+    // es para el trail de auditoría de plataforma (docs/disenos/super-admin-plataforma.md §6).
+    // Es best-effort: si falla, no interrumpe la respuesta principal.
+    if (callerEsSuperAdmin) {
+      this.platformAudit
+        .record({
+          actorUserId: adminUserId,
+          action: 'platform.impersonation.start',
+          targetOrganizationId: organizationId,
+          payload: { targetUserId: dto.targetUserId, impersonationId: log.id },
+          createdAt: now,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Failed to write platform_audit for impersonation: ${err.message}`),
+        );
+    }
 
     return { impersonationToken, expiresAt, impersonationId: log.id };
   }

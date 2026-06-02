@@ -399,37 +399,28 @@ esta deuda.
 780/780 tests verdes al cierre (42 domain impersonation + 5 integration
 reader + 18 unit service + resto de la suite).
 
-### 3.3 Modelo de super-admin global
+### 3.3 Modelo de super-admin global — ✅ SALDADA (2026-06-02, change `super-admin`)
 
 El catálogo RBAC es **tenant-scoped**: `PermissionsGuard` exige un
 `tenantId` (JWT `activeTenantId` o header `X-Tenant-ID`) y resuelve
-permisos contra la membership del caller en ese tenant. No existe
+permisos contra la membership del caller en ese tenant. No existía
 concepto de "super-admin global" en el modelo de datos — `SystemRole`
 es `OWNER | ADMIN` por membership, no a nivel de `User`.
 
-**Consecuencia hoy** (descubierta al cerrar §2.2): las operaciones
-cross-tenant legítimas (p. ej. administrar el catálogo global de
-feature flags en `POST /api/admin/feature-flags`) no tienen un
-modelo natural para decir "sólo un subconjunto de humanos puede
-ejecutar esto". La solución interina que quedó en `sistema.feature-flags.admin`
-es: caller debe ser OWNER o ADMIN de **algún** tenant (matchean vía
-wildcard `*` del rbac resolver) y pasar un `X-Tenant-ID` válido.
-Eso cierra el endpoint frente al público anónimo pero no frente a
-owners de otros tenants — es mejor que el hoyo abierto del starter,
-pero no es la respuesta final.
+**Saldada** con el change `super-admin` (branch `feat/super-admin-impersonation`):
+1. `User.isSuperAdmin: Boolean @default(false)` en DB + claim JWT condicional.
+2. `SuperAdminGuard` valida el flag directamente (comparación estricta `=== true`).
+3. `TenantGuard` con bypass disciplinado: si `isSuperAdmin === true`, saltea
+   el lookup de `Membership` y setea `req.tenantId` desde `X-Tenant-ID`.
+4. `PermissionsGuard` con short-circuit: si `isSuperAdmin === true`, retorna `true`
+   sin consultar `RbacService`.
+5. Tabla `platform_audit` + `PlatformAuditInterceptor` para trazabilidad de
+   todas las acciones del super-admin.
+6. `feature-flags-admin.controller.ts` re-gateado con `SuperAdminGuard` (ya no
+   es accesible para owners de tenants arbitrarios).
 
-Para refinar — cuando aparezca la presión real (p. ej. cliente paga
-por onboarding, o compliance):
-1. Agregar `User.isSuperAdmin: Boolean` (o tabla `SuperAdmin` si se
-   quiere auditar mejor) con flag booleano.
-2. Extender el resolver para que `isSuperAdmin` otorgue wildcard
-   global `sistema.*` sin depender de membership.
-3. Endpoint cross-tenant sin `TenantGuard`: guard dedicado
-   `SuperAdminGuard` que valide el flag directamente.
-4. Auditoría obligatoria de cualquier acción `sistema.*`.
-
-Permisos afectados hoy (único ítem de módulo `sistema` del catálogo):
-- `sistema.feature-flags.admin`
+**Guía de diseño**: `docs/disenos/super-admin-plataforma.md`.
+**Doc de seguridad reconciliado**: `docs/claude/seguridad.md §5.4`.
 
 ### 3.4 A8 — Drift de extensions Postgres no declaradas en `schema.prisma` — ✅ FIX PARCIAL APLICADO (PR #27)
 
