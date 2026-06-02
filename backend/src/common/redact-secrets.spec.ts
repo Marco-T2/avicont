@@ -57,4 +57,47 @@ describe('redactarSensibles', () => {
     expect(redactarSensibles('string')).toEqual({});
     expect(redactarSensibles([1, 2, 3])).toEqual({});
   });
+
+  it('redacta claves sensibles en sub-objetos anidados', () => {
+    const result = redactarSensibles({
+      owner: { email: 'a@b.com', password: 'p' },
+      meta: { credentials: { clientSecret: 'cs', name: 'svc' } },
+    });
+    expect(result).toEqual({
+      owner: { email: 'a@b.com', password: '[REDACTED]' },
+      meta: { credentials: { clientSecret: '[REDACTED]', name: 'svc' } },
+    });
+  });
+
+  it('redacta claves sensibles dentro de objetos en arrays', () => {
+    const result = redactarSensibles({
+      users: [
+        { id: '1', token: 't1' },
+        { id: '2', token: 't2' },
+      ],
+      tags: ['a', 'b'],
+    });
+    expect(result).toEqual({
+      users: [
+        { id: '1', token: '[REDACTED]' },
+        { id: '2', token: '[REDACTED]' },
+      ],
+      tags: ['a', 'b'],
+    });
+  });
+
+  it('no muta sub-objetos ni arrays anidados del original', () => {
+    const original = { owner: { password: 'p', name: 'Acme' }, tags: ['x'] };
+    const result = redactarSensibles(original);
+    expect(original.owner).toEqual({ password: 'p', name: 'Acme' });
+    expect(result.owner).not.toBe(original.owner);
+    expect(result.tags).not.toBe(original.tags);
+  });
+
+  it('corta referencias circulares sin desbordar la pila', () => {
+    const nodo: Record<string, unknown> = { name: 'raíz', password: 'p' };
+    nodo.self = nodo;
+    const result = redactarSensibles(nodo);
+    expect(result).toEqual({ name: 'raíz', password: '[REDACTED]', self: '[CIRCULAR]' });
+  });
 });
