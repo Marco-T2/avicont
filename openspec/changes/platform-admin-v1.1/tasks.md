@@ -100,7 +100,7 @@ REQ cubiertos: REQ-SA-17 (delta), REQ-PAUI-12, REQ-PAUI-13, REQ-PAUI-14
 
 ### Backend — `organizationId?` en `StartImpersonationDto` (TDD)
 
-- [ ] **S2-B1 [test]** En `backend/test/impersonation.e2e-spec.ts` (extender), agregar describe `'REQ-SA-17 delta: SA org-less impersonation con organizationId'`:
+- [x] **S2-B1 [test]** En `backend/test/impersonation.e2e-spec.ts` (extender), agregar describe `'REQ-SA-17 delta: SA org-less impersonation con organizationId'`:
   - `'[+] SA envía organizationId → 201 + impersonationToken; token NO contiene isSuperAdmin'`.
   - `'[+] fila en platform_audit y en ImpersonationLog'`.
   - `'[-] SA sin organizationId y sin tenant activo → 403 "Se requiere contexto de organización"'`.
@@ -111,15 +111,15 @@ REQ cubiertos: REQ-SA-17 (delta), REQ-PAUI-12, REQ-PAUI-13, REQ-PAUI-14
   - `'[-] OWNER envía organizationId de otra org → ignorado; resolveTenantId usa contexto propio'`.
   - Ejecutar: fallan (rojo) → avanzar a S2-B2+.
 
-- [ ] **S2-B2 [test]** Unitario: en `backend/src/impersonation/impersonation.controller.spec.ts` (nuevo o extender):
+- [x] **S2-B2 [test]** Unitario: en `backend/src/impersonation/impersonation.controller.spec.ts` (nuevo o extender):
   - `'SA + dto.organizationId → service.start recibe dto.organizationId como organizationId arg'`.
   - `'OWNER sin dto.organizationId → service.start recibe resolveTenantId(req)'`.
   - Mockear service. Ejecutar: fallan (rojo) → avanzar a S2-B3.
 
-- [ ] **S2-B3 [impl]** En `backend/src/impersonation/dto/start-impersonation.dto.ts`:
+- [x] **S2-B3 [impl]** En `backend/src/impersonation/dto/start-impersonation.dto.ts`:
   - Agregar `@IsOptional() @IsUUID() organizationId?: string`. Sin romper DTO existente.
 
-- [ ] **S2-B4 [impl]** En `backend/src/impersonation/impersonation.controller.ts` (handler `start`):
+- [x] **S2-B4 [impl]** En `backend/src/impersonation/impersonation.controller.ts` (handler `start`):
   - Resolver `organizationId` según caller:
     ```ts
     const callerEsSuperAdmin = req.user.isSuperAdmin === true;
@@ -131,7 +131,7 @@ REQ cubiertos: REQ-SA-17 (delta), REQ-PAUI-12, REQ-PAUI-13, REQ-PAUI-14
     ```
   - El service NO cambia de firma (ya recibe `organizationId` y `callerEsSuperAdmin`).
 
-- [ ] **S2-B5 [chore]** Verificar verde backend:
+- [x] **S2-B5 [chore]** Verificar verde backend:
   ```bash
   cd backend && pnpm exec tsc --noEmit -p tsconfig.json && pnpm run lint
   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" JWT_ACCESS_SECRET="test-secret" JWT_REFRESH_SECRET="test-refresh" pnpm exec jest test/impersonation.e2e-spec.ts --runInBand --forceExit
@@ -139,37 +139,37 @@ REQ cubiertos: REQ-SA-17 (delta), REQ-PAUI-12, REQ-PAUI-13, REQ-PAUI-14
 
 ### Frontend — api + dialog + botón por miembro (TDD)
 
-- [ ] **S2-F1 [impl]** En `frontend/src/types/api.ts`:
+- [x] **S2-F1 [impl]** En `frontend/src/types/api.ts`:
   - Agregar `organizationId?` a `StartImpersonationRequest`. Spread condicional en uso (`exactOptionalPropertyTypes`).
 
-- [ ] **S2-F2 [test]** Test primero: `frontend/src/features/impersonation/api/start-impersonation.test.ts`:
+- [x] **S2-F2 [test]** Test primero: `frontend/src/features/impersonation/api/start-impersonation.test.ts`:
   - Con `organizationId` → body incluye el campo; sin `organizationId` → body NO incluye el campo.
   - Ejecutar: fallan (rojo) → avanzar a S2-F3.
 
-- [ ] **S2-F3 [impl]** En `frontend/src/features/impersonation/api/start-impersonation.ts`:
+- [x] **S2-F3 [impl]** En `frontend/src/features/impersonation/api/start-impersonation.ts`:
   - Aceptar `organizationId?` en el request; spread condicional para omitir si undefined.
 
-- [ ] **S2-F4 [test]** Test primero: `frontend/src/features/platform-admin/components/platform-impersonate-dialog.test.tsx` (REQ-PAUI-13):
+- [x] **S2-F4 [test]** Test primero: `frontend/src/features/platform-admin/components/platform-impersonate-dialog.test.tsx` (REQ-PAUI-13):
   - Renderiza con targetUser + orgId; reason vacío → botón disabled; reason < 10 chars → error validación, no llama backend; reason válido + confirm → llama mutation con `{ targetUserId, reason, organizationId }`; `isPending` → botón disabled; error backend → toast.error + dialog abierto; éxito → setToken + navegación.
   - Ejecutar: fallan (rojo) → avanzar a S2-F5.
 
-- [ ] **S2-F5 [impl]** Crear `frontend/src/features/platform-admin/components/platform-impersonate-dialog.tsx`:
+- [x] **S2-F5 [impl]** Crear `frontend/src/features/platform-admin/components/platform-impersonate-dialog.tsx`:
   - Props: `open`, `onOpenChange`, `targetUser: { id, email, displayName }`, `orgId: string`.
   - Campo `reason` (mínimo 10 chars, validación cliente). Botón confirm deshabilitado con `isPending` o `reason < 10`.
   - Al éxito: `setToken(impersonationToken)` + `navigate('/')` (IndexRedirect lleva a DashboardShell del target).
   - Al error: `toast.error` con mensaje del backend; dialog permanece abierto.
 
-- [ ] **S2-F6 [test]** Test primero: `frontend/src/features/platform-admin/components/platform-members-table.test.tsx` (REQ-PAUI-12):
+- [x] **S2-F6 [test]** Test primero: `frontend/src/features/platform-admin/components/platform-members-table.test.tsx` (REQ-PAUI-12):
   - Miembro regular → botón "Impersonar" habilitado; OWNER (`systemRole === 'OWNER'`) → botón ausente/disabled; SA mismo (`userId === currentUser.sub`) → botón ausente/disabled; click botón → abre `PlatformImpersonateDialog`.
   - Ejecutar: fallan (rojo) → avanzar a S2-F7.
 
-- [ ] **S2-F7 [impl]** Crear `frontend/src/features/platform-admin/components/platform-members-table.tsx`:
+- [x] **S2-F7 [impl]** Crear `frontend/src/features/platform-admin/components/platform-members-table.tsx`:
   - Tabla presentacional. Botón "Impersonar" por fila con gating (no-OWNER, no-self). Abre `PlatformImpersonateDialog` con org y target.
 
-- [ ] **S2-F8 [impl]** En `frontend/src/features/platform-admin/pages/org-members-page.tsx`:
+- [x] **S2-F8 [impl]** En `frontend/src/features/platform-admin/pages/org-members-page.tsx`:
   - Reemplazar tabla standalone por `<PlatformMembersTable>` con el botón de impersonar integrado.
 
-- [ ] **S2-F9 [chore]** Verificar verde frontend:
+- [x] **S2-F9 [chore]** Verificar verde frontend:
   ```bash
   cd frontend && pnpm exec tsc -b && pnpm run lint
   pnpm exec vitest run src/features/platform-admin src/features/impersonation/api/start-impersonation.test.ts
@@ -177,8 +177,8 @@ REQ cubiertos: REQ-SA-17 (delta), REQ-PAUI-12, REQ-PAUI-13, REQ-PAUI-14
 
 ### Cierre Slice 2
 
-- [ ] **S2-C1 [chore]** Regresión backend completa: `pnpm exec jest test/ --runInBand --forceExit` (con env vars). Verificar que todos los e2e existentes de impersonation/platform siguen verdes.
-- [ ] **S2-C2 [chore]** Regresión frontend completa: `pnpm exec vitest run src/` — 0 regresiones.
+- [x] **S2-C1 [chore]** Regresión backend completa: `pnpm exec jest test/ --runInBand --forceExit` (con env vars). Verificar que todos los e2e existentes de impersonation/platform siguen verdes.
+- [x] **S2-C2 [chore]** Regresión frontend completa: `pnpm exec vitest run src/` — 0 regresiones.
 - [ ] **S2-C3 [chore]** Commit `feat(impersonation): SA cross-tenant via organizationId body + panel UI` + PR Slice 2.
 
 ---

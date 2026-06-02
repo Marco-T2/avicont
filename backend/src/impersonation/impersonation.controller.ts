@@ -34,9 +34,12 @@ export class ImpersonationController {
 
   @Post()
   @ApiOperation({
-    summary: 'Iniciar sesión de impersonation (solo OWNER)',
+    summary: 'Iniciar sesión de impersonation (OWNER o super-admin)',
     description:
-      'Devuelve un access token especial (vida 30 min, no refrescable) que actúa como el target. Toda acción durante la sesión queda auditada en ImpersonationAction.',
+      'Devuelve un access token especial (vida 30 min, no refrescable) que actúa como el target. ' +
+      'Toda acción durante la sesión queda auditada en ImpersonationAction. ' +
+      'El super-admin org-less puede especificar la organización target en el body (organizationId). ' +
+      'Un OWNER usa el tenant de su contexto (header X-Tenant-ID o JWT.activeTenantId).',
   })
   start(@Req() req: AuthenticatedRequest, @Body() dto: StartImpersonationDto) {
     if (req.user.impersonationId) {
@@ -44,10 +47,15 @@ export class ImpersonationController {
         'No se puede iniciar impersonation mientras ya estás dentro de otra',
       );
     }
-    // REQ-SA-17: el super-admin puede impersonar en org donde no es miembro.
-    // isSuperAdmin viene del JWT validado por JwtStrategy (Slice 2).
+    // REQ-SA-17 delta: el super-admin org-less pasa la org target en el body.
+    // El OWNER sigue usando resolveTenantId(req) (header/JWT) — retrocompatible.
+    // `exactOptionalPropertyTypes`: nunca pasar undefined; el ternario lo garantiza.
     const callerEsSuperAdmin = req.user.isSuperAdmin === true;
-    return this.service.start(req.user.sub, resolveTenantId(req), dto, callerEsSuperAdmin);
+    const organizationId =
+      callerEsSuperAdmin && dto.organizationId !== undefined
+        ? dto.organizationId
+        : resolveTenantId(req);
+    return this.service.start(req.user.sub, organizationId, dto, callerEsSuperAdmin);
   }
 
   @Post('end')
