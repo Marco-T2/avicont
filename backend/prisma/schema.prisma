@@ -198,6 +198,11 @@ model Organization {
   // Ver PlatformAudit y docs/disenos/super-admin-plataforma.md §6.
   platformAudits       PlatformAudit[]
 
+  // Entitlement de packs (eje 2). La fila existe ⇔ la plataforma habilitó
+  // el pack a esta org; `activo` embebido es la activación. Ver
+  // docs/disenos/packs-eje2.md §4.4.
+  packEntitlements     OrgPackEntitlement[]
+
   @@map("organizations")
 }
 
@@ -1123,4 +1128,68 @@ model PlatformAudit {
   @@index([actorUserId, createdAt])
   @@index([targetOrganizationId, createdAt])
   @@map("platform_audit")
+}
+
+// ---------------------------------------------------------------------------
+// Riel de packs (eje 2). Ver docs/disenos/packs-eje2.md §4.
+// ---------------------------------------------------------------------------
+
+// A qué vertical pertenece un pack. Un pack vive DENTRO de un vertical y no
+// rompe la exclusividad de vertical de la org (§8 diseño).
+enum VerticalPack {
+  CONTABILIDAD
+  GRANJA
+}
+
+// Tipo de pack (informativo / para agrupación UI). Ver diseño §3.2.
+enum TipoPack {
+  DOMINIO   // genera/consume comprobantes (Ventas, Compras, ...)
+  CAPACIDAD // capa transversal (Adjuntos, RAG)
+}
+
+// Catálogo cerrado de packs disponibles en el producto. Global, sin
+// organizationId → read-only cross-tenant (excepción multi-tenant §4.2 core,
+// análogo a un catálogo compartido). Lo administra la plataforma.
+model Pack {
+  id          String       @id @default(uuid())
+  // Clave estable namespaced por vertical. Ej: "contabilidad.adjuntos",
+  // "contabilidad.rag", "granja.rag".
+  clave       String       @unique
+  nombre      String // user-facing, español
+  descripcion String?
+  // Vertical al que pertenece el pack.
+  verticalAplicable VerticalPack
+  tipo        TipoPack
+  // Un pack retirado del catálogo no se vende (no afecta entitlements existentes).
+  activo      Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+
+  entitlements OrgPackEntitlement[]
+
+  @@map("packs")
+}
+
+// Lo que la plataforma HABILITA a una org (entitlement, §5 diseño). La fila
+// existe ⇔ el pack está habilitado para la org. La columna `activo` ES la
+// activación embebida (frontera activación⊆entitlement estructural §4.5).
+model OrgPackEntitlement {
+  id             String  @id @default(uuid())
+  organizationId String
+  packId         String
+  // Activación embebida: el Owner prende/apaga DENTRO del entitlement.
+  // Por defecto false: habilitar ≠ activar.
+  activo         Boolean @default(false)
+  // Auditoría: super-admin que habilitó el pack.
+  habilitadoPorUserId String
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pack         Pack         @relation(fields: [packId], references: [id], onDelete: Restrict)
+
+  // Defense in depth (§4.8 core): unicidad hard — un pack se habilita UNA vez por org.
+  @@unique([organizationId, packId])
+  @@index([organizationId])
+  @@map("org_pack_entitlements")
 }
