@@ -334,7 +334,7 @@ El frontend conoce el vertical activo vía `vertical` en `GET /me/permissions`
 | **Gating frontend** (`usePermissions` + filtrar sidebar/rutas/botones) | ✅ existe |
 | `NavItem` extensible (requiredPermission/vertical/pack) | ⚠️ parcial (tiene `requiredPermission` + `vertical`; `pack` pendiente) |
 | Shell/navegación por vertical | ✅ existe (change `shell-por-vertical`: nav filtrado por vertical, ruta default por vertical, estado "sin módulo") |
-| Super-admin de plataforma explícito | ❌ no modelado (§10.1) |
+| Super-admin de plataforma explícito | ✅ construido (change `super-admin`, 2026-06-02, ver `docs/disenos/super-admin-plataforma.md`) |
 | Vertical Granja (dominio, tablas, UI) | ✅ construido (v1, 2026-06-01) |
 | Packs avícolas (compras/fletes/liquidaciones) | ❌ greenfield |
 | Frontera entitlement→activación explícita | ⚠️ implícita (§10.3) |
@@ -351,23 +351,24 @@ Estas son **producto**, no técnica. Deben cerrarse antes de construir la pieza 
 cada una afecta. Se registran acá con recomendación; al decidirse, se documentan
 en su sección correspondiente.
 
-### 10.1 Super-admin de plataforma — ⏳ ENFOQUE DECIDIDO (a), NO construido (2026-06-01)
+### 10.1 Super-admin de plataforma — ✅ CERRADA (2026-06-02, change `super-admin`)
 
-**Decisión de enfoque: (a) identidad de plataforma en `User` (`isSuperAdmin`).** El
+**Decisión implementada: (a) identidad de plataforma en `User` (`isSuperAdmin`).** El
 super-admin es atributo de identidad de plataforma (coherente con §3.1: `User` no
 pertenece a un tenant), no un `SystemRole` (que es por-org). Descartados: (b)
 org-plataforma (obliga a tocar `ImpersonationService`, cadena confusa) y (c)
 manual/SQL (solo interino).
 
-Hoy **no hay** flag de plataforma en `User` (verificado: no existe `isSuperAdmin`).
-El super-admin del header `X-Tenant-ID` que describe `seguridad.md §5.4` nunca se
-implementó (es diseño sobre papel; deuda `docs/deudas-arquitecturales.md §3.3`).
+**Implementado** (branch `feat/super-admin-impersonation`, 7 slices):
+- `User.isSuperAdmin: Boolean` en DB + claim JWT (solo cuando `true`).
+- `SuperAdminGuard`, bypass `TenantGuard`, short-circuit RBAC.
+- Tabla `platform_audit` + `PlatformAuditInterceptor`.
+- Bootstrap seed + CLI `grant`/`revoke`.
+- Endpoints `/admin/platform/*` (listar/crear orgs, cambiar status/entitlement).
+- Impersonation cross-tenant (ImpersonationService con `callerEsSuperAdmin`).
 
-**Guía de diseño completa**: `docs/disenos/super-admin-plataforma.md` (modelo de
-datos, cadena de autorización, bootstrap, auditoría cross-tenant, secuencia de build,
-pre-requisito de seguridad bloqueante). Mientras no se construya, operación manual
-(c). Al implementar, mover esta decisión a "✅ CERRADA" y reconciliar §5.4 del doc de
-seguridad.
+**Guía de diseño completa**: `docs/disenos/super-admin-plataforma.md`.
+**Doc de seguridad reconciliado**: `docs/claude/seguridad.md §5.4` (reemplazado `role: 'super_admin'` → `isSuperAdmin`, documentado el bypass de `TenantGuard`).
 
 ### 10.2 Profundidad de RBAC en Granja — ✅ CERRADA (2026-06-01, de facto)
 

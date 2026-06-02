@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-04-23
-Última revisión contra core: 2026-04-23
+Última edición: 2026-06-02
+Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
 
@@ -28,7 +28,7 @@ Owner: backend-lead
 |---------|----------|
 | **Access token** | JWT firmado, vida 1h, revocable vía blocklist Redis |
 | **Refresh token** | Hash SHA-256 en Postgres, rotativo con detección de reuso, 30 días |
-| **Fuente de `tenantId`** | `JWT.activeTenantId`; header `X-Tenant-ID` solo para super-admin |
+| **Fuente de `tenantId`** | `JWT.activeTenantId`; header `X-Tenant-ID` solo si `JWT.isSuperAdmin === true` |
 | **Switch de tenant** | Endpoint explícito `POST /auth/switch-tenant`, emite JWT nuevo, auditado |
 | **Impersonation** | Flujo explícito, JWT dedicado 30 min, auditoría doble |
 | **Resolución por subdomain** | Descartada, remover del starter |
@@ -53,10 +53,12 @@ Owner: backend-lead
 
 **Precedencia:**
 1. `JWT.activeTenantId` — fuente normal para usuarios regulares.
-2. Header `X-Tenant-ID` — válido **solo si** `JWT.role === 'super_admin'`, siempre con auditoría.
+2. Header `X-Tenant-ID` — válido **solo si** `JWT.isSuperAdmin === true` (claim booleano en el JWT), siempre con auditoría. El `TenantGuard` implementa un bypass disciplinado para este caso: si `user.isSuperAdmin === true`, saltea el lookup de `Membership` y setea `req.tenantId` directamente desde el header. Ver `src/common/guards/tenant.guard.ts` y `docs/disenos/super-admin-plataforma.md §4.3`.
 3. Subdomain — **eliminar del starter** (no se usa).
 
 Un usuario puede pertenecer a varios tenants con roles distintos. La tabla `Membership` refleja eso.
+
+> **Nota implementación**: el campo `isSuperAdmin` es un `Boolean` en la tabla `users` (no un `SystemRole` por-membership). El claim se incluye en el JWT **solo cuando es `true`** (spread condicional en `JwtClaims.forUser`). Los tokens de impersonation **no heredan** el claim `isSuperAdmin` — `ImpersonationJwtClaims.forImpersonation` no lo incluye (REQ-SA-04).
 
 ### 5.5 Switch de tenant
 

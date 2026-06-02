@@ -7,6 +7,7 @@ import { ImpersonationAuditInterceptor } from './interceptors/impersonation-audi
 import { PrismaService } from '../common/prisma.service';
 import { TenantContextService } from '../common/tenant-context/tenant-context.service';
 import { MembershipsModule } from '../memberships/memberships.module';
+import { PlatformModule } from '../platform/platform.module';
 import { IMPERSONATION_REPOSITORY_PORT } from './ports/impersonation.repository.port';
 import { PrismaImpersonationRepository } from './adapters/prisma-impersonation.repository';
 
@@ -14,6 +15,10 @@ import { PrismaImpersonationRepository } from './adapters/prisma-impersonation.r
   imports: [
     ConfigModule,
     MembershipsModule,
+    // PlatformModule exporta PLATFORM_AUDIT_PORT — usado por ImpersonationService
+    // para auditoría cross-tenant (REQ-SA-17). No hay ciclo: PlatformModule
+    // no importa ImpersonationModule.
+    PlatformModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
