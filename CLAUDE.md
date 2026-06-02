@@ -876,7 +876,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | `openapi-typescript` para tipos compartidos frontend↔backend | Deuda | Cuando haya 4-5 features consumiendo la API con DTOs duplicados a mano |
 | Migración de `accessToken` en memoria a un worker/SW con rotación background | Diferido | Si el proyecto escala a múltiples frontends/apps móviles |
 | Refactor de los ~80 `throw new *Exception(...)` viejos a `DomainError` (§6.2) | Deuda técnica | **Regla de oro**: al tocar un módulo para agregar features, migrar primero sus errores a la nueva jerarquía. El `GlobalExceptionFilter` ya mapea los `HttpException` viejos al formato estándar (§6.4), así que el refactor no es bloqueante — pero no agregues throws nuevos con `*Exception` de NestJS en código nuevo |
-| Generalizar revocación epoch a logout-all | ✅ RESUELTA — change `logout-all` (2026-06-02) | Clave unificada `revoked:access:{userId}`, TTL 1h, check general en `JwtStrategy.validate` para todos los usuarios. Endpoint `POST /auth/logout-all` (self-only). Sin `jti` — epoch por usuario es suficiente para el caso de uso (cuenta comprometida / cambio de contraseña). Ver `openspec/changes/logout-all/`. |
+| Generalizar revocación epoch a logout-all | ✅ RESUELTA — change `logout-all` (2026-06-02) | Clave unificada `revoked:access:{userId}`, TTL 1h, check general en `JwtStrategy.validate` para todos los usuarios. Endpoint `POST /auth/logout-all` (self-only). Sin `jti` — epoch por usuario es suficiente para el caso de uso (cuenta comprometida / cambio de contraseña). Ver `openspec/changes/archive/2026-06-02-logout-all/` + `openspec/specs/logout-all/`. |
 
 ---
 
