@@ -65,8 +65,8 @@ describe('REQ-SA-02: JwtStrategy.validate propaga isSuperAdmin', () => {
     });
   });
 
-  describe('revocación por epoch (REQ-SA-03)', () => {
-    it('token revocado: isSuperAdmin true en payload pero Redis marca más nueva que iat → UnauthorizedException', async () => {
+  describe('revocación por epoch generalizada (REQ-LA-01, REQ-LA-02)', () => {
+    it('token revocado: Redis marca más nueva que iat → UnauthorizedException (super-admin)', async () => {
       // iat = 1000s, revokedAt = 1_500_000ms > 1000 * 1000 = 1_000_000ms
       const iat = 1000; // segundos
       const revokedAtMs = 1_500_000; // milisegundos — posterior al iat
@@ -78,10 +78,11 @@ describe('REQ-SA-02: JwtStrategy.validate propaga isSuperAdmin', () => {
         UnauthorizedException,
       );
 
-      expect(redis.get).toHaveBeenCalledWith(`superadmin:revoked:${basePayload.sub}`);
+      // REQ-LA-01: clave unificada revoked:access: (no la vieja superadmin:revoked:)
+      expect(redis.get).toHaveBeenCalledWith(`revoked:access:${basePayload.sub}`);
     });
 
-    it('token válido post-epoch: iat posterior a la marca Redis → pasa', async () => {
+    it('token válido post-epoch: iat posterior a la marca Redis → pasa (super-admin)', async () => {
       // iat = 2000s = 2_000_000ms, revokedAt = 1_500_000ms < 2_000_000ms → válido
       const iat = 2000; // segundos
       const revokedAtMs = 1_500_000; // milisegundos — anterior al iat → no revocado
@@ -94,14 +95,28 @@ describe('REQ-SA-02: JwtStrategy.validate propaga isSuperAdmin', () => {
       expect(result.isSuperAdmin).toBe(true);
     });
 
-    it('usuario regular: no consulta Redis aunque no sea super-admin', async () => {
+    it('REQ-LA-02: usuario regular SÍ consulta Redis con clave revoked:access:', async () => {
+      // El check de revocación corre para TODOS, no solo super-admins (REQ-LA-02)
       const redis = makeRedis(null);
       const clock = makeClock(Date.now());
       const strategy = buildStrategy(redis, clock);
 
       await strategy.validate({ ...basePayload });
 
-      expect(redis.get).not.toHaveBeenCalled();
+      expect(redis.get).toHaveBeenCalledWith(`revoked:access:${basePayload.sub}`);
+    });
+
+    it('REQ-LA-02: usuario regular con epoch posterior a iat → UnauthorizedException', async () => {
+      // isSuperAdmin ausente/false pero con epoch activo → igual rechazado
+      const iat = 1000; // segundos
+      const revokedAtMs = 1_500_000; // ms — posterior al iat (1_000_000ms)
+      const redis = makeRedis(String(revokedAtMs));
+      const clock = makeClock(Date.now());
+      const strategy = buildStrategy(redis, clock);
+
+      await expect(strategy.validate({ ...basePayload, iat })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 });

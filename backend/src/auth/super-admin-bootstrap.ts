@@ -4,7 +4,7 @@ import type Redis from 'ioredis';
 /**
  * TTL del epoch de revocación de super-admin en Redis.
  * Debe coincidir con la vida del access token (1h = 3600s).
- * Mismo valor que `SUPER_ADMIN_REVOCATION_TTL_SECONDS` en auth.service.ts.
+ * Mismo valor que `ACCESS_REVOCATION_TTL_SECONDS` en auth.service.ts.
  */
 const REVOCATION_TTL_SECONDS = 3600;
 
@@ -14,20 +14,20 @@ const REVOCATION_TTL_SECONDS = 3600;
  * el prefijo explícitamente para que JwtStrategy.validate() encuentre la misma clave.
  *
  * auth.service.ts usa RedisService que tiene `keyPrefix: 'saas:'`, por lo que
- * la clave real en Redis es `saas:superadmin:revoked:<userId>`.
+ * la clave real en Redis es `saas:revoked:access:<userId>`.
  * Ver: cache/redis.service.ts constructor.
  */
 const REDIS_KEY_PREFIX = 'saas:';
 
 /**
  * Construye la clave Redis completa (con prefijo) para el epoch de revocación.
- * Canónica con `revocarTokensSuperAdmin` en auth.service.ts:
- *   - Clave base: `superadmin:revoked:<userId>`
+ * Canónica con `escribirEpochRevocacion` en auth.service.ts (mecanismo generalizado):
+ *   - Clave base: `revoked:access:<userId>`
  *   - Valor:      timestamp en ms como string
  *   - TTL:        3600s
  */
-function superAdminRevocationKey(userId: string): string {
-  return `${REDIS_KEY_PREFIX}superadmin:revoked:${userId}`;
+function accessRevocationKey(userId: string): string {
+  return `${REDIS_KEY_PREFIX}revoked:access:${userId}`;
 }
 
 /**
@@ -97,7 +97,7 @@ export async function grantSuperAdmin(
  * 2. Registra la acción en `platform_audit` (REQ-SA-09/11).
  *
  * El formato del epoch en Redis es idéntico al que escribe `revocarTokensSuperAdmin`
- * en `auth.service.ts` (clave `saas:superadmin:revoked:<userId>`, valor en ms como
+ * en `auth.service.ts` (clave `saas:revoked:access:<userId>`, valor en ms como
  * string, TTL 3600s). `JwtStrategy.validate` usa ese mismo formato para rechazar
  * tokens con `iat` anterior al epoch.
  *
@@ -127,14 +127,14 @@ export async function revokeSuperAdmin(
     data: { isSuperAdmin: false },
   });
 
-  // Epoch de revocación en Redis (REQ-SA-03, design.md Decisión 4.2).
+  // Epoch de revocación en Redis (REQ-SA-03, REQ-LA-01 — clave generalizada).
   // El valor es el timestamp actual en ms como string — mismo formato que
-  // AuthService.revocarTokensSuperAdmin() para que JwtStrategy.validate()
+  // AuthService.escribirEpochRevocacion() para que JwtStrategy.validate()
   // lo interprete correctamente: `revokedAtMs > iat * 1000 → UnauthorizedException`.
   // Se usa Date.now() directamente porque este es un script standalone, no domain/service
   // (la regla de ClockPort aplica a domain/*.ts y *.service.ts — CLAUDE.md §4.6).
   const nowMs = Date.now();
-  const key = superAdminRevocationKey(user.id);
+  const key = accessRevocationKey(user.id);
   await redis.setex(key, REVOCATION_TTL_SECONDS, String(nowMs));
 
   // Auditoría en platform_audit (REQ-SA-09/11).

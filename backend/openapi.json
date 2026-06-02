@@ -597,6 +597,29 @@
         ]
       }
     },
+    "/api/auth/logout-all": {
+      "post": {
+        "operationId": "AuthController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "All sessions revoked"
+          },
+          "401": {
+            "description": "Missing or invalid access token"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Revoke ALL sessions of the authenticated user (access + refresh)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/auth/switch-tenant": {
       "post": {
         "operationId": "AuthController_switchTenant",

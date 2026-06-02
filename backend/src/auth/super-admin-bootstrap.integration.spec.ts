@@ -4,16 +4,16 @@ import Redis from 'ioredis';
 import { grantSuperAdmin, revokeSuperAdmin } from './super-admin-bootstrap';
 
 /**
- * Integration spec del bootstrap de super-admin (REQ-SA-10, REQ-SA-11).
+ * Integration spec del bootstrap de super-admin (REQ-SA-10, REQ-SA-11, REQ-LA-05).
  *
  * Usa Prisma y Redis reales. La función bajo test es `grantSuperAdmin` /
  * `revokeSuperAdmin` — extraídas del seed/CLI para ser directamente testeables
  * sin spawn de proceso (CLAUDE.md §7.2: integración preferida sobre E2E para
  * lógica de negocio testeable directamente).
  *
- * Clave Redis: `saas:superadmin:revoked:<userId>` — prefijo `saas:` aplicado
+ * Clave Redis: `saas:revoked:access:<userId>` — prefijo `saas:` aplicado
  * por `RedisService` en el app; el CLI usa ioredis directo con la clave completa.
- * Ver auth.service.ts `revocarTokensSuperAdmin` para el formato canónico.
+ * Ver auth.service.ts `escribirEpochRevocacion` para el formato canónico.
  */
 describe('REQ-SA-10: seed idempotente por SUPER_ADMIN_EMAIL', () => {
   const SEED_ACTOR_ID = 'seed';
@@ -123,7 +123,7 @@ describe('REQ-SA-11: CLI grant/revoke', () => {
   afterAll(async () => {
     // actorUserId en platform_audit es el id del user (FK válida)
     await prisma.platformAudit.deleteMany({ where: { actorUserId: cliUserId } });
-    await redis.del(`saas:superadmin:revoked:${cliUserId}`);
+    await redis.del(`saas:revoked:access:${cliUserId}`);
     await prisma.user.delete({ where: { id: cliUserId } });
     await prisma.$disconnect();
     await redis.quit();
@@ -152,15 +152,15 @@ describe('REQ-SA-11: CLI grant/revoke', () => {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: cliUserId } });
     expect(user.isSuperAdmin).toBe(false);
 
-    // Verificar epoch en Redis con la clave completa (prefijo saas: incluido)
-    const epochStr = await redis.get(`saas:superadmin:revoked:${cliUserId}`);
+    // Verificar epoch en Redis con la clave generalizada (prefijo saas: incluido, REQ-LA-01)
+    const epochStr = await redis.get(`saas:revoked:access:${cliUserId}`);
     expect(epochStr).not.toBeNull();
     const epochMs = Number(epochStr);
     expect(epochMs).toBeGreaterThanOrEqual(beforeRevokeMs);
     expect(epochMs).toBeLessThanOrEqual(Date.now());
 
     // Verificar TTL aproximado (debe ser ~3600s)
-    const ttl = await redis.ttl(`saas:superadmin:revoked:${cliUserId}`);
+    const ttl = await redis.ttl(`saas:revoked:access:${cliUserId}`);
     expect(ttl).toBeGreaterThan(3590);
     expect(ttl).toBeLessThanOrEqual(3600);
 
@@ -173,9 +173,9 @@ describe('REQ-SA-11: CLI grant/revoke', () => {
     expect(payload?.['revokedBy']).toBe(CLI_ACTOR_ID);
   });
 
-  it('[+] revoke → token con iat previo al epoch es rechazado (integración con JwtStrategy)', async () => {
+  it('[+] revoke → el epoch escrito es posterior al iat de un token viejo (lógica de comparación)', async () => {
     // El epoch fue escrito en el test anterior. Un iat anterior al epoch debe fallar.
-    const epochStr = await redis.get(`saas:superadmin:revoked:${cliUserId}`);
+    const epochStr = await redis.get(`saas:revoked:access:${cliUserId}`);
     expect(epochStr).not.toBeNull();
     const epochMs = Number(epochStr);
 

@@ -807,7 +807,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Defense in depth | Guard + servicio + repositorio chequean `tenantId` | §5.7 |
 | Subdomain resolver | Descartado, remover del starter | §5.4 |
 | Super-admin | `User.isSuperAdmin` booleano; `SuperAdminGuard` + `TenantGuard` bypass + short-circuit RBAC; auditoría en `platform_audit`; change `super-admin` (2026-06-02) | §5.4 / `docs/disenos/super-admin-plataforma.md` |
-| Revocación epoch super-admin | Primer mecanismo real de revocación de access tokens; clave Redis `superadmin:revoked:<userId>`; acotado al claim `isSuperAdmin` — generalizar a logout-all es deuda separada (§10.10) | Slice 2 del change `super-admin` |
+| Revocación epoch — logout-all | Mecanismo generalizado de revocación de access tokens: clave Redis `revoked:access:{userId}`, TTL 1h, check corre para TODOS los usuarios en `JwtStrategy.validate`. `POST /auth/logout-all` (self-only) revoca access epoch + todos los refresh tokens activos. `revocarTokensSuperAdmin` es caso particular (delega al mismo mecanismo). Change `logout-all` (2026-06-02). | `auth.service.ts`, `jwt.strategy.ts`, `auth.controller.ts` |
 
 ### 10.5 Errores y logs
 
@@ -876,7 +876,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | `openapi-typescript` para tipos compartidos frontend↔backend | Deuda | Cuando haya 4-5 features consumiendo la API con DTOs duplicados a mano |
 | Migración de `accessToken` en memoria a un worker/SW con rotación background | Diferido | Si el proyecto escala a múltiples frontends/apps móviles |
 | Refactor de los ~80 `throw new *Exception(...)` viejos a `DomainError` (§6.2) | Deuda técnica | **Regla de oro**: al tocar un módulo para agregar features, migrar primero sus errores a la nueva jerarquía. El `GlobalExceptionFilter` ya mapea los `HttpException` viejos al formato estándar (§6.4), así que el refactor no es bloqueante — pero no agregues throws nuevos con `*Exception` de NestJS en código nuevo |
-| Generalizar revocación epoch a logout-all | Deuda | El change `super-admin` (2026-06-02) implementó la PRIMERA revocación real de access tokens del proyecto, acotada al claim `isSuperAdmin` (clave Redis `superadmin:revoked:<userId>`, TTL 1h). Generalizar a logout-all de cualquier usuario (clave `saas:revoked:access:{jti}`) es deuda separada — requiere pasar `jti` en todos los JWT y consultar la blocklist en cada request. |
+| Generalizar revocación epoch a logout-all | ✅ RESUELTA — change `logout-all` (2026-06-02) | Clave unificada `revoked:access:{userId}`, TTL 1h, check general en `JwtStrategy.validate` para todos los usuarios. Endpoint `POST /auth/logout-all` (self-only). Sin `jti` — epoch por usuario es suficiente para el caso de uso (cuenta comprometida / cambio de contraseña). Ver `openspec/changes/logout-all/`. |
 
 ---
 

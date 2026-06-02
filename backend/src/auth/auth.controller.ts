@@ -91,6 +91,21 @@ export class AuthController {
     this.clearRefreshCookie(res);
   }
 
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Revoke ALL sessions of the authenticated user (access + refresh)' })
+  @ApiResponse({ status: 204, description: 'All sessions revoked' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  async logoutAll(
+    @CurrentUser() user: { sub: string },
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.authService.logoutAll(user.sub);
+    this.clearRefreshCookie(res);
+  }
+
   @Post('switch-tenant')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
