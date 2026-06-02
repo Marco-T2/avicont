@@ -13,6 +13,7 @@ import type {
   OrgPackRepositoryPort,
 } from './ports/org-pack.repository.port';
 import type { OrgVerticalReaderPort } from './ports/org-vertical.reader.port';
+import type { RedisService } from '@/cache/redis.service';
 
 // ============================================================
 // Fixtures y mocks
@@ -22,6 +23,7 @@ const ORG_ID = 'org-1';
 const USER_ID = 'user-1';
 const PACK_ID = 'pack-1';
 const CLAVE = 'contabilidad.adjuntos';
+const CACHE_KEY = `org-packs:${ORG_ID}`;
 
 function makePack(overrides: Partial<Pack> = {}): Pack {
   return {
@@ -50,6 +52,7 @@ function makeEntitlementRow(overrides: Partial<OrgPackEntitlementRow> = {}): Org
 type MockRepo = jest.Mocked<OrgPackRepositoryPort>;
 type MockCatalog = jest.Mocked<PackCatalogReaderPort>;
 type MockVertical = jest.Mocked<OrgVerticalReaderPort>;
+type MockRedis = Pick<jest.Mocked<RedisService>, 'del'>;
 
 function makeRepoMock(): MockRepo {
   return {
@@ -74,17 +77,28 @@ function makeVerticalMock(vertical: VerticalPack | null = 'CONTABILIDAD'): MockV
   return { verticalDe: jest.fn().mockResolvedValue(vertical) };
 }
 
-function makeService(deps?: { repo?: MockRepo; catalog?: MockCatalog; vertical?: MockVertical }): {
+function makeRedisMock(): MockRedis {
+  return { del: jest.fn().mockResolvedValue(undefined) };
+}
+
+function makeService(deps?: {
+  repo?: MockRepo;
+  catalog?: MockCatalog;
+  vertical?: MockVertical;
+  redis?: MockRedis;
+}): {
   service: PackService;
   repo: MockRepo;
   catalog: MockCatalog;
   vertical: MockVertical;
+  redis: MockRedis;
 } {
   const repo = deps?.repo ?? makeRepoMock();
   const catalog = deps?.catalog ?? makeCatalogMock();
   const vertical = deps?.vertical ?? makeVerticalMock();
-  const service = new PackService(catalog, repo, vertical);
-  return { service, repo, catalog, vertical };
+  const redis = deps?.redis ?? makeRedisMock();
+  const service = new PackService(catalog, repo, vertical, redis as unknown as RedisService);
+  return { service, repo, catalog, vertical, redis };
 }
 
 describe('PackService', () => {
@@ -99,6 +113,30 @@ describe('PackService', () => {
       await service.habilitar(ORG_ID, PACK_ID, USER_ID);
 
       expect(repo.habilitar).toHaveBeenCalledWith(ORG_ID, PACK_ID, USER_ID);
+    });
+
+    it('invalida el cache org-packs:<id> tras habilitar', async () => {
+      const { service, repo, catalog, redis } = makeService({
+        vertical: makeVerticalMock('CONTABILIDAD'),
+      });
+      catalog.findById.mockResolvedValue(makePack({ verticalAplicable: 'CONTABILIDAD' }));
+      repo.habilitar.mockResolvedValue(makeEntitlementRow());
+
+      await service.habilitar(ORG_ID, PACK_ID, USER_ID);
+
+      expect(redis.del).toHaveBeenCalledWith(CACHE_KEY);
+    });
+
+    it('NO invalida el cache si la habilitación falla por vertical ajeno', async () => {
+      const { service, catalog, redis } = makeService({
+        vertical: makeVerticalMock('CONTABILIDAD'),
+      });
+      catalog.findById.mockResolvedValue(makePack({ verticalAplicable: 'GRANJA' }));
+
+      await expect(service.habilitar(ORG_ID, PACK_ID, USER_ID)).rejects.toBeInstanceOf(
+        PackVerticalNoAplicableError,
+      );
+      expect(redis.del).not.toHaveBeenCalled();
     });
 
     it('rechaza con PackVerticalNoAplicableError si el pack es de otro vertical', async () => {
@@ -136,6 +174,16 @@ describe('PackService', () => {
       expect(res.activo).toBe(true);
     });
 
+    it('invalida el cache org-packs:<id> tras activar', async () => {
+      const { service, repo, redis } = makeService();
+      repo.findByOrgYPack.mockResolvedValue(makeEntitlementRow({ activo: false }));
+      repo.setActivo.mockResolvedValue(makeEntitlementRow({ activo: true }));
+
+      await service.activar(ORG_ID, PACK_ID, true);
+
+      expect(redis.del).toHaveBeenCalledWith(CACHE_KEY);
+    });
+
     it('rechaza con PackNoHabilitadoError al activar sin entitlement', async () => {
       const { service, repo } = makeService();
       repo.findByOrgYPack.mockResolvedValue(null);
@@ -155,6 +203,54 @@ describe('PackService', () => {
       await service.revocar(ORG_ID, PACK_ID);
 
       expect(repo.revocar).toHaveBeenCalledWith(ORG_ID, PACK_ID);
+    });
+
+    it('invalida el cache org-packs:<id> tras revocar', async () => {
+      const { service, repo, redis } = makeService();
+      repo.revocar.mockResolvedValue(undefined);
+
+      await service.revocar(ORG_ID, PACK_ID);
+
+      expect(redis.del).toHaveBeenCalledWith(CACHE_KEY);
+    });
+  });
+
+  describe('habilitarParaOrg (resolución packId | clave)', () => {
+    it('resuelve por packId y delega en habilitar', async () => {
+      const { service, repo, catalog } = makeService({
+        vertical: makeVerticalMock('CONTABILIDAD'),
+      });
+      catalog.findById.mockResolvedValue(makePack({ verticalAplicable: 'CONTABILIDAD' }));
+      repo.habilitar.mockResolvedValue(makeEntitlementRow());
+
+      await service.habilitarParaOrg(ORG_ID, { packId: PACK_ID }, USER_ID);
+
+      expect(catalog.findById).toHaveBeenCalledWith(PACK_ID);
+      expect(repo.habilitar).toHaveBeenCalledWith(ORG_ID, PACK_ID, USER_ID);
+    });
+
+    it('resuelve por clave → packId y delega en habilitar', async () => {
+      const { service, repo, catalog } = makeService({
+        vertical: makeVerticalMock('CONTABILIDAD'),
+      });
+      catalog.findByClave.mockResolvedValue(makePack({ verticalAplicable: 'CONTABILIDAD' }));
+      catalog.findById.mockResolvedValue(makePack({ verticalAplicable: 'CONTABILIDAD' }));
+      repo.habilitar.mockResolvedValue(makeEntitlementRow());
+
+      await service.habilitarParaOrg(ORG_ID, { clave: CLAVE }, USER_ID);
+
+      expect(catalog.findByClave).toHaveBeenCalledWith(CLAVE);
+      expect(repo.habilitar).toHaveBeenCalledWith(ORG_ID, PACK_ID, USER_ID);
+    });
+
+    it('rechaza con PackNoEncontradoError si la clave no existe en el catálogo', async () => {
+      const { service, repo, catalog } = makeService();
+      catalog.findByClave.mockResolvedValue(null);
+
+      await expect(
+        service.habilitarParaOrg(ORG_ID, { clave: 'no.existe' }, USER_ID),
+      ).rejects.toBeInstanceOf(PackNoEncontradoError);
+      expect(repo.habilitar).not.toHaveBeenCalled();
     });
   });
 

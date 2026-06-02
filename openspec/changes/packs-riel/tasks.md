@@ -129,20 +129,22 @@ registrable en `app.module.ts`, exportando `OrgPacksReaderPort`.
 vertical, auditoría.
 **Paralelizable con**: Slices 3 y 4 (todos dependen solo de Slice 2).
 
-- [ ] 5.1 **Test (e2e)**: super-admin habilita pack del vertical correcto → 201 + fila
+- [x] 5.1 **Test (e2e)**: super-admin habilita pack del vertical correcto → 201 + fila
   `activo=false` + entrada en `platform_audit`; habilitar pack de vertical ajeno → error;
   no super-admin → 403; revocar → borra fila + invalida cache.
-- [ ] 5.2 DTO `habilitar-pack.dto.ts` (packId o clave). Métodos
-  `PlatformAdminService.habilitarPack(orgId, packId, actorUserId)` /
-  `revocarPack(orgId, packId)` (clon de `actualizarEntitlement`,
-  `platform-admin.service.ts:146`): valida vertical de la org vs `pack.verticalAplicable`,
-  delega en `OrgPackRepositoryPort`, invalida cache `org-packs:<id>`.
-- [ ] 5.3 Endpoints en `platform-admin.controller.ts` (`@Controller('admin/platform')`,
+- [x] 5.2 DTO `habilitar-pack.dto.ts` (packId o clave). Métodos
+  `PlatformAdminService.habilitarPack(orgId, ref, actorUserId)` /
+  `revocarPack(orgId, packId)`: validan que la org exista (404) y DELEGAN en
+  `PackService` (la lógica de dominio —validación de vertical vs `pack.verticalAplicable`,
+  escritura del entitlement, invalidación de cache `org-packs:<id>`— vive en `packs/`,
+  no en `platform/`). `PackService` gana `habilitarParaOrg` (resuelve packId|clave) +
+  inyección de `RedisService` para invalidar cache en habilitar/revocar/activar.
+- [x] 5.3 Endpoints en `platform-admin.controller.ts` (`@Controller('admin/platform')`,
   ya bajo `SuperAdminGuard` + `PlatformAuditInterceptor`): `POST orgs/:id/packs`,
   `DELETE orgs/:id/packs/:packId`. Poblar `req['tenantId'] = id` para la auditoría
   cross-tenant (patrón `orgs/:id/members`, controller `:92`).
-- [ ] 5.4 `GET orgs/:id/packs` (listar catálogo + estado entitlement/activación de la org,
-  para el panel super-admin) — opcional pero recomendado para la UI futura.
+- [x] 5.4 `GET orgs/:id/packs` (listar entitlements + estado de activación de la org,
+  para el panel super-admin).
 - **Hecho cuando**: e2e verde (incl. 403 y validación de vertical), auditoría registrada.
 
 ---

@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { RedisService } from '@/cache/redis.service';
+
 import type { Pack } from './domain/pack';
 import {
   PackNoEncontradoError,
@@ -22,6 +24,11 @@ import { PACK_CATALOG_READER_PORT, PackCatalogReaderPort } from './ports/pack-ca
  *
  * Sin `new Date()` (core §4.6): los timestamps los pone Prisma (`@default(now())`,
  * `@updatedAt`); el service no maneja fechas de dominio.
+ *
+ * Toda mutación de entitlement/activación invalida el cache `org-packs:<id>`
+ * (Redis, TTL 300s del `PackEnabledGuard`) para que el guard y `/me/permissions`
+ * reflejen el cambio en caliente, sin esperar el TTL — mismo patrón que
+ * `actualizarStatus` con `org-status:<id>` (org-status-enforcement).
  */
 @Injectable()
 export class PackService {
@@ -32,7 +39,13 @@ export class PackService {
     private readonly repo: OrgPackRepositoryPort,
     @Inject(ORG_VERTICAL_READER_PORT)
     private readonly orgVertical: OrgVerticalReaderPort,
+    private readonly redis: RedisService,
   ) {}
+
+  /** Clave del cache Redis de packs activos de la org (espejo del PackEnabledGuard). */
+  private cacheKey(organizationId: string): string {
+    return `org-packs:${organizationId}`;
+  }
 
   /** Lista el catálogo de packs activos (vendibles). */
   listarCatalogo(): Promise<Pack[]> {
@@ -50,9 +63,23 @@ export class PackService {
   }
 
   /**
+   * Habilita un pack para una org resolviendo la referencia (`packId` o `clave`).
+   * Punto de entrada del super-admin (`POST /admin/platform/orgs/:id/packs`): el
+   * panel puede enviar el id directo o la clave estable del catálogo.
+   */
+  async habilitarParaOrg(
+    organizationId: string,
+    ref: { packId?: string; clave?: string },
+    habilitadoPorUserId: string,
+  ): Promise<OrgPackEntitlementRow> {
+    const packId = await this.resolverPackId(ref);
+    return this.habilitar(organizationId, packId, habilitadoPorUserId);
+  }
+
+  /**
    * Habilita un pack para una org (entitlement, `activo = false`). Valida que el
    * `verticalAplicable` del pack coincida con el vertical de la org — un pack NO
-   * rompe la exclusividad de vertical (§8 diseño, §10.4 core).
+   * rompe la exclusividad de vertical (§8 diseño, §10.4 core). Invalida el cache.
    */
   async habilitar(
     organizationId: string,
@@ -73,12 +100,30 @@ export class PackService {
       });
     }
 
-    return this.repo.habilitar(organizationId, packId, habilitadoPorUserId);
+    const entitlement = await this.repo.habilitar(organizationId, packId, habilitadoPorUserId);
+    await this.redis.del(this.cacheKey(organizationId));
+    return entitlement;
   }
 
-  /** Revoca el entitlement (borra la fila → revoca también la activación). */
-  revocar(organizationId: string, packId: string): Promise<void> {
-    return this.repo.revocar(organizationId, packId);
+  /** Revoca el entitlement (borra la fila → revoca también la activación). Invalida el cache. */
+  async revocar(organizationId: string, packId: string): Promise<void> {
+    await this.repo.revocar(organizationId, packId);
+    await this.redis.del(this.cacheKey(organizationId));
+  }
+
+  /** Resuelve `packId` o `clave` a un packId del catálogo (404 si no existe). */
+  private async resolverPackId(ref: { packId?: string; clave?: string }): Promise<string> {
+    if (ref.packId !== undefined) {
+      return ref.packId;
+    }
+    if (ref.clave !== undefined) {
+      const pack = await this.catalog.findByClave(ref.clave);
+      if (pack === null) {
+        throw new PackNoEncontradoError({ clave: ref.clave });
+      }
+      return pack.id;
+    }
+    throw new PackNoEncontradoError({ clave: '' });
   }
 
   /**
@@ -96,6 +141,8 @@ export class PackService {
     if (entitlement === null) {
       throw new PackNoHabilitadoError(packId);
     }
-    return this.repo.setActivo(organizationId, packId, activo);
+    const updated = await this.repo.setActivo(organizationId, packId, activo);
+    await this.redis.del(this.cacheKey(organizationId));
+    return updated;
   }
 }

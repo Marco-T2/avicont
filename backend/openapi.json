@@ -3087,6 +3087,147 @@
         ]
       }
     },
+    "/api/admin/platform/orgs/{id}/packs": {
+      "post": {
+        "operationId": "PlatformAdminController_habilitarPack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabilitarPackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Entitlement creado (activo=false)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgPackEntitlementResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El pack no aplica al vertical de la organización"
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          },
+          "404": {
+            "description": "Organización o pack no encontrado"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Habilitar un pack a una organización (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      },
+      "get": {
+        "operationId": "PlatformAdminController_listarPacks",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de entitlements con su pack y estado de activación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgPackEntitlementResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          },
+          "404": {
+            "description": "Organización no encontrada"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar entitlements de packs de una organización (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      }
+    },
+    "/api/admin/platform/orgs/{id}/packs/{packId}": {
+      "delete": {
+        "operationId": "PlatformAdminController_revocarPack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entitlement revocado"
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          },
+          "404": {
+            "description": "Organización no encontrada"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Revocar el entitlement de un pack de una organización (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      }
+    },
     "/api/audit": {
       "get": {
         "operationId": "AuditController_list",
@@ -6271,6 +6412,98 @@
             "example": false
           }
         }
+      },
+      "HabilitarPackDto": {
+        "type": "object",
+        "properties": {
+          "packId": {
+            "type": "string",
+            "description": "Id del pack en el catálogo. Alternativo a `clave` (uno requerido).",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "clave": {
+            "type": "string",
+            "description": "Clave estable del pack. Alternativa a `packId` (uno requerido).",
+            "example": "contabilidad.adjuntos"
+          }
+        }
+      },
+      "PackResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string",
+            "description": "Clave estable namespaced. Ej: \"contabilidad.adjuntos\"."
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "verticalAplicable": {
+            "type": "string",
+            "enum": [
+              "CONTABILIDAD",
+              "GRANJA"
+            ]
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DOMINIO",
+              "CAPACIDAD"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "clave",
+          "nombre",
+          "descripcion",
+          "verticalAplicable",
+          "tipo",
+          "activo"
+        ]
+      },
+      "OrgPackEntitlementResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "packId": {
+            "type": "string"
+          },
+          "activo": {
+            "type": "boolean",
+            "description": "Activación embebida: true = el Owner activó el pack."
+          },
+          "habilitadoPorUserId": {
+            "type": "string"
+          },
+          "pack": {
+            "$ref": "#/components/schemas/PackResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "packId",
+          "activo",
+          "habilitadoPorUserId",
+          "pack"
+        ]
       },
       "CreateFeatureFlagDto": {
         "type": "object",

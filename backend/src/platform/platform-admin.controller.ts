@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -17,6 +18,9 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '@/common/guards/super-admin.guard';
 import { PlatformAuditInterceptor } from '@/audit/platform-audit.interceptor';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { HabilitarPackDto } from '@/packs/dto/habilitar-pack.dto';
+import { OrgPackEntitlementResponseDto } from '@/packs/dto/org-pack-entitlement-response.dto';
 
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateOrgStatusDto } from './dto/update-org-status.dto';
@@ -160,5 +164,81 @@ export class PlatformAdminController {
   ): Promise<PlatformOrgResponseDto> {
     (req as unknown as Record<string, unknown>)['tenantId'] = id;
     return this.platformAdminService.actualizarEntitlement(id, dto);
+  }
+
+  /**
+   * Riel de packs §5.4: el super-admin habilita un pack (eje 2) a una org. Crea
+   * el entitlement con `activo=false` (habilitar ≠ activar). Valida que el pack
+   * pertenezca al vertical de la org (§8) y audita la mutación.
+   *
+   * `req.tenantId = id` se popula para que el interceptor capture
+   * `targetOrganizationId` (sin TenantGuard, mismo patrón que status/entitlement).
+   */
+  @Post('orgs/:id/packs')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Habilitar un pack a una organización (super-admin)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Entitlement creado (activo=false)',
+    type: OrgPackEntitlementResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'El pack no aplica al vertical de la organización' })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  @ApiResponse({ status: 404, description: 'Organización o pack no encontrado' })
+  async habilitarPack(
+    @Param('id') id: string,
+    @Body() dto: HabilitarPackDto,
+    @CurrentUser() user: { sub: string },
+    @Req() req: Request,
+  ): Promise<OrgPackEntitlementResponseDto> {
+    (req as unknown as Record<string, unknown>)['tenantId'] = id;
+    return this.platformAdminService.habilitarPack(
+      id,
+      {
+        ...(dto.packId !== undefined ? { packId: dto.packId } : {}),
+        ...(dto.clave !== undefined ? { clave: dto.clave } : {}),
+      },
+      user.sub,
+    );
+  }
+
+  /**
+   * Riel de packs §5.4: el super-admin revoca el entitlement de un pack (borra la
+   * fila → cae la activación). Invalida el cache `org-packs:<id>` y audita.
+   */
+  @Delete('orgs/:id/packs/:packId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revocar el entitlement de un pack de una organización (super-admin)' })
+  @ApiResponse({ status: 204, description: 'Entitlement revocado' })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  @ApiResponse({ status: 404, description: 'Organización no encontrada' })
+  async revocarPack(
+    @Param('id') id: string,
+    @Param('packId') packId: string,
+    @Req() req: Request,
+  ): Promise<void> {
+    (req as unknown as Record<string, unknown>)['tenantId'] = id;
+    await this.platformAdminService.revocarPack(id, packId);
+  }
+
+  /**
+   * Riel de packs §5.4: lista los entitlements de packs de una org (habilitados +
+   * estado de activación) para el panel super-admin. GET cross-tenant auditado.
+   */
+  @Get('orgs/:id/packs')
+  @ApiOperation({ summary: 'Listar entitlements de packs de una organización (super-admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de entitlements con su pack y estado de activación',
+    type: [OrgPackEntitlementResponseDto],
+  })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  @ApiResponse({ status: 404, description: 'Organización no encontrada' })
+  async listarPacks(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<OrgPackEntitlementResponseDto[]> {
+    (req as unknown as Record<string, unknown>)['tenantId'] = id;
+    return this.platformAdminService.listarPacks(id);
   }
 }
