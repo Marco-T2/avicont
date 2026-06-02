@@ -2779,6 +2779,7 @@ export interface components {
             activeTenantId: string;
             /** @enum {string|null} */
             vertical: "CONTABILIDAD" | "GRANJA" | null;
+            packsActivos: string[];
         };
     };
     responses: never;

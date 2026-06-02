@@ -7831,13 +7831,20 @@
               "GRANJA"
             ],
             "nullable": true
+          },
+          "packsActivos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "permissions",
           "isOwner",
           "activeTenantId",
-          "vertical"
+          "vertical",
+          "packsActivos"
         ]
       }
     }

@@ -40,6 +40,7 @@ describe('useVerticalActivo', () => {
       isOwner: false,
       activeTenantId: 'tenant-1',
       vertical: 'GRANJA',
+      packsActivos: [],
     });
     const { result } = renderHook(() => useVerticalActivo(), {
       wrapper: makeWrapper(qc),
@@ -55,6 +56,7 @@ describe('useVerticalActivo', () => {
       isOwner: true,
       activeTenantId: 'tenant-1',
       vertical: 'CONTABILIDAD',
+      packsActivos: [],
     });
     const { result } = renderHook(() => useVerticalActivo(), {
       wrapper: makeWrapper(qc),
@@ -69,6 +71,7 @@ describe('useVerticalActivo', () => {
       isOwner: false,
       activeTenantId: 'tenant-1',
       vertical: null,
+      packsActivos: [],
     });
     const { result } = renderHook(() => useVerticalActivo(), {
       wrapper: makeWrapper(qc),
@@ -99,6 +102,7 @@ describe('useVerticalActivo', () => {
       isOwner: false,
       activeTenantId: 'tenant-1',
       vertical: 'GRANJA',
+      packsActivos: [],
     });
     const { result } = renderHook(() => useVerticalActivo(), {
       wrapper: makeWrapper(qc),

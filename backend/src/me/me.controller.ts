@@ -1,10 +1,11 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Inject, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ForbiddenError } from '@/common/errors/forbidden.error';
 import { RbacService } from '@/rbac/rbac.service';
 import { PrismaService } from '@/common/prisma.service';
+import { ORG_PACKS_READER_PORT, OrgPacksReaderPort } from '@/packs/ports/org-packs.reader.port';
 import { MePermissionsResponseDto, VerticalActivo } from './dto/me-permissions-response.dto';
 import { MePlatformResponseDto } from './dto/me-platform-response.dto';
 
@@ -23,6 +24,8 @@ export class MeController {
   constructor(
     private readonly rbac: RbacService,
     private readonly prisma: PrismaService,
+    @Inject(ORG_PACKS_READER_PORT)
+    private readonly orgPacks: OrgPacksReaderPort,
   ) {}
 
   @Get('permissions')
@@ -70,11 +73,18 @@ export class MeController {
 
     const resolved = await this.rbac.resolverPermisosConContexto(user.sub, activeTenantId);
 
+    // Packs activos (eje 2) leídos por el puerto público del módulo packs/ (core
+    // §3.7): cruzar frontera de módulo → port, nunca query directa a
+    // OrgPackEntitlement desde me/. Va en la misma respuesta que el frontend ya
+    // pide para el vertical → cero round-trip HTTP extra.
+    const packsActivos = await this.orgPacks.packsActivos(activeTenantId);
+
     return {
       permissions: resolved.permissions,
       isOwner: resolved.isOwner,
       activeTenantId,
       vertical: derivarVertical(membresia.organization),
+      packsActivos,
     };
   }
 

@@ -99,7 +99,12 @@ export async function cleanupTestData() {
   await prisma.periodoFiscalReopening.deleteMany({});
   await prisma.periodoFiscal.deleteMany({});
   await prisma.gestionFiscal.deleteMany({});
+  // Packs (eje 2): OrgPackEntitlement cascadea al borrar Organization, pero lo
+  // borramos explícito antes (su FK hacia Pack es Restrict). Pack es catálogo
+  // global sin FK a Organization, así que se limpia aparte tras los entitlements.
+  await prisma.orgPackEntitlement.deleteMany({});
   await prisma.organization.deleteMany({});
+  await prisma.pack.deleteMany({});
   // Segunda limpieza de platform_audit justo antes de usuarios: atrapa escrituras
   // async tardías (el interceptor usa void/fire-and-forget). La org ya fue borrada
   // (targetOrganizationId → SET NULL en BD); ahora limpiamos antes de eliminar users

@@ -259,5 +259,91 @@ describe('GET /api/me/permissions (e2e)', () => {
         expect(res.body).toHaveProperty('activeTenantId');
       });
     });
+
+    describe('campo packsActivos', () => {
+      it('org con un pack activo → packsActivos incluye su clave', async () => {
+        const pack = await prisma.pack.create({
+          data: {
+            clave: `contabilidad.adjuntos-${Date.now()}`,
+            nombre: 'Adjuntos',
+            verticalAplicable: 'CONTABILIDAD',
+            tipo: 'CAPACIDAD',
+          },
+        });
+        const habilitador = await prisma.user.create({
+          data: {
+            email: `habilitador-pack-${Date.now()}@me.bo`,
+            hashedPassword: 'x',
+            isEmailVerified: true,
+          },
+        });
+        await prisma.orgPackEntitlement.create({
+          data: {
+            organizationId: orgId,
+            packId: pack.id,
+            activo: true,
+            habilitadoPorUserId: habilitador.id,
+          },
+        });
+
+        const token = await crearUsuarioYToken('packs-activo@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.packsActivos).toEqual([pack.clave]);
+        // Aditivo: el resto de la respuesta sigue presente.
+        expect(res.body).toHaveProperty('permissions');
+        expect(res.body).toHaveProperty('vertical');
+      });
+
+      it('org con entitlement apagado (activo=false) → packsActivos no lo incluye', async () => {
+        const pack = await prisma.pack.create({
+          data: {
+            clave: `contabilidad.rag-${Date.now()}`,
+            nombre: 'RAG',
+            verticalAplicable: 'CONTABILIDAD',
+            tipo: 'CAPACIDAD',
+          },
+        });
+        const habilitador = await prisma.user.create({
+          data: {
+            email: `habilitador-apagado-${Date.now()}@me.bo`,
+            hashedPassword: 'x',
+            isEmailVerified: true,
+          },
+        });
+        await prisma.orgPackEntitlement.create({
+          data: {
+            organizationId: orgId,
+            packId: pack.id,
+            activo: false,
+            habilitadoPorUserId: habilitador.id,
+          },
+        });
+
+        const token = await crearUsuarioYToken('packs-apagado@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.packsActivos).toEqual([]);
+      });
+
+      it('org sin packs → packsActivos: []', async () => {
+        const token = await crearUsuarioYToken('packs-ninguno@me.bo', SystemRole.OWNER);
+
+        const res = await request(app.getHttpServer())
+          .get('/api/me/permissions')
+          .set('Authorization', `Bearer ${token}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.packsActivos).toEqual([]);
+      });
+    });
   });
 });
