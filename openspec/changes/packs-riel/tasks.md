@@ -180,29 +180,35 @@ OWNER/ADMIN, validación de frontera; e2e del flujo completo del riel.
 **Entregable**: catálogo asignable filtrado backend-autoritativo + `validatePermissions`
 suma el filtro + frontend espeja.
 
-- [ ] 7.1 **Test (integración/e2e)**: org de Contabilidad con pack `contabilidad.adjuntos`
+- [x] 7.1 **Test (integración/e2e)**: org de Contabilidad con pack `contabilidad.adjuntos`
   activo → catálogo asignable incluye `contabilidad.adjuntos.*`; sin el pack → NO los
   incluye; nunca incluye `granja.*`; siempre incluye `organizacion.*`/`sistema.*`.
   Crear `CustomRole` con permiso de pack no activo → `PermisoNoHabilitadoError`.
-- [ ] 7.2 Función de filtrado (en `common/permisos/` o servicio): dado vertical + packs
+  (e2e `test/permissions-asignables.e2e-spec.ts` con pack real `contabilidad.ventas` —
+  adjuntos es placeholder sin permisos en el catálogo todavía.)
+- [x] 7.2 Función de filtrado (en `common/permisos/` o servicio): dado vertical + packs
   activos de la org, filtra `CATALOGO_PERMISOS`/`catalogoAgrupado()`. **Convención**: un
   submódulo `{modulo}.{submodulo}` que sea clave de un `Pack` solo entra si ese pack está
   activo; submódulos cross-vertical (`organizacion`, `sistema`) y del vertical activo no
   asociados a pack entran siempre; submódulos de otro vertical se excluyen.
-- [ ] 7.3 Endpoint asignable: filtrar el catálogo en `permissions.controller.ts`
+  (`common/permisos/catalogo-asignable.ts` — puro; resolver `permissions/catalogo-asignable.resolver.ts`.)
+- [x] 7.3 Endpoint asignable: filtrar el catálogo en `permissions.controller.ts`
   (`GET /permissions/grouped` ya consumido por la UI, o nuevo `GET /permissions/asignables`)
   por vertical + packs activos del tenant. Server-authoritative.
-- [ ] 7.4 `custom-roles.service.ts:149` (`validatePermissions`): sumar el filtro — un
+  (`GET /permissions/grouped` ahora filtrado; `GET /permissions` queda como referencia plana.)
+- [x] 7.4 `custom-roles.service.ts:149` (`validatePermissions`): sumar el filtro — un
   permiso de un submódulo de pack no activo → `PermisoNoHabilitadoError`. Mantener el
   comportamiento de wildcards existente.
-- [ ] 7.5 `PermisoNoHabilitadoError` en `custom-roles/domain/custom-role-errors.ts`
-  (código estable, mensaje español).
-- [ ] 7.6 **Frontend**: `permissions-picker.tsx`
+- [x] 7.5 `PermisoNoHabilitadoError` en `custom-roles/domain/custom-role-errors.ts`
+  (código estable, mensaje español: `CUSTOM_ROLE_PERMISO_NO_HABILITADO`).
+- [x] 7.6 **Frontend**: `permissions-picker.tsx`
   (`frontend/src/features/roles/components/`) consume el catálogo YA filtrado (no
   re-filtra; espeja el backend como `usePermissions`). Ajustar el hook/api del picker al
   endpoint asignable. Regenerar OpenAPI si cambió el contrato.
-- [ ] 7.7 **Test (frontend)**: el picker no muestra permisos de packs no activos
-  (renderiza lo que el backend devuelve).
+  (El picker ya consumía `GET /permissions/grouped`, ahora filtrado server-side — espeja sin
+  cambio de código; OpenAPI back+front regenerado.)
+- [x] 7.7 **Test (frontend)**: el picker no muestra permisos de packs no activos
+  (renderiza lo que el backend devuelve). (`permissions-picker.test.tsx`.)
 - **Hecho cuando**: backend filtra y `validatePermissions` rechaza permisos de pack no
   activo; front espeja; tests back + front verdes; sin drift de contrato.
 

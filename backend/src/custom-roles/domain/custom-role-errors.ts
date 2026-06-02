@@ -99,3 +99,19 @@ export class PermisoDesconocidoError extends ValidationError {
     super('CUSTOM_ROLE_PERMISO_DESCONOCIDO', `Permiso desconocido: "${permiso}"`, { permiso });
   }
 }
+
+/**
+ * El permiso existe en el catálogo pero NO es asignable en esta org: pertenece
+ * a otro vertical, o a un submódulo de un pack que la org no tiene activo
+ * (eje 2, cierre de la deuda RBAC — docs/disenos/packs-eje2.md §7). Es el
+ * candado server-authoritative que respalda el filtrado del catálogo asignable.
+ */
+export class PermisoNoHabilitadoError extends ValidationError {
+  constructor(permiso: string) {
+    super(
+      'CUSTOM_ROLE_PERMISO_NO_HABILITADO',
+      `El permiso "${permiso}" no está habilitado para esta organización (vertical o pack no activo)`,
+      { permiso },
+    );
+  }
+}

@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
+import type { ContextoAsignable } from '@/common/permisos/catalogo-asignable';
+import { CatalogoAsignableResolver } from '@/permissions/catalogo-asignable.resolver';
 import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   type PermissionsCacheInvalidationPort,
@@ -14,6 +16,7 @@ import {
   CustomRoleSlugDuplicadoError,
   PermisoDesconocidoError,
   PermisoInvalidoError,
+  PermisoNoHabilitadoError,
 } from './domain/custom-role-errors';
 import {
   CUSTOM_ROLE_REPOSITORY_PORT,
@@ -33,10 +36,23 @@ describe('CustomRolesService (unit)', () => {
 
   type RepoMock = jest.Mocked<CustomRoleRepositoryPort>;
   type RbacMock = jest.Mocked<PermissionsCacheInvalidationPort>;
+  type ResolverMock = jest.Mocked<Pick<CatalogoAsignableResolver, 'resolver'>>;
+
+  // Contexto por defecto: org de CONTABILIDAD sin packs (catálogo de packs vacío)
+  // → todos los submódulos de contabilidad son core/asignables. Los tests del
+  // candado de pack sobreescriben este contexto. Se usa `contabilidad.ventas`
+  // como submódulo "pack" en esos tests porque SÍ tiene permisos en el catálogo
+  // (contabilidad.adjuntos es placeholder sin permisos todavía).
+  const CTX_CONTABILIDAD: ContextoAsignable = {
+    vertical: 'CONTABILIDAD',
+    packsCatalogo: [],
+    packsActivos: [],
+  };
 
   let service: CustomRolesService;
   let repo: RepoMock;
   let rbac: RbacMock;
+  let resolver: ResolverMock;
 
   const baseRole = () => ({
     id: ROLE_ID,
@@ -68,12 +84,16 @@ describe('CustomRolesService (unit)', () => {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
       invalidateUsersByCustomRole: jest.fn().mockResolvedValue(undefined),
     } as unknown as RbacMock;
+    resolver = {
+      resolver: jest.fn().mockResolvedValue(CTX_CONTABILIDAD),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CustomRolesService,
         { provide: CUSTOM_ROLE_REPOSITORY_PORT, useValue: repo },
         { provide: PERMISSIONS_CACHE_INVALIDATION_PORT, useValue: rbac },
+        { provide: CatalogoAsignableResolver, useValue: resolver },
       ],
     }).compile();
 
@@ -174,6 +194,106 @@ describe('CustomRolesService (unit)', () => {
           permissions: ['*.read'],
         }),
       ).rejects.toBeInstanceOf(PermisoInvalidoError);
+    });
+
+    // ---- Candado de la deuda RBAC: vertical + packs (§7) ----
+
+    it('acepta un permiso core del vertical activo', async () => {
+      repo.findBySlug.mockResolvedValue(null);
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
+
+      await service.create(TENANT_ID, ACTOR_USER_ID, {
+        slug: 'contador',
+        name: 'Contador',
+        permissions: ['contabilidad.asientos.create'],
+      });
+
+      expect(repo.create).toHaveBeenCalled();
+    });
+
+    it('lanza PermisoNoHabilitadoError si el permiso es de otro vertical', async () => {
+      await expect(
+        service.create(TENANT_ID, ACTOR_USER_ID, {
+          slug: 'granjero',
+          name: 'Granjero',
+          permissions: ['granja.lotes.read'],
+        }),
+      ).rejects.toBeInstanceOf(PermisoNoHabilitadoError);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('lanza PermisoNoHabilitadoError si el permiso es de un submódulo de pack NO activo', async () => {
+      resolver.resolver.mockResolvedValue({
+        vertical: 'CONTABILIDAD',
+        packsCatalogo: ['contabilidad.ventas'],
+        packsActivos: [],
+      });
+      await expect(
+        service.create(TENANT_ID, ACTOR_USER_ID, {
+          slug: 'vendedor',
+          name: 'Vendedor',
+          permissions: ['contabilidad.ventas.read'],
+        }),
+      ).rejects.toBeInstanceOf(PermisoNoHabilitadoError);
+    });
+
+    it('acepta un permiso de submódulo de pack cuando el pack está activo', async () => {
+      resolver.resolver.mockResolvedValue({
+        vertical: 'CONTABILIDAD',
+        packsCatalogo: ['contabilidad.ventas'],
+        packsActivos: ['contabilidad.ventas'],
+      });
+      repo.findBySlug.mockResolvedValue(null);
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
+
+      await service.create(TENANT_ID, ACTOR_USER_ID, {
+        slug: 'vendedor',
+        name: 'Vendedor',
+        permissions: ['contabilidad.ventas.read'],
+      });
+
+      expect(repo.create).toHaveBeenCalled();
+    });
+
+    it('acepta organizacion.* y sistema.* siempre (cross-vertical)', async () => {
+      repo.findBySlug.mockResolvedValue(null);
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
+
+      await service.create(TENANT_ID, ACTOR_USER_ID, {
+        slug: 'admin-rol',
+        name: 'Admin',
+        permissions: ['organizacion.miembros.read', 'sistema.feature-flags.admin'],
+      });
+
+      expect(repo.create).toHaveBeenCalled();
+    });
+
+    it('rechaza wildcard de submódulo de pack no activo (contabilidad.ventas.*)', async () => {
+      resolver.resolver.mockResolvedValue({
+        vertical: 'CONTABILIDAD',
+        packsCatalogo: ['contabilidad.ventas'],
+        packsActivos: [],
+      });
+      await expect(
+        service.create(TENANT_ID, ACTOR_USER_ID, {
+          slug: 'vendedor',
+          name: 'Vendedor',
+          permissions: ['contabilidad.ventas.*'],
+        }),
+      ).rejects.toBeInstanceOf(PermisoNoHabilitadoError);
+    });
+
+    it('acepta wildcard amplio del vertical (contabilidad.*) — grant estilo OWNER', async () => {
+      repo.findBySlug.mockResolvedValue(null);
+      repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
+
+      await service.create(TENANT_ID, ACTOR_USER_ID, {
+        slug: 'jefe',
+        name: 'Jefe',
+        permissions: ['contabilidad.*'],
+      });
+
+      expect(repo.create).toHaveBeenCalled();
     });
   });
 

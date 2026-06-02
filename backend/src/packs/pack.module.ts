@@ -52,6 +52,9 @@ import { PackService } from './pack.service';
     PackService,
     PACK_CATALOG_READER_PORT,
     ORG_PACK_REPOSITORY_PORT,
+    // Vertical de la org: lo consume el filtrado del catálogo asignable (slice 7,
+    // deuda RBAC) para excluir permisos del otro vertical.
+    ORG_VERTICAL_READER_PORT,
   ],
 })
 export class PacksModule {}
