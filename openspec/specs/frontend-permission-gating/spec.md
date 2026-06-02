@@ -1,8 +1,8 @@
 # frontend-permission-gating — Especificación
 
 <!--
-Última edición: 2026-06-01
-Última revisión contra core: 2026-06-01
+Última edición: 2026-06-02
+Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
 
@@ -195,15 +195,25 @@ catálogo y un permiso no-catalogado no aparecería para ADMIN.
 
 ---
 
-### REQ-FG-04: NavItem con requiredPermission opcional
+### REQ-FG-04: NavItem con requiredPermission y vertical opcionales
 
-El tipo `NavItem` en `src/components/nav-items.ts` DEBE agregar la prop
-`requiredPermission?: string`.
+El tipo `NavItem` en `src/components/nav-items.ts` DEBE tener las props:
+- `requiredPermission?: string` — el permiso requerido para ver el ítem.
+- `vertical?: 'CONTABILIDAD' | 'GRANJA'` — el vertical al que pertenece el ítem de operación.
+  Items de administración (`organizacion.*`) y el "Panel" raíz NO declaran `vertical` → visibles en ambos verticales.
 
-El componente `NavList` (o `NavItemRenderer`) DEBE evaluar `requiredPermission`:
-- Si está presente y `has(requiredPermission)` es `false`: el ítem NO se renderiza.
-- Si está presente y `has(requiredPermission)` es `true`: el ítem se renderiza normalmente.
-- Si está ausente (undefined): el ítem siempre se renderiza.
+> El campo `vertical` fue agregado al archivar el change `shell-por-vertical` (2026-06-02).
+> El comportamiento completo del filtrado por vertical vive en
+> `openspec/specs/shell-vertical/spec.md` (REQ-SV-2).
+
+El componente `NavList` DEBE filtrar un ítem como visible si y solo si se cumplen AMBOS predicados:
+
+1. **Permiso**: `item.requiredPermission === undefined || has(item.requiredPermission)`.
+2. **Vertical**: `item.vertical === undefined || item.vertical === verticalActivo`.
+
+El predicado de vertical es **fail-closed**: si `verticalActivo` es `undefined`
+(cargando) o `null` (org sin vertical), ningún ítem con `vertical` declarado pasa el
+filtro. Los items sin `vertical` siguen sujetos solo a `requiredPermission`.
 
 `NavList` DEBE llamar a `usePermissions()` una sola vez y pasar el resultado
 a cada item, NO llamar al hook una vez por item.
