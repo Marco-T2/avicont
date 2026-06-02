@@ -1130,6 +1130,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/packs/mis-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar los packs habilitados de la org con su estado de activación */
+        get: operations["PackController_misPacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/packs/{clave}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Activar o desactivar un pack habilitado de la org activa */
+        patch: operations["PackController_activar"];
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -2293,6 +2327,17 @@ export interface components {
             activo: boolean;
             habilitadoPorUserId: string;
             pack: components["schemas"]["PackResponseDto"];
+        };
+        ActivarPackDto: {
+            /** @description true = activar el pack; false = desactivarlo. */
+            activo: boolean;
+        };
+        ActivacionPackResponseDto: {
+            id: string;
+            organizationId: string;
+            packId: string;
+            /** @description Estado de activación tras el cambio. */
+            activo: boolean;
         };
         CreateFeatureFlagDto: {
             /**
@@ -5115,6 +5160,64 @@ export interface operations {
                 content?: never;
             };
             /** @description Organización no encontrada */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PackController_misPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPackEntitlementResponseDto"][];
+                };
+            };
+        };
+    };
+    PackController_activar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivarPackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivacionPackResponseDto"];
+                };
+            };
+            /** @description Pack no habilitado para la org (PACK_NO_HABILITADO) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pack inexistente en el catálogo */
             404: {
                 headers: {
                     [name: string]: unknown;

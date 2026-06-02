@@ -10,6 +10,7 @@ import { ORG_PACK_REPOSITORY_PORT } from './ports/org-pack.repository.port';
 import { ORG_PACKS_READER_PORT } from './ports/org-packs.reader.port';
 import { ORG_VERTICAL_READER_PORT } from './ports/org-vertical.reader.port';
 import { PACK_CATALOG_READER_PORT } from './ports/pack-catalog.reader.port';
+import { PackController } from './pack.controller';
 import { PackService } from './pack.service';
 
 /**
@@ -22,6 +23,7 @@ import { PackService } from './pack.service';
  * exporta `PackService` y el catálogo para los controllers de slices posteriores.
  */
 @Module({
+  controllers: [PackController],
   providers: [
     PrismaService,
     // PrismaService depende de TenantContextService (mismo patrón que granja y

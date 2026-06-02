@@ -3228,6 +3228,88 @@
         ]
       }
     },
+    "/api/packs/mis-packs": {
+      "get": {
+        "operationId": "PackController_misPacks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgPackEntitlementResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar los packs habilitados de la org con su estado de activación",
+        "tags": [
+          "Packs"
+        ]
+      }
+    },
+    "/api/packs/{clave}": {
+      "patch": {
+        "operationId": "PackController_activar",
+        "parameters": [
+          {
+            "name": "clave",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivarPackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivacionPackResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pack no habilitado para la org (PACK_NO_HABILITADO)"
+          },
+          "404": {
+            "description": "Pack inexistente en el catálogo"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Activar o desactivar un pack habilitado de la org activa",
+        "tags": [
+          "Packs"
+        ]
+      }
+    },
     "/api/audit": {
       "get": {
         "operationId": "AuditController_list",
@@ -6503,6 +6585,42 @@
           "activo",
           "habilitadoPorUserId",
           "pack"
+        ]
+      },
+      "ActivarPackDto": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "description": "true = activar el pack; false = desactivarlo."
+          }
+        },
+        "required": [
+          "activo"
+        ]
+      },
+      "ActivacionPackResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "packId": {
+            "type": "string"
+          },
+          "activo": {
+            "type": "boolean",
+            "description": "Estado de activación tras el cambio."
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "packId",
+          "activo"
         ]
       },
       "CreateFeatureFlagDto": {

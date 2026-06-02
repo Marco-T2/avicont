@@ -195,6 +195,66 @@ describe('PackService', () => {
     });
   });
 
+  describe('activarPorClave (resolución clave → packId + frontera)', () => {
+    it('resuelve la clave y delega en activar', async () => {
+      const { service, repo, catalog } = makeService();
+      catalog.findByClave.mockResolvedValue(makePack());
+      repo.findByOrgYPack.mockResolvedValue(makeEntitlementRow({ activo: false }));
+      repo.setActivo.mockResolvedValue(makeEntitlementRow({ activo: true }));
+
+      const res = await service.activarPorClave(ORG_ID, CLAVE, true);
+
+      expect(catalog.findByClave).toHaveBeenCalledWith(CLAVE);
+      expect(repo.setActivo).toHaveBeenCalledWith(ORG_ID, PACK_ID, true);
+      expect(res.activo).toBe(true);
+    });
+
+    it('desactiva (activo=false) cuando hay entitlement', async () => {
+      const { service, repo, catalog, redis } = makeService();
+      catalog.findByClave.mockResolvedValue(makePack());
+      repo.findByOrgYPack.mockResolvedValue(makeEntitlementRow({ activo: true }));
+      repo.setActivo.mockResolvedValue(makeEntitlementRow({ activo: false }));
+
+      const res = await service.activarPorClave(ORG_ID, CLAVE, false);
+
+      expect(repo.setActivo).toHaveBeenCalledWith(ORG_ID, PACK_ID, false);
+      expect(redis.del).toHaveBeenCalledWith(CACHE_KEY);
+      expect(res.activo).toBe(false);
+    });
+
+    it('rechaza con PackNoEncontradoError si la clave no existe en el catálogo', async () => {
+      const { service, repo, catalog } = makeService();
+      catalog.findByClave.mockResolvedValue(null);
+
+      await expect(service.activarPorClave(ORG_ID, 'no.existe', true)).rejects.toBeInstanceOf(
+        PackNoEncontradoError,
+      );
+      expect(repo.setActivo).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con PackNoHabilitadoError (frontera) si el pack existe pero NO está habilitado', async () => {
+      const { service, repo, catalog } = makeService();
+      catalog.findByClave.mockResolvedValue(makePack());
+      repo.findByOrgYPack.mockResolvedValue(null);
+
+      await expect(service.activarPorClave(ORG_ID, CLAVE, true)).rejects.toBeInstanceOf(
+        PackNoHabilitadoError,
+      );
+      expect(repo.setActivo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listarMisPacks', () => {
+    it('devuelve los entitlements de la org con su pack y estado de activación', async () => {
+      const { service, repo } = makeService();
+      const entitlements = [{ ...makeEntitlementRow({ activo: true }), pack: makePack() }];
+      repo.findByOrg.mockResolvedValue(entitlements);
+
+      expect(await service.listarMisPacks(ORG_ID)).toBe(entitlements);
+      expect(repo.findByOrg).toHaveBeenCalledWith(ORG_ID);
+    });
+  });
+
   describe('revocar', () => {
     it('borra el entitlement de la org', async () => {
       const { service, repo } = makeService();
