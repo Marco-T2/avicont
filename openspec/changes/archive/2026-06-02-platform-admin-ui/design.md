@@ -237,7 +237,7 @@ Agregar a `frontend/src/types/api.ts` (con comentario que referencia el DTO back
 - `PlatformOrg = { id, name, slug, status: OrgStatus, plan: OrgPlan, contabilidadEnabled, granjaEnabled, createdAt: string }`.
 - `OrgStatus = 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED'`.
 - `OrgPlan = 'FREE' | 'PRO'`.
-- `ModuloOrganizacion = 'CONTABILIDAD' | 'GRANJA'`.
+- `ModuloOrganizacion = 'CONTABILIDAD' | 'GRANJA' | 'OTROS'` (espeja el enum backend de 3 valores).
 - `CreateOrgRequest = { name: string; modulo: ModuloOrganizacion; ownerEmail: string }`.
 - `UpdateOrgStatusRequest = { status: OrgStatus }`.
 - `UpdateEntitlementRequest = { plan?: OrgPlan; contabilidadEnabled?: boolean; granjaEnabled?: boolean }`.
