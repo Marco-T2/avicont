@@ -4,10 +4,12 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as usePermissionsModule from '@/lib/use-permissions';
+import * as usePacksModule from '@/lib/use-packs';
 import * as useVerticalModule from '@/lib/use-vertical';
 import type { VerticalActivo } from '@/types/api';
 
-import { NAV_ITEMS } from './nav-items';
+import * as navItemsModule from './nav-items';
+import { NAV_ITEMS, type NavItem } from './nav-items';
 import { NavList } from './nav-list';
 
 function mockPermissions(overrides: {
@@ -35,6 +37,13 @@ function mockVertical(v: VerticalActivo | undefined) {
   });
 }
 
+function mockPacks(packsActivos: string[] | undefined) {
+  vi.spyOn(usePacksModule, 'useMisPacks').mockReturnValue({
+    packsActivos,
+    isLoading: packsActivos === undefined,
+  });
+}
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient();
   return (
@@ -43,6 +52,12 @@ function Wrapper({ children }: { children: React.ReactNode }) {
     </QueryClientProvider>
   );
 }
+
+beforeEach(() => {
+  // Default: sin packs activos. Como ningún NAV_ITEM real declara `pack`,
+  // los ítems de producción no se ven afectados por este default.
+  mockPacks([]);
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -300,5 +315,114 @@ describe('NavList — filtrado por vertical', () => {
       </Wrapper>,
     );
     expect(screen.queryByText('Balance General')).not.toBeInTheDocument();
+  });
+});
+
+describe('NavList — filtrado por pack (riel eje 2)', () => {
+  // Ningún NAV_ITEM real declara `pack` todavía (no hay pack concreto construido).
+  // Para probar el tercer eje del riel inyectamos un ítem-sonda con `pack` en el
+  // array real de producción y lo removemos en cleanup — exactamente el patrón con
+  // el que se enchufará un pack futuro (item.pack === clave del Pack).
+  const PROBE_LABEL = 'Sonda Pack';
+  const PROBE_PACK = 'contabilidad.adjuntos';
+  const probeItem: NavItem = {
+    to: '/__probe-pack__',
+    label: PROBE_LABEL,
+    icon: navItemsModule.NAV_ITEMS[0]!.icon,
+    requiredPermission: 'contabilidad.eeff.read',
+    vertical: 'CONTABILIDAD',
+    pack: PROBE_PACK,
+  };
+
+  beforeEach(() => {
+    // isOwner=true + vertical CONTABILIDAD para aislar el filtro de pack.
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    NAV_ITEMS.push(probeItem);
+  });
+
+  afterEach(() => {
+    const idx = NAV_ITEMS.indexOf(probeItem);
+    if (idx !== -1) NAV_ITEMS.splice(idx, 1);
+  });
+
+  it('ítem sin `pack` pasa el filtro de pack (visible aun sin packs activos)', () => {
+    mockPacks([]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    // Balance General no declara `pack` → visible aunque packsActivos esté vacío.
+    expect(screen.getAllByText('Balance General').length).toBeGreaterThan(0);
+  });
+
+  it('ítem con `pack` activo → visible', () => {
+    mockPacks([PROBE_PACK]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText(PROBE_LABEL).length).toBeGreaterThan(0);
+  });
+
+  it('ítem con `pack` NO activo → oculto', () => {
+    mockPacks(['contabilidad.rag']); // otro pack, no el de la sonda
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText(PROBE_LABEL)).not.toBeInTheDocument();
+  });
+
+  it('loading (packsActivos indefinido) → ítem con `pack` oculto (fail-closed)', () => {
+    mockPacks(undefined);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText(PROBE_LABEL)).not.toBeInTheDocument();
+  });
+
+  it('cascada completa permiso ∧ vertical ∧ pack: falla cualquiera → oculto', () => {
+    // Pack activo y vertical OK, pero SIN el permiso requerido → oculto.
+    mockPermissions({ allowedPermissions: [] });
+    mockPacks([PROBE_PACK]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText(PROBE_LABEL)).not.toBeInTheDocument();
+  });
+
+  it('cascada completa: pack activo + vertical ajeno → oculto', () => {
+    // Permiso OK (isOwner) y pack activo, pero vertical GRANJA ≠ CONTABILIDAD → oculto.
+    mockPermissions({ isOwner: true });
+    mockVertical('GRANJA');
+    mockPacks([PROBE_PACK]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText(PROBE_LABEL)).not.toBeInTheDocument();
+  });
+});
+
+// Guard anti-drift: ningún NAV_ITEM de producción declara `pack` todavía. El riel
+// queda listo para enchufar; cuando se construya el primer pack, este test obliga a
+// revisar conscientemente la decisión (y a actualizar la cascada de filtros si cambia).
+describe('NAV_ITEMS — riel de pack sin enchufar aún', () => {
+  it('ningún ítem de producción declara `pack` (riel listo, sin pack concreto)', () => {
+    for (const item of NAV_ITEMS) {
+      expect(
+        item.pack,
+        `"${item.label}" (${item.to}) declara pack sin que exista un pack concreto construido`,
+      ).toBeUndefined();
+    }
   });
 });

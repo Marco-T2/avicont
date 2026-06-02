@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useMisPacks } from '@/lib/use-packs';
 import { usePermissions } from '@/lib/use-permissions';
 import { useVerticalActivo } from '@/lib/use-vertical';
 import { cn } from '@/lib/utils';
@@ -18,19 +19,25 @@ export function NavList({
   onItemClick,
   collapsed = false,
 }: NavListProps): React.JSX.Element {
-  // Filtrado AND por permiso Y vertical (aditivos, independientes).
+  // Filtrado AND por permiso Y vertical Y pack (aditivos, independientes).
   // has() es fail-closed (false durante loading) → los ítems con requiredPermission
   // permanecen ocultos hasta que carguen los permisos.
   // Filtro de vertical: fail-closed por comparación estricta —
   //   undefined === 'CONTABILIDAD' → false (cargando: ocultar ítems con vertical)
   //   null === 'GRANJA' → false (sin módulo: ocultar ítems con vertical)
   // Items sin `vertical` (administración cross-vertical) siempre pasan.
+  // Filtro de pack (eje 2): fail-closed —
+  //   packsActivos undefined (cargando) → ocultar ítems con `pack` (no parpadean).
+  //   Items sin `pack` siempre pasan (igual que los sin `vertical`).
   const { has } = usePermissions();
   const { vertical: verticalActivo } = useVerticalActivo();
+  const { packsActivos } = useMisPacks();
   const visibleItems = NAV_ITEMS.filter((item) => {
     const pasaPermiso = item.requiredPermission === undefined || has(item.requiredPermission);
     const pasaVertical = item.vertical === undefined || item.vertical === verticalActivo;
-    return pasaPermiso && pasaVertical;
+    const pasaPack =
+      item.pack === undefined || (packsActivos?.includes(item.pack) ?? false);
+    return pasaPermiso && pasaVertical && pasaPack;
   });
 
   return (
