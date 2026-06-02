@@ -187,7 +187,7 @@ estados de loading / empty / error.
 ## REQ-PAUI-07 — Crear organización (manejo 422 ownerEmail)
 
 La pantalla DEBE permitir crear una organización vía un Sheet-form (`name`, `modulo`
-CONTABILIDAD/GRANJA, `ownerEmail`) que llama `POST /admin/platform/orgs`. Valida con zod en el
+CONTABILIDAD/GRANJA/OTROS, `ownerEmail`) que llama `POST /admin/platform/orgs`. Valida con zod en el
 cliente y maneja el `422` del backend (ownerEmail no es usuario registrado) sin cerrar el form.
 
 ### Scenario: crear org exitoso
