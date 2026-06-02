@@ -1060,6 +1060,16 @@ export interface PlatformOrg {
   createdAt: string;
 }
 
+// Espeja backend platform/dto/create-org.dto.ts (CreateOrgDto). El super-admin
+// crea la org y designa al OWNER por email (debe ser un usuario ya registrado;
+// si no existe, el backend responde 422 PLATFORM_ORG_OWNER_NOT_FOUND). `modulo`
+// determina el seeding inicial y los flags de vertical (reusa ModuloOrganizacion).
+export interface CreateOrgRequest {
+  name: string;
+  modulo: ModuloOrganizacion;
+  ownerEmail: string;
+}
+
 // ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
 // Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.

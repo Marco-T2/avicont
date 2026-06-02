@@ -100,14 +100,14 @@ Branch: `feat/platform-admin-orgs-list`. Depende de PR-0.
 
 Branch: `feat/platform-admin-create-org`. Depende de PR-0/PR-1.
 
-- [ ] Tipos: `ModuloOrganizacion = 'CONTABILIDAD'|'GRANJA'`, `CreateOrgRequest = { name: string; modulo: ModuloOrganizacion; ownerEmail: string }`.
-- [ ] `api/create-org.ts`: `POST /admin/platform/orgs`.
-- [ ] `schemas/create-org-schema.ts`: zod — `name` (≤100, no vacío), `modulo` enum, `ownerEmail` email; mensajes en español.
-- [ ] `hooks/use-create-org.ts`: `useMutation` con `onSuccess` (invalidar `['platform-orgs']` + toast éxito), `onError` (toast.error con `mensajeDeError`, sin cerrar form).
-- [ ] **Test primero**: `components/create-org-sheet.test.tsx` (mock `use-create-org`): validación zod (name vacío / email inválido → no llama backend), submit deshabilitado con `isPending`, éxito cierra + refresca, 422 → toast + form abierto.
-- [ ] `components/create-org-sheet.tsx` (Sheet + react-hook-form + zod + select modulo).
-- [ ] Botón "Crear organización" en `OrgsPage` que abre el Sheet.
-- [ ] Verificación PR-2:
+- [x] Tipos: `CreateOrgRequest = { name: string; modulo: ModuloOrganizacion; ownerEmail: string }`. (`ModuloOrganizacion` ya existe en `types/api.ts` con los 3 valores `'CONTABILIDAD'|'GRANJA'|'OTROS'` — se reusa, espeja el `CreateOrgDto` real del backend.)
+- [x] `api/create-org.ts`: `POST /admin/platform/orgs`.
+- [x] `schemas/create-org-schema.ts`: zod — `name` (≤100, no vacío), `modulo` enum, `ownerEmail` email; mensajes en español.
+- [x] `hooks/use-create-org.ts`: `useMutation` con `onSuccess` (invalidar `['platform-orgs']` + toast éxito), `onError` (toast.error con `backendErrorMessage`, sin cerrar form).
+- [x] **Test primero**: `components/create-org-sheet.test.tsx` (mock `use-create-org`): validación zod (name vacío / email inválido → no llama backend), submit deshabilitado con `isPending`, éxito cierra + refresca, 422 → form abierto.
+- [x] `components/create-org-sheet.tsx` (Sheet + react-hook-form + zod + select modulo).
+- [x] Botón "Crear organización" en `OrgsPage` que abre el Sheet.
+- [x] Verificación PR-2:
   ```bash
   cd frontend
   pnpm exec tsc -b

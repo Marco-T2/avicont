@@ -1,6 +1,8 @@
-import { Building2 } from 'lucide-react';
+import { Building2, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -12,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import type { PlatformOrg } from '@/types/api';
 
+import { CreateOrgSheet } from '../components/create-org-sheet';
 import { OrgPlanBadge } from '../components/org-plan-badge';
 import { OrgStatusBadge } from '../components/org-status-badge';
 import { useOrgs } from '../hooks/use-orgs';
@@ -29,12 +32,13 @@ function formatearFecha(iso: string): string {
 }
 
 /**
- * Listado de organizaciones de la plataforma (super-admin, PR-1).
- * Container: orquesta useOrgs y maneja loading/empty/error. La creación de orgs
- * y las acciones por fila llegan en PR-2/PR-3.
+ * Listado de organizaciones de la plataforma (super-admin, PR-1/PR-2).
+ * Container: orquesta useOrgs y maneja loading/empty/error. PR-2 agrega la creación
+ * de orgs (CreateOrgSheet). Las acciones por fila llegan en PR-3.
  */
 export function OrgsPage(): React.JSX.Element {
   const { data, isLoading, isError } = useOrgs();
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -45,9 +49,15 @@ export function OrgsPage(): React.JSX.Element {
             Todas las organizaciones de la plataforma.
           </p>
         </div>
+        <Button onClick={() => setCreateOpen(true)} className="self-start">
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva organización
+        </Button>
       </div>
 
       <OrgsContent data={data} isLoading={isLoading} isError={isError} />
+
+      <CreateOrgSheet open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

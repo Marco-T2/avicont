@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PlatformOrg } from '@/types/api';
@@ -7,6 +8,10 @@ import { OrgsPage } from './orgs-page';
 
 vi.mock('../hooks/use-orgs', () => ({
   useOrgs: vi.fn(),
+}));
+
+vi.mock('../hooks/use-create-org', () => ({
+  useCreateOrg: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 import { useOrgs } from '../hooks/use-orgs';
@@ -83,5 +88,20 @@ describe('OrgsPage', () => {
     expect(
       screen.getByText('No se pudieron cargar las organizaciones.'),
     ).toBeInTheDocument();
+  });
+
+  it('el botón "Nueva organización" abre el sheet de creación', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    render(<OrgsPage />);
+
+    // El sheet arranca cerrado: su título no está montado.
+    expect(screen.queryByText('Nueva organización', { selector: 'h2' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /nueva organización/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Email del responsable')).toBeInTheDocument();
+    });
   });
 });
