@@ -38,6 +38,14 @@ export interface NavItem {
    * Items con permiso contabilidad.* → 'CONTABILIDAD'; granja.* → 'GRANJA'.
    */
   vertical?: 'CONTABILIDAD' | 'GRANJA';
+  /**
+   * Clave del Pack (eje 2) que habilita el ítem. Si está ausente, el ítem
+   * siempre pasa el filtro de pack (como los ítems sin `vertical` pasan el de
+   * vertical). Si está presente, el ítem solo se muestra cuando esa clave está
+   * en los packs activos de la org (`packsActivos` de /me/permissions).
+   * Coincide con la clave que el backend exige vía `@RequirePack`.
+   */
+  pack?: string;
 }
 
 // Única fuente de verdad del menú principal. Consumida por AppSidebar
