@@ -140,15 +140,15 @@ Branch: `feat/platform-admin-status-entitlement`. Depende de PR-0/PR-1.
 
 Branch: `feat/platform-admin-feature-flags`. Depende de PR-0.
 
-- [ ] Tipos: `FeatureFlag = { id; key; name; description?; enabled; tenantId?; metadata?; createdAt: string; updatedAt: string }`, `CreateFeatureFlagRequest = { key; name; description?; enabled?; metadata? }`, `UpdateFeatureFlagRequest = { name?; description?; enabled?; metadata? }` (espeja `feature-flag.dto.ts`). Spread condicional para opcionales.
-- [ ] `api/`: `get-feature-flags.ts` (GET), `create-feature-flag.ts` (POST), `update-feature-flag.ts` (PUT `/:key`), `toggle-feature-flag.ts` (POST `/:key/toggle`), `delete-feature-flag.ts` (DELETE `/:key`).
-- [ ] `schemas/feature-flag-schema.ts`: zod — `key` patrón `^[a-z][a-z0-9_]*$` (≤100), `name` (≤200), `description?` (≤500); mensajes en español.
-- [ ] `hooks/`: `use-feature-flags.ts` (query `['feature-flags-global']`), `use-create-feature-flag.ts`, `use-update-feature-flag.ts`, `use-toggle-feature-flag.ts`, `use-delete-feature-flag.ts` (mutations con invalidación + toast).
-- [ ] **Test primero**: `pages/feature-flags-page.test.tsx` (mock hooks): tabla con switch, loading/empty/error en español, toggle llama mutation. Luego `pages/feature-flags-page.tsx`.
-- [ ] **Test primero**: `components/feature-flag-sheet.test.tsx` (mock create/update): validación de `key` (formato inválido no llama backend), crear y editar. Luego `components/feature-flag-sheet.tsx`.
-- [ ] **Test primero**: `components/feature-flag-delete-dialog.test.tsx` (mock delete): confirmar llama, cancelar no. Luego `components/feature-flag-delete-dialog.tsx` (`AlertDialog`).
-- [ ] Conectar la ruta `/platform-admin/feature-flags` del router a `FeatureFlagsPage` real (reemplazar placeholder de PR-0).
-- [ ] Verificación PR-4:
+- [x] Tipos: `FeatureFlag` (reusado: el catálogo global devuelve filas Prisma crudas → `organizationId` no `tenantId`; el shape ya existía en `api.ts`), `CreateFeatureFlagRequest = { key; name; description?; enabled?; metadata? }`, `UpdateFeatureFlagRequest = { name?; description?; enabled?; metadata? }`, `ToggleFeatureFlagResponse = { key; enabled }` (espeja `feature-flag.dto.ts`). Spread condicional para opcionales.
+- [x] `api/`: `get-feature-flags.ts` (GET), `create-feature-flag.ts` (POST), `update-feature-flag.ts` (PUT `/:key`), `toggle-feature-flag.ts` (POST `/:key/toggle`), `delete-feature-flag.ts` (DELETE `/:key`).
+- [x] `schemas/feature-flag-schema.ts`: zod — `key` patrón `^[a-z][a-z0-9_]*$` (≤100), `name` (≤200), `description?` (≤500); mensajes en español.
+- [x] `hooks/`: `use-feature-flags.ts` (query `['feature-flags-global']`), `use-create-feature-flag.ts`, `use-update-feature-flag.ts`, `use-toggle-feature-flag.ts`, `use-delete-feature-flag.ts` (mutations con invalidación + toast).
+- [x] **Test primero**: `pages/feature-flags-page.test.tsx` (mock hooks): tabla con switch, loading/empty/error en español, toggle llama mutation. Luego `pages/feature-flags-page.tsx`.
+- [x] **Test primero**: `components/feature-flag-sheet.test.tsx` (mock create/update): validación de `key` (formato inválido no llama backend), crear y editar. Luego `components/feature-flag-sheet.tsx`.
+- [x] **Test primero**: `components/feature-flag-delete-dialog.test.tsx` (mock delete): confirmar llama, cancelar no. Luego `components/feature-flag-delete-dialog.tsx` (`AlertDialog`).
+- [x] Conectar la ruta `/platform-admin/feature-flags` del router a `FeatureFlagsPage` real (reemplazar placeholder de PR-0).
+- [x] Verificación PR-4:
   ```bash
   cd frontend
   pnpm exec tsc -b
@@ -156,6 +156,11 @@ Branch: `feat/platform-admin-feature-flags`. Depende de PR-0.
   ```
 
 ---
+
+> **PR-4 completado (2026-06-02)**. Con esto, todas las tasks de PR-0..PR-4 quedan en `[x]`.
+> El change `platform-admin-ui` está **listo para `/sdd-verify`**. Verificación final
+> frontend: `tsc -b` limpio + lint 0 + 981/981 tests verde (134 archivos), incluyendo
+> 72/72 de `src/features/platform-admin` y 63/63 de `src/routes` + `src/components`.
 
 ## Fuera de scope (v1)
 

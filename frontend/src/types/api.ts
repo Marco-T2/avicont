@@ -562,6 +562,38 @@ export interface UpdateFeatureFlagOverrideRequest {
   metadata?: Record<string, unknown>;
 }
 
+// ── Catálogo GLOBAL de feature flags (super-admin) — /api/admin/feature-flags ──
+// El controller admin (feature-flags-admin.controller.ts) devuelve las filas
+// Prisma crudas, así que el shape de un flag global es el mismo `FeatureFlag` de
+// arriba (organizationId === null para los globales). Estos requests espejan
+// CreateFeatureFlagDto / UpdateFeatureFlagDto (feature-flags/dto/feature-flag.dto.ts).
+// La `key` valida el patrón ^[a-z][a-z0-9_]*$ (≤100) en el backend (400 si no);
+// crear una key existente da 409 FEATURE_FLAG_DUPLICADA, mutar una inexistente da
+// 404 FEATURE_FLAG_NO_ENCONTRADA. Por exactOptionalPropertyTypes, construir el
+// body con spread condicional (no pasar `undefined` explícito).
+
+export interface CreateFeatureFlagRequest {
+  key: string;
+  name: string;
+  description?: string;
+  enabled?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateFeatureFlagRequest {
+  name?: string;
+  description?: string;
+  enabled?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+// Respuesta de POST /admin/feature-flags/:key/toggle — el backend devuelve solo
+// la key y el nuevo estado (no la fila completa).
+export interface ToggleFeatureFlagResponse {
+  key: string;
+  enabled: boolean;
+}
+
 // ============================================================
 // Gestiones y períodos fiscales (Fase 1.2 backend)
 // Espejo de backend/src/periodos-fiscales/dto/*.ts.

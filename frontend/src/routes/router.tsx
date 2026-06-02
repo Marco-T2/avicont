@@ -29,7 +29,7 @@ import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
 import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
-import { FeatureFlagsPlaceholderPage } from '@/features/platform-admin/pages/feature-flags-placeholder-page';
+import { FeatureFlagsPage } from '@/features/platform-admin/pages/feature-flags-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -241,7 +241,7 @@ export const router = createBrowserRouter([
             path: '/platform-admin/feature-flags',
             element: (
               <RequireSuperAdmin>
-                <FeatureFlagsPlaceholderPage />
+                <FeatureFlagsPage />
               </RequireSuperAdmin>
             ),
           },
