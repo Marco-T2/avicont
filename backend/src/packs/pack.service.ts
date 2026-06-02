@@ -111,6 +111,32 @@ export class PackService {
     await this.redis.del(this.cacheKey(organizationId));
   }
 
+  /**
+   * Activa/desactiva un pack de la org activa por su `clave` estable. Punto de
+   * entrada del Owner (`PATCH /packs/:clave`): el front conoce la clave, no el id.
+   * Resuelve clave → packId (404 `PACK_NO_ENCONTRADO` si no está en el catálogo)
+   * y delega en `activar`, que enforza la frontera activación⊆entitlement (§4.5).
+   */
+  async activarPorClave(
+    organizationId: string,
+    clave: string,
+    activo: boolean,
+  ): Promise<OrgPackEntitlementRow> {
+    const pack = await this.catalog.findByClave(clave);
+    if (pack === null) {
+      throw new PackNoEncontradoError({ clave });
+    }
+    return this.activar(organizationId, pack.id, activo);
+  }
+
+  /**
+   * Lista los packs habilitados de la org activa con su estado de activación,
+   * para que el Owner sepa qué puede prender/apagar (`GET /packs/mis-packs`).
+   */
+  listarMisPacks(organizationId: string): Promise<OrgPackEntitlementConPack[]> {
+    return this.repo.findByOrg(organizationId);
+  }
+
   /** Resuelve `packId` o `clave` a un packId del catálogo (404 si no existe). */
   private async resolverPackId(ref: { packId?: string; clave?: string }): Promise<string> {
     if (ref.packId !== undefined) {
