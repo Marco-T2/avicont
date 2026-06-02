@@ -333,5 +333,243 @@ describe('Impersonation (e2e)', () => {
       expect(res.status).toBe(403);
     });
   });
-});
 
+  describe('REQ-SA-17 delta: SA org-less impersonation con organizationId', () => {
+    let saOrglessToken: string;
+    let targetOrgId: string;
+    let targetMemberId: string;
+    let targetOwnerIdInTargetOrg: string;
+
+    beforeEach(async () => {
+      // Crear una segunda org con sus propios miembros — completamente ajena al SA
+      const hashedPassword = await bcrypt.hash('password123', 10);
+
+      const targetOwner = await prisma.user.create({
+        data: { email: 'targetowner@sa-imp.bo', hashedPassword, isEmailVerified: true },
+      });
+      targetOwnerIdInTargetOrg = targetOwner.id;
+
+      const targetMember = await prisma.user.create({
+        data: { email: 'targetmember@sa-imp.bo', hashedPassword, isEmailVerified: true },
+      });
+      targetMemberId = targetMember.id;
+
+      const targetOrg = await prisma.organization.create({
+        data: {
+          slug: 'sa-imp-target-org',
+          name: 'SA Imp Target Org',
+          memberships: {
+            create: [{ userId: targetOwner.id, systemRole: SystemRole.OWNER }],
+          },
+        },
+      });
+      targetOrgId = targetOrg.id;
+
+      // Crear el role y el miembro para targetOrg
+      const role = await prisma.customRole.create({
+        data: {
+          organizationId: targetOrgId,
+          slug: 'contador-sa',
+          name: 'Contador SA',
+          permissions: ['contabilidad.*'],
+        },
+      });
+      await prisma.membership.create({
+        data: { organizationId: targetOrgId, userId: targetMember.id, customRoleId: role.id },
+      });
+
+      // SA org-less: sin activeTenantId en JWT (no tiene membresía en ninguna org)
+      saOrglessToken = await setupSuperAdmin('sa-orgless@sa-imp.bo');
+    });
+
+    it('[+] SA envía organizationId → 201 + impersonationToken; token NO contiene isSuperAdmin', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({
+          targetUserId: targetMemberId,
+          reason: 'SA cross-tenant: revisar cuenta del cliente',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.impersonationToken).toBeTruthy();
+      expect(res.body.impersonationId).toBeTruthy();
+      expect(res.body.expiresAt).toBeTruthy();
+
+      // El token de impersonation NO debe llevar isSuperAdmin (REQ-SA-04)
+      const impToken = res.body.impersonationToken as string;
+      const payload = JSON.parse(
+        Buffer.from(impToken.split('.')[1] ?? '', 'base64').toString(),
+      ) as Record<string, unknown>;
+      expect(Object.prototype.hasOwnProperty.call(payload, 'isSuperAdmin')).toBe(false);
+      expect(payload.sub).toBe(targetMemberId);
+    });
+
+    it('[+] fila en platform_audit y en ImpersonationLog', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({
+          targetUserId: targetMemberId,
+          reason: 'SA cross-tenant: doble auditoría test',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(201);
+      const impId = res.body.impersonationId as string;
+
+      // Dar tiempo al void fire-and-forget del platformAudit.record
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // ImpersonationLog creado (auditoría existente)
+      const log = await prisma.impersonationLog.findUnique({ where: { id: impId } });
+      expect(log).not.toBeNull();
+      expect(log?.targetUserId).toBe(targetMemberId);
+      expect(log?.organizationId).toBe(targetOrgId);
+
+      // platform_audit creado (auditoría cross-tenant SA)
+      const auditRow = await prisma.platformAudit.findFirst({
+        where: { action: 'platform.impersonation.start', targetOrganizationId: targetOrgId },
+      });
+      expect(auditRow).not.toBeNull();
+      expect(auditRow?.payload).toMatchObject({ impersonationId: impId });
+    });
+
+    it('[-] SA sin organizationId y sin tenant activo → 403 "Se requiere contexto de organización"', async () => {
+      // SA org-less sin organizationId → resolveTenantId lanza ForbiddenException
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({ targetUserId: targetMemberId, reason: 'sin org → debe fallar' });
+
+      expect(res.status).toBe(403);
+      // El GlobalExceptionFilter envuelve el mensaje en { error: { message } }
+      const body = res.body as { error?: { message?: string } };
+      expect(body.error?.message).toMatch(/organización/i);
+    });
+
+    it('[-] SA intenta impersonar a OWNER de org ajena → IMPERSONATION_TARGET_ES_OWNER', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({
+          targetUserId: targetOwnerIdInTargetOrg,
+          reason: 'SA intenta impersonar a OWNER',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('[-] SA con organizationId pero target no es miembro de esa org → IMPERSONATION_TARGET_NO_MIEMBRO (404)', async () => {
+      // targetUserId viene del describe padre → es miembro de orgId, NO de targetOrgId
+      // TargetNoMiembroError extends NotFoundError → 404
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({
+          targetUserId,
+          reason: 'target no miembro de targetOrgId',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('[-] SA intenta impersonarse a sí mismo → IMPERSONATION_SELF_NO_PERMITIDA', async () => {
+      const saPayload = JSON.parse(
+        Buffer.from(saOrglessToken.split('.')[1] ?? '', 'base64').toString(),
+      ) as { sub: string };
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${saOrglessToken}`)
+        .send({
+          targetUserId: saPayload.sub,
+          reason: 'auto-impersonation no permitida',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('[regresión] OWNER sin organizationId → 201 exactamente como antes (retrocompat)', async () => {
+      // ownerToken + X-Tenant-ID header → resolveTenantId usa header como hoy
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ targetUserId, reason: 'regresión: OWNER flujo intacto' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.impersonationToken).toBeTruthy();
+      expect(res.body.impersonationId).toBeTruthy();
+    });
+
+    it('[-] OWNER envía organizationId de otra org → ignorado; resolveTenantId usa contexto propio', async () => {
+      // OWNER que envía organizationId: como isSuperAdmin es false, el controller lo ignora
+      // y usa resolveTenantId(req) = X-Tenant-ID header = orgId (propio)
+      // → target sí es miembro de orgId → 201
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({
+          targetUserId,
+          reason: 'OWNER con organizationId ajena → ignorada',
+          organizationId: targetOrgId,
+        });
+
+      expect(res.status).toBe(201);
+    });
+
+    it('[-] OWNER envía organizationId ajena con target SOLO en esa org → 404 (gap W2: no escalación cross-tenant)', async () => {
+      // Escenario adversarial (gap W2 del verify): OWNER de orgId intenta impersonar a
+      // targetMemberId, que es miembro de targetOrgId pero NO de orgId.
+      // El controller ignora organizationId porque isSuperAdmin=false y usa
+      // resolveTenantId(req) = orgId (propio). El service busca al target en orgId
+      // y no lo encuentra → TargetNoMiembroError → 404.
+      // Garantía: un OWNER no puede usar el campo organizationId para escalar privilegios
+      // e impersonar en una org ajena, incluso si el target existe allí.
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({
+          targetUserId: targetMemberId,
+          reason: 'W2: OWNER intenta escalar a org ajena via organizationId',
+          organizationId: targetOrgId,
+        });
+
+      // 404 porque el controller resuelve orgId (propio del OWNER) y targetMemberId
+      // no tiene membresía ahí → TargetNoMiembroError.
+      // NO debe ser 201 (que indicaría escalación cross-tenant exitosa).
+      expect(res.status).toBe(404);
+
+      // Confirmar que NO se creó ningún ImpersonationLog para este intento
+      const logs = await prisma.impersonationLog.findMany({
+        where: { targetUserId: targetMemberId, organizationId: orgId },
+      });
+      expect(logs).toHaveLength(0);
+    });
+
+    it('[-] OWNER sin organizationId con target SOLO en org ajena → mismo 404 (confirma que el body org no cambia nada)', async () => {
+      // Variante: misma situación pero sin enviar organizationId en el body.
+      // El resultado es idéntico: el controller usa resolveTenantId(req) = orgId,
+      // el target no está en orgId → 404.
+      // Este test confirma que el campo organizationId no tiene ningún efecto
+      // sobre la resolución de tenant para un OWNER.
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/impersonate')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({
+          targetUserId: targetMemberId,
+          reason: 'W2 variante: sin organizationId, target en org ajena → mismo 404',
+        });
+
+      expect(res.status).toBe(404);
+    });
+  });
+});

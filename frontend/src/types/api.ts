@@ -517,6 +517,8 @@ export interface ListarDocumentosFisicosParams {
 export interface StartImpersonationRequest {
   targetUserId: string;
   reason: string;
+  /** Solo lo usa el super-admin org-less para especificar la org target. */
+  organizationId?: string;
 }
 
 export interface StartImpersonationResponse {

@@ -12,9 +12,20 @@ vi.mock('../hooks/use-org-members', () => ({
 // Router param mock
 vi.mock('react-router-dom', () => ({
   useParams: vi.fn(() => ({ id: 'org-1' })),
+  useNavigate: vi.fn(() => vi.fn()),
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
     <a href={to}>{children}</a>
   ),
+}));
+
+// Auth store: el SA tiene id 'sa-user'
+vi.mock('@/stores/auth-store', () => ({
+  useAuthStore: vi.fn(() => 'sa-user'),
+}));
+
+// useStartImpersonation mock (usado por PlatformImpersonateDialog dentro de PlatformMembersTable)
+vi.mock('../../../features/impersonation/hooks/use-impersonation', () => ({
+  useStartImpersonation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 import { useOrgMembers } from '../hooks/use-org-members';
