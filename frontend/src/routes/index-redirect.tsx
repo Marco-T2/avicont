@@ -2,7 +2,9 @@ import { Navigate } from 'react-router-dom';
 
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEsSuperAdmin } from '@/features/platform-admin/hooks/use-es-super-admin';
 import { useVerticalActivo } from '@/lib/use-vertical';
+import { useAuthStore } from '@/stores/auth-store';
 
 import { SinModulo } from './sin-modulo';
 
@@ -17,19 +19,37 @@ import { SinModulo } from './sin-modulo';
  * - 'GRANJA'             → <Navigate replace> a /granja
  * - null (sin módulo)    → <SinModulo> (admin ve botón, no-admin ve mensaje)
  * - 'CONTABILIDAD'       → <DashboardPage> (comportamiento previo al change)
+ *
+ * Rama previa: un super-admin SIN tenant activo se redirige al panel de
+ * plataforma (su home natural). Un super-admin que TAMBIÉN tiene tenant activo
+ * sigue el flujo de vertical (no se le secuestra el dashboard de la org).
  */
 export function IndexRedirect(): React.JSX.Element {
+  const { esSuperAdmin, isLoading: superAdminLoading } = useEsSuperAdmin();
+  const activeTenantId = useAuthStore((s) => s.user?.activeTenantId);
   const { vertical } = useVerticalActivo();
+
+  const skeleton = (
+    <div data-testid="index-redirect-skeleton" className="space-y-4">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-32 w-full" />
+      <Skeleton className="h-48 w-full" />
+    </div>
+  );
+
+  // Mientras no sepamos si es super-admin, no decidir → skeleton (anti-flash).
+  if (superAdminLoading) {
+    return skeleton;
+  }
+
+  // Super-admin sin tenant activo → panel de plataforma (su home org-less).
+  if (esSuperAdmin && activeTenantId === undefined) {
+    return <Navigate to="/platform-admin" replace />;
+  }
 
   // undefined = cargando → skeleton, NO flash de la pantalla contable.
   if (vertical === undefined) {
-    return (
-      <div data-testid="index-redirect-skeleton" className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return skeleton;
   }
 
   if (vertical === 'GRANJA') {
