@@ -57,6 +57,7 @@ describe('usePermissions', () => {
         isOwner: false,
         activeTenantId: 'tenant-123',
         vertical: null,
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -73,6 +74,7 @@ describe('usePermissions', () => {
         isOwner: false,
         activeTenantId: 'tenant-123',
         vertical: null,
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -88,6 +90,7 @@ describe('usePermissions', () => {
         isOwner: false,
         activeTenantId: 'tenant-123',
         vertical: null,
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -103,6 +106,7 @@ describe('usePermissions', () => {
         isOwner: false,
         activeTenantId: 'tenant-123',
         vertical: null,
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -118,6 +122,7 @@ describe('usePermissions', () => {
         isOwner: true,
         activeTenantId: 'tenant-123',
         vertical: 'CONTABILIDAD',
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -148,6 +153,7 @@ describe('usePermissions', () => {
         isOwner: false,
         activeTenantId: 'tenant-123',
         vertical: null,
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
@@ -175,6 +181,7 @@ describe('usePermissions', () => {
         isOwner: true,
         activeTenantId: 'tenant-123',
         vertical: 'CONTABILIDAD',
+        packsActivos: [],
       });
       withAuthenticatedUser('tenant-123');
       const { result } = renderHook(() => usePermissions(), {
