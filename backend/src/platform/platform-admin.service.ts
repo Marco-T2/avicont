@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { OrganizationStatus } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
+import { RedisService } from '@/cache/redis.service';
 import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
 import {
   PLAN_CUENTAS_SEEDER_PORT,
@@ -49,6 +50,7 @@ export class PlatformAdminService {
     @Inject(MEMBERSHIPS_READER_PORT)
     private readonly membershipsReader: MembershipsReaderPort,
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
   ) {}
 
   async listarOrgs(): Promise<PlatformOrgResponseDto[]> {
@@ -129,6 +131,9 @@ export class PlatformAdminService {
     if (!org) {
       throw new PlatformOrgNoEncontradaError(orgId);
     }
+    // Invalidar caché del guard para que el próximo request refleje el nuevo
+    // status sin esperar el TTL de 300s (OrgStatusGuard usa clave org-status:<id>).
+    await this.redis.del(`org-status:${orgId}`);
     this.logger.log(`Org '${org.name}' (${org.id}) status actualizado a ${status}`);
     return PlatformOrgResponseDto.fromOrganization(org);
   }
