@@ -1,5 +1,6 @@
-import { Building2, MoreHorizontal, Plus } from 'lucide-react';
+import { Building2, MoreHorizontal, Plus, Users } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -245,6 +246,13 @@ function OrgRowActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem asChild>
+          <Link to={`/platform-admin/orgs/${org.id}/members`} className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Ver miembros
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onEditEntitlement(org)}>
           Editar entitlement
         </DropdownMenuItem>

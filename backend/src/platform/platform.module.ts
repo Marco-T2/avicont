@@ -7,6 +7,7 @@ import { CuentasModule } from '@/cuentas/cuentas.module';
 import { TiposDocumentoFisicoModule } from '@/tipos-documento-fisico/tipos-documento-fisico.module';
 import { GranjaModule } from '@/granja/granja.module';
 import { UsersModule } from '@/users/users.module';
+import { MembershipsReaderModule } from '@/memberships/memberships-reader.module';
 
 import { PLATFORM_AUDIT_PORT } from './ports/platform-audit.port';
 import { PrismaPlatformAuditRepository } from './adapters/prisma-platform-audit.repository';
@@ -39,6 +40,8 @@ import { PlatformAdminController } from './platform-admin.controller';
     GranjaModule,
     // Provee USERS_READER_PORT para resolver ownerEmail → userId
     UsersModule,
+    // Provee MEMBERSHIPS_READER_PORT para listar miembros cross-tenant (REQ-PM-01)
+    MembershipsReaderModule,
   ],
   controllers: [PlatformAdminController],
   providers: [

@@ -22,6 +22,7 @@ import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateOrgStatusDto } from './dto/update-org-status.dto';
 import { UpdateEntitlementDto } from './dto/update-entitlement.dto';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
+import { PlatformOrgMemberResponseDto } from './dto/platform-org-member-response.dto';
 import { PlatformAdminService } from './platform-admin.service';
 
 /**
@@ -77,6 +78,34 @@ export class PlatformAdminController {
   })
   async crearOrg(@Body() dto: CreateOrgDto): Promise<PlatformOrgResponseDto> {
     return this.platformAdminService.crearOrgConOwner(dto);
+  }
+
+  /**
+   * REQ-PM-01: Lista los miembros de una organización (activos + desactivados).
+   *
+   * El SA opera cross-tenant: no usa TenantGuard. Se inyecta `req['tenantId'] = id`
+   * antes del interceptor para que PlatformAuditInterceptor registre
+   * targetOrganizationId (idéntico al patrón de actualizarStatus/actualizarEntitlement).
+   *
+   * Incluye activos Y desactivados (design §3.1 — el SA necesita ver toda la historia).
+   */
+  @Get('orgs/:id/members')
+  @ApiOperation({ summary: 'Listar miembros de una organización (super-admin)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de miembros (activos + desactivados)',
+    type: [PlatformOrgMemberResponseDto],
+  })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  @ApiResponse({ status: 404, description: 'Organización no encontrada' })
+  async listarMiembros(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<PlatformOrgMemberResponseDto[]> {
+    // El interceptor usa req.tenantId para registrar targetOrganizationId.
+    // Como no usamos TenantGuard aquí, lo poblamos manualmente con el path id.
+    (req as unknown as Record<string, unknown>)['tenantId'] = id;
+    return this.platformAdminService.listarMiembros(id);
   }
 
   /**

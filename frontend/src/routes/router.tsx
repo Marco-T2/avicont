@@ -30,6 +30,7 @@ import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
 import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
 import { FeatureFlagsPage } from '@/features/platform-admin/pages/feature-flags-page';
+import { OrgMembersPage } from '@/features/platform-admin/pages/org-members-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -242,6 +243,14 @@ export const router = createBrowserRouter([
             element: (
               <RequireSuperAdmin>
                 <FeatureFlagsPage />
+              </RequireSuperAdmin>
+            ),
+          },
+          {
+            path: '/platform-admin/orgs/:id/members',
+            element: (
+              <RequireSuperAdmin>
+                <OrgMembersPage />
               </RequireSuperAdmin>
             ),
           },
