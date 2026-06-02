@@ -14,6 +14,14 @@ vi.mock('../hooks/use-create-org', () => ({
   useCreateOrg: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+vi.mock('../hooks/use-update-org-status', () => ({
+  useUpdateOrgStatus: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('../hooks/use-update-entitlement', () => ({
+  useUpdateEntitlement: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
 import { useOrgs } from '../hooks/use-orgs';
 
 const orgs: PlatformOrg[] = [
@@ -102,6 +110,58 @@ describe('OrgsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Email del responsable')).toBeInTheDocument();
+    });
+  });
+
+  it('el menú de acciones de una org ACTIVE ofrece suspender, archivar y editar entitlement', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    render(<OrgsPage />);
+
+    await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
+
+    expect(
+      await screen.findByRole('menuitem', { name: /editar entitlement/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /suspender/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /archivar/i })).toBeInTheDocument();
+  });
+
+  it('el menú de acciones de una org SUSPENDED ofrece reactivar', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    render(<OrgsPage />);
+
+    await user.click(screen.getByRole('button', { name: /acciones para granja san josé/i }));
+
+    expect(
+      await screen.findByRole('menuitem', { name: /reactivar/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('al elegir "Editar entitlement" abre el sheet de entitlement', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    render(<OrgsPage />);
+
+    await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /editar entitlement/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /guardar/i })).toBeInTheDocument();
+    });
+  });
+
+  it('al elegir "Suspender" abre el dialog de confirmación de estado', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    render(<OrgsPage />);
+
+    await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /suspender/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('¿Suspender esta organización?')).toBeInTheDocument();
     });
   });
 });

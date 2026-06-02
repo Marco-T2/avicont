@@ -1070,6 +1070,24 @@ export interface CreateOrgRequest {
   ownerEmail: string;
 }
 
+// Espeja backend platform/dto/update-org-status.dto.ts (UpdateOrgStatusDto).
+// PATCH /admin/platform/orgs/:id/status — cambia el ciclo de vida de la org.
+export interface UpdateOrgStatusRequest {
+  status: OrgStatus;
+}
+
+// Espeja backend platform/dto/update-entitlement.dto.ts (UpdateEntitlementDto).
+// PATCH /admin/platform/orgs/:id/entitlement — patch parcial: todos los campos
+// son opcionales (los ausentes conservan el valor actual). El backend rechaza
+// con 422 PLATFORM_VERTICAL_NO_EXCLUSIVO si el estado resultante deja ambas
+// verticales en true. Por exactOptionalPropertyTypes, construir el body con
+// spread condicional (no pasar `undefined` explícito).
+export interface UpdateEntitlementRequest {
+  plan?: OrgPlan;
+  contabilidadEnabled?: boolean;
+  granjaEnabled?: boolean;
+}
+
 // ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
 // Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.

@@ -120,14 +120,14 @@ Branch: `feat/platform-admin-create-org`. Depende de PR-0/PR-1.
 
 Branch: `feat/platform-admin-status-entitlement`. Depende de PR-0/PR-1.
 
-- [ ] Tipos: `UpdateOrgStatusRequest = { status: OrgStatus }`, `UpdateEntitlementRequest = { plan?: OrgPlan; contabilidadEnabled?: boolean; granjaEnabled?: boolean }`. Usar spread condicional para campos opcionales (`exactOptionalPropertyTypes`).
-- [ ] `api/update-org-status.ts`: `PATCH /admin/platform/orgs/:id/status`. `api/update-entitlement.ts`: `PATCH /admin/platform/orgs/:id/entitlement`.
-- [ ] `schemas/entitlement-schema.ts`: zod — `plan` enum opcional + guard de exclusividad (no ambas verticales `true`), mensaje en español.
-- [ ] `hooks/use-update-org-status.ts` y `hooks/use-update-entitlement.ts`: mutations con invalidación de `['platform-orgs']` + toast; `onError` toast.error sin cerrar (entitlement: mapear 422 exclusividad).
-- [ ] **Test primero**: `components/org-status-dialog.test.tsx` (mock `use-update-org-status`): confirmar llama mutation + cierra al éxito; cancelar no llama. Luego `components/org-status-dialog.tsx` (`AlertDialog`).
-- [ ] **Test primero**: `components/entitlement-sheet.test.tsx` (mock `use-update-entitlement`): guard exclusividad en cliente (ambas true → error, no llama), submit OK, 422 → toast + form abierto. Luego `components/entitlement-sheet.tsx` (Sheet + plan select + switches verticales).
-- [ ] Acciones por fila en `OrgsPage` (dropdown-menu): "Cambiar estado" → `OrgStatusDialog`, "Editar entitlement" → `EntitlementSheet`.
-- [ ] Verificación PR-3:
+- [x] Tipos: `UpdateOrgStatusRequest = { status: OrgStatus }`, `UpdateEntitlementRequest = { plan?: OrgPlan; contabilidadEnabled?: boolean; granjaEnabled?: boolean }`. Usar spread condicional para campos opcionales (`exactOptionalPropertyTypes`).
+- [x] `api/update-org-status.ts`: `PATCH /admin/platform/orgs/:id/status`. `api/update-entitlement.ts`: `PATCH /admin/platform/orgs/:id/entitlement`.
+- [x] `schemas/entitlement-schema.ts`: zod — `plan` enum opcional + guard de exclusividad (no ambas verticales `true`), mensaje en español.
+- [x] `hooks/use-update-org-status.ts` y `hooks/use-update-entitlement.ts`: mutations con invalidación de `['platform-orgs']` + toast; `onError` toast.error sin cerrar (entitlement: mapear 422 exclusividad).
+- [x] **Test primero**: `components/org-status-dialog.test.tsx` (mock `use-update-org-status`): confirmar llama mutation + cierra al éxito; cancelar no llama. Luego `components/org-status-dialog.tsx` (`AlertDialog`).
+- [x] **Test primero**: `components/entitlement-sheet.test.tsx` (mock `use-update-entitlement`): guard exclusividad en cliente (ambas true → error, no llama), submit OK, 422 → toast + form abierto. Luego `components/entitlement-sheet.tsx` (Sheet + plan select + switches verticales).
+- [x] Acciones por fila en `OrgsPage` (dropdown-menu): "Cambiar estado" → `OrgStatusDialog`, "Editar entitlement" → `EntitlementSheet`.
+- [x] Verificación PR-3:
   ```bash
   cd frontend
   pnpm exec tsc -b
