@@ -26,4 +26,3 @@ export class PrismaOrgsReaderAdapter extends OrgsReaderPort {
     return this.prisma.organization.findUnique({ where: { id } });
   }
 }
-

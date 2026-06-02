@@ -13,7 +13,8 @@ export class UpdateEntitlementDto {
   plan?: Plan;
 
   @ApiPropertyOptional({
-    description: 'Activa o desactiva el módulo de contabilidad. No puede ser true si granjaEnabled es true.',
+    description:
+      'Activa o desactiva el módulo de contabilidad. No puede ser true si granjaEnabled es true.',
     example: true,
   })
   @IsBoolean()
@@ -21,7 +22,8 @@ export class UpdateEntitlementDto {
   contabilidadEnabled?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Activa o desactiva el módulo de granja. No puede ser true si contabilidadEnabled es true.',
+    description:
+      'Activa o desactiva el módulo de granja. No puede ser true si contabilidadEnabled es true.',
     example: false,
   })
   @IsBoolean()

@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 
 import { CLOCK_PORT } from '@/common/clock/clock.port';
 import { FakeClockAdapter } from '@/common/clock/fake-clock.adapter';
+import { RedisService } from '@/cache/redis.service';
 import {
   MEMBERSHIPS_READER_PORT,
   type MembershipsReaderPort,
@@ -81,7 +82,7 @@ describe('AuthService (unit)', () => {
         { provide: CLOCK_PORT, useValue: clock },
         { provide: 'RedisService', useValue: redis },
         // RedisService inyectado por clase (no por token), usamos useValue directo
-        { provide: require('@/cache/redis.service').RedisService, useValue: redis },
+        { provide: RedisService, useValue: redis },
       ],
     }).compile();
 

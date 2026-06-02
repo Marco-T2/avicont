@@ -67,7 +67,12 @@ describe('RbacService', () => {
 
     it('MEMBER con CustomRole ["contabilidad.*"] → solo permisos con prefijo contabilidad', async () => {
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: ['contabilidad.*'] },
+        resolvedResult: {
+          esOwner: false,
+          esAdmin: false,
+          esSuperAdmin: false,
+          wildcards: ['contabilidad.*'],
+        },
       });
 
       const result = await service.resolverPermisosConContexto('user-3', 'org-1');
@@ -96,7 +101,12 @@ describe('RbacService', () => {
     it('MEMBER con permisos exactos → devuelve exactamente esos permisos sin duplicados', async () => {
       const permisosExactos = ['contabilidad.libro-diario.read', 'contabilidad.libro-mayor.read'];
       const service = buildService({
-        resolvedResult: { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: permisosExactos },
+        resolvedResult: {
+          esOwner: false,
+          esAdmin: false,
+          esSuperAdmin: false,
+          wildcards: permisosExactos,
+        },
       });
 
       const result = await service.resolverPermisosConContexto('user-5', 'org-1');

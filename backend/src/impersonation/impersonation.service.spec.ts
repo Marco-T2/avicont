@@ -296,7 +296,9 @@ describe('ImpersonationService (unit)', () => {
       it('[-] callerEsSuperAdmin = true pero target es OWNER → lanza TargetEsOwnerError', async () => {
         memberships.findForImpersonation
           .mockResolvedValueOnce(null) // super-admin sin membership
-          .mockResolvedValueOnce(mkMembership({ systemRole: SystemRole.OWNER, userEmail: 'owner@imp.bo' }));
+          .mockResolvedValueOnce(
+            mkMembership({ systemRole: SystemRole.OWNER, userEmail: 'owner@imp.bo' }),
+          );
 
         await expect(service.start(ADMIN, TENANT, validDto(), true)).rejects.toThrow(
           TargetEsOwnerError,

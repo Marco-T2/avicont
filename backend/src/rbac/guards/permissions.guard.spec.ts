@@ -4,31 +4,9 @@ import { PermissionsGuard } from './permissions.guard';
 import { RbacService } from '../rbac.service';
 import { Reflector } from '@nestjs/core';
 
-function buildContext(opts: {
-  user?: unknown;
-  headers?: Record<string, string>;
-  handlerMetadata?: string[];
-}): ExecutionContext {
-  const reflector = {
-    getAllAndOverride: jest.fn().mockReturnValue(opts.handlerMetadata ?? ['some.permission']),
-  } as unknown as Reflector;
-
-  const request = {
-    user: opts.user,
-    headers: opts.headers ?? {},
-  };
-
-  const ctx = {
-    switchToHttp: () => ({ getRequest: () => request }),
-    getHandler: () => ({}),
-    getClass: () => ({}),
-    _reflector: reflector,
-  } as unknown as ExecutionContext;
-
-  return ctx;
-}
-
-function makeRbacSpy(hasAllResult = false): jest.Mocked<Pick<RbacService, 'hasAllPermissions' | 'hasPermission' | 'hasAnyPermission'>> {
+function makeRbacSpy(
+  hasAllResult = false,
+): jest.Mocked<Pick<RbacService, 'hasAllPermissions' | 'hasPermission' | 'hasAnyPermission'>> {
   return {
     hasAllPermissions: jest.fn().mockResolvedValue(hasAllResult),
     hasPermission: jest.fn().mockResolvedValue(hasAllResult),

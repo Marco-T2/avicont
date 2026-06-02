@@ -16,7 +16,12 @@ import {
 // Cuando el cache está vacío y el resolver dice "no es miembro", devolvemos
 // este objeto para fail-safe: cero permisos. NO se cachea para no dejar
 // "stuck" un usuario que aún se está terminando de aprovisionar.
-const EMPTY: ResolvedPermissions = { esOwner: false, esAdmin: false, esSuperAdmin: false, wildcards: [] };
+const EMPTY: ResolvedPermissions = {
+  esOwner: false,
+  esAdmin: false,
+  esSuperAdmin: false,
+  wildcards: [],
+};
 
 @Injectable()
 export class RbacService implements PermissionsCacheInvalidationPort {

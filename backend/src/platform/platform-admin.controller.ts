@@ -51,7 +51,11 @@ export class PlatformAdminController {
    */
   @Get('orgs')
   @ApiOperation({ summary: 'Listar todas las organizaciones (super-admin)' })
-  @ApiResponse({ status: 200, description: 'Lista de organizaciones', type: [PlatformOrgResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de organizaciones',
+    type: [PlatformOrgResponseDto],
+  })
   @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
   async listarOrgs(): Promise<PlatformOrgResponseDto[]> {
     return this.platformAdminService.listarOrgs();
@@ -67,7 +71,10 @@ export class PlatformAdminController {
   @ApiOperation({ summary: 'Crear organización con OWNER designado (super-admin)' })
   @ApiResponse({ status: 201, description: 'Organización creada', type: PlatformOrgResponseDto })
   @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
-  @ApiResponse({ status: 422, description: 'El ownerEmail no corresponde a ningún usuario registrado' })
+  @ApiResponse({
+    status: 422,
+    description: 'El ownerEmail no corresponde a ningún usuario registrado',
+  })
   async crearOrg(@Body() dto: CreateOrgDto): Promise<PlatformOrgResponseDto> {
     return this.platformAdminService.crearOrgConOwner(dto);
   }
@@ -106,10 +113,17 @@ export class PlatformAdminController {
    */
   @Patch('orgs/:id/entitlement')
   @ApiOperation({ summary: 'Actualizar plan y verticales de organización (super-admin)' })
-  @ApiResponse({ status: 200, description: 'Entitlement actualizado', type: PlatformOrgResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Entitlement actualizado',
+    type: PlatformOrgResponseDto,
+  })
   @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
   @ApiResponse({ status: 404, description: 'Organización no encontrada' })
-  @ApiResponse({ status: 422, description: 'Ambos verticales no pueden estar activos simultáneamente' })
+  @ApiResponse({
+    status: 422,
+    description: 'Ambos verticales no pueden estar activos simultáneamente',
+  })
   async actualizarEntitlement(
     @Param('id') id: string,
     @Body() dto: UpdateEntitlementDto,

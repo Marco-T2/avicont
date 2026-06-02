@@ -1,9 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { type Organization, type OrganizationStatus, SystemRole, type Prisma, type Plan } from '@prisma/client';
+import {
+  type Organization,
+  type OrganizationStatus,
+  SystemRole,
+  type Prisma,
+  type Plan,
+} from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 import { OrganizationConMemberships } from '@/tenants/ports/tenant.repository.port';
-import { OrgCreateData, OrgEntitlementData, OrgsWriterPort } from '@/platform/ports/orgs-writer.port';
+import {
+  OrgCreateData,
+  OrgEntitlementData,
+  OrgsWriterPort,
+} from '@/platform/ports/orgs-writer.port';
 
 /**
  * Adapter que implementa OrgsWriterPort para el módulo platform.
@@ -39,7 +49,10 @@ export class PrismaOrgsWriterAdapter extends OrgsWriterPort {
     });
   }
 
-  override async updateStatus(id: string, status: OrganizationStatus): Promise<Organization | null> {
+  override async updateStatus(
+    id: string,
+    status: OrganizationStatus,
+  ): Promise<Organization | null> {
     try {
       return await this.prisma.organization.update({
         where: { id },
@@ -52,13 +65,18 @@ export class PrismaOrgsWriterAdapter extends OrgsWriterPort {
     }
   }
 
-  override async updateEntitlement(id: string, data: OrgEntitlementData): Promise<Organization | null> {
+  override async updateEntitlement(
+    id: string,
+    data: OrgEntitlementData,
+  ): Promise<Organization | null> {
     try {
       return await this.prisma.organization.update({
         where: { id },
         data: {
           ...(data.plan !== undefined ? { plan: data.plan as Plan } : {}),
-          ...(data.contabilidadEnabled !== undefined ? { contabilidadEnabled: data.contabilidadEnabled } : {}),
+          ...(data.contabilidadEnabled !== undefined
+            ? { contabilidadEnabled: data.contabilidadEnabled }
+            : {}),
           ...(data.granjaEnabled !== undefined ? { granjaEnabled: data.granjaEnabled } : {}),
         },
       });
@@ -71,9 +89,6 @@ export class PrismaOrgsWriterAdapter extends OrgsWriterPort {
 
 function isPrismaNotFound(e: unknown): boolean {
   return (
-    typeof e === 'object' &&
-    e !== null &&
-    'code' in e &&
-    (e as { code: unknown }).code === 'P2025'
+    typeof e === 'object' && e !== null && 'code' in e && (e as { code: unknown }).code === 'P2025'
   );
 }

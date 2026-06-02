@@ -33,11 +33,7 @@ export class PlatformOrgOwnerNotFoundError extends InvalidStateError {
  */
 export class PlatformOrgNoEncontradaError extends NotFoundError {
   constructor(orgId: string) {
-    super(
-      'PLATFORM_ORG_NO_ENCONTRADA',
-      'La organización no existe en la plataforma',
-      { orgId },
-    );
+    super('PLATFORM_ORG_NO_ENCONTRADA', 'La organización no existe en la plataforma', { orgId });
   }
 }
 
