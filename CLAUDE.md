@@ -765,6 +765,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Path aliases | `@/` para imports desde `src/` | §3.6 |
 | Regla de imports | Nunca subir más de un nivel con `../`. Cross-module vía `@/` | §3.6 |
 | Separación dominio/infra | Dominio puro, sin NestJS ni Prisma | §3.5 |
+| Riel de packs (eje 2) | Catálogo global `Pack` + entitlement `OrgPackEntitlement` (activación embebida) + `@RequirePack`/`PackEnabledGuard` (cache Redis `org-packs:<id>` TTL 300, 404 deliberado) + `packsActivos` en `/me/permissions` + catálogo RBAC filtrado por packs. Módulo en `backend/src/packs/`. `OrgPacksReaderPort` = superficie cross-módulo. Change `packs-riel` (2026-06-02, PRs #150–#157). Diseño: `docs/disenos/packs-eje2.md`. Spec viva: `openspec/specs/packs-riel/spec.md`. | — |
 
 ### 10.2 Código
 

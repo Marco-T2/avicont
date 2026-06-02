@@ -1,10 +1,14 @@
-# Riel de packs (eje 2) — Bases / reglas para construcción futura
+# Riel de packs (eje 2) — Referencia del riel construido
 
-> **Estado: BASES / EN DISEÑO** (2026-06-02) — Documento que cierra las decisiones
-> de producto del **eje 2 (packs)** de `docs/disenos/plataforma-multi-vertical.md`
-> (§7, §10.3) y traza el plano de implementación. **No hay código aún**: esto
-> describe el QUÉ y el CÓMO antes de construir. **Ningún pack concreto se construye
-> en esta etapa** — se construye el RIEL sobre el que los packs se enchufan.
+> **Estado: CONSTRUIDO** (2026-06-02, change `packs-riel`, PRs #150–#157, main
+> `86105e8`) — El RIEL completo del eje 2 está implementado. Este documento pasó de
+> plano de diseño a referencia de lo construido. **Ningún pack concreto fue
+> construido en esta fase**: el catálogo contiene claves placeholder
+> (`contabilidad.adjuntos`, `contabilidad.rag`, `granja.rag`). La siguiente fase
+> consiste en enchufar el PRIMER PACK CONCRETO (Marco decide cuál): ver §9 para la
+> guía de "cómo enchufar un pack".
+>
+> **Spec viva**: `openspec/specs/packs-riel/spec.md` (reconciliada contra el código).
 >
 > Este doc **presupone** el `CLAUDE.md` raíz (multi-tenancy flat §4.2, defense in
 > depth §4.8, seguridad §5/§10.4), `docs/claude/seguridad.md`,
@@ -13,10 +17,8 @@
 > (alcance de plataforma, `isSuperAdmin`). Si algo acá contradice un invariante del
 > core → va al core primero, acá después (regla anti-drift §12 core).
 >
-> **Fuente de verdad de implementación**: el código y `schema.prisma`. Las
-> referencias `archivo:línea` reflejan el estado al 2026-06-02 (exploración previa
-> al build, engram `sdd/packs/explore`); verificá contra el código actual antes de
-> implementar.
+> **Fuente de verdad de implementación**: el código y `schema.prisma`.
+> Las referencias de archivos reflejan el estado al 2026-06-02.
 
 ---
 
