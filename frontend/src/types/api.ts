@@ -1030,6 +1030,12 @@ export interface MePermissionsResponse {
   vertical: VerticalActivo;
 }
 
+// Espeja backend me-platform-response.dto.ts. Org-less: identidad de plataforma
+// del usuario, independiente del tenant activo.
+export interface MePlatformResponse {
+  isSuperAdmin: boolean;
+}
+
 // ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
 // Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.

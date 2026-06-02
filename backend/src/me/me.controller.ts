@@ -6,11 +6,13 @@ import { ForbiddenError } from '@/common/errors/forbidden.error';
 import { RbacService } from '@/rbac/rbac.service';
 import { PrismaService } from '@/common/prisma.service';
 import { MePermissionsResponseDto, VerticalActivo } from './dto/me-permissions-response.dto';
+import { MePlatformResponseDto } from './dto/me-platform-response.dto';
 
 interface JwtUser {
   sub: string;
   email: string;
   activeTenantId?: string;
+  isSuperAdmin: boolean;
 }
 
 @ApiTags('Me')
@@ -73,6 +75,13 @@ export class MeController {
       activeTenantId,
       vertical: derivarVertical(membresia.organization),
     };
+  }
+
+  // Org-less por construcción (REQ-PAUI-01): no replica el chequeo de tenant del
+  // método permissions(). Un usuario normal recibe 200 { isSuperAdmin: false }.
+  @Get('platform')
+  platform(@CurrentUser() user: JwtUser): MePlatformResponseDto {
+    return { isSuperAdmin: user.isSuperAdmin === true };
   }
 }
 

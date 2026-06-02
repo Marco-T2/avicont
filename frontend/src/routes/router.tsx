@@ -1,8 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { RequirePermission } from '@/components/shared/require-permission';
+import { RequireSuperAdmin } from '@/components/shared/require-super-admin';
 import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
+import { PlatformShell } from '@/components/shells/platform-shell';
 import { LoginPage } from '@/features/auth/login-page';
 import { RegisterPage } from '@/features/auth/register-page';
 import { ComprobanteDetailPage } from '@/features/comprobantes/pages/comprobante-detail-page';
@@ -25,6 +27,9 @@ import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodo
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
+import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
+import { OrgsPlaceholderPage } from '@/features/platform-admin/pages/orgs-placeholder-page';
+import { FeatureFlagsPlaceholderPage } from '@/features/platform-admin/pages/feature-flags-placeholder-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -205,6 +210,39 @@ export const router = createBrowserRouter([
               <RequirePermission permission={PERMISSIONS.granja.tiposRegistro.read}>
                 <TiposRegistroPage />
               </RequirePermission>
+            ),
+          },
+        ],
+      },
+      // ─── Plataforma (super-admin, org-less) ───────────────────────────────
+      // Bloque hermano de DashboardShell: bajo ProtectedRoute (auth) pero FUERA
+      // de DashboardShell — usa PlatformShell (sin org-switcher). Cada ruta va
+      // envuelta en RequireSuperAdmin (defensa de routing, server-authoritative).
+      {
+        element: <PlatformShell />,
+        children: [
+          {
+            path: '/platform-admin',
+            element: (
+              <RequireSuperAdmin>
+                <PlatformHomePage />
+              </RequireSuperAdmin>
+            ),
+          },
+          {
+            path: '/platform-admin/orgs',
+            element: (
+              <RequireSuperAdmin>
+                <OrgsPlaceholderPage />
+              </RequireSuperAdmin>
+            ),
+          },
+          {
+            path: '/platform-admin/feature-flags',
+            element: (
+              <RequireSuperAdmin>
+                <FeatureFlagsPlaceholderPage />
+              </RequireSuperAdmin>
             ),
           },
         ],
