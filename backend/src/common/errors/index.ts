@@ -6,3 +6,4 @@ export * from './unauthorized.error';
 export * from './forbidden.error';
 export * from './invalid-state.error';
 export * from './external-service.error';
+export * from './org-status-no-activa.error';

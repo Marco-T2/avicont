@@ -12,6 +12,8 @@ import { TiposDocumentoFisicoModule } from '../tipos-documento-fisico/tipos-docu
 import { GranjaModule } from '../granja/granja.module';
 import { TENANT_REPOSITORY_PORT } from './ports/tenant.repository.port';
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
+import { ORG_STATUS_READER_PORT } from '@/common/ports/org-status-reader.port';
+import { PrismaOrgStatusReaderAdapter } from './adapters/prisma-org-status-reader.adapter';
 
 // CacheModule es @Global, así que RedisService está disponible sin importar.
 // forwardRef con PeriodosFiscalesModule para evitar dependencia circular si
@@ -48,7 +50,9 @@ import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
     TenantGuard,
     PrismaTenantRepository,
     { provide: TENANT_REPOSITORY_PORT, useExisting: PrismaTenantRepository },
+    PrismaOrgStatusReaderAdapter,
+    { provide: ORG_STATUS_READER_PORT, useExisting: PrismaOrgStatusReaderAdapter },
   ],
-  exports: [TenantsService],
+  exports: [TenantsService, ORG_STATUS_READER_PORT],
 })
 export class TenantsModule {}

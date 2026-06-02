@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
@@ -40,10 +41,22 @@ import { TenantContextInterceptor } from './common/interceptors/tenant-context.i
 import { HttpMetricsInterceptor } from './metrics/interceptors/http-metrics.interceptor';
 import { HttpLoggingInterceptor } from './logger/interceptors/http-logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { OrgStatusGuard } from './common/guards/org-status.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    // JwtModule expone JwtService para OrgStatusGuard (best-effort decode del
+    // access token sin req.user — ver design §D1 Decisión 1 y WIRING GAP).
+    // AuthModule no exporta JwtModule, por lo que se registra acá con el mismo
+    // secret para que el guard pueda verificar tokens sin forzar auth.
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_ACCESS_SECRET') || 'fallback-secret-change-in-production',
+      }),
+    }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -94,6 +107,10 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ImpersonationAuditInterceptor },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // OrgStatusGuard bloquea mutaciones (POST/PUT/PATCH/DELETE) si la org activa
+    // no está en estado ACTIVE. Best-effort: sin token o token inválido → transparente.
+    // Requiere JwtModule (registrado arriba) y TenantsModule (ya importado).
+    { provide: APP_GUARD, useClass: OrgStatusGuard },
     // ModuleEnabledGuard ya NO es global: corría antes del AuthGuard('jwt') de
     // cada controller, así que no veía req.user (activeTenantId) y preemptaba el
     // 401. Ahora se aplica a nivel de controller en @UseGuards, después de
