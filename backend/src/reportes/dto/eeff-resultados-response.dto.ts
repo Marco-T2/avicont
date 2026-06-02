@@ -11,6 +11,8 @@
  * no se inserta en el árbol INGRESO/EGRESO.
  */
 
+import { ApiProperty } from '@nestjs/swagger';
+
 import type { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
@@ -60,50 +62,50 @@ export interface EstadoResultadosArbolResult {
 // ============================================================
 
 /** Cuenta del Estado de Resultados en el DTO. Sin esSintetica. */
-export interface CuentaResultadosDto {
-  cuentaId: string;
-  codigoInterno: string;
-  nombre: string;
-  nivel: number;
-  esContraria: boolean;
+export class CuentaResultadosDto {
+  @ApiProperty() cuentaId!: string;
+  @ApiProperty() codigoInterno!: string;
+  @ApiProperty() nombre!: string;
+  @ApiProperty() nivel!: number;
+  @ApiProperty() esContraria!: boolean;
   /** Saldo neto de flujo en BOB como string decimal (§4.5 CLAUDE.md). */
-  saldoBob: string;
+  @ApiProperty({ example: '1000.00' }) saldoBob!: string;
 }
 
-export interface SubseccionResultadosDto {
-  subClaseCuenta: string;
-  titulo: string;
-  cuentas: CuentaResultadosDto[];
+export class SubseccionResultadosDto {
+  @ApiProperty() subClaseCuenta!: string;
+  @ApiProperty() titulo!: string;
+  @ApiProperty({ type: () => [CuentaResultadosDto] }) cuentas!: CuentaResultadosDto[];
   /** Total de la subsección en BOB como string decimal (§4.5 CLAUDE.md). */
-  totalBob: string;
+  @ApiProperty({ example: '1000.00' }) totalBob!: string;
 }
 
-export interface SeccionResultadosDto {
-  claseCuenta: string;
-  titulo: string;
-  subsecciones: SubseccionResultadosDto[];
+export class SeccionResultadosDto {
+  @ApiProperty() claseCuenta!: string;
+  @ApiProperty() titulo!: string;
+  @ApiProperty({ type: () => [SubseccionResultadosDto] }) subsecciones!: SubseccionResultadosDto[];
   /** Total de la sección en BOB como string decimal (§4.5 CLAUDE.md). */
-  totalBob: string;
+  @ApiProperty({ example: '1000.00' }) totalBob!: string;
 }
 
-export interface EstadoResultadosResponseDto {
+export class EstadoResultadosResponseDto {
   /** Inicio del rango de flujo. Formato "YYYY-MM-DD" (§4.6 CLAUDE.md). */
-  fechaDesde: string;
+  @ApiProperty({ example: '2026-04-01' }) fechaDesde!: string;
   /** Fin del rango de flujo. Formato "YYYY-MM-DD" (§4.6 CLAUDE.md). */
-  fechaHasta: string;
-  ingreso: SeccionResultadosDto;
-  egreso: SeccionResultadosDto;
+  @ApiProperty({ example: '2026-04-30' }) fechaHasta!: string;
+  @ApiProperty({ type: () => SeccionResultadosDto }) ingreso!: SeccionResultadosDto;
+  @ApiProperty({ type: () => SeccionResultadosDto }) egreso!: SeccionResultadosDto;
   /** Resultado del Ejercicio = Σ INGRESO − Σ EGRESO; puede ser negativo (pérdida). String decimal. */
-  resultadoEjercicioBob: string;
+  @ApiProperty({ example: '1000.00' }) resultadoEjercicioBob!: string;
   /** Atajo: = ingreso.totalBob */
-  totalIngresoBob: string;
+  @ApiProperty({ example: '1000.00' }) totalIngresoBob!: string;
   /** Atajo: = egreso.totalBob */
-  totalEgresoBob: string;
+  @ApiProperty({ example: '0.00' }) totalEgresoBob!: string;
   /**
    * true si resultadoEjercicio >= 0 (utilidad o break-even).
    * Conveniencia para el frontend.
    */
-  esGanancia: boolean;
+  @ApiProperty() esGanancia!: boolean;
 }
 
 // ============================================================

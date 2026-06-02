@@ -1,5 +1,5 @@
 import { EstadoComprobante, Moneda, TipoComprobante } from '@prisma/client';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 import { FechaContable } from '@/common/domain/fecha-contable';
 
@@ -12,20 +12,20 @@ export class LineaResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() orden!: number;
   @ApiProperty() cuentaId!: string;
-  @ApiPropertyOptional({ nullable: true }) contactoId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) contactoId!: string | null;
   @ApiProperty({ enum: Moneda }) moneda!: Moneda;
   @ApiProperty({ example: '1000.00' }) debito!: string;
   @ApiProperty({ example: '0' }) credito!: string;
   @ApiProperty({ example: '1' }) tipoCambio!: string;
   @ApiProperty({ example: '1000.00' }) debitoBob!: string;
   @ApiProperty({ example: '0' }) creditoBob!: string;
-  @ApiPropertyOptional({ nullable: true }) glosaLinea!: string | null;
+  @ApiProperty({ type: String, nullable: true }) glosaLinea!: string | null;
 }
 
 export class ComprobanteResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: TipoComprobante }) tipo!: TipoComprobante;
-  @ApiPropertyOptional({ nullable: true, example: 'I2604-000042' })
+  @ApiProperty({ type: String, nullable: true, example: 'I2604-000042' })
   numero!: string | null;
   @ApiProperty({ enum: EstadoComprobante }) estado!: EstadoComprobante;
   @ApiProperty({ example: '2026-04-22' }) fechaContable!: string;
@@ -43,9 +43,9 @@ export class ComprobanteResponseDto {
 
   @ApiProperty({ description: 'true si el comprobante fue anulado (§4.7 CLAUDE.md)' })
   anulado!: boolean;
-  @ApiPropertyOptional({ nullable: true }) fechaAnulacion!: string | null;
-  @ApiPropertyOptional({ nullable: true }) anuladoPorUserId!: string | null;
-  @ApiPropertyOptional({ nullable: true }) motivoAnulacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) fechaAnulacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) anuladoPorUserId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivoAnulacion!: string | null;
 
   @ApiProperty() createdByUserId!: string;
   @ApiProperty() createdAt!: string;
@@ -72,7 +72,7 @@ export class DocumentoRespaldoResumenDto {
 export class ComprobanteListItemDto {
   @ApiProperty() id!: string;
   @ApiProperty({ enum: TipoComprobante }) tipo!: TipoComprobante;
-  @ApiPropertyOptional({ nullable: true, example: 'I2604-000042' })
+  @ApiProperty({ type: String, nullable: true, example: 'I2604-000042' })
   numero!: string | null;
   @ApiProperty({ enum: EstadoComprobante }) estado!: EstadoComprobante;
   @ApiProperty({ example: '2026-04-22' }) fechaContable!: string;
@@ -83,9 +83,9 @@ export class ComprobanteListItemDto {
   @ApiProperty({ example: '1000.00' }) totalDebitoBob!: string;
   @ApiProperty({ example: '1000.00' }) totalCreditoBob!: string;
   @ApiProperty() anulado!: boolean;
-  @ApiPropertyOptional({ nullable: true }) fechaAnulacion!: string | null;
-  @ApiPropertyOptional({ nullable: true }) anuladoPorUserId!: string | null;
-  @ApiPropertyOptional({ nullable: true }) motivoAnulacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) fechaAnulacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) anuladoPorUserId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivoAnulacion!: string | null;
   @ApiProperty() createdByUserId!: string;
   @ApiProperty() createdAt!: string;
   @ApiProperty() updatedAt!: string;
@@ -97,11 +97,11 @@ export class ComprobanteListItemDto {
   documentosRespaldo!: DocumentoRespaldoResumenDto[];
 }
 
-export interface ListarComprobantesResponseDto {
-  items: ComprobanteListItemDto[];
-  total: number;
-  page: number;
-  limit: number;
+export class ListarComprobantesResponseDto {
+  @ApiProperty({ type: () => [ComprobanteListItemDto] }) items!: ComprobanteListItemDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() limit!: number;
 }
 
 export function toComprobanteListItem(c: ComprobanteListRow): ComprobanteListItemDto {

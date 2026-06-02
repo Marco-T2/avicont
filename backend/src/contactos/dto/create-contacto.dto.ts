@@ -7,13 +7,14 @@ export class CreateContactoDto {
   @Length(2, 200)
   razonSocial!: string;
 
-  @ApiPropertyOptional({ example: 'El Sol', maxLength: 200, nullable: true })
+  @ApiPropertyOptional({ type: String, example: 'El Sol', maxLength: 200, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 200)
   nombreComercial?: string | null;
 
   @ApiPropertyOptional({
+    type: String,
     example: '1234567019',
     maxLength: 50,
     nullable: true,
@@ -32,19 +33,19 @@ export class CreateContactoDto {
   @IsBoolean()
   esProveedor!: boolean;
 
-  @ApiPropertyOptional({ example: 'ventas@elsol.bo', nullable: true })
+  @ApiPropertyOptional({ type: String, example: 'ventas@elsol.bo', nullable: true })
   @IsOptional()
   @IsEmail()
   @Length(0, 200)
   email?: string | null;
 
-  @ApiPropertyOptional({ example: '+591 3 1234567', maxLength: 50, nullable: true })
+  @ApiPropertyOptional({ type: String, example: '+591 3 1234567', maxLength: 50, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 50)
   telefono?: string | null;
 
-  @ApiPropertyOptional({ maxLength: 500, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 500)

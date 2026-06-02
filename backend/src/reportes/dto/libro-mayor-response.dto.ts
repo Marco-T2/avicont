@@ -8,65 +8,65 @@
  * en service/domain (§4.6). Si se necesita en frontend, se agrega ahí.
  */
 
+import { ApiProperty } from '@nestjs/swagger';
+
 import { NaturalezaCuenta } from '@/common/domain/enums';
 import { Money } from '@/common/domain/money';
 
 import { formatFechaContable } from '../fecha-contable';
+import { RangoFechasDto } from './libro-diario-response.dto';
 
 // ============================================================
 // Tipos del DTO de respuesta
 // ============================================================
 
-export interface MovimientoMayorDto {
-  comprobanteId: string;
+export class MovimientoMayorDto {
+  @ApiProperty() comprobanteId!: string;
   /** Número correlativo del comprobante. Null solo en BORRADOR — el Mayor nunca muestra BORRADOR. */
-  numeroComprobante: string | null;
+  @ApiProperty({ type: String, nullable: true }) numeroComprobante!: string | null;
   /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
-  fechaContable: string;
+  @ApiProperty({ example: '2026-04-22' }) fechaContable!: string;
   /** Glosa del comprobante cabecera. */
-  glosa: string;
+  @ApiProperty() glosa!: string;
   /** Glosa de la línea (nullable). */
-  glosaLinea: string | null;
-  estado: string;
+  @ApiProperty({ type: String, nullable: true }) glosaLinea!: string | null;
+  @ApiProperty() estado!: string;
   /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
-  anulado: boolean;
-  orden: number;
+  @ApiProperty() anulado!: boolean;
+  @ApiProperty() orden!: number;
   /** Monto debe en BOB como string decimal. "0.00" si es haber. (§4.5) */
-  debeBob: string;
+  @ApiProperty({ example: '1000.00' }) debeBob!: string;
   /** Monto haber en BOB como string decimal. "0.00" si es debe. (§4.5) */
-  haberBob: string;
+  @ApiProperty({ example: '0.00' }) haberBob!: string;
   /** Saldo corriente acumulado después de este movimiento. String decimal (§4.5). */
-  saldoCorrienteBob: string;
+  @ApiProperty({ example: '1000.00' }) saldoCorrienteBob!: string;
 }
 
-export interface CuentaMayorDto {
-  cuentaId: string;
-  codigoInterno: string;
-  nombreCuenta: string;
+export class CuentaMayorDto {
+  @ApiProperty() cuentaId!: string;
+  @ApiProperty() codigoInterno!: string;
+  @ApiProperty() nombreCuenta!: string;
   /** Naturaleza contable: DEUDORA (activos/egresos) o ACREEDORA (pasivos/patrimonio/ingresos). */
-  naturaleza: string;
+  @ApiProperty() naturaleza!: string;
   /** Saldo antes del primer movimiento del rango. String decimal, puede ser negativo. (§4.5) */
-  saldoInicialBob: string;
+  @ApiProperty({ example: '0.00' }) saldoInicialBob!: string;
   /** Saldo al final del rango (= saldoCorriente del último movimiento). String decimal. (§4.5) */
-  saldoFinalBob: string;
+  @ApiProperty({ example: '1000.00' }) saldoFinalBob!: string;
   /** Suma de debitoBob de los movimientos del rango. */
-  totalDebeBob: string;
+  @ApiProperty({ example: '1000.00' }) totalDebeBob!: string;
   /** Suma de creditoBob de los movimientos del rango. */
-  totalHaberBob: string;
-  movimientos: MovimientoMayorDto[];
+  @ApiProperty({ example: '0.00' }) totalHaberBob!: string;
+  @ApiProperty({ type: () => [MovimientoMayorDto] }) movimientos!: MovimientoMayorDto[];
 }
 
-export interface LibroMayorResponseDto {
-  rango: {
-    fechaDesde: string;
-    fechaHasta: string;
-  };
+export class LibroMayorResponseDto {
+  @ApiProperty({ type: () => RangoFechasDto }) rango!: RangoFechasDto;
   /** Cuentas con movimientos (y/o saldo previo si soloConMovimiento=false), ordenadas por codigoInterno ASC. */
-  cuentas: CuentaMayorDto[];
+  @ApiProperty({ type: () => [CuentaMayorDto] }) cuentas!: CuentaMayorDto[];
   /** Suma de todos los debitoBob del rango, de todas las cuentas. */
-  totalDebeBob: string;
+  @ApiProperty({ example: '1000.00' }) totalDebeBob!: string;
   /** Suma de todos los creditoBob del rango, de todas las cuentas. */
-  totalHaberBob: string;
+  @ApiProperty({ example: '1000.00' }) totalHaberBob!: string;
 }
 
 // ============================================================

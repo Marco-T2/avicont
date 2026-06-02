@@ -9,15 +9,15 @@ import { LoteConResumen } from '../dashboard.service';
  */
 export class LoteDashboardItemDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ nullable: true }) nombre!: string | null;
-  @ApiProperty({ nullable: true }) galpon!: string | null;
+  @ApiProperty({ type: String, nullable: true }) nombre!: string | null;
+  @ApiProperty({ type: String, nullable: true }) galpon!: string | null;
   @ApiProperty({ enum: EstadoLote }) estado!: EstadoLote;
   @ApiProperty() cantidadInicial!: number;
   @ApiProperty({ example: '2026-06-01' }) fechaIngreso!: string;
   @ApiProperty() edadDias!: number;
   @ApiProperty() avesVivas!: number;
   @ApiProperty({ example: '12500.00' }) costoAcumulado!: string;
-  @ApiProperty({ nullable: true, example: '2.51' }) costoPorPolloVivo!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '2.51' }) costoPorPolloVivo!: string | null;
   @ApiProperty({ example: 0.004 }) porcentajeMortalidad!: number;
 }
 

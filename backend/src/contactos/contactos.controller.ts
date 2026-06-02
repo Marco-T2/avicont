@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
 import { ForbiddenError } from '@/common/errors';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
@@ -74,6 +74,7 @@ export class ContactosController {
     summary:
       'Lista contactos del tenant con paginación y filtros (q, documento, esCliente, esProveedor, activo).',
   })
+  @ApiOkResponse({ type: ListarContactosResponseDto })
   async listar(
     @Req() req: AuthenticatedRequest,
     @Query() query: ListarContactosQueryDto,

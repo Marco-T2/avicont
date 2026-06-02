@@ -8,7 +8,7 @@ export class MovimientoInversionResponseDto {
   @ApiProperty() tipoRegistroId!: string;
   @ApiProperty({ example: '1250.50', description: 'Monto en BOB como string (§4.5).' })
   monto!: string;
-  @ApiProperty({ nullable: true }) detalle!: string | null;
+  @ApiProperty({ type: String, nullable: true }) detalle!: string | null;
   @ApiProperty({ example: '2026-06-10' }) fecha!: string;
   @ApiProperty() createdAt!: string;
 }
@@ -18,7 +18,7 @@ export class MovimientoCantidadResponseDto {
   @ApiProperty() loteId!: string;
   @ApiProperty() tipoRegistroId!: string;
   @ApiProperty({ example: 12 }) cantidad!: number;
-  @ApiProperty({ nullable: true }) detalle!: string | null;
+  @ApiProperty({ type: String, nullable: true }) detalle!: string | null;
   @ApiProperty({ example: '2026-06-10' }) fecha!: string;
   @ApiProperty() createdAt!: string;
 }

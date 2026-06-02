@@ -13,7 +13,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
@@ -27,6 +34,7 @@ import { ComprobantesService } from './comprobantes.service';
 import { AnularComprobanteDto } from './dto/anular-comprobante.dto';
 import { CreateComprobanteDto } from './dto/create-comprobante.dto';
 import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
+import { ListarComprobantesResponseDto } from './dto/comprobante-response.dto';
 import { ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
 
 // ---- Resolución de tenantId desde JWT + header opcional ----------------
@@ -72,6 +80,7 @@ export class ComprobantesController {
     summary:
       'Listar comprobantes del tenant con paginación y filtros (periodoFiscalId, tipo, estado, rango de fechas, texto libre).',
   })
+  @ApiOkResponse({ type: ListarComprobantesResponseDto })
   listar(@Req() req: AuthenticatedRequest, @Query() query: ListarComprobantesQueryDto) {
     return this.service.listar(resolveTenantId(req), query);
   }

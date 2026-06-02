@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
@@ -8,7 +8,9 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { LibroDiarioQueryDto } from './dto/libro-diario-query.dto';
+import { LibroDiarioResponseDto } from './dto/libro-diario-response.dto';
 import { LibroMayorQueryDto } from './dto/libro-mayor-query.dto';
+import { LibroMayorResponseDto } from './dto/libro-mayor-response.dto';
 import { LibroDiarioService } from './libro-diario.service';
 import { LibroMayorService } from './libro-mayor.service';
 import { resolveTenantId } from './tenant-id';
@@ -32,6 +34,7 @@ export class ReportesController {
       'Libro Diario: listado cronológico de asientos CONTABILIZADOS y BLOQUEADOS. ' +
       'Filtrar por periodoFiscalId O fechaDesde+fechaHasta. Tope: 5.000 asientos (REQ-LD-10).',
   })
+  @ApiOkResponse({ type: LibroDiarioResponseDto })
   obtenerLibroDiario(@Req() req: AuthenticatedRequest, @Query() query: LibroDiarioQueryDto) {
     const tenantId = resolveTenantId(req);
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
@@ -53,6 +56,7 @@ export class ReportesController {
       'Filtrar por periodoFiscalId O fechaDesde+fechaHasta. Filtro opcional por cuentaId. ' +
       'Tope: 20.000 movimientos (REQ-LM-12).',
   })
+  @ApiOkResponse({ type: LibroMayorResponseDto })
   obtenerLibroMayor(@Req() req: AuthenticatedRequest, @Query() query: LibroMayorQueryDto) {
     const tenantId = resolveTenantId(req);
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional

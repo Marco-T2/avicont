@@ -16,7 +16,8 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "ts-node prisma/seed.ts",
-    "super-admin": "ts-node prisma/scripts/super-admin.ts"
+    "super-admin": "ts-node prisma/scripts/super-admin.ts",
+    "openapi:dump": "ts-node -r tsconfig-paths/register scripts/dump-openapi.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.12",

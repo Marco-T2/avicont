@@ -126,3 +126,84 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  # Gate anti-drift del contrato OpenAPI (deuda "openapi-typescript", CLAUDE.md §10.10).
+  # Regenera el contrato (backend/openapi.json) y los tipos del frontend
+  # (api.generated.ts) desde el código actual. Si un DTO del backend cambió y
+  # no se regeneraron los artefactos, el `git diff --exit-code` rompe el build.
+  # Así el frontend nunca queda desincronizado del backend sin que nadie lo note.
+  contract-drift:
+    runs-on: ubuntu-latest
+    # El dump bootea el AppModule de Nest, que conecta Postgres y Redis en bootstrap.
+    services:
+      postgres:
+        image: postgres:14
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saas
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+      redis:
+        image: redis:6
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # pnpm/action-setup DEBE ir ANTES de setup-node, o el cache 'pnpm' falla.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.11.0'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pnpm install
+
+      - name: Copy env
+        working-directory: backend
+        run: cp .env.example .env
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: pnpm exec prisma generate
+
+      - name: Run Prisma migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+        run: pnpm exec prisma migrate deploy
+
+      - name: Dump OpenAPI spec
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+          REDIS_HOST: localhost
+          JWT_ACCESS_SECRET: ci-access-secret
+          JWT_REFRESH_SECRET: ci-refresh-secret
+        run: pnpm run openapi:dump
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install
+
+      - name: Generate frontend API types
+        working-directory: frontend
+        run: pnpm run gen:api-types
+
+      - name: Verify contract & generated types are in sync
+        run: |
+          git diff --exit-code backend/openapi.json frontend/src/types/api.generated.ts \
+            || { echo "::error::Contrato OpenAPI o tipos generados desincronizados. Corré 'pnpm run openapi:dump' (backend) + 'pnpm run gen:api-types' (frontend) y commiteá los artefactos."; exit 1; }

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { PeriodoFiscal, PeriodoFiscalStatus } from '@prisma/client';
 
 export class PeriodoFiscalResponseDto {
@@ -15,9 +15,9 @@ export class PeriodoFiscalResponseDto {
   })
   esDefinitivo!: boolean;
 
-  @ApiPropertyOptional({ nullable: true, example: '2026-05-03T10:15:00.000Z' })
+  @ApiProperty({ type: String, nullable: true, example: '2026-05-03T10:15:00.000Z' })
   closedAt!: string | null;
-  @ApiPropertyOptional({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   closedByUserId!: string | null;
 
   @ApiProperty({ example: '2026-01-01T00:00:00.000Z' }) createdAt!: string;

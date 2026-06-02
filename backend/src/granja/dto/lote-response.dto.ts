@@ -13,6 +13,7 @@ export class ResumenLoteDto {
   costoAcumulado!: string;
 
   @ApiProperty({
+    type: String,
     example: '2.51',
     nullable: true,
     description: 'costoAcumulado / avesVivas. null si avesVivas = 0 (mortalidad total).',
@@ -28,13 +29,14 @@ export class ResumenLoteDto {
 
 export class LoteResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ nullable: true }) nombre!: string | null;
+  @ApiProperty({ type: String, nullable: true }) nombre!: string | null;
   @ApiProperty() cantidadInicial!: number;
   @ApiProperty({ example: '2026-06-01' }) fechaIngreso!: string;
-  @ApiProperty({ nullable: true, example: '2026-07-15' }) fechaEstimadaSaca!: string | null;
-  @ApiProperty({ nullable: true }) fechaCierre!: string | null;
-  @ApiProperty({ nullable: true }) galpon!: string | null;
-  @ApiProperty({ nullable: true }) detalle!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '2026-07-15' })
+  fechaEstimadaSaca!: string | null;
+  @ApiProperty({ type: String, nullable: true }) fechaCierre!: string | null;
+  @ApiProperty({ type: String, nullable: true }) galpon!: string | null;
+  @ApiProperty({ type: String, nullable: true }) detalle!: string | null;
   @ApiProperty({ enum: EstadoLote }) estado!: EstadoLote;
   @ApiProperty() organizationId!: string;
   @ApiProperty({ type: ResumenLoteDto }) resumen!: ResumenLoteDto;
@@ -49,19 +51,19 @@ export class LoteResponseDto {
  */
 export class LoteListItemDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ nullable: true }) nombre!: string | null;
+  @ApiProperty({ type: String, nullable: true }) nombre!: string | null;
   @ApiProperty() cantidadInicial!: number;
   @ApiProperty({ example: '2026-06-01' }) fechaIngreso!: string;
-  @ApiProperty({ nullable: true }) fechaCierre!: string | null;
-  @ApiProperty({ nullable: true }) galpon!: string | null;
+  @ApiProperty({ type: String, nullable: true }) fechaCierre!: string | null;
+  @ApiProperty({ type: String, nullable: true }) galpon!: string | null;
   @ApiProperty({ enum: EstadoLote }) estado!: EstadoLote;
 }
 
-export interface ListarLotesResponseDto {
-  items: LoteListItemDto[];
-  total: number;
-  page: number;
-  pageSize: number;
+export class ListarLotesResponseDto {
+  @ApiProperty({ type: () => [LoteListItemDto] }) items!: LoteListItemDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() pageSize!: number;
 }
 
 export function toLoteListItem(lote: LoteRow): LoteListItemDto {

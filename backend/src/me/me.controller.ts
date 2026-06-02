@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ForbiddenError } from '@/common/errors/forbidden.error';
@@ -26,6 +26,7 @@ export class MeController {
   ) {}
 
   @Get('permissions')
+  @ApiOkResponse({ type: MePermissionsResponseDto })
   async permissions(@CurrentUser() user: JwtUser): Promise<MePermissionsResponseDto> {
     if (!user.activeTenantId) {
       // Sin tenant activo en el JWT: coherente con PermissionsGuard (403).

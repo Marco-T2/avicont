@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import type { User } from '@prisma/client';
 
 /**
@@ -6,14 +7,14 @@ import type { User } from '@prisma/client';
  * mapper es allow-list, no deny-list, así que nuevas columnas del schema
  * no se filtran por accidente.
  */
-export interface UserResponseDto {
-  id: string;
-  email: string;
-  displayName: string | null;
-  isEmailVerified: boolean;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export class UserResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() email!: string;
+  @ApiProperty({ type: String, nullable: true }) displayName!: string | null;
+  @ApiProperty() isEmailVerified!: boolean;
+  @ApiProperty() isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
 export function toUserResponseDto(user: User): UserResponseDto {
@@ -23,7 +24,7 @@ export function toUserResponseDto(user: User): UserResponseDto {
     displayName: user.displayName,
     isEmailVerified: user.isEmailVerified,
     isActive: user.isActive,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
   };
 }

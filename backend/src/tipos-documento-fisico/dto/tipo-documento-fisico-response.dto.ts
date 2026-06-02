@@ -15,11 +15,12 @@ export class TipoDocumentoFisicoResponseDto {
   @ApiProperty() updatedAt!: string;
 }
 
-export interface ListarTiposDocumentoFisicoResponseDto {
-  items: TipoDocumentoFisicoResponseDto[];
-  total: number;
-  page: number;
-  pageSize: number;
+export class ListarTiposDocumentoFisicoResponseDto {
+  @ApiProperty({ type: () => [TipoDocumentoFisicoResponseDto] })
+  items!: TipoDocumentoFisicoResponseDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() pageSize!: number;
 }
 
 export function toTipoDocumentoFisicoResponse(

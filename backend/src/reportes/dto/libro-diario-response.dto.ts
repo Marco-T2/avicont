@@ -5,6 +5,7 @@
  * Fechas como "YYYY-MM-DD" (§4.6 CLAUDE.md): fecha calendario puro, sin hora ni UTC.
  */
 
+import { ApiProperty } from '@nestjs/swagger';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import { formatFechaContable } from '../fecha-contable';
@@ -14,41 +15,44 @@ import type { ComprobanteLibroDiarioRow } from '../ports/comprobantes-reader.por
 // Tipos del DTO de respuesta
 // ============================================================
 
-export interface LineaLibroDiarioDto {
-  codigoCuenta: string;
-  nombreCuenta: string;
+export class LineaLibroDiarioDto {
+  @ApiProperty() codigoCuenta!: string;
+  @ApiProperty() nombreCuenta!: string;
   /** Glosa de la línea (nullable — no todas las líneas tienen glosa). */
-  glosa: string | null;
+  @ApiProperty({ type: String, nullable: true }) glosa!: string | null;
   /** Monto debe en BOB como string decimal. "0.00" si es haber. (§4.5) */
-  debeBob: string;
+  @ApiProperty({ example: '1000.00' }) debeBob!: string;
   /** Monto haber en BOB como string decimal. "0.00" si es debe. (§4.5) */
-  haberBob: string;
+  @ApiProperty({ example: '0.00' }) haberBob!: string;
 }
 
-export interface AsientoLibroDiarioDto {
-  id: string;
+export class AsientoLibroDiarioDto {
+  @ApiProperty() id!: string;
   /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
-  fechaContable: string;
+  @ApiProperty({ example: '2026-04-22' }) fechaContable!: string;
   /** Número correlativo. Null en BORRADOR, pero el Libro Diario nunca muestra BORRADOR. */
-  numero: string | null;
-  tipo: string;
-  estado: string;
-  glosa: string;
+  @ApiProperty({ type: String, nullable: true, example: 'I2604-000042' })
+  numero!: string | null;
+  @ApiProperty() tipo!: string;
+  @ApiProperty() estado!: string;
+  @ApiProperty() glosa!: string;
   /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
-  anulado: boolean;
-  lineas: LineaLibroDiarioDto[];
+  @ApiProperty() anulado!: boolean;
+  @ApiProperty({ type: () => [LineaLibroDiarioDto] }) lineas!: LineaLibroDiarioDto[];
 }
 
-export interface LibroDiarioResponseDto {
-  rango: {
-    fechaDesde: string;
-    fechaHasta: string;
-  };
-  asientos: AsientoLibroDiarioDto[];
+export class RangoFechasDto {
+  @ApiProperty({ example: '2026-04-01' }) fechaDesde!: string;
+  @ApiProperty({ example: '2026-04-30' }) fechaHasta!: string;
+}
+
+export class LibroDiarioResponseDto {
+  @ApiProperty({ type: () => RangoFechasDto }) rango!: RangoFechasDto;
+  @ApiProperty({ type: () => [AsientoLibroDiarioDto] }) asientos!: AsientoLibroDiarioDto[];
   /** Suma de todos los debitoBob de las líneas incluidas. (§4.6) */
-  totalDebeBob: string;
+  @ApiProperty({ example: '1000.00' }) totalDebeBob!: string;
   /** Suma de todos los creditoBob de las líneas incluidas. En asientos válidos: === totalDebeBob. */
-  totalHaberBob: string;
+  @ApiProperty({ example: '1000.00' }) totalHaberBob!: string;
 }
 
 // ============================================================
