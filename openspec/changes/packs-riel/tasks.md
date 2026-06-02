@@ -155,18 +155,20 @@ vertical, auditoría.
 **Entregable**: `pack.controller.ts` con `PATCH` de activación gateado por SystemRole
 OWNER/ADMIN, validación de frontera; e2e del flujo completo del riel.
 
-- [ ] 6.1 **Test (e2e del flujo completo)**: super-admin habilita → Owner activa
+- [x] 6.1 **Test (e2e del flujo completo)**: super-admin habilita → Owner activa
   (`PATCH activo=true`) → endpoint de prueba con `@RequirePack` responde 200; Owner
   desactiva → 404; Owner intenta activar pack NO habilitado → 403 `PACK_NO_HABILITADO`;
   activación de org A no afecta org B (filtro por tenant).
-- [ ] 6.2 DTO `activar-pack.dto.ts` (`activo: boolean`) + `pack-response.dto.ts`.
-- [ ] 6.3 `pack.controller.ts` (endpoints del Owner): `PATCH` sobre la activación,
-  gateado por SystemRole OWNER/ADMIN (`useHasSystemRole`/guard equivalente, NO permiso
-  fino). El service valida frontera (sin entitlement → `PackNoHabilitadoError` 403).
-  `GET` "mis packs" (catálogo + estado para la org) opcional.
-- [ ] 6.4 Endpoint de prueba interno (controller de test o fixture e2e) decorado con
-  `@RequirePack('contabilidad.adjuntos')` para validar el guard end-to-end. NO es un
-  pack concreto — es el shakedown del riel.
+- [x] 6.2 DTO `activar-pack.dto.ts` (`activo: boolean`) + `activacion-pack-response.dto.ts`.
+- [x] 6.3 `pack.controller.ts` (endpoints del Owner): `PATCH /api/packs/:clave` sobre la
+  activación, gateado por SystemRole OWNER/ADMIN (`@RequireSystemRole` + `SystemRolesGuard`
+  net-new en `common/`, lee el claim `roles` del JWT — NO permiso fino). El service valida
+  frontera (sin entitlement → `PackNoHabilitadoError` 403). `GET /api/packs/mis-packs`
+  (entitlements + estado para la org).
+- [x] 6.4 Endpoint de prueba interno (controller `ShakedownProtegidoController` SOLO en el
+  e2e `test/packs-activacion-owner.e2e-spec.ts`, montado vía `ShakedownModule` que importa
+  `PacksModule`) decorado con `@RequirePack('contabilidad.adjuntos')` para validar el guard
+  end-to-end. NO es un pack concreto — es el shakedown del riel.
 - **Hecho cuando**: e2e del flujo completo verde (habilitar→activar→200, desactivar→404,
   frontera→403, aislamiento por tenant).
 
