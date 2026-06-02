@@ -114,7 +114,10 @@ export class PlatformAdminService {
    * Actualiza el status (ACTIVE/SUSPENDED/ARCHIVED) de una organización (REQ-SA-14).
    * El `:id` viene del path — el super-admin opera cross-tenant sin TenantGuard.
    */
-  async actualizarStatus(orgId: string, status: OrganizationStatus): Promise<PlatformOrgResponseDto> {
+  async actualizarStatus(
+    orgId: string,
+    status: OrganizationStatus,
+  ): Promise<PlatformOrgResponseDto> {
     const org = await this.orgsWriter.updateStatus(orgId, status);
     if (!org) {
       throw new PlatformOrgNoEncontradaError(orgId);
@@ -128,7 +131,10 @@ export class PlatformAdminService {
    * Valida exclusividad de vertical: no pueden estar ambos en true (§10.4).
    * El reader se usa para obtener el estado actual cuando el patch es parcial.
    */
-  async actualizarEntitlement(orgId: string, dto: UpdateEntitlementDto): Promise<PlatformOrgResponseDto> {
+  async actualizarEntitlement(
+    orgId: string,
+    dto: UpdateEntitlementDto,
+  ): Promise<PlatformOrgResponseDto> {
     const current = await this.orgsReader.findById(orgId);
     if (!current) {
       throw new PlatformOrgNoEncontradaError(orgId);
@@ -147,7 +153,9 @@ export class PlatformAdminService {
 
     const updated = await this.orgsWriter.updateEntitlement(orgId, {
       ...(dto.plan !== undefined ? { plan: dto.plan } : {}),
-      ...(dto.contabilidadEnabled !== undefined ? { contabilidadEnabled: dto.contabilidadEnabled } : {}),
+      ...(dto.contabilidadEnabled !== undefined
+        ? { contabilidadEnabled: dto.contabilidadEnabled }
+        : {}),
       ...(dto.granjaEnabled !== undefined ? { granjaEnabled: dto.granjaEnabled } : {}),
     });
 

@@ -28,7 +28,9 @@ function buildStrategy(
 ): JwtStrategy {
   // Usamos el constructor que acepta deps sin levantar NestJS.
   return new JwtStrategy(
-    { get: (key: string, def?: string) => (key === 'JWT_ACCESS_SECRET' ? 'test-secret' : def) } as unknown as import('@nestjs/config').ConfigService,
+    {
+      get: (key: string, def?: string) => (key === 'JWT_ACCESS_SECRET' ? 'test-secret' : def),
+    } as unknown as import('@nestjs/config').ConfigService,
     redis as unknown as RedisService,
     clock as unknown as ClockPort,
   );
@@ -72,9 +74,9 @@ describe('REQ-SA-02: JwtStrategy.validate propaga isSuperAdmin', () => {
       const clock = makeClock(Date.now());
       const strategy = buildStrategy(redis, clock);
 
-      await expect(
-        strategy.validate({ ...basePayload, iat, isSuperAdmin: true }),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(strategy.validate({ ...basePayload, iat, isSuperAdmin: true })).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       expect(redis.get).toHaveBeenCalledWith(`superadmin:revoked:${basePayload.sub}`);
     });

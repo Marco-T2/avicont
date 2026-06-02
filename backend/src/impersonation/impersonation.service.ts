@@ -7,10 +7,7 @@ import {
   MEMBERSHIPS_READER_PORT,
   MembershipsReaderPort,
 } from '@/memberships/ports/memberships-reader.port';
-import {
-  PLATFORM_AUDIT_PORT,
-  PlatformAuditPort,
-} from '@/platform/ports/platform-audit.port';
+import { PLATFORM_AUDIT_PORT, PlatformAuditPort } from '@/platform/ports/platform-audit.port';
 
 import {
   IMPERSONATION_REPOSITORY_PORT,
@@ -62,7 +59,10 @@ export class ImpersonationService {
     );
     // docs/disenos/super-admin-plataforma.md §4.3: un super-admin puede impersonar
     // en cualquier org sin ser miembro. Un no-super-admin sigue necesitando ser OWNER.
-    if (!callerEsSuperAdmin && (!adminMembership || adminMembership.systemRole !== SystemRole.OWNER)) {
+    if (
+      !callerEsSuperAdmin &&
+      (!adminMembership || adminMembership.systemRole !== SystemRole.OWNER)
+    ) {
       throw new SoloOwnerPuedeImpersonarError(adminUserId, organizationId);
     }
 

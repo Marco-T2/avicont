@@ -190,9 +190,9 @@ describe('REQ-SA-11: CLI grant/revoke', () => {
   });
 
   it('[-] grant con email inexistente → falla con error descriptivo', async () => {
-    await expect(
-      grantSuperAdmin(prisma, 'noexiste-cli@example.com', CLI_ACTOR_ID),
-    ).rejects.toThrow('no existe');
+    await expect(grantSuperAdmin(prisma, 'noexiste-cli@example.com', CLI_ACTOR_ID)).rejects.toThrow(
+      'no existe',
+    );
   });
 
   it('[-] revoke con email inexistente → falla con error descriptivo', async () => {
