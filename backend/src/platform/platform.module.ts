@@ -14,8 +14,6 @@ import { ORGS_READER_PORT } from './ports/orgs-reader.port';
 import { PrismaOrgsReaderAdapter } from '@/tenants/adapters/prisma-orgs-reader.adapter';
 import { ORGS_WRITER_PORT } from './ports/orgs-writer.port';
 import { PrismaOrgsWriterAdapter } from '@/tenants/adapters/prisma-orgs-writer.adapter';
-import { MEMBERSHIPS_WRITER_PORT } from './ports/memberships-writer.port';
-import { PrismaMembershipsWriterAdapter } from '@/memberships/adapters/prisma-memberships-writer.adapter';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformAdminController } from './platform-admin.controller';
 
@@ -27,7 +25,8 @@ import { PlatformAdminController } from './platform-admin.controller';
  * - OrgsReaderPort y OrgsWriterPort: adapters implementados en el módulo
  *   `tenants` (dueño del dominio Organization). Los adapters se registran acá
  *   con sus tokens para no cruzar módulos directamente (CLAUDE.md §3.3).
- * - MembershipsWriterPort: adapter implementado en el módulo `memberships`.
+ *   La membership OWNER se crea en el mismo nested write que la org
+ *   (ver PrismaOrgsWriterAdapter.create).
  * - PlatformAdminService y PlatformAdminController (Slice 6a).
  *
  * ClockPort ya es global (ClockModule) — no se re-registra acá.
@@ -60,10 +59,6 @@ import { PlatformAdminController } from './platform-admin.controller';
     // Ports cross-module: adapter de escritura de orgs (dueño: tenants)
     PrismaOrgsWriterAdapter,
     { provide: ORGS_WRITER_PORT, useExisting: PrismaOrgsWriterAdapter },
-
-    // Ports cross-module: adapter de escritura de memberships (dueño: memberships)
-    PrismaMembershipsWriterAdapter,
-    { provide: MEMBERSHIPS_WRITER_PORT, useExisting: PrismaMembershipsWriterAdapter },
 
     PlatformAdminService,
   ],
