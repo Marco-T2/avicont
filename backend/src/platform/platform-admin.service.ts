@@ -22,6 +22,11 @@ import {
   MEMBERSHIPS_READER_PORT,
   MembershipsReaderPort,
 } from '@/memberships/ports/memberships-reader.port';
+import { PackService } from '@/packs/pack.service';
+import {
+  OrgPackEntitlementResponseDto,
+  toOrgPackEntitlementResponse,
+} from '@/packs/dto/org-pack-entitlement-response.dto';
 import { ORGS_READER_PORT, OrgsReaderPort } from './ports/orgs-reader.port';
 import { ORGS_WRITER_PORT, OrgsWriterPort } from './ports/orgs-writer.port';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
@@ -49,6 +54,7 @@ export class PlatformAdminService {
     @Inject(TIPO_REGISTRO_SEEDER_PORT) private readonly tipoRegistroSeeder: TipoRegistroSeederPort,
     @Inject(MEMBERSHIPS_READER_PORT)
     private readonly membershipsReader: MembershipsReaderPort,
+    private readonly packs: PackService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
   ) {}
@@ -196,6 +202,76 @@ export class PlatformAdminService {
 
     const memberships = await this.membershipsReader.findAllByTenant(orgId);
     return memberships.map((m) => PlatformOrgMemberResponseDto.fromMembership(m));
+  }
+
+  /**
+   * Habilita un pack (eje 2) a una org (riel de packs §5.4). El super-admin es el
+   * único que crea entitlement (`SuperAdminGuard`); la operación se audita vía
+   * `PlatformAuditInterceptor`. La LÓGICA de dominio (validación de vertical §8,
+   * escritura del entitlement con `activo=false`, invalidación de cache
+   * `org-packs:<id>`) vive en `PackService`; este service solo valida que la org
+   * exista (404 friendly) y delega — frontera de módulo vía `PackService`.
+   *
+   * @throws PlatformOrgNoEncontradaError si la org no existe.
+   * @throws PackNoEncontradoError / PackVerticalNoAplicableError desde el dominio.
+   */
+  async habilitarPack(
+    orgId: string,
+    ref: { packId?: string; clave?: string },
+    actorUserId: string,
+  ): Promise<OrgPackEntitlementResponseDto> {
+    await this.assertOrgExiste(orgId);
+    const entitlement = await this.packs.habilitarParaOrg(orgId, ref, actorUserId);
+    const conPack = await this.findEntitlementConPack(orgId, entitlement.packId);
+    this.logger.log(`Org '${orgId}' pack ${entitlement.packId} habilitado por super-admin`);
+    return toOrgPackEntitlementResponse(conPack);
+  }
+
+  /**
+   * Revoca el entitlement de un pack de una org (borra la fila → cae la
+   * activación). Idempotente: revocar un pack no habilitado no falla (el delete
+   * no encuentra fila). Invalida el cache vía `PackService`.
+   *
+   * @throws PlatformOrgNoEncontradaError si la org no existe.
+   */
+  async revocarPack(orgId: string, packId: string): Promise<void> {
+    await this.assertOrgExiste(orgId);
+    await this.packs.revocar(orgId, packId);
+    this.logger.log(`Org '${orgId}' pack ${packId} revocado por super-admin`);
+  }
+
+  /**
+   * Lista los entitlements de packs de una org (catálogo habilitado + estado de
+   * activación) para el panel super-admin.
+   *
+   * @throws PlatformOrgNoEncontradaError si la org no existe.
+   */
+  async listarPacks(orgId: string): Promise<OrgPackEntitlementResponseDto[]> {
+    await this.assertOrgExiste(orgId);
+    const entitlements = await this.packs.listarEntitlementsDeOrg(orgId);
+    return entitlements.map(toOrgPackEntitlementResponse);
+  }
+
+  /** Valida que la org exista; lanza 404 friendly antes de tocar el dominio de packs. */
+  private async assertOrgExiste(orgId: string): Promise<void> {
+    const org = await this.orgsReader.findById(orgId);
+    if (!org) {
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+  }
+
+  /** Recupera el entitlement recién creado enriquecido con el pack (para la respuesta). */
+  private async findEntitlementConPack(
+    orgId: string,
+    packId: string,
+  ): Promise<Parameters<typeof toOrgPackEntitlementResponse>[0]> {
+    const entitlements = await this.packs.listarEntitlementsDeOrg(orgId);
+    const conPack = entitlements.find((e) => e.packId === packId);
+    if (!conPack) {
+      // No debería ocurrir: lo acabamos de habilitar en la misma request.
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+    return conPack;
   }
 
   /**

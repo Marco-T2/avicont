@@ -8,6 +8,7 @@ import { PlanCuentasSeederPort } from '@/cuentas/ports/plan-cuentas-seeder.port'
 import { TipoDocumentoFisicoSeederPort } from '@/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
 import { TipoRegistroSeederPort } from '@/granja/ports/tipo-registro-seeder.port';
 import { MembershipsReaderPort } from '@/memberships/ports/memberships-reader.port';
+import { PackService } from '@/packs/pack.service';
 import { OrgsReaderPort } from './ports/orgs-reader.port';
 import { OrgsWriterPort } from './ports/orgs-writer.port';
 import { PlatformAdminService } from './platform-admin.service';
@@ -50,6 +51,11 @@ function buildService(
   const membershipsReader = {
     findAllByTenant: jest.fn(),
   } as unknown as jest.Mocked<MembershipsReaderPort>;
+  const packs = {
+    habilitarParaOrg: jest.fn(),
+    revocar: jest.fn(),
+    listarEntitlementsDeOrg: jest.fn().mockResolvedValue([]),
+  } as unknown as jest.Mocked<PackService>;
   const prisma = {
     organization: { findUnique: jest.fn().mockResolvedValue(null) },
     $transaction: jest.fn(),
@@ -63,6 +69,7 @@ function buildService(
     tiposDocSeeder,
     tipoRegistroSeeder,
     membershipsReader,
+    packs,
     prisma,
     redis,
   );

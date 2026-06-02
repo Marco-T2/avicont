@@ -8,6 +8,7 @@ import { TiposDocumentoFisicoModule } from '@/tipos-documento-fisico/tipos-docum
 import { GranjaModule } from '@/granja/granja.module';
 import { UsersModule } from '@/users/users.module';
 import { MembershipsReaderModule } from '@/memberships/memberships-reader.module';
+import { PacksModule } from '@/packs/pack.module';
 
 import { PLATFORM_AUDIT_PORT } from './ports/platform-audit.port';
 import { PrismaPlatformAuditRepository } from './adapters/prisma-platform-audit.repository';
@@ -42,6 +43,9 @@ import { PlatformAdminController } from './platform-admin.controller';
     UsersModule,
     // Provee MEMBERSHIPS_READER_PORT para listar miembros cross-tenant (REQ-PM-01)
     MembershipsReaderModule,
+    // Provee PackService (eje 2): el super-admin habilita/revoca entitlement.
+    // La lógica de dominio (vertical, cache, escritura) vive en packs/.
+    PacksModule,
   ],
   controllers: [PlatformAdminController],
   providers: [

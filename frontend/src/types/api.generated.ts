@@ -1095,6 +1095,41 @@ export interface paths {
         patch: operations["PlatformAdminController_actualizarEntitlement"];
         trace?: never;
     };
+    "/api/admin/platform/orgs/{id}/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar entitlements de packs de una organización (super-admin) */
+        get: operations["PlatformAdminController_listarPacks"];
+        put?: never;
+        /** Habilitar un pack a una organización (super-admin) */
+        post: operations["PlatformAdminController_habilitarPack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/platform/orgs/{id}/packs/{packId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revocar el entitlement de un pack de una organización (super-admin) */
+        delete: operations["PlatformAdminController_revocarPack"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -2225,6 +2260,39 @@ export interface components {
              * @example false
              */
             granjaEnabled?: boolean;
+        };
+        HabilitarPackDto: {
+            /**
+             * @description Id del pack en el catálogo. Alternativo a `clave` (uno requerido).
+             * @example 550e8400-e29b-41d4-a716-446655440000
+             */
+            packId?: string;
+            /**
+             * @description Clave estable del pack. Alternativa a `packId` (uno requerido).
+             * @example contabilidad.adjuntos
+             */
+            clave?: string;
+        };
+        PackResponseDto: {
+            id: string;
+            /** @description Clave estable namespaced. Ej: "contabilidad.adjuntos". */
+            clave: string;
+            nombre: string;
+            descripcion: string | null;
+            /** @enum {string} */
+            verticalAplicable: "CONTABILIDAD" | "GRANJA";
+            /** @enum {string} */
+            tipo: "DOMINIO" | "CAPACIDAD";
+            activo: boolean;
+        };
+        OrgPackEntitlementResponseDto: {
+            id: string;
+            organizationId: string;
+            packId: string;
+            /** @description Activación embebida: true = el Owner activó el pack. */
+            activo: boolean;
+            habilitadoPorUserId: string;
+            pack: components["schemas"]["PackResponseDto"];
         };
         CreateFeatureFlagDto: {
             /**
@@ -4930,6 +4998,124 @@ export interface operations {
             };
             /** @description Ambos verticales no pueden estar activos simultáneamente */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_listarPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de entitlements con su pack y estado de activación */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPackEntitlementResponseDto"][];
+                };
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Organización no encontrada */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_habilitarPack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HabilitarPackDto"];
+            };
+        };
+        responses: {
+            /** @description Entitlement creado (activo=false) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPackEntitlementResponseDto"];
+                };
+            };
+            /** @description El pack no aplica al vertical de la organización */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Organización o pack no encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_revocarPack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                packId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entitlement revocado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Organización no encontrada */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
