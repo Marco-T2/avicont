@@ -1,8 +1,8 @@
 # me-permissions — Especificación
 
 <!--
-Última edición: 2026-06-01
-Última revisión contra core: 2026-06-01
+Última edición: 2026-06-02
+Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
 
@@ -249,6 +249,73 @@ para el catálogo completo) para evitar confusión.
 
 ---
 
+### REQ-MP-V1: Campo `vertical` en la respuesta — adición aditiva
+
+> Agregado al archivar el change `shell-por-vertical` (2026-06-02).
+
+El endpoint DEBE incluir, además de los campos actuales (`permissions`, `isOwner`,
+`activeTenantId`), el campo `vertical` con valor `'CONTABILIDAD' | 'GRANJA' | null`.
+
+El `vertical` se DEBE derivar de los flags de la organización indicada por
+`activeTenantId`:
+
+- `contabilidadEnabled === true` → `'CONTABILIDAD'`.
+- `granjaEnabled === true` → `'GRANJA'`.
+- ambos `false` → `null`.
+
+El campo es **aditivo**: el contrato previo (`permissions`, `isOwner`,
+`activeTenantId`) NO cambia. La adición NO DEBE alterar los códigos de estado ni
+los flujos de error existentes (401 sin JWT, 403 sin tenant, 403 membresía
+inactiva). El `vertical` solo se calcula en el camino exitoso (200).
+
+> Invariante de exclusividad (CLAUDE.md §4.2 / schema
+> `organizations_vertical_exclusivo_check`): ambos flags NUNCA están en `true`
+> simultáneamente. Por lo tanto el derivado nunca es ambiguo. El orden de
+> evaluación (contabilidad antes que granja) es defensivo, no significativo.
+
+#### Escenario: organización de contabilidad → `'CONTABILIDAD'`
+
+- DADO un usuario miembro activo de una organización con `contabilidadEnabled = true`
+  y `granjaEnabled = false`
+- CUANDO consulta `GET /api/me/permissions` con su JWT (con `activeTenantId`)
+- ENTONCES la respuesta es 200
+- Y `vertical === 'CONTABILIDAD'`
+- Y `permissions`, `isOwner` y `activeTenantId` mantienen el comportamiento previo
+
+#### Escenario: organización de granja → `'GRANJA'`
+
+- DADO un usuario miembro activo de una organización con `granjaEnabled = true`
+  y `contabilidadEnabled = false`
+- CUANDO consulta `GET /api/me/permissions`
+- ENTONCES la respuesta es 200
+- Y `vertical === 'GRANJA'`
+
+#### Escenario: organización sin vertical → `null`
+
+- DADO un usuario miembro activo de una organización con `contabilidadEnabled = false`
+  y `granjaEnabled = false` (alta tipo `OTROS` o data legacy)
+- CUANDO consulta `GET /api/me/permissions`
+- ENTONCES la respuesta es 200
+- Y `vertical === null`
+- Y la respuesta NO es un error
+
+#### Escenario: regresión — consumidor actual no se rompe
+
+- DADO el consumidor frontend actual de `/me/permissions` (gating de permisos)
+- CUANDO recibe la respuesta con el campo `vertical` agregado
+- ENTONCES `permissions`, `isOwner` y `activeTenantId` siguen presentes con el mismo
+  shape y semántica
+- Y el gating de permisos existente NO cambia su comportamiento
+
+#### Escenario: sin tenant activo — el flujo de error no se altera
+
+- DADO un usuario autenticado SIN `activeTenantId` en el JWT
+- CUANDO consulta `GET /api/me/permissions`
+- ENTONCES la respuesta es 403 con código `ME_PERMISSIONS_SIN_TENANT`
+- Y NO se intenta derivar `vertical` (el camino de error es anterior al cálculo)
+
+---
+
 ## Notas de scope
 
 - **Entitlement fuera de scope**: este corte NO filtra permisos por módulos activados del
@@ -257,3 +324,7 @@ para el catálogo completo) para evitar confusión.
   toda la intersección rol∩catálogo sin verificar si el módulo está activado.
 - **Catálogo compartido**: `CATALOGO_PERMISOS` ya existe en `src/common/permisos/catalogo.ts`.
   El expand de wildcards usa ese array como referencia fija.
+- **Vertical activo**: el campo `vertical` se resuelve en el camino exitoso a partir de
+  los flags `contabilidadEnabled`/`granjaEnabled` de la org activa. El comportamiento
+  completo de frontend asociado (nav filtrado por vertical, ruta default, `<SinModulo>`)
+  vive en `openspec/specs/shell-vertical/spec.md`.
