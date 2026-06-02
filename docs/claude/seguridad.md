@@ -3,6 +3,7 @@
 Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
+<!-- Actualizado: enforcement de Organization.status vía OrgStatusGuard APP_GUARD (change org-status-enforcement 2026-06-02) -->
 <!-- Actualizado: revocación de access tokens generalizada a todos los usuarios (change logout-all 2026-06-02) -->
 
 # Seguridad y permisos — detalle
@@ -111,6 +112,7 @@ Response: { impersonationToken: string, expiresAt: string }
 ### 5.7 Defense in depth
 
 - **Guard (JWT + Permisos)**: primera línea. Rechaza requests sin auth o con permisos insuficientes.
+- **`OrgStatusGuard` (`APP_GUARD`)**: segunda línea. Bloquea mutaciones (POST/PUT/PATCH/DELETE) en orgs SUSPENDED/ARCHIVED → 403. Lecturas siempre pasan. SuperAdmin bypassa. Ver `src/common/guards/org-status.guard.ts` y `openspec/specs/org-status-enforcement/`. Change `org-status-enforcement` (2026-06-02).
 - **Servicio**: usa `TenantContext` inyectado para enforce `tenantId` en queries.
 - **Repositorio**: todo método de repositorio recibe `tenantId` como parámetro obligatorio y lo añade al `where`. Un método sin filtro por `tenantId` es **bug de seguridad** y debe romper tests.
 

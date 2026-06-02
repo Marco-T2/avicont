@@ -808,6 +808,7 @@ Este índice existe para que el próximo lector (vos en 6 meses o un dev nuevo) 
 | Subdomain resolver | Descartado, remover del starter | §5.4 |
 | Super-admin | `User.isSuperAdmin` booleano; `SuperAdminGuard` + `TenantGuard` bypass + short-circuit RBAC; auditoría en `platform_audit`; change `super-admin` (2026-06-02) | §5.4 / `docs/disenos/super-admin-plataforma.md` |
 | Revocación epoch — logout-all | Mecanismo generalizado de revocación de access tokens: clave Redis `revoked:access:{userId}`, TTL 1h, check corre para TODOS los usuarios en `JwtStrategy.validate`. `POST /auth/logout-all` (self-only) revoca access epoch + todos los refresh tokens activos. `revocarTokensSuperAdmin` es caso particular (delega al mismo mecanismo). Change `logout-all` (2026-06-02). | `auth.service.ts`, `jwt.strategy.ts`, `auth.controller.ts` |
+| Enforcement de `Organization.status` | `OrgStatusGuard` global (`APP_GUARD`); org SUSPENDED/ARCHIVED → mutaciones 403 (`ORG_STATUS_NO_ACTIVE`), lecturas siempre permitidas; SuperAdmin bypassa (`isSuperAdmin === true`); guard decodifica JWT con `jwt.verify` propio (corre antes de los guards de controller); cache Redis `org-status:<tenantId>` invalidado en `actualizarStatus`; decorator `@AllowOnNonActiveOrg()` para eximir endpoints. Change `org-status-enforcement` (2026-06-02). | `org-status.guard.ts` + `openspec/specs/org-status-enforcement/` |
 
 ### 10.5 Errores y logs
 
