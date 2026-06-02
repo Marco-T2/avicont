@@ -123,26 +123,35 @@ describe('CustomRoles (e2e)', () => {
       expect(res.body.length).toBeGreaterThan(50);
     });
 
-    it('debe devolver el catálogo agrupado por modulo', async () => {
+    it('debe devolver el catálogo agrupado FILTRADO por el vertical de la org', async () => {
+      // La org de test es de CONTABILIDAD (contabilidadEnabled default true). El
+      // catálogo asignable agrupado ahora se filtra server-authoritative por
+      // vertical + packs (cierre deuda RBAC §7): incluye contabilidad +
+      // cross-vertical, excluye granja.
       const res = await request(app.getHttpServer())
         .get('/api/permissions/grouped')
-        .set('Authorization', `Bearer ${ownerToken}`);
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId);
       expect(res.status).toBe(200);
       const modulos = res.body.map((g: { modulo: string }) => g.modulo);
       expect(modulos).toContain('contabilidad');
-      expect(modulos).toContain('granja');
+      expect(modulos).toContain('organizacion');
+      expect(modulos).not.toContain('granja');
     });
   });
 });
 
 async function cleanup(prisma: PrismaService) {
   await prisma.refreshToken.deleteMany({});
+  await prisma.platformAudit.deleteMany({});
   await prisma.impersonationAction.deleteMany({});
   await prisma.impersonationLog.deleteMany({});
   await prisma.invitation.deleteMany({});
   await prisma.auditLog.deleteMany({});
   await prisma.membership.deleteMany({});
   await prisma.customRole.deleteMany({});
+  await prisma.orgPackEntitlement.deleteMany({});
+  await prisma.pack.deleteMany({});
   await prisma.featureFlag.deleteMany({});
   await prisma.organization.deleteMany({});
   await prisma.user.deleteMany({});

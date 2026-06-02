@@ -1081,6 +1081,128 @@
         ]
       }
     },
+    "/api/permissions": {
+      "get": {
+        "operationId": "PermissionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Catálogo plano de permisos finos (referencia completa)",
+        "tags": [
+          "Permissions"
+        ]
+      }
+    },
+    "/api/permissions/grouped": {
+      "get": {
+        "operationId": "PermissionsController_grouped",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Catálogo asignable agrupado, filtrado por vertical y packs de la org",
+        "tags": [
+          "Permissions"
+        ]
+      }
+    },
+    "/api/packs/mis-packs": {
+      "get": {
+        "operationId": "PackController_misPacks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgPackEntitlementResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar los packs habilitados de la org con su estado de activación",
+        "tags": [
+          "Packs"
+        ]
+      }
+    },
+    "/api/packs/{clave}": {
+      "patch": {
+        "operationId": "PackController_activar",
+        "parameters": [
+          {
+            "name": "clave",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivarPackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivacionPackResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pack no habilitado para la org (PACK_NO_HABILITADO)"
+          },
+          "404": {
+            "description": "Pack inexistente en el catálogo"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Activar o desactivar un pack habilitado de la org activa",
+        "tags": [
+          "Packs"
+        ]
+      }
+    },
     "/api/tenants": {
       "post": {
         "operationId": "TenantsController_create",
@@ -2604,46 +2726,6 @@
         ]
       }
     },
-    "/api/permissions": {
-      "get": {
-        "operationId": "PermissionsController_list",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Catálogo plano de permisos finos",
-        "tags": [
-          "Permissions"
-        ]
-      }
-    },
-    "/api/permissions/grouped": {
-      "get": {
-        "operationId": "PermissionsController_grouped",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Catálogo agrupado por módulo y submódulo (vista UI)",
-        "tags": [
-          "Permissions"
-        ]
-      }
-    },
     "/api/invitations/preview": {
       "get": {
         "operationId": "InvitationsController_preview",
@@ -3225,88 +3307,6 @@
         "summary": "Revocar el entitlement de un pack de una organización (super-admin)",
         "tags": [
           "Platform Admin"
-        ]
-      }
-    },
-    "/api/packs/mis-packs": {
-      "get": {
-        "operationId": "PackController_misPacks",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OrgPackEntitlementResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Listar los packs habilitados de la org con su estado de activación",
-        "tags": [
-          "Packs"
-        ]
-      }
-    },
-    "/api/packs/{clave}": {
-      "patch": {
-        "operationId": "PackController_activar",
-        "parameters": [
-          {
-            "name": "clave",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ActivarPackDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ActivacionPackResponseDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Pack no habilitado para la org (PACK_NO_HABILITADO)"
-          },
-          "404": {
-            "description": "Pack inexistente en el catálogo"
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Activar o desactivar un pack habilitado de la org activa",
-        "tags": [
-          "Packs"
         ]
       }
     },
@@ -5319,6 +5319,119 @@
           }
         }
       },
+      "PackResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clave": {
+            "type": "string",
+            "description": "Clave estable namespaced. Ej: \"contabilidad.adjuntos\"."
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "verticalAplicable": {
+            "type": "string",
+            "enum": [
+              "CONTABILIDAD",
+              "GRANJA"
+            ]
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DOMINIO",
+              "CAPACIDAD"
+            ]
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "clave",
+          "nombre",
+          "descripcion",
+          "verticalAplicable",
+          "tipo",
+          "activo"
+        ]
+      },
+      "OrgPackEntitlementResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "packId": {
+            "type": "string"
+          },
+          "activo": {
+            "type": "boolean",
+            "description": "Activación embebida: true = el Owner activó el pack."
+          },
+          "habilitadoPorUserId": {
+            "type": "string"
+          },
+          "pack": {
+            "$ref": "#/components/schemas/PackResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "packId",
+          "activo",
+          "habilitadoPorUserId",
+          "pack"
+        ]
+      },
+      "ActivarPackDto": {
+        "type": "object",
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "description": "true = activar el pack; false = desactivarlo."
+          }
+        },
+        "required": [
+          "activo"
+        ]
+      },
+      "ActivacionPackResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "packId": {
+            "type": "string"
+          },
+          "activo": {
+            "type": "boolean",
+            "description": "Estado de activación tras el cambio."
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "packId",
+          "activo"
+        ]
+      },
       "CreateTenantDto": {
         "type": "object",
         "properties": {
@@ -6509,119 +6622,6 @@
             "example": "contabilidad.adjuntos"
           }
         }
-      },
-      "PackResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "clave": {
-            "type": "string",
-            "description": "Clave estable namespaced. Ej: \"contabilidad.adjuntos\"."
-          },
-          "nombre": {
-            "type": "string"
-          },
-          "descripcion": {
-            "type": "string",
-            "nullable": true
-          },
-          "verticalAplicable": {
-            "type": "string",
-            "enum": [
-              "CONTABILIDAD",
-              "GRANJA"
-            ]
-          },
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "DOMINIO",
-              "CAPACIDAD"
-            ]
-          },
-          "activo": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "clave",
-          "nombre",
-          "descripcion",
-          "verticalAplicable",
-          "tipo",
-          "activo"
-        ]
-      },
-      "OrgPackEntitlementResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "packId": {
-            "type": "string"
-          },
-          "activo": {
-            "type": "boolean",
-            "description": "Activación embebida: true = el Owner activó el pack."
-          },
-          "habilitadoPorUserId": {
-            "type": "string"
-          },
-          "pack": {
-            "$ref": "#/components/schemas/PackResponseDto"
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "packId",
-          "activo",
-          "habilitadoPorUserId",
-          "pack"
-        ]
-      },
-      "ActivarPackDto": {
-        "type": "object",
-        "properties": {
-          "activo": {
-            "type": "boolean",
-            "description": "true = activar el pack; false = desactivarlo."
-          }
-        },
-        "required": [
-          "activo"
-        ]
-      },
-      "ActivacionPackResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "packId": {
-            "type": "string"
-          },
-          "activo": {
-            "type": "boolean",
-            "description": "Estado de activación tras el cambio."
-          }
-        },
-        "required": [
-          "id",
-          "organizationId",
-          "packId",
-          "activo"
-        ]
       },
       "CreateFeatureFlagDto": {
         "type": "object",

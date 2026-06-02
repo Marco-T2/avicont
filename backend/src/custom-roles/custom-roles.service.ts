@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CustomRole } from '@prisma/client';
 
 import { permisoExisteEnCatalogo } from '@/common/permisos/catalogo';
+import { type ContextoAsignable, submoduloEsAsignable } from '@/common/permisos/catalogo-asignable';
+import { CatalogoAsignableResolver } from '@/permissions/catalogo-asignable.resolver';
 import { assertValidPermissionPattern } from '@/rbac/domain/permission-matcher';
 import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
@@ -16,6 +18,7 @@ import {
   CustomRoleSlugDuplicadoError,
   PermisoDesconocidoError,
   PermisoInvalidoError,
+  PermisoNoHabilitadoError,
 } from './domain/custom-role-errors';
 import { CloneCustomRoleDto } from './dto/clone-custom-role.dto';
 import { CreateCustomRoleDto } from './dto/create-custom-role.dto';
@@ -32,6 +35,7 @@ export class CustomRolesService {
     private readonly repo: CustomRoleRepositoryPort,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
     private readonly rbac: PermissionsCacheInvalidationPort,
+    private readonly asignableResolver: CatalogoAsignableResolver,
   ) {}
 
   list(organizationId: string): Promise<CustomRole[]> {
@@ -56,7 +60,7 @@ export class CustomRolesService {
     actorUserId: string,
     dto: CreateCustomRoleDto,
   ): Promise<CustomRole> {
-    this.validatePermissions(dto.permissions);
+    await this.validatePermissions(organizationId, dto.permissions);
 
     const dup = await this.repo.findBySlug(organizationId, dto.slug);
     if (dup) {
@@ -106,7 +110,7 @@ export class CustomRolesService {
       throw new CustomRoleNoEditableError(id);
     }
     if (dto.permissions) {
-      this.validatePermissions(dto.permissions);
+      await this.validatePermissions(organizationId, dto.permissions);
     }
 
     const updated = await this.repo.update(id, organizationId, {
@@ -141,22 +145,66 @@ export class CustomRolesService {
 
   // -------- helpers --------
 
-  // Valida cada permiso pasado al rol:
+  // Valida cada permiso pasado al rol, server-authoritative (candado de la
+  // deuda RBAC, docs/disenos/packs-eje2.md §7). Para cada permiso:
   //  - Patrón válido (sintaxis de wildcards permitida).
-  //  - Si es exacto (sin wildcards), debe existir en el catálogo.
-  // Patrones con wildcards no se chequean contra el catálogo: pueden cubrir
-  // permisos futuros que se agreguen sin romper el rol.
-  private validatePermissions(permissions: string[]): void {
+  //  - Si es exacto (sin wildcards): debe existir en el catálogo Y ser asignable
+  //    en esta org (su submódulo pertenece al vertical activo y, si es submódulo
+  //    de pack, el pack está activo).
+  //  - Si es wildcard de submódulo (`modulo.submodulo.*`): su submódulo debe ser
+  //    asignable (no se puede colar un pack inactivo vía wildcard).
+  //  - Wildcards amplios (`*`, `modulo.*`, `modulo.*.accion`) conservan el
+  //    comportamiento existente: se aceptan sin chequear catálogo ni pack (son
+  //    el grant amplio estilo OWNER; pueden cubrir permisos futuros).
+  //
+  // El filtro de asignabilidad es defense in depth con el endpoint del catálogo
+  // asignable (permissions.controller): el endpoint es UX, esto es el candado.
+  private async validatePermissions(organizationId: string, permissions: string[]): Promise<void> {
+    const ctx = await this.asignableResolver.resolver(organizationId);
+
     for (const p of permissions) {
       try {
         assertValidPermissionPattern(p);
       } catch (e) {
         throw new PermisoInvalidoError(p, (e as Error).message);
       }
+
+      const partes = p.split('.');
       const tieneWildcard = p === '*' || p.includes('*');
-      if (!tieneWildcard && !permisoExisteEnCatalogo(p)) {
-        throw new PermisoDesconocidoError(p);
+
+      if (!tieneWildcard) {
+        if (!permisoExisteEnCatalogo(p)) {
+          throw new PermisoDesconocidoError(p);
+        }
+        // Permiso exacto: existe en el catálogo ⇒ tiene forma modulo.submodulo.accion.
+        const modulo = partes[0] ?? '';
+        const submodulo = partes[1] ?? '';
+        if (!submoduloEsAsignable(modulo, submodulo, ctx)) {
+          throw new PermisoNoHabilitadoError(p);
+        }
+        continue;
       }
+
+      // Wildcard que apunta a un submódulo concreto (`modulo.submodulo.*`): el
+      // candado de pack/vertical aplica al submódulo. Los wildcards más amplios
+      // (`modulo.*`, `modulo.*.accion`, `*`) no fijan un submódulo → se aceptan.
+      this.validarWildcardDeSubmodulo(p, partes, ctx);
+    }
+  }
+
+  private validarWildcardDeSubmodulo(
+    permiso: string,
+    partes: string[],
+    ctx: ContextoAsignable,
+  ): void {
+    if (partes.length !== 3) return;
+    const modulo = partes[0] ?? '';
+    const submodulo = partes[1] ?? '';
+    const accion = partes[2] ?? '';
+    if (modulo === '*' || submodulo === '*' || accion !== '*') return;
+    // Es `modulo.submodulo.*` con modulo y submodulo concretos.
+    if (!submoduloEsAsignable(modulo, submodulo, ctx)) {
+      throw new PermisoNoHabilitadoError(permiso);
     }
   }
 }

@@ -310,6 +310,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo plano de permisos finos (referencia completa) */
+        get: operations["PermissionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permissions/grouped": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo asignable agrupado, filtrado por vertical y packs de la org */
+        get: operations["PermissionsController_grouped"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/packs/mis-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar los packs habilitados de la org con su estado de activación */
+        get: operations["PackController_misPacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/packs/{clave}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Activar o desactivar un pack habilitado de la org activa */
+        patch: operations["PackController_activar"];
+        trace?: never;
+    };
     "/api/tenants": {
         parameters: {
             query?: never;
@@ -866,40 +934,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/permissions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Catálogo plano de permisos finos */
-        get: operations["PermissionsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/permissions/grouped": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Catálogo agrupado por módulo y submódulo (vista UI) */
-        get: operations["PermissionsController_grouped"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/invitations/preview": {
         parameters: {
             query?: never;
@@ -1128,40 +1162,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/api/packs/mis-packs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Listar los packs habilitados de la org con su estado de activación */
-        get: operations["PackController_misPacks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/packs/{clave}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Activar o desactivar un pack habilitado de la org activa */
-        patch: operations["PackController_activar"];
         trace?: never;
     };
     "/api/audit": {
@@ -1881,6 +1881,38 @@ export interface components {
             description?: string;
             permissions?: string[];
         };
+        PackResponseDto: {
+            id: string;
+            /** @description Clave estable namespaced. Ej: "contabilidad.adjuntos". */
+            clave: string;
+            nombre: string;
+            descripcion: string | null;
+            /** @enum {string} */
+            verticalAplicable: "CONTABILIDAD" | "GRANJA";
+            /** @enum {string} */
+            tipo: "DOMINIO" | "CAPACIDAD";
+            activo: boolean;
+        };
+        OrgPackEntitlementResponseDto: {
+            id: string;
+            organizationId: string;
+            packId: string;
+            /** @description Activación embebida: true = el Owner activó el pack. */
+            activo: boolean;
+            habilitadoPorUserId: string;
+            pack: components["schemas"]["PackResponseDto"];
+        };
+        ActivarPackDto: {
+            /** @description true = activar el pack; false = desactivarlo. */
+            activo: boolean;
+        };
+        ActivacionPackResponseDto: {
+            id: string;
+            organizationId: string;
+            packId: string;
+            /** @description Estado de activación tras el cambio. */
+            activo: boolean;
+        };
         CreateTenantDto: {
             /**
              * @description Organization name
@@ -2306,38 +2338,6 @@ export interface components {
              * @example contabilidad.adjuntos
              */
             clave?: string;
-        };
-        PackResponseDto: {
-            id: string;
-            /** @description Clave estable namespaced. Ej: "contabilidad.adjuntos". */
-            clave: string;
-            nombre: string;
-            descripcion: string | null;
-            /** @enum {string} */
-            verticalAplicable: "CONTABILIDAD" | "GRANJA";
-            /** @enum {string} */
-            tipo: "DOMINIO" | "CAPACIDAD";
-            activo: boolean;
-        };
-        OrgPackEntitlementResponseDto: {
-            id: string;
-            organizationId: string;
-            packId: string;
-            /** @description Activación embebida: true = el Owner activó el pack. */
-            activo: boolean;
-            habilitadoPorUserId: string;
-            pack: components["schemas"]["PackResponseDto"];
-        };
-        ActivarPackDto: {
-            /** @description true = activar el pack; false = desactivarlo. */
-            activo: boolean;
-        };
-        ActivacionPackResponseDto: {
-            id: string;
-            organizationId: string;
-            packId: string;
-            /** @description Estado de activación tras el cambio. */
-            activo: boolean;
         };
         CreateFeatureFlagDto: {
             /**
@@ -3738,6 +3738,98 @@ export interface operations {
             };
         };
     };
+    PermissionsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PermissionsController_grouped: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PackController_misPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgPackEntitlementResponseDto"][];
+                };
+            };
+        };
+    };
+    PackController_activar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivarPackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivacionPackResponseDto"];
+                };
+            };
+            /** @description Pack no habilitado para la org (PACK_NO_HABILITADO) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Pack inexistente en el catálogo */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TenantsController_create: {
         parameters: {
             query?: never;
@@ -4670,40 +4762,6 @@ export interface operations {
             };
         };
     };
-    PermissionsController_list: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PermissionsController_grouped: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     InvitationsController_preview: {
         parameters: {
             query: {
@@ -5160,64 +5218,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Organización no encontrada */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PackController_misPacks: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OrgPackEntitlementResponseDto"][];
-                };
-            };
-        };
-    };
-    PackController_activar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                clave: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ActivarPackDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ActivacionPackResponseDto"];
-                };
-            };
-            /** @description Pack no habilitado para la org (PACK_NO_HABILITADO) */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Pack inexistente en el catálogo */
             404: {
                 headers: {
                     [name: string]: unknown;
