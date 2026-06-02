@@ -1,8 +1,15 @@
-import { Building2, Plus } from 'lucide-react';
+import { Building2, MoreHorizontal, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -12,11 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { PlatformOrg } from '@/types/api';
+import type { OrgStatus, PlatformOrg } from '@/types/api';
 
 import { CreateOrgSheet } from '../components/create-org-sheet';
+import { EntitlementSheet } from '../components/entitlement-sheet';
 import { OrgPlanBadge } from '../components/org-plan-badge';
 import { OrgStatusBadge } from '../components/org-status-badge';
+import { OrgStatusDialog } from '../components/org-status-dialog';
 import { useOrgs } from '../hooks/use-orgs';
 
 const FECHA_FORMATTER = new Intl.DateTimeFormat('es-BO', {
@@ -32,13 +41,22 @@ function formatearFecha(iso: string): string {
 }
 
 /**
- * Listado de organizaciones de la plataforma (super-admin, PR-1/PR-2).
+ * Listado de organizaciones de la plataforma (super-admin, PR-1/PR-2/PR-3).
  * Container: orquesta useOrgs y maneja loading/empty/error. PR-2 agrega la creación
- * de orgs (CreateOrgSheet). Las acciones por fila llegan en PR-3.
+ * de orgs (CreateOrgSheet). PR-3 agrega las acciones por fila: cambiar estado
+ * (OrgStatusDialog) y editar entitlement (EntitlementSheet).
  */
 export function OrgsPage(): React.JSX.Element {
   const { data, isLoading, isError } = useOrgs();
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Acción de status seleccionada: la org + el status destino de la transición.
+  const [statusTarget, setStatusTarget] = useState<{
+    org: PlatformOrg;
+    target: OrgStatus;
+  } | null>(null);
+  // Org cuyo entitlement se está editando.
+  const [entitlementOrg, setEntitlementOrg] = useState<PlatformOrg | null>(null);
 
   return (
     <div className="space-y-6">
@@ -55,9 +73,32 @@ export function OrgsPage(): React.JSX.Element {
         </Button>
       </div>
 
-      <OrgsContent data={data} isLoading={isLoading} isError={isError} />
+      <OrgsContent
+        data={data}
+        isLoading={isLoading}
+        isError={isError}
+        onChangeStatus={(org, target) => setStatusTarget({ org, target })}
+        onEditEntitlement={setEntitlementOrg}
+      />
 
       <CreateOrgSheet open={createOpen} onOpenChange={setCreateOpen} />
+
+      <OrgStatusDialog
+        org={statusTarget?.org ?? null}
+        targetStatus={statusTarget?.target ?? 'ACTIVE'}
+        open={statusTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setStatusTarget(null);
+        }}
+      />
+
+      <EntitlementSheet
+        org={entitlementOrg}
+        open={entitlementOrg !== null}
+        onOpenChange={(open) => {
+          if (!open) setEntitlementOrg(null);
+        }}
+      />
     </div>
   );
 }
@@ -66,9 +107,17 @@ interface OrgsContentProps {
   data: PlatformOrg[] | undefined;
   isLoading: boolean;
   isError: boolean;
+  onChangeStatus: (org: PlatformOrg, target: OrgStatus) => void;
+  onEditEntitlement: (org: PlatformOrg) => void;
 }
 
-function OrgsContent({ data, isLoading, isError }: OrgsContentProps): React.JSX.Element {
+function OrgsContent({
+  data,
+  isLoading,
+  isError,
+  onChangeStatus,
+  onEditEntitlement,
+}: OrgsContentProps): React.JSX.Element {
   if (isError) {
     return (
       <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3">
@@ -105,7 +154,7 @@ function OrgsContent({ data, isLoading, isError }: OrgsContentProps): React.JSX.
 
   return (
     <div className="relative overflow-x-auto rounded-md border">
-      <Table className="min-w-[760px]">
+      <Table className="min-w-[860px]">
         <TableHeader>
           <TableRow>
             <TableHead className="sticky left-0 z-10 bg-background min-w-[200px]">
@@ -115,6 +164,7 @@ function OrgsContent({ data, isLoading, isError }: OrgsContentProps): React.JSX.
             <TableHead>Plan</TableHead>
             <TableHead>Verticales</TableHead>
             <TableHead>Creada</TableHead>
+            <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -139,11 +189,73 @@ function OrgsContent({ data, isLoading, isError }: OrgsContentProps): React.JSX.
               <TableCell className="text-muted-foreground text-xs">
                 {formatearFecha(org.createdAt)}
               </TableCell>
+              <TableCell className="text-right">
+                <OrgRowActions
+                  org={org}
+                  onChangeStatus={onChangeStatus}
+                  onEditEntitlement={onEditEntitlement}
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+interface OrgRowActionsProps {
+  org: PlatformOrg;
+  onChangeStatus: (org: PlatformOrg, target: OrgStatus) => void;
+  onEditEntitlement: (org: PlatformOrg) => void;
+}
+
+// Transiciones de status disponibles según el estado actual de la org. El
+// backend acepta cualquier status; acá modelamos las transiciones con sentido
+// para no ofrecer "suspender" sobre algo ya suspendido.
+const TRANSICIONES_STATUS: Record<OrgStatus, { target: OrgStatus; label: string }[]> = {
+  ACTIVE: [
+    { target: 'SUSPENDED', label: 'Suspender' },
+    { target: 'ARCHIVED', label: 'Archivar' },
+  ],
+  SUSPENDED: [
+    { target: 'ACTIVE', label: 'Reactivar' },
+    { target: 'ARCHIVED', label: 'Archivar' },
+  ],
+  ARCHIVED: [{ target: 'ACTIVE', label: 'Reactivar' }],
+};
+
+function OrgRowActions({
+  org,
+  onChangeStatus,
+  onEditEntitlement,
+}: OrgRowActionsProps): React.JSX.Element {
+  const transiciones = TRANSICIONES_STATUS[org.status] ?? [];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11 md:h-9 md:w-9"
+          aria-label={`Acciones para ${org.name}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={() => onEditEntitlement(org)}>
+          Editar entitlement
+        </DropdownMenuItem>
+        {transiciones.length > 0 ? <DropdownMenuSeparator /> : null}
+        {transiciones.map((t) => (
+          <DropdownMenuItem key={t.target} onClick={() => onChangeStatus(org, t.target)}>
+            {t.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
