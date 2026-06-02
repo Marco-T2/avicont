@@ -28,7 +28,7 @@ import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
-import { OrgsPlaceholderPage } from '@/features/platform-admin/pages/orgs-placeholder-page';
+import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
 import { FeatureFlagsPlaceholderPage } from '@/features/platform-admin/pages/feature-flags-placeholder-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -233,7 +233,7 @@ export const router = createBrowserRouter([
             path: '/platform-admin/orgs',
             element: (
               <RequireSuperAdmin>
-                <OrgsPlaceholderPage />
+                <OrgsPage />
               </RequireSuperAdmin>
             ),
           },
