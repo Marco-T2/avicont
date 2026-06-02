@@ -22,6 +22,7 @@ import { TiposDocumentoFisicoModule } from './tipos-documento-fisico/tipos-docum
 import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { GranjaModule } from './granja/granja.module';
+import { PacksModule } from './packs/pack.module';
 import { MeModule } from './me/me.module';
 import { PlatformModule } from './platform/platform.module';
 import { ClockModule } from './common/clock';
@@ -95,6 +96,7 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     DocumentosFisicosModule,
     ReportesModule,
     GranjaModule,
+    PacksModule,
     MeModule,
     PlatformModule,
   ],
