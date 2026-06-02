@@ -58,4 +58,12 @@ export class PrismaCredentialsRepository implements CredentialsRepositoryPort {
       data: { revokedAt: new Date(), revokedReason: reason },
     });
   }
+
+  async revokeAllByUserId(userId: string, reason: string): Promise<void> {
+    // Solo revoca los activos (revokedAt IS NULL) — no toca los ya revocados.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
+  }
 }

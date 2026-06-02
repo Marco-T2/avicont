@@ -22,21 +22,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Revocación inmediata para tokens de super-admin (REQ-SA-03).
-    // El mecanismo es un epoch por usuario en Redis: si existe una marca de
-    // revocación más nueva que el iat del token, el token se considera revocado.
-    // El claim de plataforma se revoca en bloque (todos los tokens activos del
-    // usuario), sin necesidad de jti por token.
-    // docs/disenos/super-admin-plataforma.md §4.3, design.md Decisión 4.2.
-    if (payload.isSuperAdmin === true) {
-      const key = `superadmin:revoked:${payload.sub}`;
-      const revokedAtStr = await this.redis.get<string>(key);
-      if (revokedAtStr !== null) {
-        const revokedAtMs = Number(revokedAtStr);
-        const iatMs = (payload.iat ?? 0) * 1000;
-        if (revokedAtMs > iatMs) {
-          throw new UnauthorizedException('Token revocado');
-        }
+    // Revocación generalizada de access tokens (logout-all + super-admin revoke).
+    // Epoch por usuario en Redis: si existe una marca posterior al iat del token,
+    // el token está revocado. Mecanismo único para todos los usuarios (REQ-LA-02).
+    // docs/claude/seguridad.md, design.md Decisión C.
+    const key = `revoked:access:${payload.sub}`;
+    const revokedAtStr = await this.redis.get<string>(key);
+    if (revokedAtStr !== null) {
+      const revokedAtMs = Number(revokedAtStr);
+      const iatMs = (payload.iat ?? 0) * 1000;
+      if (revokedAtMs > iatMs) {
+        throw new UnauthorizedException('Token revocado');
       }
     }
 

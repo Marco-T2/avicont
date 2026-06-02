@@ -3,6 +3,7 @@
 Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
+<!-- Actualizado: revocación de access tokens generalizada a todos los usuarios (change logout-all 2026-06-02) -->
 
 # Seguridad y permisos — detalle
 
@@ -38,7 +39,8 @@ Owner: backend-lead
 - Vida 1h. 15 min es overkill; 4h es laxo para sistema con plata.
 - Firmado con `JWT_ACCESS_SECRET`. Algoritmo HS256 (el starter viene así).
 - Claims mínimos: `sub` (userId), `email`, `activeTenantId`, `roles`, `iat`, `exp`.
-- **Revocación inmediata**: blocklist en Redis, key `saas:revoked:access:{jti}`, TTL = `exp - now`. El guard consulta la blocklist en cada request (una sola roundtrip a Redis).
+- **Revocación inmediata (mecanismo epoch por usuario)**: clave Redis `saas:revoked:access:{userId}`, TTL 1h. `JwtStrategy.validate` consulta la clave para TODOS los usuarios (no solo super-admins) en cada request. Si `revokedAtMs > iat * 1000` → `UnauthorizedException`. Se escribe en: `AuthService.logoutAll` (self logout-all) y `revocarTokensSuperAdmin` (revoke de super-admin). El CLI de revoke escribe la misma clave directamente. Change `logout-all` (2026-06-02). Ver `design.md Decisiones B y C` en `openspec/changes/logout-all/design.md`.
+- **`POST /auth/logout-all`** (self-only): escribe el epoch + revoca todos los refresh tokens activos del usuario en BD. Responde 204. Sin parámetro userId — opera sobre `req.user.sub`.
 
 ### 5.3 Refresh token
 

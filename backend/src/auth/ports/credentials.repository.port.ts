@@ -39,4 +39,7 @@ export interface CredentialsRepositoryPort {
 
   /** Marca todos los tokens con ese hash como revocados. Usado en logout. */
   revokeByHash(hash: string, reason: string): Promise<void>;
+
+  /** Marca como revocados TODOS los refresh tokens activos del usuario. Usado en logout-all. */
+  revokeAllByUserId(userId: string, reason: string): Promise<void>;
 }

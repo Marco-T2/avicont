@@ -40,6 +40,7 @@ describe('AuthService (unit)', () => {
   let jwt: { sign: jest.Mock };
   let metrics: { recordLogin: jest.Mock; recordTokenRefresh: jest.Mock };
   let clock: FakeClockAdapter;
+  let redis: { set: jest.Mock; get: jest.Mock };
 
   beforeEach(async () => {
     credentials = {
@@ -47,6 +48,7 @@ describe('AuthService (unit)', () => {
       create: jest.fn(),
       revokeById: jest.fn(),
       revokeByHash: jest.fn(),
+      revokeAllByUserId: jest.fn(),
     };
     memberships = {
       findActivasByUserId: jest.fn().mockResolvedValue([]),
@@ -67,7 +69,7 @@ describe('AuthService (unit)', () => {
     const config = {
       get: jest.fn().mockReturnValue('30d'),
     } as unknown as ConfigService;
-    const redis = { set: jest.fn(), get: jest.fn() };
+    redis = { set: jest.fn(), get: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -299,6 +301,28 @@ describe('AuthService (unit)', () => {
       expect(signedPayload.activeTenantId).toBe('org-2');
       expect(signedPayload.roles).toEqual(['granjero']);
       expect(credentials.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('logoutAll (REQ-LA-03)', () => {
+    it('escribe el epoch revoked:access del usuario con el timestamp del ClockPort', async () => {
+      const frozenNow = new Date('2026-06-02T10:00:00.000Z');
+      clock.setTo(frozenNow);
+
+      await service.logoutAll('user-xyz');
+
+      expect(redis.set).toHaveBeenCalledWith(
+        'revoked:access:user-xyz',
+        String(frozenNow.getTime()),
+        3600,
+      );
+    });
+
+    it('llama revokeAllByUserId con el userId y reason logout-all', async () => {
+      await service.logoutAll('user-xyz');
+
+      expect(credentials.revokeAllByUserId).toHaveBeenCalledWith('user-xyz', 'logout-all');
+      expect(credentials.revokeAllByUserId).toHaveBeenCalledTimes(1);
     });
   });
 });

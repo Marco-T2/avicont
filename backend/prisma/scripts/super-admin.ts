@@ -15,7 +15,7 @@
  * (Prisma) y Redis (ioredis) para mantener el arranque liviano.
  *
  * El epoch de revocación de Redis usa el mismo formato que `AuthService.revocarTokensSuperAdmin`:
- *   clave: `saas:superadmin:revoked:<userId>` (prefijo `saas:` explícito)
+ *   clave: `saas:revoked:access:<userId>` (prefijo `saas:` explícito)
  *   valor: timestamp en ms como string
  *   TTL:   3600s (vida del access token)
  * `JwtStrategy.validate` en el app NestJS usa ese mismo formato para invalidar tokens.

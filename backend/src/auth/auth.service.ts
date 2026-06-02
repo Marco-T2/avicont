@@ -29,10 +29,10 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MetricsService } from '../metrics/metrics.service';
 
-/** TTL del epoch de revocación de super-admin en Redis. Debe coincidir con la
+/** TTL del epoch de revocación de access tokens en Redis. Debe coincidir con la
  *  vida del access token (1h = 3600s) para que la marca se auto-limpie.
- *  design.md Decisión 4.2. */
-const SUPER_ADMIN_REVOCATION_TTL_SECONDS = 3600;
+ *  design.md Decisión F (generalizado — aplica a todos los usuarios). */
+const ACCESS_REVOCATION_TTL_SECONDS = 3600;
 
 export type { JwtPayload };
 
@@ -190,20 +190,43 @@ export class AuthService {
   }
 
   /**
-   * Revoca inmediatamente todos los tokens de acceso activos de un super-admin
-   * escribiendo un epoch de revocación en Redis (REQ-SA-03, design.md Decisión 4.2).
+   * Revoca inmediatamente todos los tokens de acceso activos de un usuario
+   * escribiendo un epoch de revocación en Redis (REQ-SA-03, REQ-LA-01).
    *
-   * El mecanismo: escribe `superadmin:revoked:<userId>` con el timestamp actual en ms
+   * El mecanismo: escribe `revoked:access:<userId>` con el timestamp actual en ms
    * y TTL = 3600s (vida del access token). JwtStrategy.validate lo lee y rechaza
    * cualquier token con iat anterior al epoch.
    *
-   * Se llama standalone desde el CLI de revoke (Slice 5) y desde cualquier endpoint
+   * Se llama desde revocarTokensSuperAdmin (revocación de super-admin) y logoutAll
+   * (self logout de cualquier usuario).
+   */
+  private async escribirEpochRevocacion(userId: string): Promise<void> {
+    const key = `revoked:access:${userId}`;
+    const nowMs = this.clock.now().getTime();
+    await this.redis.set(key, String(nowMs), ACCESS_REVOCATION_TTL_SECONDS);
+  }
+
+  /**
+   * Revoca inmediatamente todos los tokens de acceso activos de un super-admin
+   * (REQ-SA-03). Delega en `escribirEpochRevocacion` para usar el mecanismo
+   * generalizado. Se llama desde el CLI de revoke y desde cualquier endpoint
    * que revoque el flag isSuperAdmin.
+   *
+   * El nombre se preserva para no romper los callers existentes (design.md §4.1).
    */
   async revocarTokensSuperAdmin(userId: string): Promise<void> {
-    const key = `superadmin:revoked:${userId}`;
-    const nowMs = this.clock.now().getTime();
-    await this.redis.set(key, String(nowMs), SUPER_ADMIN_REVOCATION_TTL_SECONDS);
+    await this.escribirEpochRevocacion(userId);
+  }
+
+  /**
+   * Revoca TODAS las sesiones del usuario: epoch de access tokens en Redis
+   * + revocación masiva de refresh tokens en BD (REQ-LA-03).
+   *
+   * Self-only: el endpoint llamador usa req.user.sub como userId.
+   */
+  async logoutAll(userId: string): Promise<void> {
+    await this.escribirEpochRevocacion(userId);
+    await this.credentials.revokeAllByUserId(userId, 'logout-all');
   }
 
   // Extrae los "roles" del usuario en un tenant dado, como array de strings.
