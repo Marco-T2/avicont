@@ -1,40 +1,43 @@
-import type { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import { ApiProperty } from '@nestjs/swagger';
+
+import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import type { Cuenta } from '../domain/cuenta';
 
-export interface CuentaResponseDto {
-  id: string;
-  organizationId: string;
-  codigoInterno: string;
-  nombre: string;
-  descripcion: string | null;
-  claseCuenta: ClaseCuenta;
-  subClaseCuenta: SubClaseCuenta | null;
-  naturaleza: NaturalezaCuenta;
-  parentId: string | null;
-  nivel: number;
-  esDetalle: boolean;
-  requiereContacto: boolean;
-  esContraria: boolean;
-  activa: boolean;
-  monedaFuncional: Moneda;
-  permiteMultiMoneda: boolean;
-  esSystemSeed: boolean;
-  esRequeridaSistema: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export class CuentaResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() organizationId!: string;
+  @ApiProperty() codigoInterno!: string;
+  @ApiProperty() nombre!: string;
+  @ApiProperty({ type: String, nullable: true }) descripcion!: string | null;
+  @ApiProperty({ enum: ClaseCuenta }) claseCuenta!: ClaseCuenta;
+  @ApiProperty({ enum: SubClaseCuenta, nullable: true })
+  subClaseCuenta!: SubClaseCuenta | null;
+  @ApiProperty({ enum: NaturalezaCuenta }) naturaleza!: NaturalezaCuenta;
+  @ApiProperty({ type: String, nullable: true }) parentId!: string | null;
+  @ApiProperty() nivel!: number;
+  @ApiProperty() esDetalle!: boolean;
+  @ApiProperty() requiereContacto!: boolean;
+  @ApiProperty() esContraria!: boolean;
+  @ApiProperty() activa!: boolean;
+  @ApiProperty({ enum: Moneda }) monedaFuncional!: Moneda;
+  @ApiProperty() permiteMultiMoneda!: boolean;
+  @ApiProperty() esSystemSeed!: boolean;
+  @ApiProperty() esRequeridaSistema!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
-export interface CuentaListResponseDto {
-  items: CuentaResponseDto[];
-  total: number;
-  page: number;
-  pageSize: number;
+export class CuentaListResponseDto {
+  @ApiProperty({ type: () => [CuentaResponseDto] }) items!: CuentaResponseDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() pageSize!: number;
 }
 
-// Árbol: la misma cuenta + arreglo anidado de hijas
-export interface CuentaTreeNodeDto extends CuentaResponseDto {
-  hijas: CuentaTreeNodeDto[];
+// Árbol: la misma cuenta + arreglo anidado de hijas (self-reference recursiva).
+export class CuentaTreeNodeDto extends CuentaResponseDto {
+  @ApiProperty({ type: () => [CuentaTreeNodeDto] }) hijas!: CuentaTreeNodeDto[];
 }
 
 export function toCuentaResponse(c: Cuenta): CuentaResponseDto {
@@ -57,7 +60,7 @@ export function toCuentaResponse(c: Cuenta): CuentaResponseDto {
     permiteMultiMoneda: c.permiteMultiMoneda,
     esSystemSeed: c.esSystemSeed,
     esRequeridaSistema: c.esRequeridaSistema,
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
   };
 }

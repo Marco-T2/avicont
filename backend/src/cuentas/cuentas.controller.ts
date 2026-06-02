@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '../common/decorators/require-module.decorator';
 import { ModuleEnabledGuard } from '../common/guards/module-enabled.guard';
@@ -21,6 +21,11 @@ import { RequirePermissions } from '../rbac/decorators/require-permissions.decor
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 import { CuentasService } from './cuentas.service';
+import {
+  CuentaListResponseDto,
+  CuentaResponseDto,
+  CuentaTreeNodeDto,
+} from './dto/cuenta-response.dto';
 import { CreateCuentaDto } from './dto/create-cuenta.dto';
 import { ListarCuentasQueryDto } from './dto/listar-cuentas.dto';
 import { UpdateCuentaDto } from './dto/update-cuenta.dto';
@@ -51,6 +56,7 @@ export class CuentasController {
   @Get()
   @RequirePermissions('contabilidad.plan-cuentas.read')
   @ApiOperation({ summary: 'Listar cuentas con filtros y paginación' })
+  @ApiOkResponse({ type: CuentaListResponseDto })
   listar(@Req() req: AuthenticatedRequest, @Query() query: ListarCuentasQueryDto) {
     return this.service.listar(resolveTenantId(req), query);
   }
@@ -58,6 +64,7 @@ export class CuentasController {
   @Get('tree')
   @RequirePermissions('contabilidad.plan-cuentas.read')
   @ApiOperation({ summary: 'Obtener el árbol jerárquico completo del plan de cuentas' })
+  @ApiOkResponse({ type: [CuentaTreeNodeDto] })
   arbol(@Req() req: AuthenticatedRequest) {
     return this.service.arbolCompleto(resolveTenantId(req));
   }
@@ -65,6 +72,7 @@ export class CuentasController {
   @Get(':id')
   @RequirePermissions('contabilidad.plan-cuentas.read')
   @ApiOperation({ summary: 'Detalle de una cuenta' })
+  @ApiOkResponse({ type: CuentaResponseDto })
   detalle(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.service.obtenerPorId(resolveTenantId(req), id);
   }
@@ -82,6 +90,7 @@ export class CuentasController {
   @Post()
   @RequirePermissions('contabilidad.plan-cuentas.create')
   @ApiOperation({ summary: 'Crear una cuenta (manual)' })
+  @ApiOkResponse({ type: CuentaResponseDto })
   crear(@Req() req: AuthenticatedRequest, @Body() dto: CreateCuentaDto) {
     return this.service.crear(resolveTenantId(req), dto);
   }
@@ -91,6 +100,7 @@ export class CuentasController {
   @ApiOperation({
     summary: 'Modificar campos mutables de una cuenta (nombre, descripción, moneda, etc.)',
   })
+  @ApiOkResponse({ type: CuentaResponseDto })
   actualizar(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -106,6 +116,7 @@ export class CuentasController {
     summary:
       'Desactivar una cuenta (activa=false). No elimina físicamente. Rechaza si está configurada como concepto.',
   })
+  @ApiOkResponse({ type: CuentaResponseDto })
   desactivar(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.service.desactivar(resolveTenantId(req), id);
   }

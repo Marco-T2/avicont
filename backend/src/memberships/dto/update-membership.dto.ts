@@ -12,7 +12,7 @@ export class UpdateMembershipDto {
   @IsIn(SYSTEM_ROLES)
   systemRole?: SystemRole | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   customRoleId?: string | null;

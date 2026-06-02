@@ -1,27 +1,27 @@
 import type { Contacto } from '@prisma/client';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class ContactoResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() razonSocial!: string;
-  @ApiPropertyOptional({ nullable: true }) nombreComercial!: string | null;
-  @ApiPropertyOptional({ nullable: true }) documento!: string | null;
+  @ApiProperty({ type: String, nullable: true }) nombreComercial!: string | null;
+  @ApiProperty({ type: String, nullable: true }) documento!: string | null;
   @ApiProperty() esCliente!: boolean;
   @ApiProperty() esProveedor!: boolean;
-  @ApiPropertyOptional({ nullable: true }) email!: string | null;
-  @ApiPropertyOptional({ nullable: true }) telefono!: string | null;
-  @ApiPropertyOptional({ nullable: true }) direccion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) email!: string | null;
+  @ApiProperty({ type: String, nullable: true }) telefono!: string | null;
+  @ApiProperty({ type: String, nullable: true }) direccion!: string | null;
   @ApiProperty() activo!: boolean;
   @ApiProperty() createdByUserId!: string;
   @ApiProperty() createdAt!: string;
   @ApiProperty() updatedAt!: string;
 }
 
-export interface ListarContactosResponseDto {
-  items: ContactoResponseDto[];
-  total: number;
-  page: number;
-  pageSize: number;
+export class ListarContactosResponseDto {
+  @ApiProperty({ type: () => [ContactoResponseDto] }) items!: ContactoResponseDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() pageSize!: number;
 }
 
 export function toContactoResponse(c: Contacto): ContactoResponseDto {

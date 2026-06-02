@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 import type {
   DocumentoFisicoConDetalle,
@@ -27,7 +27,7 @@ export class ContactoEmbebidoDto {
 
 export class ComprobanteAsociadoDto {
   @ApiProperty() id!: string;
-  @ApiPropertyOptional({ nullable: true }) numero!: string | null;
+  @ApiProperty({ type: String, nullable: true }) numero!: string | null;
   @ApiProperty() estado!: string;
 }
 
@@ -35,11 +35,11 @@ export class DocumentoFisicoDto {
   @ApiProperty() id!: string;
   @ApiProperty() numero!: string;
   @ApiProperty() fechaEmision!: string;
-  @ApiPropertyOptional({ nullable: true }) monto!: string | null;
-  @ApiPropertyOptional({ nullable: true }) moneda!: string | null;
-  @ApiPropertyOptional({ nullable: true }) glosa!: string | null;
+  @ApiProperty({ type: String, nullable: true }) monto!: string | null;
+  @ApiProperty({ type: String, nullable: true }) moneda!: string | null;
+  @ApiProperty({ type: String, nullable: true }) glosa!: string | null;
   @ApiProperty() tipoDocumentoFisico!: TipoDocumentoFisicoEmbebidoDto;
-  @ApiPropertyOptional({ nullable: true, type: () => ContactoEmbebidoDto })
+  @ApiProperty({ nullable: true, type: () => ContactoEmbebidoDto })
   contacto!: ContactoEmbebidoDto | null;
   @ApiProperty() organizationId!: string;
   @ApiProperty() createdAt!: string;
@@ -58,8 +58,8 @@ export class DocumentoFisicoAsociadoDto {
   @ApiProperty() id!: string;
   @ApiProperty() numero!: string;
   @ApiProperty() tipoDocumentoFisico!: Pick<TipoDocumentoFisicoEmbebidoDto, 'id' | 'nombre'>;
-  @ApiPropertyOptional({ nullable: true }) monto!: string | null;
-  @ApiPropertyOptional({ nullable: true }) moneda!: string | null;
+  @ApiProperty({ type: String, nullable: true }) monto!: string | null;
+  @ApiProperty({ type: String, nullable: true }) moneda!: string | null;
   @ApiProperty() fechaEmision!: string;
 }
 
@@ -67,11 +67,11 @@ export class DocumentoFisicoAsociadoDto {
 // Mappers
 // ============================================================
 
-export interface ListarDocumentosFisicosResponseDto {
-  items: DocumentoFisicoDto[];
-  total: number;
-  page: number;
-  pageSize: number;
+export class ListarDocumentosFisicosResponseDto {
+  @ApiProperty({ type: () => [DocumentoFisicoDto] }) items!: DocumentoFisicoDto[];
+  @ApiProperty() total!: number;
+  @ApiProperty() page!: number;
+  @ApiProperty() pageSize!: number;
 }
 
 export function toDocumentoFisicoDto(doc: DocumentoFisicoConRelaciones): DocumentoFisicoDto {

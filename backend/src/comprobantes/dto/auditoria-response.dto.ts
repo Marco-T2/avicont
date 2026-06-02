@@ -2,7 +2,7 @@
 // (no modelada por Prisma) y se puebla exclusivamente por triggers Postgres.
 // El adapter lee de ella via $queryRaw y devuelve ComprobanteAuditEntry[].
 // Este DTO mapea esas entries al shape de respuesta HTTP.
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 import type { ComprobanteAuditEntry } from '../ports/comprobante-audit.types';
 
@@ -13,12 +13,12 @@ export class AuditoriaEntryDto {
   @ApiProperty({ description: "Operación: 'INSERT' | 'UPDATE' | 'DELETE'" })
   operation!: string;
   @ApiProperty() comprobanteId!: string;
-  @ApiPropertyOptional({ nullable: true }) userId!: string | null;
-  @ApiPropertyOptional({ nullable: true }) motivo!: string | null;
+  @ApiProperty({ type: String, nullable: true }) userId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) motivo!: string | null;
   @ApiProperty() fueDuranteReapertura!: boolean;
-  @ApiPropertyOptional({ nullable: true }) reaperturaId!: string | null;
-  @ApiPropertyOptional({ nullable: true }) rowOld!: unknown;
-  @ApiPropertyOptional({ nullable: true }) rowNew!: unknown;
+  @ApiProperty({ type: String, nullable: true }) reaperturaId!: string | null;
+  @ApiProperty({ nullable: true }) rowOld!: unknown;
+  @ApiProperty({ nullable: true }) rowNew!: unknown;
   @ApiProperty({ example: '2026-04-22T14:30:00.000Z' }) ts!: string;
 }
 

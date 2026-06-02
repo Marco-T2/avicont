@@ -8,6 +8,8 @@
  * igual que el Mayor. El mapper serializa Money → string y Date → "YYYY-MM-DD".
  */
 
+import { ApiProperty } from '@nestjs/swagger';
+
 import type { ClaseCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
 import { Money } from '@/common/domain/money';
@@ -59,54 +61,54 @@ export interface BalanceArbolResult {
 // Tipos del DTO de respuesta (string — serializados)
 // ============================================================
 
-export interface CuentaBalanceDto {
-  cuentaId: string | null;
-  codigoInterno: string | null;
-  nombre: string;
-  nivel: number;
-  esContraria: boolean;
-  esSintetica: boolean;
+export class CuentaBalanceDto {
+  @ApiProperty({ type: String, nullable: true }) cuentaId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) codigoInterno!: string | null;
+  @ApiProperty() nombre!: string;
+  @ApiProperty() nivel!: number;
+  @ApiProperty() esContraria!: boolean;
+  @ApiProperty() esSintetica!: boolean;
   /** Saldo neto en BOB como string decimal (§4.5 CLAUDE.md). */
-  saldoBob: string;
+  @ApiProperty({ example: '1000.00' }) saldoBob!: string;
 }
 
-export interface SubseccionBalanceDto {
-  subClaseCuenta: string;
-  titulo: string;
-  cuentas: CuentaBalanceDto[];
+export class SubseccionBalanceDto {
+  @ApiProperty() subClaseCuenta!: string;
+  @ApiProperty() titulo!: string;
+  @ApiProperty({ type: () => [CuentaBalanceDto] }) cuentas!: CuentaBalanceDto[];
   /** Total de la subsección en BOB como string decimal (§4.5 CLAUDE.md). */
-  totalBob: string;
+  @ApiProperty({ example: '1000.00' }) totalBob!: string;
 }
 
-export interface SeccionBalanceDto {
-  claseCuenta: string;
-  titulo: string;
-  subsecciones: SubseccionBalanceDto[];
+export class SeccionBalanceDto {
+  @ApiProperty() claseCuenta!: string;
+  @ApiProperty() titulo!: string;
+  @ApiProperty({ type: () => [SubseccionBalanceDto] }) subsecciones!: SubseccionBalanceDto[];
   /** Total de la sección en BOB como string decimal (§4.5 CLAUDE.md). */
-  totalBob: string;
+  @ApiProperty({ example: '1000.00' }) totalBob!: string;
 }
 
-export interface BalanceResponseDto {
+export class BalanceResponseDto {
   /** Fecha de corte del Balance. Formato "YYYY-MM-DD" (§4.6 CLAUDE.md). */
-  fechaCorte: string;
+  @ApiProperty({ example: '2026-04-30' }) fechaCorte!: string;
   /** ID de la gestión fiscal usada para el Resultado del Ejercicio. */
-  gestionId: string;
-  activo: SeccionBalanceDto;
-  pasivo: SeccionBalanceDto;
-  patrimonio: SeccionBalanceDto;
+  @ApiProperty() gestionId!: string;
+  @ApiProperty({ type: () => SeccionBalanceDto }) activo!: SeccionBalanceDto;
+  @ApiProperty({ type: () => SeccionBalanceDto }) pasivo!: SeccionBalanceDto;
+  @ApiProperty({ type: () => SeccionBalanceDto }) patrimonio!: SeccionBalanceDto;
   /** Resultado del Ejercicio calculado (Σ INGRESO − Σ EGRESO de la gestión). String decimal. */
-  resultadoEjercicioBob: string;
-  totalActivoBob: string;
-  totalPasivoBob: string;
-  totalPatrimonioBob: string;
+  @ApiProperty({ example: '1000.00' }) resultadoEjercicioBob!: string;
+  @ApiProperty({ example: '1000.00' }) totalActivoBob!: string;
+  @ApiProperty({ example: '1000.00' }) totalPasivoBob!: string;
+  @ApiProperty({ example: '1000.00' }) totalPatrimonioBob!: string;
   /**
    * true si |Activo − (Pasivo + Patrimonio)| ≤ ±Bs 0.01.
    * Código Tributario art. 47: Activo = Pasivo + Patrimonio.
    * HTTP 200 siempre — el descuadre es dato, no error (§5.5 design).
    */
-  cuadra: boolean;
+  @ApiProperty() cuadra!: boolean;
   /** Activo − (Pasivo + Patrimonio) como string decimal. "0.00" si cuadra. */
-  diferenciaBob: string;
+  @ApiProperty({ example: '0.00' }) diferenciaBob!: string;
 }
 
 // ============================================================

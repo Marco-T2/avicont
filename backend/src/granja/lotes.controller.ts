@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
@@ -99,6 +99,7 @@ export class LotesController {
   @Get()
   @RequirePermissions('granja.lotes.read')
   @ApiOperation({ summary: 'Lista lotes del tenant. Orden: fechaIngreso DESC.' })
+  @ApiOkResponse({ type: ListarLotesResponseDto })
   async listar(
     @Req() req: AuthenticatedRequest,
     @Query('estado') estado?: string,

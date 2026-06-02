@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
@@ -8,8 +8,10 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { BalanceGeneralService } from './balance-general.service';
+import { BalanceResponseDto } from './dto/balance-response.dto';
 import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
+import { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
 import { EstadoResultadosService } from './estado-resultados.service';
 import { resolveTenantId } from './tenant-id';
 import type { AuthenticatedRequest } from './tenant-id';
@@ -41,6 +43,7 @@ export class EeffController {
       'Requiere fecha=YYYY-MM-DD. Presenta Activo, Pasivo y Patrimonio con Resultado del Ejercicio. ' +
       'REQ-BG-01..15.',
   })
+  @ApiOkResponse({ type: BalanceResponseDto })
   obtenerBalanceGeneral(@Req() req: AuthenticatedRequest, @Query() query: BalanceQueryDto) {
     const tenantId = resolveTenantId(req);
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
@@ -61,6 +64,7 @@ export class EeffController {
       'Presenta Ingresos y Egresos con Resultado del Ejercicio. ' +
       'REQ-ER-01..12.',
   })
+  @ApiOkResponse({ type: EstadoResultadosResponseDto })
   obtenerEstadoResultados(
     @Req() req: AuthenticatedRequest,
     @Query() query: EeffResultadosQueryDto,

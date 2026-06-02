@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { OrganizationStatus, Plan } from '@prisma/client';
 import type { Organization } from '@prisma/client';
 
 /**
@@ -15,11 +16,11 @@ export class PlatformOrgResponseDto {
   @ApiProperty()
   slug!: string;
 
-  @ApiProperty()
-  status!: string;
+  @ApiProperty({ enum: OrganizationStatus })
+  status!: OrganizationStatus;
 
-  @ApiProperty()
-  plan!: string;
+  @ApiProperty({ enum: Plan })
+  plan!: Plan;
 
   @ApiProperty()
   contabilidadEnabled!: boolean;

@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
@@ -108,6 +108,7 @@ export class DocumentosFisicosController {
     summary:
       'Lista documentos físicos del tenant con paginación y filtros (tipo, fechas, contacto, estado de asociación, número).',
   })
+  @ApiOkResponse({ type: ListarDocumentosFisicosResponseDto })
   async listar(
     @Req() req: AuthenticatedRequest,
     @Query() query: ListarDocumentosFisicosQueryDto,

@@ -44,6 +44,7 @@ export class CreateDocumentoFisicoDto {
   fechaEmision!: string;
 
   @ApiPropertyOptional({
+    type: String,
     description:
       'Monto del documento como string decimal. Obligatorio para tipos tributarios (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).',
     example: '1250.50',
@@ -64,6 +65,7 @@ export class CreateDocumentoFisicoDto {
   moneda?: Moneda | null;
 
   @ApiPropertyOptional({
+    type: String,
     description: 'ID del contacto (cliente o proveedor) asociado al documento.',
     format: 'uuid',
     nullable: true,
@@ -73,6 +75,7 @@ export class CreateDocumentoFisicoDto {
   contactoId?: string | null;
 
   @ApiPropertyOptional({
+    type: String,
     description: 'Glosa o descripción libre del documento.',
     maxLength: 500,
     nullable: true,

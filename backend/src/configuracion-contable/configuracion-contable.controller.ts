@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { RequireModule } from '../common/decorators/require-module.decorator';
 import { ModuleEnabledGuard } from '../common/guards/module-enabled.guard';
@@ -19,6 +19,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 import { ConfiguracionContableService } from './configuracion-contable.service';
 import { ActualizarConfiguracionDto } from './dto/actualizar-configuracion.dto';
+import { ConfiguracionContableResponseDto } from './dto/configuracion-response.dto';
 
 interface AuthenticatedRequest {
   user: { sub: string; activeTenantId?: string };
@@ -49,6 +50,7 @@ export class ConfiguracionContableController {
     summary:
       'Obtener la configuración contable (mapeo de conceptos a cuentas). Devuelve vacía si aún no hay fila.',
   })
+  @ApiOkResponse({ type: ConfiguracionContableResponseDto })
   obtener(@Req() req: AuthenticatedRequest) {
     return this.service.obtener(resolveTenantId(req));
   }
@@ -59,6 +61,7 @@ export class ConfiguracionContableController {
     summary:
       'Actualizar (upsert) uno o más conceptos. null = desmapear. Valida clase, activa, esDetalle.',
   })
+  @ApiOkResponse({ type: ConfiguracionContableResponseDto })
   actualizar(@Req() req: AuthenticatedRequest, @Body() dto: ActualizarConfiguracionDto) {
     return this.service.actualizar(resolveTenantId(req), dto);
   }
@@ -68,6 +71,7 @@ export class ConfiguracionContableController {
   @ApiOperation({
     summary: 'Desmapear un concepto específico (atajo para PATCH con ese campo en null).',
   })
+  @ApiOkResponse({ type: ConfiguracionContableResponseDto })
   desmapear(@Req() req: AuthenticatedRequest, @Param('concepto') concepto: string) {
     return this.service.desmapearConcepto(resolveTenantId(req), concepto);
   }

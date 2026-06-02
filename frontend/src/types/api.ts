@@ -1,31 +1,43 @@
-// Tipos DTO espejados a mano del backend (Opción 1A según CLAUDE.md §10.10).
-// Migraremos a openapi-typescript cuando haya 4-5 features consumiendo la API.
-// Mantener en sincronía manual con backend/src/**/dto/*.ts.
+// Fachada (anti-corruption layer) sobre los tipos generados desde el contrato
+// OpenAPI del backend (`api.generated.ts`). Reemplaza el espejo manual previo
+// (CLAUDE.md §10.10 deuda "openapi-typescript").
+//
+// REGLA: los consumidores siguen importando `{ Contacto, Cuenta, ... }` desde
+// `@/types/api`. Acá decidimos, por cada nombre:
+//   - ALIAS  → existe como schema en el OpenAPI → `type X = Schemas['XDto']`.
+//   - MANUAL → NO existe en el backend (params de query, JWT, shapes de endpoints
+//              sin DTO decorado) → se mantiene escrito a mano.
+//
+// El generado (`api.generated.ts`) es artefacto: NO se edita a mano y se
+// regenera con `pnpm run gen:api-types`. El gate de CI (`contract-drift`)
+// garantiza que ambos artefactos estén sincronizados con el código backend.
 
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
+import type { components } from './api.generated';
+
+type Schemas = components['schemas'];
+
+// ============================================================
+// Auth (client-only: estos endpoints no exponen DTOs decorados)
+// ============================================================
+
+export type LoginRequest = Schemas['LoginDto'];
 
 export interface LoginResponse {
   // refreshToken va en cookie httpOnly, NO en el body.
   accessToken: string;
 }
 
-export interface RegisterRequest {
-  email: string;
-  password: string;
-  displayName?: string;
-}
+export type RegisterRequest = Schemas['RegisterDto'];
 
+// El endpoint de registro devuelve un shape ad-hoc (no un DTO decorado).
 export interface RegisterResponse {
   id: string;
   email: string;
 }
 
 // Decodificación del JWT access token (ver backend/src/auth/auth.service.ts).
-// NOTA: el frontend NO valida la firma — solo usa los claims para UX.
-// La validación real la hace el backend en cada request.
+// Client-only: NO es un DTO del backend, es el payload decodificado del token.
+// El frontend NO valida la firma — solo usa los claims para UX.
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -38,7 +50,15 @@ export interface JwtPayload {
 }
 
 // ============================================================
-// Enums y tipos del dominio contable — espejo de @prisma/client
+// Enums del dominio contable
+// ------------------------------------------------------------
+// openapi-typescript emite los enums como UNIONES de strings (tipos), no como
+// objetos runtime. El frontend los usa como VALOR (`ClaseCuenta.ACTIVO` en
+// selects/comparaciones), así que se conservan como objetos `as const` a mano.
+// El `satisfies Record<string, Schemas[...][campo]>` hace que `tsc` falle si el
+// objeto deriva del enum del backend (drift de valores). Donde el enum no tiene
+// un campo schema correspondiente (params de query, DTOs aún sin decorar), el
+// objeto queda sin `satisfies` (no hay contra qué chequear).
 // ============================================================
 
 export const ClaseCuenta = {
@@ -47,13 +67,13 @@ export const ClaseCuenta = {
   PATRIMONIO: 'PATRIMONIO',
   INGRESO: 'INGRESO',
   EGRESO: 'EGRESO',
-} as const;
+} as const satisfies Record<string, Schemas['CuentaResponseDto']['claseCuenta']>;
 export type ClaseCuenta = (typeof ClaseCuenta)[keyof typeof ClaseCuenta];
 
 export const NaturalezaCuenta = {
   DEUDORA: 'DEUDORA',
   ACREEDORA: 'ACREEDORA',
-} as const;
+} as const satisfies Record<string, Schemas['CuentaResponseDto']['naturaleza']>;
 export type NaturalezaCuenta = (typeof NaturalezaCuenta)[keyof typeof NaturalezaCuenta];
 
 export const SubClaseCuenta = {
@@ -70,58 +90,28 @@ export const SubClaseCuenta = {
   EGRESO_COMERCIALIZACION: 'EGRESO_COMERCIALIZACION',
   EGRESO_FINANCIERO: 'EGRESO_FINANCIERO',
   EGRESO_NO_OPERATIVO: 'EGRESO_NO_OPERATIVO',
-} as const;
+} as const satisfies Record<string, NonNullable<Schemas['CuentaResponseDto']['subClaseCuenta']>>;
 export type SubClaseCuenta = (typeof SubClaseCuenta)[keyof typeof SubClaseCuenta];
 
 export const Moneda = {
   BOB: 'BOB',
   USD: 'USD',
-} as const;
+} as const satisfies Record<string, Schemas['CuentaResponseDto']['monedaFuncional']>;
 export type Moneda = (typeof Moneda)[keyof typeof Moneda];
 
 // ============================================================
 // Cuenta (plan de cuentas)
 // ============================================================
 
-// Espejo de CuentaResponseDto en backend/src/cuentas/dto/cuenta-response.dto.ts.
-export interface Cuenta {
-  id: string;
-  organizationId: string;
-  codigoInterno: string;
-  nombre: string;
-  descripcion: string | null;
-  claseCuenta: ClaseCuenta;
-  subClaseCuenta: SubClaseCuenta | null;
-  naturaleza: NaturalezaCuenta;
-  parentId: string | null;
-  nivel: number;
-  esDetalle: boolean;
-  requiereContacto: boolean;
-  esContraria: boolean;
-  activa: boolean;
-  monedaFuncional: Moneda;
-  permiteMultiMoneda: boolean;
-  esSystemSeed: boolean;
-  esRequeridaSistema: boolean;
-  // createdAt/updatedAt llegan como string ISO por el transporte JSON.
-  createdAt: string;
-  updatedAt: string;
-}
+export type Cuenta = Schemas['CuentaResponseDto'];
 
-export interface CuentaListResponse {
-  items: Cuenta[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type CuentaListResponse = Schemas['CuentaListResponseDto'];
 
-// Nodo del árbol jerárquico (GET /api/cuentas/tree). Espejo de
-// CuentaTreeNodeDto — Cuenta + hijas recursivas.
-export interface CuentaTreeNode extends Cuenta {
-  hijas: CuentaTreeNode[];
-}
+// Nodo del árbol jerárquico (GET /api/cuentas/tree): Cuenta + hijas recursivas.
+export type CuentaTreeNode = Schemas['CuentaTreeNodeDto'];
 
-// Query params para GET /api/cuentas.
+// Query params para GET /api/cuentas (client-only: el backend los recibe como
+// query params sueltos, no como un DTO con @ApiProperty).
 export interface ListarCuentasParams {
   claseCuenta?: ClaseCuenta;
   subClaseCuenta?: SubClaseCuenta;
@@ -134,9 +124,11 @@ export interface ListarCuentasParams {
 
 // ============================================================
 // Identidad / multi-tenant
+// ------------------------------------------------------------
+// Client-only: GET /api/users/me devuelve un shape compuesto (perfil + tenants)
+// que no está modelado como un DTO decorado en el backend.
 // ============================================================
 
-// Espejo de GET /api/users/me (backend/src/users/users.service.ts#getProfile).
 export interface UserProfile {
   id: string;
   email: string;
@@ -153,33 +145,28 @@ export interface UserTenant {
   role: string | null;
 }
 
-// Módulo vertical de la organización. Define el seeding inicial y los feature
-// flags que el backend activa al crear la org (ver CreateTenantDto del backend).
-export type ModuloOrganizacion = 'CONTABILIDAD' | 'GRANJA' | 'OTROS';
+// Módulo vertical de la organización. Reusa el enum literal del DTO de creación.
+export type ModuloOrganizacion = Schemas['CreateTenantDto']['modulo'];
 
-// POST /api/tenants — crear organización. El backend crea la org + la
-// membership OWNER del usuario autenticado en una transacción.
-export interface CreateTenantRequest {
-  name: string;
-  modulo: ModuloOrganizacion;
-}
-// El response es la Organization creada; acá tipamos solo lo que consume el
-// front (el id es necesario para el switch-tenant posterior al onboarding).
+// POST /api/tenants — crear organización.
+export type CreateTenantRequest = Schemas['CreateTenantDto'];
+
+// El response es la Organization creada; client-only (solo se consume el id).
 export interface CreateTenantResponse {
   id: string;
   name: string;
   slug: string;
 }
 
-// POST /api/auth/switch-tenant request + response.
-export interface SwitchTenantRequest {
-  tenantId: string;
-}
+// POST /api/auth/switch-tenant.
+export type SwitchTenantRequest = Schemas['SwitchTenantDto'];
 // El response tiene la misma shape que LoginResponse (refresh en cookie).
 export type SwitchTenantResponse = LoginResponse;
 
 // ============================================================
 // Memberships (miembros del tenant activo)
+// ------------------------------------------------------------
+// Client-only: getMembers devuelve filas Prisma enriquecidas, sin DTO decorado.
 // ============================================================
 
 export type SystemRole = 'OWNER' | 'ADMIN';
@@ -196,7 +183,6 @@ export interface MembershipCustomRole {
   name: string;
 }
 
-// Espejo de getMembers (backend/src/tenants/tenants.service.ts).
 export interface Membership {
   id: string;
   organizationId: string;
@@ -211,20 +197,15 @@ export interface Membership {
 }
 
 // POST /api/memberships/invite (requiere que el user YA exista).
-export interface InviteExistingUserRequest {
-  email: string;
-  systemRole?: SystemRole;
-  customRoleId?: string;
-}
+export type InviteExistingUserRequest = Schemas['InviteUserDto'];
 
 // PATCH /api/memberships/:id — cambio de rol del miembro.
-export interface UpdateMembershipRequest {
-  systemRole?: SystemRole;
-  customRoleId?: string;
-}
+export type UpdateMembershipRequest = Schemas['UpdateMembershipDto'];
 
 // ============================================================
 // Invitations (flujo email — admin + pública)
+// ------------------------------------------------------------
+// Las responses son client-only (sin DTO decorado); los requests sí aliasan.
 // ============================================================
 
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
@@ -245,22 +226,15 @@ export interface Invitation {
 }
 
 // POST /api/invitations — body del admin para invitar por email.
-export interface CreateInvitationRequest {
-  email: string;
-  systemRole?: SystemRole;
-  customRoleId?: string;
-  expiresInDays?: number;
-}
+export type CreateInvitationRequest = Schemas['CreateInvitationDto'];
 
-// Response del POST incluye la invitation creada + el token plano (para
-// que el admin lo copie al email manualmente si el mailer falla).
+// Response del POST incluye la invitation creada + el token plano.
 export interface CreateInvitationResponse {
   invitation: Invitation;
   token: string;
 }
 
-// GET /api/invitations/preview?token=... — shape del backend
-// (backend/src/invitations/invitations.service.ts#previewByToken).
+// GET /api/invitations/preview?token=... — shape del backend (sin DTO decorado).
 export interface InvitationPreview {
   email: string;
   expiresAt: string;
@@ -269,11 +243,7 @@ export interface InvitationPreview {
 }
 
 // POST /api/invitations/accept-and-register — registro + aceptación en una.
-export interface AcceptAndRegisterRequest {
-  token: string;
-  password: string;
-  displayName?: string;
-}
+export type AcceptAndRegisterRequest = Schemas['AcceptAndRegisterDto'];
 
 export interface AcceptAndRegisterResponse {
   invitation: Invitation;
@@ -282,6 +252,9 @@ export interface AcceptAndRegisterResponse {
 
 // ============================================================
 // Custom Roles (RBAC per-tenant)
+// ------------------------------------------------------------
+// Client-only: CustomRole se devuelve como fila Prisma, sin DTO decorado.
+// Los requests sí aliasan.
 // ============================================================
 
 export interface CustomRole {
@@ -308,20 +281,11 @@ export interface CustomRoleMember {
   };
 }
 
-export interface CreateCustomRoleRequest {
-  slug: string;
-  name: string;
-  description?: string;
-  permissions: string[];
-}
+export type CreateCustomRoleRequest = Schemas['CreateCustomRoleDto'];
 
-export interface UpdateCustomRoleRequest {
-  name?: string;
-  description?: string;
-  permissions?: string[];
-}
+export type UpdateCustomRoleRequest = Schemas['UpdateCustomRoleDto'];
 
-// Catálogo de permisos del backend.
+// Catálogo de permisos del backend (client-only: endpoint sin DTO decorado).
 export interface PermisoCatalogado {
   key: string;
   modulo: string;
@@ -342,33 +306,11 @@ export interface CatalogoAgrupado {
 // Contactos (directorio de clientes y proveedores)
 // ============================================================
 
-// Espejo de ContactoResponseDto en
-// backend/src/modules/contactos/dto/contacto-response.dto.ts.
-// NOTA: no incluye organizationId — el backend lo filtra por tenant activo.
-export interface Contacto {
-  id: string;
-  razonSocial: string;
-  nombreComercial: string | null;
-  documento: string | null;
-  esCliente: boolean;
-  esProveedor: boolean;
-  email: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  activo: boolean;
-  createdByUserId: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Contacto = Schemas['ContactoResponseDto'];
 
-export interface ContactoListResponse {
-  items: Contacto[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type ContactoListResponse = Schemas['ListarContactosResponseDto'];
 
-// Query params para GET /api/contactos.
+// Query params para GET /api/contactos (client-only).
 // activo: boolean → filtra por estado; 'all' → sin filtro; undefined → sin filtro.
 export interface ListarContactosParams {
   q?: string;
@@ -384,41 +326,13 @@ export interface ListarContactosParams {
 // Tipos de documento físico
 // ============================================================
 
-// Espejo de TipoDocumentoFisicoResponseDto en
-// backend/src/tipos-documento-fisico/dto/tipo-documento-fisico-response.dto.ts.
-export interface TipoDocumentoFisico {
-  id: string;
-  nombre: string;
-  codigo: string;
-  esTributario: boolean;
-  activo: boolean;
-  tiposComprobanteAplicables: TipoComprobante[];
-  organizationId: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TipoDocumentoFisico = Schemas['TipoDocumentoFisicoResponseDto'];
 
-export interface TipoDocumentoFisicoListResponse {
-  items: TipoDocumentoFisico[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type TipoDocumentoFisicoListResponse = Schemas['ListarTiposDocumentoFisicoResponseDto'];
 
-export interface CreateTipoDocumentoFisicoRequest {
-  nombre: string;
-  codigo: string;
-  esTributario: boolean;
-  tiposComprobanteAplicables: TipoComprobante[];
-}
+export type CreateTipoDocumentoFisicoRequest = Schemas['CreateTipoDocumentoFisicoDto'];
 
-// codigo NO va (inmutable post-creación). activo puede ir en el mismo PATCH.
-export interface UpdateTipoDocumentoFisicoRequest {
-  nombre?: string;
-  esTributario?: boolean;
-  tiposComprobanteAplicables?: TipoComprobante[];
-  activo?: boolean;
-}
+export type UpdateTipoDocumentoFisicoRequest = Schemas['UpdateTipoDocumentoFisicoDto'];
 
 // activo sin param → backend default solo activos; false → inactivos; 'all' → todos.
 export interface ListarTiposDocumentoFisicoParams {
@@ -432,7 +346,8 @@ export interface ListarTiposDocumentoFisicoParams {
 // Documentos físicos
 // ============================================================
 
-// Espejo de DocumentoFisicoDto + enums del backend.
+// Client-only: el enum estadoAsociacion solo aparece como query param, no en un
+// DTO decorado → no hay schema contra el cual hacer `satisfies`.
 export const EstadoAsociacion = {
   SUELTO: 'SUELTO',
   EN_BORRADOR: 'EN_BORRADOR',
@@ -440,64 +355,34 @@ export const EstadoAsociacion = {
 } as const;
 export type EstadoAsociacion = (typeof EstadoAsociacion)[keyof typeof EstadoAsociacion];
 
-export interface TipoDocumentoFisicoEmbebido {
-  id: string;
-  nombre: string;
-  codigo: string;
-  esTributario: boolean;
-}
+export type TipoDocumentoFisicoEmbebido = Schemas['TipoDocumentoFisicoEmbebidoDto'];
 
-export interface ContactoEmbebido {
-  id: string;
-  razonSocial: string;
-}
+export type ContactoEmbebido = Schemas['ContactoEmbebidoDto'];
 
+// Client-only: ComprobanteAsociadoDto no está referenciado por @ApiOkResponse,
+// así que no entra al OpenAPI (su endpoint padre devuelve el detalle inline).
 export interface ComprobanteAsociadoView {
   id: string;
   numero: string | null;
   estado: string;
 }
 
-// Espejo de DocumentoFisicoDto en backend/src/documentos-fisicos/dto/.
-// monto: string | null — §4.5 (dinero como string, nunca number).
-export interface DocumentoFisico {
-  id: string;
-  numero: string;
-  fechaEmision: string; // YYYY-MM-DD
-  monto: string | null;
-  moneda: string | null;
-  glosa: string | null;
-  tipoDocumentoFisico: TipoDocumentoFisicoEmbebido;
-  contacto: ContactoEmbebido | null;
-  organizationId: string;
-  createdAt: string;
-}
+export type DocumentoFisico = Schemas['DocumentoFisicoDto'];
 
-// GET /api/documentos-fisicos/:id — incluye comprobantesAsociados para D2.
+// GET /api/documentos-fisicos/:id — el detalle agrega comprobantesAsociados.
+// DocumentoFisicoDetalleDto no entra al OpenAPI (sin @ApiOkResponse), así que se
+// compone extendiendo el alias base.
 export interface DocumentoFisicoDetalle extends DocumentoFisico {
   comprobantesAsociados: ComprobanteAsociadoView[];
 }
 
-export interface DocumentoFisicoListResponse {
-  items: DocumentoFisico[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export type DocumentoFisicoListResponse = Schemas['ListarDocumentosFisicosResponseDto'];
 
-export interface CreateDocumentoFisicoRequest {
-  tipoDocumentoFisicoId: string;
-  numero: string;
-  fechaEmision: string;
-  monto?: string | null;
-  moneda?: Moneda | null;
-  contactoId?: string | null;
-  glosa?: string | null;
-}
+export type CreateDocumentoFisicoRequest = Schemas['CreateDocumentoFisicoDto'];
 
-export type UpdateDocumentoFisicoRequest = Partial<CreateDocumentoFisicoRequest>;
+export type UpdateDocumentoFisicoRequest = Schemas['UpdateDocumentoFisicoDto'];
 
-// Query params para GET /api/documentos-fisicos.
+// Query params para GET /api/documentos-fisicos (client-only).
 export interface ListarDocumentosFisicosParams {
   tipoDocumentoFisicoId?: string;
   fechaDesde?: string;
@@ -514,13 +399,9 @@ export interface ListarDocumentosFisicosParams {
 // Impersonation
 // ============================================================
 
-export interface StartImpersonationRequest {
-  targetUserId: string;
-  reason: string;
-  /** Solo lo usa el super-admin org-less para especificar la org target. */
-  organizationId?: string;
-}
+export type StartImpersonationRequest = Schemas['StartImpersonationDto'];
 
+// Client-only: el endpoint devuelve el token + metadata, sin DTO decorado.
 export interface StartImpersonationResponse {
   impersonationToken: string;
   expiresAt: string;
@@ -529,6 +410,8 @@ export interface StartImpersonationResponse {
 
 // ============================================================
 // Feature flags
+// ------------------------------------------------------------
+// Client-only: los flags se devuelven como filas Prisma. Los requests aliasan.
 // ============================================================
 
 export interface FeatureFlag {
@@ -549,48 +432,23 @@ export interface FeatureFlagListResponse {
   overrides: FeatureFlag[];
 }
 
-export interface CreateFeatureFlagOverrideRequest {
-  key: string;
-  name: string;
-  description?: string;
-  enabled?: boolean;
-  metadata?: Record<string, unknown>;
-}
+export type CreateFeatureFlagOverrideRequest = Schemas['CreateFeatureFlagDto'];
 
-export interface UpdateFeatureFlagOverrideRequest {
-  name?: string;
-  description?: string;
-  enabled?: boolean;
-  metadata?: Record<string, unknown>;
-}
+export type UpdateFeatureFlagOverrideRequest = Schemas['UpdateFeatureFlagDto'];
 
 // ── Catálogo GLOBAL de feature flags (super-admin) — /api/admin/feature-flags ──
-// El controller admin (feature-flags-admin.controller.ts) devuelve las filas
-// Prisma crudas, así que el shape de un flag global es el mismo `FeatureFlag` de
-// arriba (organizationId === null para los globales). Estos requests espejan
-// CreateFeatureFlagDto / UpdateFeatureFlagDto (feature-flags/dto/feature-flag.dto.ts).
-// La `key` valida el patrón ^[a-z][a-z0-9_]*$ (≤100) en el backend (400 si no);
-// crear una key existente da 409 FEATURE_FLAG_DUPLICADA, mutar una inexistente da
-// 404 FEATURE_FLAG_NO_ENCONTRADA. Por exactOptionalPropertyTypes, construir el
-// body con spread condicional (no pasar `undefined` explícito).
+// El controller admin devuelve filas Prisma crudas; el shape de un flag global es
+// el mismo `FeatureFlag` de arriba (organizationId === null para los globales).
+// Los requests espejan CreateFeatureFlagDto / UpdateFeatureFlagDto. La `key` valida
+// ^[a-z][a-z0-9_]*$ (≤100) en el backend (400 si no); crear una key existente da
+// 409 FEATURE_FLAG_DUPLICADA, mutar una inexistente da 404. Por
+// exactOptionalPropertyTypes, construir el body con spread condicional.
 
-export interface CreateFeatureFlagRequest {
-  key: string;
-  name: string;
-  description?: string;
-  enabled?: boolean;
-  metadata?: Record<string, unknown>;
-}
+export type CreateFeatureFlagRequest = Schemas['CreateFeatureFlagDto'];
 
-export interface UpdateFeatureFlagRequest {
-  name?: string;
-  description?: string;
-  enabled?: boolean;
-  metadata?: Record<string, unknown>;
-}
+export type UpdateFeatureFlagRequest = Schemas['UpdateFeatureFlagDto'];
 
-// Respuesta de POST /admin/feature-flags/:key/toggle — el backend devuelve solo
-// la key y el nuevo estado (no la fila completa).
+// Respuesta de POST /admin/feature-flags/:key/toggle — client-only (solo key + estado).
 export interface ToggleFeatureFlagResponse {
   key: string;
   enabled: boolean;
@@ -598,11 +456,13 @@ export interface ToggleFeatureFlagResponse {
 
 // ============================================================
 // Gestiones y períodos fiscales (Fase 1.2 backend)
-// Espejo de backend/src/periodos-fiscales/dto/*.ts.
+// ------------------------------------------------------------
+// Client-only: los DTOs de respuesta (Gestion/Periodo) aún no están referenciados
+// por @ApiOkResponse, así que no entran al OpenAPI. Los enums tampoco tienen un
+// campo schema contra el cual hacer `satisfies`.
 // ============================================================
 
 // Determina el mes de inicio del año fiscal (Ley 843 art. 46).
-// Inmutable una vez que existe ≥1 GestionFiscal para el tenant.
 export const TipoEmpresa = {
   COMERCIAL: 'COMERCIAL',
   SERVICIOS: 'SERVICIOS',
@@ -612,7 +472,7 @@ export const TipoEmpresa = {
   PETROLERA: 'PETROLERA',
   AGROPECUARIA: 'AGROPECUARIA',
   MINERA: 'MINERA',
-} as const;
+} as const satisfies Record<string, NonNullable<Schemas['UpdateTenantDto']['tipoEmpresaPrincipal']>>;
 export type TipoEmpresa = (typeof TipoEmpresa)[keyof typeof TipoEmpresa];
 
 export const GestionFiscalStatus = {
@@ -698,30 +558,25 @@ export interface ResumenPrecierre {
   razonNoPuedeCerrar?: string;
 }
 
-// Query params de GET /api/gestiones.
+// Query params de GET /api/gestiones (client-only).
 export interface ListarGestionesParams {
   status?: GestionFiscalStatus;
 }
 
-// Query params de GET /api/periodos.
+// Query params de GET /api/periodos (client-only).
 export interface ListarPeriodosParams {
   gestionId?: string;
   status?: PeriodoFiscalStatus;
 }
 
 // Body de POST /api/gestiones — el mesInicio se deriva del tenant.
-export interface CrearGestionRequest {
-  year: number;
-}
+export type CrearGestionRequest = Schemas['CrearGestionDto'];
 
 // Body de POST /api/periodos/:id/reabrir.
-export interface ReabrirPeriodoRequest {
-  motivo: string;
-}
+export type ReabrirPeriodoRequest = Schemas['ReabrirPeriodoDto'];
 
 // ============================================================
 // Comprobantes (asientos contables — Fase 1 slice 1)
-// Espejo de backend/src/comprobantes/dto/*.ts.
 // ============================================================
 
 export const TipoComprobante = {
@@ -732,17 +587,18 @@ export const TipoComprobante = {
   AJUSTE: 'AJUSTE',
   TRASPASO: 'TRASPASO',
   CIERRE: 'CIERRE',
-} as const;
+} as const satisfies Record<string, Schemas['ComprobanteListItemDto']['tipo']>;
 export type TipoComprobante = (typeof TipoComprobante)[keyof typeof TipoComprobante];
 
 export const EstadoComprobante = {
   BORRADOR: 'BORRADOR',
   CONTABILIZADO: 'CONTABILIZADO',
   BLOQUEADO: 'BLOQUEADO',
-} as const;
+} as const satisfies Record<string, Schemas['ComprobanteListItemDto']['estado']>;
 export type EstadoComprobante = (typeof EstadoComprobante)[keyof typeof EstadoComprobante];
 
-// Espejo de LineaResponseDto en backend/src/comprobantes/dto/comprobante-response.dto.ts.
+// Client-only: ComprobanteResponseDto / LineaResponseDto no están referenciados
+// por @ApiOkResponse, así que no entran al OpenAPI. El detalle se tipa a mano.
 export interface LineaComprobante {
   id: string;
   orden: number;
@@ -757,7 +613,6 @@ export interface LineaComprobante {
   glosaLinea: string | null;
 }
 
-// Espejo de ComprobanteResponseDto en backend/src/comprobantes/dto/comprobante-response.dto.ts.
 export interface Comprobante {
   id: string;
   tipo: TipoComprobante;
@@ -780,52 +635,16 @@ export interface Comprobante {
   lineas: LineaComprobante[];
 }
 
-// Espejo de ContactoResumenDto: contacto distinto referenciado por las líneas.
-export interface ContactoResumen {
-  id: string;
-  nombre: string;
-}
+export type ContactoResumen = Schemas['ContactoResumenDto'];
 
-// Espejo de DocumentoRespaldoResumenDto: documento físico de respaldo asociado.
-export interface DocumentoRespaldoResumen {
-  id: string;
-  tipoNombre: string;
-  numero: string;
-}
+export type DocumentoRespaldoResumen = Schemas['DocumentoRespaldoResumenDto'];
 
-// Item de la lista paginada. No trae líneas; en su lugar proyecta los contactos
-// distintos y los documentos de respaldo. Espejo de ComprobanteListItemDto.
-export interface ComprobanteListItem {
-  id: string;
-  tipo: TipoComprobante;
-  numero: string | null;
-  estado: EstadoComprobante;
-  fechaContable: string; // YYYY-MM-DD
-  periodoFiscalId: string;
-  glosa: string;
-  monedaPrincipal: Moneda;
-  tipoCambioReexpresion: string;
-  totalDebitoBob: string;
-  totalCreditoBob: string;
-  anulado: boolean;
-  fechaAnulacion: string | null;
-  anuladoPorUserId: string | null;
-  motivoAnulacion: string | null;
-  createdByUserId: string;
-  createdAt: string;
-  updatedAt: string;
-  contactos: ContactoResumen[];
-  documentosRespaldo: DocumentoRespaldoResumen[];
-}
+// Item de la lista paginada (no trae líneas; proyecta contactos + documentos).
+export type ComprobanteListItem = Schemas['ComprobanteListItemDto'];
 
-export interface ListarComprobantesResponse {
-  items: ComprobanteListItem[];
-  total: number;
-  page: number;
-  limit: number;
-}
+export type ListarComprobantesResponse = Schemas['ListarComprobantesResponseDto'];
 
-// Query params para GET /api/comprobantes.
+// Query params para GET /api/comprobantes (client-only).
 export interface ListarComprobantesParams {
   page?: number;
   limit?: number;
@@ -837,7 +656,7 @@ export interface ListarComprobantesParams {
   incluirAnulados?: boolean;
 }
 
-// Espejo de AuditoriaEntryDto en backend/src/comprobantes/dto/auditoria-response.dto.ts.
+// Client-only: AuditoriaEntryDto no entra al OpenAPI (sin @ApiOkResponse).
 export interface AuditoriaEntry {
   id: string;
   comprobanteId: string;
@@ -854,12 +673,9 @@ export interface AuditoriaEntry {
 
 // ============================================================
 // Reportes — Libro Diario (GET /api/libros/diario)
-// Espejo de backend/src/reportes/dto/libro-diario-response.dto.ts
 // ============================================================
 
-// Query params para GET /api/libros/diario.
-// La regla de negocio "exactamente uno de período O rango" se valida
-// en el schema del form (libro-diario-filtro-schema.ts) y en el backend.
+// Query params para GET /api/libros/diario (client-only).
 export interface LibroDiarioParams {
   /** UUID del período fiscal (exclusivo con fechaDesde/fechaHasta). */
   periodoFiscalId?: string;
@@ -873,56 +689,17 @@ export interface LibroDiarioParams {
   cuentaId?: string;
 }
 
-// Espejo de LineaLibroDiarioDto.
-// Montos como string decimal (§4.5 CLAUDE.md).
-export interface LineaLibroDiario {
-  codigoCuenta: string;
-  nombreCuenta: string;
-  /** Glosa de la línea — nullable (no todas las líneas tienen glosa). */
-  glosa: string | null;
-  /** Monto debe en BOB. "0.00" si la línea es haber. */
-  debeBob: string;
-  /** Monto haber en BOB. "0.00" si la línea es debe. */
-  haberBob: string;
-}
+export type LineaLibroDiario = Schemas['LineaLibroDiarioDto'];
 
-// Espejo de AsientoLibroDiarioDto.
-export interface AsientoLibroDiario {
-  id: string;
-  /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
-  fechaContable: string;
-  /** Número correlativo del comprobante. Null solo en BORRADOR, pero el
-   *  Libro Diario nunca incluye BORRADOR (REQ-LD-02). */
-  numero: string | null;
-  tipo: string;
-  estado: string;
-  glosa: string;
-  /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
-  anulado: boolean;
-  lineas: LineaLibroDiario[];
-}
+export type AsientoLibroDiario = Schemas['AsientoLibroDiarioDto'];
 
-// Espejo de LibroDiarioResponseDto.
-export interface LibroDiarioResponse {
-  rango: {
-    fechaDesde: string; // YYYY-MM-DD
-    fechaHasta: string; // YYYY-MM-DD
-  };
-  asientos: AsientoLibroDiario[];
-  /** Suma de todos los debeBob de las líneas incluidas. */
-  totalDebeBob: string;
-  /** Suma de todos los haberBob de las líneas incluidas.
-   *  En asientos balanceados: === totalDebeBob. */
-  totalHaberBob: string;
-}
+export type LibroDiarioResponse = Schemas['LibroDiarioResponseDto'];
 
 // ============================================================
 // Libro Mayor — GET /api/libros/mayor
 // ============================================================
 
-// Query params para GET /api/libros/mayor.
-// La regla "exactamente uno de período O rango" se valida en el schema del
-// form (libro-mayor-filtro-schema.ts) y en el backend (service, no DTO).
+// Query params para GET /api/libros/mayor (client-only).
 export interface LibroMayorParams {
   /** UUID de la cuenta. Si se pasa, el Mayor muestra solo esa cuenta de detalle. */
   cuentaId?: string;
@@ -939,208 +716,63 @@ export interface LibroMayorParams {
   soloConMovimiento?: boolean;
 }
 
-// Espejo de MovimientoMayorDto.
-// Montos como string decimal (§4.5 CLAUDE.md).
-export interface MovimientoLibroMayor {
-  comprobanteId: string;
-  /** Número correlativo del comprobante. Null solo en BORRADOR — el Mayor nunca lo muestra. */
-  numeroComprobante: string | null;
-  /** Fecha contable calendario puro: "YYYY-MM-DD" (§4.6). */
-  fechaContable: string;
-  /** Glosa del comprobante cabecera. */
-  glosa: string;
-  /** Glosa de la línea (nullable). */
-  glosaLinea: string | null;
-  estado: string;
-  /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
-  anulado: boolean;
-  orden: number;
-  /** Monto debe en BOB. "0.00" si la línea es haber. */
-  debeBob: string;
-  /** Monto haber en BOB. "0.00" si la línea es debe. */
-  haberBob: string;
-  /** Saldo corriente acumulado después de este movimiento. String decimal (§4.5). */
-  saldoCorrienteBob: string;
-}
+export type MovimientoLibroMayor = Schemas['MovimientoMayorDto'];
 
-// Espejo de CuentaMayorDto.
-export interface CuentaLibroMayor {
-  cuentaId: string;
-  codigoInterno: string;
-  nombreCuenta: string;
-  /** Naturaleza contable: DEUDORA (activos/egresos) o ACREEDORA (pasivos/patrimonio/ingresos). */
-  naturaleza: 'DEUDORA' | 'ACREEDORA';
-  /** Saldo antes del primer movimiento del rango. String decimal, puede ser negativo. (§4.5) */
-  saldoInicialBob: string;
-  /** Saldo al final del rango (= saldoCorriente del último movimiento). String decimal. (§4.5) */
-  saldoFinalBob: string;
-  /** Suma de debeBob de los movimientos del rango. */
-  totalDebeBob: string;
-  /** Suma de haberBob de los movimientos del rango. */
-  totalHaberBob: string;
-  movimientos: MovimientoLibroMayor[];
-}
+export type CuentaLibroMayor = Schemas['CuentaMayorDto'];
 
-// Espejo de LibroMayorResponseDto.
-export interface LibroMayorResponse {
-  rango: {
-    fechaDesde: string; // YYYY-MM-DD
-    fechaHasta: string; // YYYY-MM-DD
-  };
-  /** Cuentas con movimiento (o con saldo previo si soloConMovimiento=false), ordenadas por codigoInterno ASC. */
-  cuentas: CuentaLibroMayor[];
-  /** Suma de todos los debeBob del rango, de todas las cuentas. */
-  totalDebeBob: string;
-  /** Suma de todos los haberBob del rango, de todas las cuentas. */
-  totalHaberBob: string;
-}
+export type LibroMayorResponse = Schemas['LibroMayorResponseDto'];
 
 // ============================================================
 // Balance General (Estado de Situación Financiera) — GET /api/eeff/balance
-// Espejo del BalanceResponseDto del backend (montos string §4.5,
-// fechaCorte YYYY-MM-DD §4.6). Las ramas vacías ya vienen podadas (REQ-BG-15).
 // ============================================================
 
-export interface CuentaBalance {
-  /** null en la línea sintética del Resultado del Ejercicio. */
-  cuentaId: string | null;
-  /** null en la línea sintética. */
-  codigoInterno: string | null;
-  nombre: string;
-  nivel: number;
-  esContraria: boolean;
-  /** true solo para "Resultado del Ejercicio (en curso)". */
-  esSintetica: boolean;
-  saldoBob: string;
-}
+export type CuentaBalance = Schemas['CuentaBalanceDto'];
 
-export interface SubseccionBalance {
-  subClaseCuenta: string;
-  titulo: string;
-  cuentas: CuentaBalance[];
-  totalBob: string;
-}
+export type SubseccionBalance = Schemas['SubseccionBalanceDto'];
 
-export interface SeccionBalance {
-  claseCuenta: string;
-  titulo: string;
-  subsecciones: SubseccionBalance[];
-  totalBob: string;
-}
+export type SeccionBalance = Schemas['SeccionBalanceDto'];
 
-export interface BalanceGeneralResponse {
-  fechaCorte: string;
-  gestionId: string;
-  activo: SeccionBalance;
-  pasivo: SeccionBalance;
-  patrimonio: SeccionBalance;
-  resultadoEjercicioBob: string;
-  totalActivoBob: string;
-  totalPasivoBob: string;
-  totalPatrimonioBob: string;
-  /** true si |Activo − (Pasivo + Patrimonio)| ≤ ±Bs 0.01 (REQ-BG-11). */
-  cuadra: boolean;
-  diferenciaBob: string;
-}
+export type BalanceGeneralResponse = Schemas['BalanceResponseDto'];
 
 // ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
-// Espejo de MePermissionsResponseDto del backend (backend/src/me/dto/).
-// `permissions` son strings de permiso EXACTOS, ya expandidos contra el catálogo
-// por el backend (NO patrones de wildcards).
 // ============================================================
 
 /** Vertical activo de la organización, derivado de sus flags de módulo. */
-export type VerticalActivo = 'CONTABILIDAD' | 'GRANJA' | null;
+export type VerticalActivo = Schemas['MePermissionsResponseDto']['vertical'];
 
-export interface MePermissionsResponse {
-  /** Permisos efectivos exactos del usuario (ej. ["contabilidad.eeff.read"]). */
-  permissions: string[];
-  /** true si el usuario es OWNER o ADMIN (tiene acceso total). */
-  isOwner: boolean;
-  /** ID del tenant activo en el JWT en el momento de la consulta. */
-  activeTenantId: string;
-  /** Vertical de la org activa. null si la org no tiene módulo asignado. */
-  vertical: VerticalActivo;
-}
+export type MePermissionsResponse = Schemas['MePermissionsResponseDto'];
 
-// Espeja backend me-platform-response.dto.ts. Org-less: identidad de plataforma
-// del usuario, independiente del tenant activo.
+// Client-only: GET /me/platform no está modelado como DTO decorado.
 export interface MePlatformResponse {
   isSuperAdmin: boolean;
 }
 
 // ============================================================
 // Administración de plataforma (super-admin) — /api/admin/platform/orgs
-// Espeja backend platform-org-response.dto.ts. status/plan vienen como string
-// en el DTO (proyección directa de los enums Prisma OrganizationStatus/Plan);
-// los tipamos con union literals para gating de UI, con render defensivo (R6)
-// si el backend agregara un valor nuevo. createdAt: Date serializa a ISO string
-// sobre HTTP.
 // ============================================================
 
-export type OrgStatus = 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+// Reusan los enum literals de los DTOs de la plataforma (status/plan vienen como
+// string en PlatformOrgResponseDto, pero los DTOs de mutación los modelan como
+// enum, que es la fuente del literal de gating de UI).
+export type OrgStatus = Schemas['UpdateOrgStatusDto']['status'];
 
-export type OrgPlan = 'FREE' | 'PRO';
+export type OrgPlan = NonNullable<Schemas['UpdateEntitlementDto']['plan']>;
 
-export interface PlatformOrg {
-  id: string;
-  name: string;
-  slug: string;
-  status: OrgStatus;
-  plan: OrgPlan;
-  contabilidadEnabled: boolean;
-  granjaEnabled: boolean;
-  createdAt: string;
-}
+export type PlatformOrg = Schemas['PlatformOrgResponseDto'];
 
-// Espeja backend platform/dto/create-org.dto.ts (CreateOrgDto). El super-admin
-// crea la org y designa al OWNER por email (debe ser un usuario ya registrado;
-// si no existe, el backend responde 422 PLATFORM_ORG_OWNER_NOT_FOUND). `modulo`
-// determina el seeding inicial y los flags de vertical (reusa ModuloOrganizacion).
-export interface CreateOrgRequest {
-  name: string;
-  modulo: ModuloOrganizacion;
-  ownerEmail: string;
-}
+export type CreateOrgRequest = Schemas['CreateOrgDto'];
 
-// Espeja backend platform/dto/update-org-status.dto.ts (UpdateOrgStatusDto).
-// PATCH /admin/platform/orgs/:id/status — cambia el ciclo de vida de la org.
-export interface UpdateOrgStatusRequest {
-  status: OrgStatus;
-}
+export type UpdateOrgStatusRequest = Schemas['UpdateOrgStatusDto'];
 
-// Espeja backend platform/dto/update-entitlement.dto.ts (UpdateEntitlementDto).
-// PATCH /admin/platform/orgs/:id/entitlement — patch parcial: todos los campos
-// son opcionales (los ausentes conservan el valor actual). El backend rechaza
-// con 422 PLATFORM_VERTICAL_NO_EXCLUSIVO si el estado resultante deja ambas
-// verticales en true. Por exactOptionalPropertyTypes, construir el body con
-// spread condicional (no pasar `undefined` explícito).
-export interface UpdateEntitlementRequest {
-  plan?: OrgPlan;
-  contabilidadEnabled?: boolean;
-  granjaEnabled?: boolean;
-}
+export type UpdateEntitlementRequest = Schemas['UpdateEntitlementDto'];
 
-// Espeja backend platform/dto/platform-org-member-response.dto.ts.
-// GET /admin/platform/orgs/:id/members — miembros de una org (activos + desactivados).
-// Slice 1 del change platform-admin-v1.1 (REQ-PM-01/02).
-export interface PlatformOrgMember {
-  id: string;
-  userId: string;
-  systemRole: string | null;
-  customRoleId: string | null;
-  customRole: { id: string; slug: string; name: string } | null;
-  /** ISO string o null. */
-  deactivatedAt: string | null;
-  /** ISO string. */
-  createdAt: string;
-  user: { id: string; email: string; displayName: string | null };
-}
+// GET /admin/platform/orgs/:id/members — miembros de una org (Slice 1 platform-admin-v1.1).
+export type PlatformOrgMember = Schemas['PlatformOrgMemberResponseDto'];
 
 // ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
-// Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.
+// Client-only: el endpoint devuelve el shape inline, sin DTO decorado.
 // ============================================================
 
 export interface AssignableRole {
@@ -1152,47 +784,12 @@ export interface AssignableRole {
 
 // ============================================================
 // Estado de Resultados (Income Statement) — GET /api/eeff/resultados
-// Espejo del EstadoResultadosResponseDto del backend (montos string §4.5,
-// rango fechaDesde/fechaHasta YYYY-MM-DD §4.6). Reporte de FLUJO del período.
-// A diferencia del Balance: dos secciones raíz (Ingresos/Egresos), sin línea
-// sintética, y el Resultado del Ejercicio es un campo escalar en raíz.
-// Las ramas vacías ya vienen podadas del backend (REQ-ER-08).
 // ============================================================
 
-export interface CuentaResultados {
-  cuentaId: string;
-  codigoInterno: string;
-  nombre: string;
-  nivel: number;
-  esContraria: boolean;
-  saldoBob: string;
-}
+export type CuentaResultados = Schemas['CuentaResultadosDto'];
 
-export interface SubseccionResultados {
-  subClaseCuenta: string;
-  titulo: string;
-  cuentas: CuentaResultados[];
-  totalBob: string;
-}
+export type SubseccionResultados = Schemas['SubseccionResultadosDto'];
 
-export interface SeccionResultados {
-  claseCuenta: string;
-  titulo: string;
-  subsecciones: SubseccionResultados[];
-  totalBob: string;
-}
+export type SeccionResultados = Schemas['SeccionResultadosDto'];
 
-export interface EstadoResultadosResponse {
-  /** Inicio del rango de flujo (inclusive), YYYY-MM-DD. */
-  fechaDesde: string;
-  /** Fin del rango de flujo (inclusive), YYYY-MM-DD. */
-  fechaHasta: string;
-  ingreso: SeccionResultados;
-  egreso: SeccionResultados;
-  /** Resultado del Ejercicio = Σ INGRESO − Σ EGRESO; puede ser negativo (pérdida). */
-  resultadoEjercicioBob: string;
-  totalIngresoBob: string;
-  totalEgresoBob: string;
-  /** true si resultadoEjercicio >= 0 (utilidad o break-even). */
-  esGanancia: boolean;
-}
+export type EstadoResultadosResponse = Schemas['EstadoResultadosResponseDto'];

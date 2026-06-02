@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { GestionFiscal, GestionFiscalStatus } from '@prisma/client';
 
 import type { GestionConPeriodos } from '../ports/gestion-fiscal.repository.port';
@@ -16,9 +16,9 @@ export class GestionResponseDto {
   mesInicio!: number;
   @ApiProperty({ enum: GestionFiscalStatus }) status!: GestionFiscalStatus;
 
-  @ApiPropertyOptional({ nullable: true, example: '2027-01-15T10:00:00.000Z' })
+  @ApiProperty({ type: String, nullable: true, example: '2027-01-15T10:00:00.000Z' })
   closedAt!: string | null;
-  @ApiPropertyOptional({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   closedByUserId!: string | null;
 
   @ApiProperty({ example: '2026-01-01T00:00:00.000Z' }) createdAt!: string;

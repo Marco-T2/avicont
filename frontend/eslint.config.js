@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `api.generated.ts` es artefacto de openapi-typescript (no se edita a mano,
+  // se regenera con `pnpm run gen:api-types`). Se excluye del lint para no
+  // acoplar el estilo del generador a las reglas del proyecto.
+  globalIgnores(['dist', 'src/types/api.generated.ts']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

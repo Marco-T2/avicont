@@ -15,13 +15,13 @@ export class UpdateContactoDto {
   @Length(2, 200)
   razonSocial?: string;
 
-  @ApiPropertyOptional({ maxLength: 200, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 200, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 200)
   nombreComercial?: string | null;
 
-  @ApiPropertyOptional({ maxLength: 50, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 50, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 50)
@@ -37,19 +37,19 @@ export class UpdateContactoDto {
   @IsBoolean()
   esProveedor?: boolean;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsEmail()
   @Length(0, 200)
   email?: string | null;
 
-  @ApiPropertyOptional({ maxLength: 50, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 50, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 50)
   telefono?: string | null;
 
-  @ApiPropertyOptional({ maxLength: 500, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @IsString()
   @Length(0, 500)
