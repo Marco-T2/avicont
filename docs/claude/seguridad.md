@@ -53,7 +53,7 @@ Owner: backend-lead
 
 **Precedencia:**
 1. `JWT.activeTenantId` — fuente normal para usuarios regulares.
-2. Header `X-Tenant-ID` — válido **solo si** `JWT.isSuperAdmin === true` (claim booleano en el JWT), siempre con auditoría. El `TenantGuard` implementa un bypass disciplinado para este caso: si `user.isSuperAdmin === true`, saltea el lookup de `Membership` y setea `req.tenantId` directamente desde el header. Ver `src/common/guards/tenant.guard.ts` y `docs/disenos/super-admin-plataforma.md §4.3`.
+2. Header `X-Tenant-ID` — válido **solo si** `JWT.isSuperAdmin === true` (claim booleano en el JWT), siempre con auditoría. El `TenantGuard` implementa un bypass disciplinado para este caso: si `user.isSuperAdmin === true`, saltea el lookup de `Membership` y setea `req.tenantId` directamente desde el header. **El bypass relaja SOLO la exigencia de pertenencia (`Membership`): el filtro `WHERE organizationId` de los repositorios sigue scoped a ese `tenantId` concreto** — el super-admin no obtiene lectura global cross-tenant, sino acceso a un tenant del que no es miembro. Comparación estricta `=== true` (un valor truthy como `1` no activa el bypass). Ver `src/common/guards/tenant.guard.ts` y `docs/disenos/super-admin-plataforma.md §4.3`.
 3. Subdomain — **eliminar del starter** (no se usa).
 
 Un usuario puede pertenecer a varios tenants con roles distintos. La tabla `Membership` refleja eso.
