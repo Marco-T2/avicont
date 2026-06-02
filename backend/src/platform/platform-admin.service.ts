@@ -17,9 +17,14 @@ import {
 } from '@/granja/ports/tipo-registro-seeder.port';
 import { TenantSlug } from '@/tenants/domain/tenant-slug';
 import { TenantSlugDuplicadoError } from '@/tenants/domain/tenant-errors';
+import {
+  MEMBERSHIPS_READER_PORT,
+  MembershipsReaderPort,
+} from '@/memberships/ports/memberships-reader.port';
 import { ORGS_READER_PORT, OrgsReaderPort } from './ports/orgs-reader.port';
 import { ORGS_WRITER_PORT, OrgsWriterPort } from './ports/orgs-writer.port';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
+import { PlatformOrgMemberResponseDto } from './dto/platform-org-member-response.dto';
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateEntitlementDto } from './dto/update-entitlement.dto';
 import {
@@ -41,6 +46,8 @@ export class PlatformAdminService {
     @Inject(TIPO_DOCUMENTO_FISICO_SEEDER_PORT)
     private readonly tiposDocSeeder: TipoDocumentoFisicoSeederPort,
     @Inject(TIPO_REGISTRO_SEEDER_PORT) private readonly tipoRegistroSeeder: TipoRegistroSeederPort,
+    @Inject(MEMBERSHIPS_READER_PORT)
+    private readonly membershipsReader: MembershipsReaderPort,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -165,6 +172,25 @@ export class PlatformAdminService {
 
     this.logger.log(`Org '${updated.name}' (${updated.id}) entitlement actualizado`);
     return PlatformOrgResponseDto.fromOrganization(updated);
+  }
+
+  /**
+   * Lista los miembros de una organización para el panel super-admin (REQ-PM-01).
+   *
+   * Incluye activos Y desactivados. El SA opera cross-tenant: no requiere
+   * TenantGuard pero la lectura queda auditada por PlatformAuditInterceptor
+   * (req.tenantId se popula en el controller antes del interceptor).
+   *
+   * @throws PlatformOrgNoEncontradaError si la org no existe.
+   */
+  async listarMiembros(orgId: string): Promise<PlatformOrgMemberResponseDto[]> {
+    const org = await this.orgsReader.findById(orgId);
+    if (!org) {
+      throw new PlatformOrgNoEncontradaError(orgId);
+    }
+
+    const memberships = await this.membershipsReader.findAllByTenant(orgId);
+    return memberships.map((m) => PlatformOrgMemberResponseDto.fromMembership(m));
   }
 
   /**

@@ -1120,6 +1120,22 @@ export interface UpdateEntitlementRequest {
   granjaEnabled?: boolean;
 }
 
+// Espeja backend platform/dto/platform-org-member-response.dto.ts.
+// GET /admin/platform/orgs/:id/members — miembros de una org (activos + desactivados).
+// Slice 1 del change platform-admin-v1.1 (REQ-PM-01/02).
+export interface PlatformOrgMember {
+  id: string;
+  userId: string;
+  systemRole: string | null;
+  customRoleId: string | null;
+  customRole: { id: string; slug: string; name: string } | null;
+  /** ISO string o null. */
+  deactivatedAt: string | null;
+  /** ISO string. */
+  createdAt: string;
+  user: { id: string; email: string; displayName: string | null };
+}
+
 // ============================================================
 // Roles asignables al invitar un miembro — GET /api/memberships/roles-asignables
 // Espejo de AssignableRoleDto en backend/src/memberships/dto/assignable-role.dto.ts.

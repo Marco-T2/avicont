@@ -55,18 +55,25 @@ export class PlatformAuditInterceptor implements NestInterceptor {
     const method = req.method;
     const isMutacion = MUTATING_METHODS.has(method);
 
-    // GET cross-tenant: el super-admin está operando sobre una org que no es
-    // su tenant activo (req.tenantId viene del header X-Tenant-ID, seteado
-    // por TenantGuard). Excluimos GET sin tenantId (listado global org-less).
-    const isCrossTenantGet =
-      method === 'GET' && req.tenantId !== undefined && req.tenantId !== user.activeTenantId;
-
-    if (!isMutacion && !isCrossTenantGet) return next.handle();
+    // Para GETs, la decisión de auditar se difiere al tap (post-handler) porque
+    // el controller puede poblar req.tenantId DENTRO del handler (antes de que el
+    // interceptor capture el resultado). En ese momento req.tenantId ya está seteado.
+    // Los métodos mutantes se auditan incondicionalmente para un SA.
+    if (!isMutacion && method !== 'GET') return next.handle();
 
     return next.handle().pipe(
       tap(() => {
         const actorUserId = user.sub;
         if (!actorUserId) return;
+
+        // Para GETs: re-evaluar isCrossTenantGet post-handler, cuando req.tenantId
+        // ya fue poblado por el controller (patrón de listarMiembros y actualizarStatus).
+        // Excluimos GETs sin tenantId (listado global org-less — sin valor en audit).
+        if (method === 'GET') {
+          const isCrossTenantGet =
+            req.tenantId !== undefined && req.tenantId !== user.activeTenantId;
+          if (!isCrossTenantGet) return;
+        }
 
         const action = `${method} ${req.route?.path ?? req.url}`;
         const createdAt = this.clock.now();

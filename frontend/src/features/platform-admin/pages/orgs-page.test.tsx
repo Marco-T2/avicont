@@ -1,10 +1,19 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PlatformOrg } from '@/types/api';
 
 import { OrgsPage } from './orgs-page';
+
+function renderOrgsPage() {
+  return render(
+    <MemoryRouter>
+      <OrgsPage />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock('../hooks/use-orgs', () => ({
   useOrgs: vi.fn(),
@@ -63,7 +72,7 @@ describe('OrgsPage', () => {
 
   it('renderiza una fila por organización con sus badges', () => {
     mockUseOrgs({ data: orgs });
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     expect(screen.getByText('Avícola del Valle')).toBeInTheDocument();
     expect(screen.getByText('Granja San José')).toBeInTheDocument();
@@ -76,7 +85,7 @@ describe('OrgsPage', () => {
 
   it('muestra skeleton mientras carga', () => {
     mockUseOrgs({ isLoading: true });
-    const { container } = render(<OrgsPage />);
+    const { container } = renderOrgsPage();
 
     expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
     expect(screen.queryByText('Avícola del Valle')).not.toBeInTheDocument();
@@ -84,14 +93,14 @@ describe('OrgsPage', () => {
 
   it('muestra el empty state cuando no hay organizaciones', () => {
     mockUseOrgs({ data: [] });
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     expect(screen.getByText('No hay organizaciones')).toBeInTheDocument();
   });
 
   it('muestra un mensaje de error en español ante un fallo', () => {
     mockUseOrgs({ isError: true });
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     expect(
       screen.getByText('No se pudieron cargar las organizaciones.'),
@@ -101,7 +110,7 @@ describe('OrgsPage', () => {
   it('el botón "Nueva organización" abre el sheet de creación', async () => {
     mockUseOrgs({ data: orgs });
     const user = userEvent.setup();
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     // El sheet arranca cerrado: su título no está montado.
     expect(screen.queryByText('Nueva organización', { selector: 'h2' })).not.toBeInTheDocument();
@@ -116,7 +125,7 @@ describe('OrgsPage', () => {
   it('el menú de acciones de una org ACTIVE ofrece suspender, archivar y editar entitlement', async () => {
     mockUseOrgs({ data: orgs });
     const user = userEvent.setup();
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
 
@@ -130,7 +139,7 @@ describe('OrgsPage', () => {
   it('el menú de acciones de una org SUSPENDED ofrece reactivar', async () => {
     mockUseOrgs({ data: orgs });
     const user = userEvent.setup();
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     await user.click(screen.getByRole('button', { name: /acciones para granja san josé/i }));
 
@@ -142,7 +151,7 @@ describe('OrgsPage', () => {
   it('al elegir "Editar entitlement" abre el sheet de entitlement', async () => {
     mockUseOrgs({ data: orgs });
     const user = userEvent.setup();
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
     await user.click(await screen.findByRole('menuitem', { name: /editar entitlement/i }));
@@ -155,7 +164,7 @@ describe('OrgsPage', () => {
   it('al elegir "Suspender" abre el dialog de confirmación de estado', async () => {
     mockUseOrgs({ data: orgs });
     const user = userEvent.setup();
-    render(<OrgsPage />);
+    renderOrgsPage();
 
     await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
     await user.click(await screen.findByRole('menuitem', { name: /suspender/i }));
