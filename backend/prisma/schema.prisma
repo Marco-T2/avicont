@@ -167,6 +167,15 @@ model Organization {
   // del PUCT). Editable. Invariante: tipoEmpresaPrincipal ∈ tiposEmpresaActivos.
   tiposEmpresaActivos TipoEmpresa[]
 
+  // Perfil fiscal para cabecera de informes (RND 10-0025-14).
+  // Optativos: ninguno es obligatorio para operar la organización.
+  razonSocial        String?
+  nit                String?
+  direccion          String?
+  representanteLegal String?
+  telefono           String?
+  email              String?
+
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
