@@ -1,5 +1,5 @@
 <!--
-Última edición: 2026-04-23
+Última edición: 2026-06-03
 Última revisión contra core: 2026-04-23
 Owner: backend-lead
 -->
@@ -30,7 +30,6 @@ El starter ya provee:
 |-----------|---------|
 | `LoggerModule` (puerto + adapters) | Pino, Winston, Loki, Console. Configurable por `LOG_PROVIDER` |
 | `HttpLoggingInterceptor` | Loguea request/response con `tenantId`, `userId`, `traceId`, `spanId`, `duration`, `status` |
-| `AuditInterceptor` | Registra acciones importantes en `AuditLog` |
 | `TenantContextInterceptor` | Extrae `tenantId` y lo pone en `AsyncLocalStorage` |
 | Integración OpenTelemetry | Todos los logs traen `traceId` para correlation con traces en Grafana |
 
