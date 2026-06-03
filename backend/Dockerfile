@@ -9,15 +9,23 @@ RUN npm i -g pnpm@11.2.2
 # package.json (deps), pnpm-lock.yaml (versiones pineadas) y
 # pnpm-workspace.yaml (allowBuilds + cooldown).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY prisma ./prisma/
 
 # --frozen-lockfile EXPLÍCITO: Docker no setea CI=true, así que pnpm no lo
 # infiere solo. Sin esto, pnpm podría intentar resolver/actualizar el árbol.
+# Va antes de copiar el schema: la capa de install cachea solo por el lockfile.
 RUN pnpm install --frozen-lockfile
+
+# El generate depende SOLO de prisma/ (schema + migrations). Copiarlo justo
+# antes del generate ata la invalidación de cache de Docker al schema: si el
+# schema cambia, el Prisma Client se regenera; si no, se reusa el cacheado.
+# Si esto va después de `COPY . .`, Docker puede servir un generate cacheado de
+# una build previa con schema viejo y el client queda desincronizado (delegate
+# undefined en runtime → 500). Ver CLAUDE.md / gotcha docker-stale-prisma-client.
+COPY prisma ./prisma/
+RUN pnpm run prisma:generate
 
 COPY . .
 
-RUN pnpm run prisma:generate
 RUN pnpm run build
 
 FROM node:24-alpine AS runner
