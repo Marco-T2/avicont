@@ -1,28 +1,39 @@
 import { z } from 'zod';
 
 // Schema espejo de la validación backend para el perfil fiscal de la organización.
-// Todos los campos son opcionales: string vacío = campo desmapeado (null en backend).
+// Todos los campos son strings (vacío = campo desmapeado → null en backend).
 //
 // La conversión '' → null ocurre en update-empresa.ts, no en el schema.
-// El form trabaja con strings vacíos; el API layer convierte antes de enviar.
+// El form trabaja con strings; el API layer convierte antes de enviar.
+//
+// Patrón: todos los campos son z.string() (sin .default() para evitar que zod
+// infiera el tipo de INPUT como `string | undefined`). Los defaultValues del
+// formulario se manejan en useForm() dentro del componente.
 export const empresaFormSchema = z.object({
-  razonSocial: z.string().max(200, 'Máximo 200 caracteres').default(''),
+  razonSocial: z.string().max(200, 'Máximo 200 caracteres'),
 
   // RND 10-0025-14: el NIT tiene entre 7 y 12 dígitos numéricos.
-  // string vacío = campo no configurado (permitido).
+  // string vacío = campo no configurado (se convierte a null al enviar).
   nit: z
-    .literal('')
-    .or(z.string().regex(/^\d{7,12}$/, 'El NIT debe tener entre 7 y 12 dígitos'))
-    .default(''),
+    .string()
+    .refine(
+      (val) => val === '' || /^\d{7,12}$/.test(val),
+      'El NIT debe tener entre 7 y 12 dígitos',
+    ),
 
-  direccion: z.string().max(300, 'Máximo 300 caracteres').default(''),
+  direccion: z.string().max(300, 'Máximo 300 caracteres'),
 
-  representanteLegal: z.string().max(150, 'Máximo 150 caracteres').default(''),
+  representanteLegal: z.string().max(150, 'Máximo 150 caracteres'),
 
-  telefono: z.string().max(30, 'Máximo 30 caracteres').default(''),
+  telefono: z.string().max(30, 'Máximo 30 caracteres'),
 
-  // string vacío = campo no configurado (permitido).
-  email: z.literal('').or(z.string().email('Email inválido')).default(''),
+  // string vacío = campo no configurado (se convierte a null al enviar).
+  email: z
+    .string()
+    .refine(
+      (val) => val === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+      'Email inválido',
+    ),
 });
 
 export type EmpresaFormValues = z.infer<typeof empresaFormSchema>;
