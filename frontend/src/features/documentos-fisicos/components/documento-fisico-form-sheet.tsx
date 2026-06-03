@@ -101,10 +101,20 @@ export function DocumentoFisicoFormSheet({
 
         <div className="px-4 pb-6">
           {showSkeleton ? (
+            // §14.5: las alturas espejan la estructura real del form
+            // (label + control), no un h-10 uniforme. La glosa es una textarea
+            // (más alta) y el monto es condicional, por eso el bloque final.
             <div className="space-y-4 pt-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
+              <Skeleton className="h-5 w-28" /> {/* label tipo */}
+              <Skeleton className="h-10 w-full" /> {/* select */}
+              <Skeleton className="h-5 w-24" /> {/* label número */}
+              <Skeleton className="h-10 w-full" /> {/* input */}
+              <Skeleton className="h-5 w-20" /> {/* label fecha */}
+              <Skeleton className="h-10 w-full" /> {/* input */}
+              <Skeleton className="h-5 w-28" /> {/* label contacto */}
+              <Skeleton className="h-10 w-full" /> {/* combobox */}
+              <Skeleton className="h-5 w-16" /> {/* label glosa */}
+              <Skeleton className="h-24 w-full" /> {/* textarea */}
             </div>
           ) : (
             <DocumentoFisicoForm
