@@ -1,7 +1,6 @@
 import { Building2, LogOut, Menu, Shield, ToggleRight } from 'lucide-react';
 import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { NavLink, Outlet } from 'react-router-dom';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { api } from '@/lib/api';
+import { useLogout } from '@/features/auth/use-logout';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -73,25 +72,13 @@ function PlatformBrand(): React.JSX.Element {
  * Marcado visualmente como "Plataforma" para que sea obvio que no es un tenant.
  */
 export function PlatformShell(): React.JSX.Element {
-  const clear = useAuthStore((s) => s.clear);
   const activeTenantId = useAuthStore((s) => s.user?.activeTenantId);
-  const navigate = useNavigate();
+  const handleLogout = useLogout();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // "Volver a la app" solo tiene sentido si el SA tiene un tenant activo. Sin
   // tenant, IndexRedirect rebota / → /platform-admin → el botón no haría nada.
   const puedeVolverALaApp = activeTenantId !== undefined;
-
-  async function handleLogout(): Promise<void> {
-    try {
-      await api.post('/api/auth/logout');
-    } catch {
-      // Silencioso: aun si el backend rechaza, limpiamos en memoria.
-    }
-    clear();
-    toast.success('Sesión cerrada');
-    navigate('/login', { replace: true });
-  }
 
   return (
     <div className="flex h-screen bg-background">
