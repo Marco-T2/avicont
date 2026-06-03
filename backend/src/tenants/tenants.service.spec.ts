@@ -24,6 +24,8 @@ import {
   TenantSlugInvalidoError,
   TipoEmpresaInmutableError,
   VerticalNoExclusivoError,
+  TenantNitInvalidoError,
+  TenantEmailInvalidoError,
 } from './domain/tenant-errors';
 import {
   TENANT_REPOSITORY_PORT,
@@ -477,6 +479,104 @@ describe('TenantsService (unit)', () => {
       ).rejects.toBeInstanceOf(TipoEmpresaInmutableError);
 
       expect(repo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — perfil fiscal', () => {
+    it('pasa los campos fiscales al repo cuando están en el dto', async () => {
+      const updated = mkOrg({ razonSocial: 'Avicultura S.R.L.', nit: '1234567' } as never);
+      repo.update.mockResolvedValue(updated);
+
+      await service.update(TENANT_ID, {
+        razonSocial: 'Avicultura S.R.L.',
+        nit: '1234567',
+        direccion: 'Av. 6 de Agosto 123',
+        representanteLegal: 'Juan Pérez',
+        telefono: '591-2-2123456',
+        email: 'contacto@avicultura.com',
+      });
+
+      expect(repo.update).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({
+          razonSocial: 'Avicultura S.R.L.',
+          nit: '1234567',
+          direccion: 'Av. 6 de Agosto 123',
+          representanteLegal: 'Juan Pérez',
+          telefono: '591-2-2123456',
+          email: 'contacto@avicultura.com',
+        }),
+      );
+    });
+
+    it('pasa null cuando el campo viene null (desmapear)', async () => {
+      const updated = mkOrg({ nit: null } as never);
+      repo.update.mockResolvedValue(updated);
+
+      await service.update(TENANT_ID, { nit: null });
+
+      expect(repo.update).toHaveBeenCalledWith(TENANT_ID, expect.objectContaining({ nit: null }));
+    });
+
+    it('NO pasa campos ausentes del dto — el repo no los recibe', async () => {
+      const updated = mkOrg({ name: 'Solo nombre' });
+      repo.update.mockResolvedValue(updated);
+
+      await service.update(TENANT_ID, { name: 'Solo nombre' });
+
+      // razonSocial, nit, etc. NO deben estar en la llamada al repo
+      expect(repo.update).toHaveBeenCalledWith(TENANT_ID, { name: 'Solo nombre' });
+    });
+
+    it('no consulta gestionesReader cuando no viene tipoEmpresaPrincipal', async () => {
+      const updated = mkOrg({ razonSocial: 'Test' } as never);
+      repo.update.mockResolvedValue(updated);
+
+      await service.update(TENANT_ID, { razonSocial: 'Test' });
+
+      expect(gestiones.existeAlgunaGestion).not.toHaveBeenCalled();
+    });
+
+    it('lanza TenantNitInvalidoError si el nit tiene letras (guard defensivo)', async () => {
+      await expect(service.update(TENANT_ID, { nit: '12345AB' })).rejects.toBeInstanceOf(
+        TenantNitInvalidoError,
+      );
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('lanza TenantNitInvalidoError si el nit es demasiado corto (< 7 dígitos)', async () => {
+      await expect(service.update(TENANT_ID, { nit: '12345' })).rejects.toBeInstanceOf(
+        TenantNitInvalidoError,
+      );
+    });
+
+    it('lanza TenantNitInvalidoError si el nit es demasiado largo (> 12 dígitos)', async () => {
+      await expect(
+        service.update(TENANT_ID, { nit: '1234567890123' }),
+      ).rejects.toBeInstanceOf(TenantNitInvalidoError);
+    });
+
+    it('lanza TenantEmailInvalidoError si el email es malformado (guard defensivo)', async () => {
+      await expect(service.update(TENANT_ID, { email: 'no-es-un-email' })).rejects.toBeInstanceOf(
+        TenantEmailInvalidoError,
+      );
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('NO lanza error cuando nit es null (desmapear)', async () => {
+      const updated = mkOrg();
+      repo.update.mockResolvedValue(updated);
+
+      await expect(service.update(TENANT_ID, { nit: null })).resolves.not.toThrow();
+    });
+
+    it('NO lanza error cuando email es null (desmapear)', async () => {
+      const updated = mkOrg();
+      repo.update.mockResolvedValue(updated);
+
+      await expect(service.update(TENANT_ID, { email: null })).resolves.not.toThrow();
     });
   });
 
