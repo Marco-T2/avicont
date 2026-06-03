@@ -131,7 +131,6 @@ model User {
 
   memberships             Membership[]
   refreshTokens           RefreshToken[]
-  auditLogs               AuditLog[]
   invitationsSent         Invitation[]         @relation("InvitedBy")
   invitationsAccepted     Invitation[]         @relation("AcceptedBy")
   customRolesCreated      CustomRole[]         @relation("CustomRoleCreator")
@@ -175,7 +174,6 @@ model Organization {
   customRoles         CustomRole[]
   invitations         Invitation[]
   refreshTokens       RefreshToken[]
-  auditLogs           AuditLog[]
   featureFlags        FeatureFlag[]
   impersonationLogs   ImpersonationLog[]
   cuentas             Cuenta[]
@@ -327,24 +325,6 @@ model RefreshToken {
 // =====================================================================
 // AUDITORÍA Y SEGURIDAD
 // =====================================================================
-
-model AuditLog {
-  id             String   @id @default(uuid())
-  action         String
-  entity         String
-  entityId       String
-  metadata       Json?
-  organizationId String
-  userId         String?
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([organizationId, createdAt])
-  @@index([organizationId, entity, entityId])
-  @@map("audit_logs")
-}
 
 // Impersonation: cuando un OWNER/ADMIN entra al tenant de otro user.
 // Toda acción durante impersonation se registra DOBLE: (a) en auditoría

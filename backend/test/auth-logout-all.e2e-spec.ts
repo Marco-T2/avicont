@@ -55,7 +55,6 @@ describe('POST /api/auth/logout-all (e2e)', () => {
     await prisma.membership.deleteMany({});
     await prisma.customRole.deleteMany({});
     await prisma.featureFlag.deleteMany({});
-    await prisma.auditLog.deleteMany({});
     await prisma.impersonationAction.deleteMany({});
     await prisma.impersonationLog.deleteMany({});
     await prisma.invitation.deleteMany({});

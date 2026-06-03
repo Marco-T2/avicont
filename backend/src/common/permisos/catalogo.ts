@@ -83,11 +83,6 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
   },
   {
     modulo: 'organizacion',
-    submodulo: 'auditoria',
-    acciones: { read: 'Consultar bitácora de auditoría' },
-  },
-  {
-    modulo: 'organizacion',
     submodulo: 'feature-flags',
     acciones: {
       read: 'Ver feature flags habilitados',

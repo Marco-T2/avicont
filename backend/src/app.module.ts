@@ -27,7 +27,6 @@ import { MeModule } from './me/me.module';
 import { PlatformModule } from './platform/platform.module';
 import { ClockModule } from './common/clock';
 import { ImpersonationAuditInterceptor } from './impersonation/interceptors/impersonation-audit.interceptor';
-import { AuditModule } from './audit/audit.module';
 import { BillingModule } from './billing/billing.module';
 import { CacheModule } from './cache/cache.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
@@ -83,7 +82,6 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     PermissionsModule,
     InvitationsModule,
     ImpersonationModule,
-    AuditModule,
     BillingModule,
     FeatureFlagsModule,
     CuentasModule,

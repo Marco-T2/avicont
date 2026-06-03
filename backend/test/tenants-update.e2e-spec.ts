@@ -122,7 +122,6 @@ async function cleanup(prisma: PrismaService) {
   await prisma.impersonationAction.deleteMany({});
   await prisma.impersonationLog.deleteMany({});
   await prisma.invitation.deleteMany({});
-  await prisma.auditLog.deleteMany({});
   await prisma.membership.deleteMany({});
   await prisma.customRole.deleteMany({});
   await prisma.featureFlag.deleteMany({});

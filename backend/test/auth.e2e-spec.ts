@@ -34,7 +34,6 @@ describe('Auth (e2e)', () => {
 
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany({});
-    await prisma.auditLog.deleteMany({});
     await prisma.impersonationAction.deleteMany({});
     await prisma.impersonationLog.deleteMany({});
     await prisma.invitation.deleteMany({});
