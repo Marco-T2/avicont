@@ -16,6 +16,10 @@ import { ORGS_READER_PORT } from './ports/orgs-reader.port';
 import { PrismaOrgsReaderAdapter } from '@/tenants/adapters/prisma-orgs-reader.adapter';
 import { ORGS_WRITER_PORT } from './ports/orgs-writer.port';
 import { PrismaOrgsWriterAdapter } from '@/tenants/adapters/prisma-orgs-writer.adapter';
+import { PLATFORM_STATS_READER_PORT } from './ports/platform-stats-reader.port';
+import { PrismaPlatformStatsReaderAdapter } from '@/tenants/adapters/prisma-platform-stats-reader.adapter';
+import { PLATFORM_ACTIVITY_READER_PORT } from './ports/platform-activity-reader.port';
+import { PrismaPlatformActivityReaderAdapter } from './adapters/prisma-platform-activity-reader.adapter';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformAdminController } from './platform-admin.controller';
 
@@ -66,6 +70,16 @@ import { PlatformAdminController } from './platform-admin.controller';
     // Ports cross-module: adapter de escritura de orgs (dueño: tenants)
     PrismaOrgsWriterAdapter,
     { provide: ORGS_WRITER_PORT, useExisting: PrismaOrgsWriterAdapter },
+
+    // Port de stats de plataforma (dueño: tenants — dueño de Organization).
+    // El adapter agrega cross-tenant, enforcement en SuperAdminGuard (Anti-31 deliberada).
+    PrismaPlatformStatsReaderAdapter,
+    { provide: PLATFORM_STATS_READER_PORT, useExisting: PrismaPlatformStatsReaderAdapter },
+
+    // Port de actividad de plataforma (lectura de platform_audit).
+    // Separado de PlatformAuditPort que es write-only (REQ-PCT-06).
+    PrismaPlatformActivityReaderAdapter,
+    { provide: PLATFORM_ACTIVITY_READER_PORT, useExisting: PrismaPlatformActivityReaderAdapter },
 
     PlatformAdminService,
   ],

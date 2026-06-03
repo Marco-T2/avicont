@@ -793,3 +793,35 @@ export type SubseccionResultados = Schemas['SubseccionResultadosDto'];
 export type SeccionResultados = Schemas['SeccionResultadosDto'];
 
 export type EstadoResultadosResponse = Schemas['EstadoResultadosResponseDto'];
+
+// ============================================================
+// Dashboard de plataforma — GET /api/admin/platform/dashboard
+// GET /api/admin/platform/activity (super-admin)
+// ============================================================
+
+export type OrgStatusCount = Schemas['OrgStatusCountDto'];
+
+export type OrgPlanCount = Schemas['OrgPlanCountDto'];
+
+export type OrgVerticalCount = Schemas['OrgVerticalCountDto'];
+
+export type UsuariosStats = Schemas['UsuariosStatsDto'];
+
+export type AltasPorMes = Schemas['AltasPorMesDto'];
+
+export type PlatformDashboard = Schemas['PlatformDashboardResponseDto'];
+
+export type ActivityActor = Schemas['ActivityActorDto'];
+
+export type ActivityTargetOrg = Schemas['ActivityTargetOrgDto'];
+
+export type PlatformActivityItem = Schemas['PlatformActivityItemDto'];
+
+export type PlatformActivity = Schemas['PlatformActivityResponseDto'];
+
+// Query params para GET /api/admin/platform/activity (client-only).
+export interface PlatformActivityParams {
+  limit?: number;
+  cursor?: string;
+  orgId?: string;
+}
