@@ -75,7 +75,6 @@ export async function cleanupTestData() {
   // Se limpia también al final para capturar escrituras async tardías (void).
   await prisma.platformAudit.deleteMany({}).catch(() => void 0);
   await prisma.refreshToken.deleteMany({});
-  await prisma.auditLog.deleteMany({});
   await prisma.impersonationAction.deleteMany({});
   await prisma.impersonationLog.deleteMany({});
   await prisma.invitation.deleteMany({});

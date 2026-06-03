@@ -1198,40 +1198,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List audit logs for current tenant */
-        get: operations["AuditController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/audit/entity": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get audit logs for a specific entity */
-        get: operations["AuditController_findByEntity"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/billing": {
         parameters: {
             query?: never;
@@ -5396,48 +5362,6 @@ export interface operations {
             };
             /** @description No es super-admin de plataforma */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuditController_list: {
-        parameters: {
-            query?: {
-                skip?: number;
-                take?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Paginated audit logs */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    AuditController_findByEntity: {
-        parameters: {
-            query: {
-                entity: string;
-                entityId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Audit logs for entity */
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };

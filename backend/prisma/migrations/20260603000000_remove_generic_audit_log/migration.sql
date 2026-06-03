@@ -1,0 +1,13 @@
+-- Elimina la tabla `audit_logs` del audit genérico (vestigial del starter).
+-- El write-path (AuditInterceptor + AuditService.log) era código muerto:
+-- nunca se registró el interceptor, así que la tabla jamás se escribió.
+-- La auditoría real del proyecto vive en `platform_audit` y `comprobantes_audit`.
+--
+-- Migración ESCRITA A MANO (protocolo CLAUDE.md §11.6): `prisma migrate dev`
+-- detecta `comprobantes_audit` (tabla raw SQL de triggers, ausente del schema)
+-- como drift e intenta dropearla (71k filas). Dropear vía Prisma destruiría
+-- el rastro contable. Esta migración toca SOLO `audit_logs`.
+--
+-- `DROP TABLE` elimina la tabla con sus índices y FKs salientes; ninguna otra
+-- tabla referencia `audit_logs`, por lo que no hay FKs entrantes que bloqueen.
+DROP TABLE "audit_logs";

@@ -32,7 +32,6 @@ describe('Tenant Isolation (e2e)', () => {
   afterAll(async () => {
     await prisma.$transaction([
       prisma.refreshToken.deleteMany({}),
-      prisma.auditLog.deleteMany({}),
       prisma.impersonationAction.deleteMany({}),
       prisma.impersonationLog.deleteMany({}),
       prisma.invitation.deleteMany({}),
@@ -47,7 +46,6 @@ describe('Tenant Isolation (e2e)', () => {
 
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany({});
-    await prisma.auditLog.deleteMany({});
     await prisma.impersonationAction.deleteMany({});
     await prisma.impersonationLog.deleteMany({});
     await prisma.invitation.deleteMany({});
@@ -122,46 +120,6 @@ describe('Tenant Isolation (e2e)', () => {
         .set('X-Tenant-ID', tenant2Id);
 
       expect([401, 403]).toContain(response.status);
-    });
-
-    it('should scope audit logs to tenant', async () => {
-      const tenantsExist = await prisma.organization.findMany({
-        where: { id: { in: [tenant1Id, tenant2Id] } },
-      });
-      expect(tenantsExist.length).toBe(2);
-
-      await prisma.auditLog.create({
-        data: {
-          action: 'test.action',
-          entity: 'test',
-          entityId: '1',
-          organizationId: tenant1Id,
-        },
-      });
-
-      await prisma.auditLog.create({
-        data: {
-          action: 'test.action',
-          entity: 'test',
-          entityId: '2',
-          organizationId: tenant2Id,
-        },
-      });
-
-      const response = await request(app.getHttpServer())
-        .get('/api/audit')
-        .set('Authorization', `Bearer ${tenant1Token}`)
-        .set('X-Tenant-ID', tenant1Id);
-
-      if (response.status !== 200) {
-        console.log('Response status:', response.status);
-        console.log('Response body:', response.body);
-      }
-      expect(response.status).toBe(200);
-
-      expect(response.body.length).toBe(1);
-      // El endpoint devuelve el campo organizationId del AuditLog.
-      expect(response.body[0].organizationId).toBe(tenant1Id);
     });
   });
 });
