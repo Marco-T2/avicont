@@ -38,6 +38,13 @@ export interface TenantUpdateData {
   plan?: Plan;
   status?: OrganizationStatus;
   tipoEmpresaPrincipal?: TipoEmpresa;
+  // Perfil fiscal — campos nullable; undefined = no tocar, null = despejar.
+  razonSocial?: string | null;
+  nit?: string | null;
+  direccion?: string | null;
+  representanteLegal?: string | null;
+  telefono?: string | null;
+  email?: string | null;
 }
 
 export interface TenantFeatures {
