@@ -1932,6 +1932,18 @@ export interface components {
              * @example New Name
              */
             name?: string;
+            /** @description Razón social (nombre legal) */
+            razonSocial?: string | null;
+            /** @description NIT de la organización (7-12 dígitos) */
+            nit?: string | null;
+            /** @description Dirección fiscal */
+            direccion?: string | null;
+            /** @description Representante legal */
+            representanteLegal?: string | null;
+            /** @description Teléfono de contacto */
+            telefono?: string | null;
+            /** @description Email de contacto */
+            email?: string | null;
             /**
              * @description Tipo de empresa principal (determina el mesInicio del cierre fiscal según Ley 843 art. 46). Inmutable una vez creada la primera gestión fiscal.
              * @enum {string}
