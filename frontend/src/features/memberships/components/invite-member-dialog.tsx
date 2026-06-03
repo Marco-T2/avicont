@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { Check, Copy, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -48,6 +49,11 @@ export function InviteMemberDialog({
   onOpenChange,
 }: InviteMemberDialogProps): React.JSX.Element {
   const mutation = useCreateInvitation();
+
+  // Resultado de una invitación creada con éxito. Mientras es null se muestra
+  // el formulario; cuando tiene valor se muestra la vista con el enlace copiable.
+  const [created, setCreated] = useState<{ link: string; email: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // G-9: hooks se azan a const top-level, nunca inline en JSX.
   const { data: roles = [], isLoading: rolesLoading, isError: rolesError } = useAssignableRoles(open);
@@ -100,10 +106,15 @@ export function InviteMemberDialog({
       expiresInDays: values.expiresInDays,
     };
     mutation.mutate(body, {
-      onSuccess: () => {
-        toast.success(`Invitación enviada a ${values.email}`);
+      onSuccess: (data) => {
+        // El backend manda el email automáticamente, pero en dev el "envío" solo
+        // loguea el link. Exponemos el enlace para que el admin lo copie y lo
+        // comparta a mano sin tener que buscarlo en los logs.
+        setCreated({
+          link: `${window.location.origin}/accept-invite?token=${data.token}`,
+          email: values.email,
+        });
         reset();
-        onOpenChange(false);
       },
       onError: (err) => {
         toast.error(backendErrorMessage(err, 'No se pudo enviar la invitación'));
@@ -111,11 +122,94 @@ export function InviteMemberDialog({
     });
   }
 
+  function handleOpenChange(next: boolean): void {
+    if (!next) {
+      setCreated(null);
+      setCopied(false);
+      reset();
+    }
+    onOpenChange(next);
+  }
+
+  function handleInviteAnother(): void {
+    setCreated(null);
+    setCopied(false);
+  }
+
+  async function handleCopy(): Promise<void> {
+    if (created === null) return;
+    try {
+      await navigator.clipboard.writeText(created.link);
+      setCopied(true);
+      toast.success('Enlace copiado al portapapeles');
+    } catch {
+      toast.error('No se pudo copiar. Seleccioná el enlace y copialo manualmente.');
+    }
+  }
+
   const systemRoles = roles.filter((r) => r.kind === 'system');
   const customRoles = roles.filter((r) => r.kind === 'custom');
 
+  if (created !== null) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invitación creada</DialogTitle>
+            <DialogDescription>
+              Se envió un email a{' '}
+              <span className="font-medium text-foreground">{created.email}</span>.
+              También podés copiar el enlace y compartirlo a mano.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-link">Enlace de invitación</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="invite-link"
+                  readOnly
+                  value={created.link}
+                  className="text-base md:text-sm font-mono"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  aria-label="Copiar enlace"
+                  onClick={() => {
+                    void handleCopy();
+                  }}
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                El enlace expira según los días configurados al invitar.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleInviteAnother}>
+              Invitar a otro
+            </Button>
+            <Button type="button" onClick={() => handleOpenChange(false)}>
+              Listo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Invitar miembro</DialogTitle>
