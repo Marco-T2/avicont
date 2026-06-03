@@ -7,8 +7,9 @@
 >
 > **Última reconciliación contra el código: 2026-06-02.** Se cerró §10.3 (frontera
 > entitlement→activación, change `packs-riel`). Se actualizó §9 (estado del riel de
-> packs y NavItem) y §11 (secuencia, paso 3). Verticales construidos: Contabilidad y
-> Granja. Riel de packs construido; packs concretos pendientes.
+> packs y NavItem, dashboard portfolio cross-tenant) y §11 (secuencia, paso 3).
+> Verticales construidos: Contabilidad y Granja. Riel de packs construido; packs
+> concretos pendientes. Dashboard portfolio super-admin construido (PR #159).
 >
 > Este doc **presupone** el `CLAUDE.md` raíz (multi-tenancy flat §4.2, seguridad
 > §5/§10.4, RBAC) y `docs/claude/seguridad.md`. Si algo acá contradice un
@@ -340,6 +341,7 @@ El frontend conoce el vertical activo vía `vertical` en `GET /me/permissions`
 | **Riel de packs** (`Pack`/`OrgPackEntitlement`/`PackEnabledGuard`/`@RequirePack`/`useMisPacks`/catálogo asignable filtrado) | ✅ construido (change `packs-riel`, 2026-06-02, PRs #150–#157). Ver `docs/disenos/packs-eje2.md` |
 | Packs avícolas concretos (compras/fletes/liquidaciones/adjuntos/RAG) | ❌ greenfield (el riel está hecho; enchufar el primer pack concreto es la siguiente fase) |
 | Frontera entitlement→activación explícita | ✅ cerrada (§10.3, change `packs-riel`, 2026-06-02) |
+| **Dashboard portfolio super-admin** (`GET /admin/platform/dashboard` + `GET /admin/platform/activity`) | ✅ construido (change `portfolio-cross-tenant`, 2026-06-02, PR #159). KPIs orgs por status/plan/vertical + total usuarios + serie altas 12 meses + timeline paginado cursor sobre `platform_audit`. Excepción cross-tenant deliberada a Anti-31 documentada en ports. Sin migración. Spec viva: `openspec/specs/portfolio-cross-tenant/spec.md` |
 
 > **Nota de seguridad**: el gating frontend es **UX, no seguridad**. El backend ya
 > enforza RBAC (403 ante falta de permiso). Ocultar opciones que el usuario no
