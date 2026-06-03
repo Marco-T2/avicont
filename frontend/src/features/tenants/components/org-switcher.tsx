@@ -1,4 +1,5 @@
 import { Building2, Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export function OrgSwitcher(): React.JSX.Element {
   const { data, isLoading } = useMyProfile();
   const activeTenantId = useAuthStore((s) => s.user?.activeTenantId);
   const switchMutation = useSwitchTenant();
+  const navigate = useNavigate();
 
   if (isLoading && data === undefined) {
     return (
@@ -80,6 +82,12 @@ export function OrgSwitcher(): React.JSX.Element {
       onSuccess: () => {
         const nombre = tenants.find((t) => t.id === tenantId)?.name ?? '';
         toast.success(`Cambiado a ${nombre}`);
+        // Tras el switch, volver al inicio: IndexRedirect enruta al home del
+        // vertical correcto y desmonta la página actual. Sin esto, una ruta de
+        // otro vertical (ej. /granja/tipos-registro) queda montada y su query,
+        // ya invalidada por el reset de cache, se re-dispara contra el tenant
+        // nuevo → 403/404 del backend → flash de error de una página huérfana.
+        navigate('/', { replace: true });
       },
       onError: (err) => {
         toast.error(backendErrorMessage(err, 'No se pudo cambiar de organización'));
