@@ -26,6 +26,7 @@ import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
+import { EmpresaPage } from '@/features/tenants/pages/empresa-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
 import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
@@ -169,6 +170,14 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
                 <RolesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/empresa',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.configuracion.read}>
+                <EmpresaPage />
               </RequirePermission>
             ),
           },
