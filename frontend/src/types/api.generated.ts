@@ -209,6 +209,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memberships/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Leave the current tenant */
+        delete: operations["MembershipsController_leave"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memberships/{id}": {
         parameters: {
             query?: never;
@@ -225,23 +242,6 @@ export interface paths {
         head?: never;
         /** Update a member role */
         patch: operations["MembershipsController_updateRole"];
-        trace?: never;
-    };
-    "/api/memberships/leave": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Leave the current tenant */
-        delete: operations["MembershipsController_leave"];
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/custom-roles": {
@@ -3623,6 +3623,31 @@ export interface operations {
             };
         };
     };
+    MembershipsController_leave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Left tenant successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Owner cannot leave */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     MembershipsController_remove: {
         parameters: {
             query?: never;
@@ -3673,31 +3698,6 @@ export interface operations {
                 content?: never;
             };
             /** @description Cannot change owner role */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    MembershipsController_leave: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Left tenant successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Owner cannot leave */
             403: {
                 headers: {
                     [name: string]: unknown;

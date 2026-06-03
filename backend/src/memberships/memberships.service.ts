@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
   CUSTOM_ROLES_READER_PORT,
   CustomRolesReaderPort,
@@ -17,7 +16,6 @@ import {
   AutoDegradacionOwnerError,
   CustomRoleInvalidoParaTenantError,
   MembershipNoEncontradoError,
-  TenantContextRequeridoError,
   UltimoOwnerError,
   UsuarioNoRegistradoParaInviteError,
   UsuarioYaEsMiembroError,
@@ -40,14 +38,12 @@ export class MembershipsService {
     private readonly customRoles: CustomRolesReaderPort,
     @Inject(USERS_READER_PORT)
     private readonly users: UsersReaderPort,
-    private readonly tenantContext: TenantContextService,
     @Inject(PERMISSIONS_CACHE_INVALIDATION_PORT)
     private readonly rbac: PermissionsCacheInvalidationPort,
     private readonly rbacService: RbacService,
   ) {}
 
-  async invite(dto: InviteUserDto) {
-    const tenantId = this.getTenantId();
+  async invite(tenantId: string, dto: InviteUserDto) {
     const role = MembershipRole.parse({
       ...(dto.customRoleId != null ? { customRoleId: dto.customRoleId } : {}),
       ...(dto.systemRole != null ? { systemRole: toDominioSystemRole(dto.systemRole) } : {}),
@@ -79,8 +75,12 @@ export class MembershipsService {
     return created;
   }
 
-  async updateRole(membershipId: string, dto: UpdateMembershipDto, actorUserId: string) {
-    const tenantId = this.getTenantId();
+  async updateRole(
+    tenantId: string,
+    membershipId: string,
+    dto: UpdateMembershipDto,
+    actorUserId: string,
+  ) {
     const role = MembershipRole.parse({
       ...(dto.customRoleId != null ? { customRoleId: dto.customRoleId } : {}),
       ...(dto.systemRole != null ? { systemRole: toDominioSystemRole(dto.systemRole) } : {}),
@@ -110,9 +110,7 @@ export class MembershipsService {
     return updated;
   }
 
-  async remove(membershipId: string, _actorUserId: string) {
-    const tenantId = this.getTenantId();
-
+  async remove(tenantId: string, membershipId: string, _actorUserId: string) {
     const membership = await this.repo.findById(tenantId, membershipId);
     if (!membership) {
       throw new MembershipNoEncontradoError(membershipId);
@@ -173,14 +171,6 @@ export class MembershipsService {
   }
 
   // ---------- helpers privados ----------
-
-  private getTenantId(): string {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new TenantContextRequeridoError();
-    }
-    return tenantId;
-  }
 
   private async assertCustomRoleBelongsToTenant(customRoleId: string, tenantId: string) {
     const ok = await this.customRoles.belongsToTenant(customRoleId, tenantId);

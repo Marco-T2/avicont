@@ -80,19 +80,6 @@ export class AutoDegradacionOwnerError extends ForbiddenError {
   }
 }
 
-/**
- * Operación de memberships invocada sin tenant resuelto. Defensa extra —
- * normalmente `TenantGuard` ya frena estas requests antes.
- */
-export class TenantContextRequeridoError extends ForbiddenError {
-  constructor() {
-    super(
-      'MEMBERSHIP_TENANT_CONTEXT_REQUERIDO',
-      'Se requiere un tenant activo para esta operación',
-    );
-  }
-}
-
 // ============================================================
 // 400 — VOs con input inválido
 // ============================================================

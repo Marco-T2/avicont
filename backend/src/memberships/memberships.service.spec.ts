@@ -5,7 +5,6 @@ import {
   CUSTOM_ROLES_READER_PORT,
   type CustomRolesReaderPort,
 } from '@/custom-roles/ports/custom-roles-reader.port';
-import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import {
   PERMISSIONS_CACHE_INVALIDATION_PORT,
   type PermissionsCacheInvalidationPort,
@@ -18,7 +17,6 @@ import {
   AutoDegradacionOwnerError,
   CustomRoleInvalidoParaTenantError,
   MembershipNoEncontradoError,
-  TenantContextRequeridoError,
   UltimoOwnerError,
   UsuarioNoRegistradoParaInviteError,
   UsuarioYaEsMiembroError,
@@ -51,7 +49,6 @@ describe('MembershipsService (unit)', () => {
 
   let service: MembershipsService;
   let repo: RepoMock;
-  let tenantContext: { getTenantId: jest.Mock };
   let rbac: RbacMock;
   let rbacService: RbacServiceMock;
   let customRoles: CustomRolesMock;
@@ -67,7 +64,6 @@ describe('MembershipsService (unit)', () => {
       findByUserAndTenant: jest.fn(),
       countOwners: jest.fn(),
     } as unknown as RepoMock;
-    tenantContext = { getTenantId: jest.fn().mockReturnValue(TENANT_ID) };
     rbac = {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
       invalidateUsersByCustomRole: jest.fn().mockResolvedValue(undefined),
@@ -90,7 +86,6 @@ describe('MembershipsService (unit)', () => {
         { provide: MEMBERSHIP_REPOSITORY_PORT, useValue: repo },
         { provide: CUSTOM_ROLES_READER_PORT, useValue: customRoles },
         { provide: USERS_READER_PORT, useValue: users },
-        { provide: TenantContextService, useValue: tenantContext },
         { provide: PERMISSIONS_CACHE_INVALIDATION_PORT, useValue: rbac },
         { provide: RbacService, useValue: rbacService },
       ],
@@ -115,7 +110,7 @@ describe('MembershipsService (unit)', () => {
         id: 'm-new',
       } as Awaited<ReturnType<RepoMock['create']>>);
 
-      const result = await service.invite({
+      const result = await service.invite(TENANT_ID, {
         email: 'a@b.com',
         systemRole: SystemRole.ADMIN,
       });
@@ -141,7 +136,7 @@ describe('MembershipsService (unit)', () => {
         id: 'm-new',
       } as Awaited<ReturnType<RepoMock['create']>>);
 
-      await service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID });
+      await service.invite(TENANT_ID, { email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID });
 
       expect(customRoles.belongsToTenant).toHaveBeenCalledWith(CUSTOM_ROLE_ID, TENANT_ID);
       expect(repo.create).toHaveBeenCalledWith(TENANT_ID, {
@@ -151,17 +146,10 @@ describe('MembershipsService (unit)', () => {
       });
     });
 
-    it('lanza TenantContextRequeridoError si no hay tenant activo', async () => {
-      tenantContext.getTenantId.mockReturnValue(null);
-      await expect(
-        service.invite({ email: 'a@b.com', systemRole: SystemRole.ADMIN }),
-      ).rejects.toBeInstanceOf(TenantContextRequeridoError);
-    });
-
     it('lanza UsuarioNoRegistradoParaInviteError si el user no existe', async () => {
       users.findMinimalByEmail.mockResolvedValue(null);
       await expect(
-        service.invite({ email: 'new@user.com', systemRole: SystemRole.ADMIN }),
+        service.invite(TENANT_ID, { email: 'new@user.com', systemRole: SystemRole.ADMIN }),
       ).rejects.toBeInstanceOf(UsuarioNoRegistradoParaInviteError);
     });
 
@@ -175,7 +163,7 @@ describe('MembershipsService (unit)', () => {
         id: 'm-existing',
       } as Awaited<ReturnType<RepoMock['findByUserAndTenant']>>);
       await expect(
-        service.invite({ email: 'a@b.com', systemRole: SystemRole.ADMIN }),
+        service.invite(TENANT_ID, { email: 'a@b.com', systemRole: SystemRole.ADMIN }),
       ).rejects.toBeInstanceOf(UsuarioYaEsMiembroError);
     });
 
@@ -190,19 +178,19 @@ describe('MembershipsService (unit)', () => {
       repo.findByUserAndTenant.mockResolvedValue(null);
       customRoles.belongsToTenant.mockResolvedValue(false);
       await expect(
-        service.invite({ email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID }),
+        service.invite(TENANT_ID, { email: 'a@b.com', customRoleId: CUSTOM_ROLE_ID }),
       ).rejects.toBeInstanceOf(CustomRoleInvalidoParaTenantError);
     });
 
     it('lanza AsignacionRolInvalidaError si no hay ni systemRole ni customRoleId', async () => {
-      await expect(service.invite({ email: 'a@b.com' })).rejects.toBeInstanceOf(
+      await expect(service.invite(TENANT_ID, { email: 'a@b.com' })).rejects.toBeInstanceOf(
         AsignacionRolInvalidaError,
       );
     });
 
     it('lanza AsignacionRolInvalidaError si vienen ambos', async () => {
       await expect(
-        service.invite({
+        service.invite(TENANT_ID, {
           email: 'a@b.com',
           systemRole: SystemRole.ADMIN,
           customRoleId: CUSTOM_ROLE_ID,
@@ -221,7 +209,7 @@ describe('MembershipsService (unit)', () => {
         id: 'm-new',
       } as Awaited<ReturnType<RepoMock['create']>>);
 
-      await service.invite({
+      await service.invite(TENANT_ID, {
         email: '  A@B.COM  ',
         systemRole: SystemRole.ADMIN,
       });
@@ -256,6 +244,7 @@ describe('MembershipsService (unit)', () => {
       } as Awaited<ReturnType<RepoMock['updateRol']>>);
 
       await service.updateRole(
+        TENANT_ID,
         MEMBERSHIP_ID,
         { systemRole: SystemRole.OWNER, customRoleId: null },
         ACTOR_USER_ID,
@@ -272,6 +261,7 @@ describe('MembershipsService (unit)', () => {
       repo.findById.mockResolvedValue(null);
       await expect(
         service.updateRole(
+          TENANT_ID,
           MEMBERSHIP_ID,
           { systemRole: SystemRole.OWNER, customRoleId: null },
           ACTOR_USER_ID,
@@ -288,6 +278,7 @@ describe('MembershipsService (unit)', () => {
 
       await expect(
         service.updateRole(
+          TENANT_ID,
           MEMBERSHIP_ID,
           { systemRole: SystemRole.ADMIN, customRoleId: null },
           ACTOR_USER_ID,
@@ -309,6 +300,7 @@ describe('MembershipsService (unit)', () => {
       } as Awaited<ReturnType<RepoMock['updateRol']>>);
 
       await service.updateRole(
+        TENANT_ID,
         MEMBERSHIP_ID,
         { systemRole: SystemRole.OWNER, customRoleId: null },
         ACTOR_USER_ID,
@@ -325,6 +317,7 @@ describe('MembershipsService (unit)', () => {
 
       await expect(
         service.updateRole(
+          TENANT_ID,
           MEMBERSHIP_ID,
           { systemRole: null, customRoleId: CUSTOM_ROLE_ID },
           ACTOR_USER_ID,
@@ -357,7 +350,7 @@ describe('MembershipsService (unit)', () => {
         adminMembership() as Awaited<ReturnType<RepoMock['deleteById']>>,
       );
 
-      await service.remove(MEMBERSHIP_ID, ACTOR_USER_ID);
+      await service.remove(TENANT_ID, MEMBERSHIP_ID, ACTOR_USER_ID);
 
       expect(repo.countOwners).not.toHaveBeenCalled();
       expect(repo.deleteById).toHaveBeenCalledWith(TENANT_ID, MEMBERSHIP_ID);
@@ -375,7 +368,7 @@ describe('MembershipsService (unit)', () => {
         systemRole: SystemRole.OWNER,
       } as Awaited<ReturnType<RepoMock['deleteById']>>);
 
-      await service.remove(MEMBERSHIP_ID, ACTOR_USER_ID);
+      await service.remove(TENANT_ID, MEMBERSHIP_ID, ACTOR_USER_ID);
 
       expect(repo.deleteById).toHaveBeenCalled();
     });
@@ -387,7 +380,7 @@ describe('MembershipsService (unit)', () => {
       } as Awaited<ReturnType<RepoMock['findById']>>);
       repo.countOwners.mockResolvedValue(1);
 
-      await expect(service.remove(MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
+      await expect(service.remove(TENANT_ID, MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
         UltimoOwnerError,
       );
       expect(repo.deleteById).not.toHaveBeenCalled();
@@ -395,7 +388,7 @@ describe('MembershipsService (unit)', () => {
 
     it('lanza MembershipNoEncontradoError si no existe en el tenant', async () => {
       repo.findById.mockResolvedValue(null);
-      await expect(service.remove(MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
+      await expect(service.remove(TENANT_ID, MEMBERSHIP_ID, ACTOR_USER_ID)).rejects.toBeInstanceOf(
         MembershipNoEncontradoError,
       );
     });
