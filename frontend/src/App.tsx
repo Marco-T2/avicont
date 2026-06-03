@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router-dom';
 import { BootstrapGate } from '@/components/bootstrap-gate';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useAuthBroadcastSync } from '@/lib/use-auth-broadcast-sync';
 import { router } from '@/routes/router';
 
 const queryClient = new QueryClient({
@@ -17,6 +18,9 @@ const queryClient = new QueryClient({
 });
 
 function App(): React.JSX.Element {
+  // Sincroniza el logout entre pestañas del mismo navegador (§10.10).
+  useAuthBroadcastSync();
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* delayDuration=200ms: tooltips aparecen rápido pero no agresivamente.
