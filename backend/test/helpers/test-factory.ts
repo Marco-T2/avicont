@@ -3,8 +3,16 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+// Contador monotónico para unicidad garantizada: Date.now() solo colisiona
+// cuando dos creaciones consecutivas caen en el mismo milisegundo (frecuente
+// bajo --runInBand), rompiendo el UNIQUE de slug/email de forma intermitente.
+let testSeq = 0;
+function uniqueToken(): string {
+  return `${Date.now()}-${testSeq++}`;
+}
+
 export async function createTestUser(overrides: { email?: string; password?: string } = {}) {
-  const email = overrides.email ?? `test-${Date.now()}@example.com`;
+  const email = overrides.email ?? `test-${uniqueToken()}@example.com`;
   const password = overrides.password ?? 'password123';
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -17,8 +25,8 @@ export async function createTestUser(overrides: { email?: string; password?: str
 }
 
 export async function createTestTenant(overrides: { name?: string; slug?: string } = {}) {
-  const name = overrides.name ?? `Test Tenant ${Date.now()}`;
-  const slug = overrides.slug ?? `test-tenant-${Date.now()}`;
+  const name = overrides.name ?? `Test Tenant ${uniqueToken()}`;
+  const slug = overrides.slug ?? `test-tenant-${uniqueToken()}`;
 
   return prisma.organization.create({
     data: { name, slug },
