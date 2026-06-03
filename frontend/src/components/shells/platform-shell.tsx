@@ -74,8 +74,13 @@ function PlatformBrand(): React.JSX.Element {
  */
 export function PlatformShell(): React.JSX.Element {
   const clear = useAuthStore((s) => s.clear);
+  const activeTenantId = useAuthStore((s) => s.user?.activeTenantId);
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // "Volver a la app" solo tiene sentido si el SA tiene un tenant activo. Sin
+  // tenant, IndexRedirect rebota / → /platform-admin → el botón no haría nada.
+  const puedeVolverALaApp = activeTenantId !== undefined;
 
   async function handleLogout(): Promise<void> {
     try {
@@ -96,19 +101,21 @@ export function PlatformShell(): React.JSX.Element {
           <PlatformBrand />
         </div>
         <PlatformNavList />
-        <div className="border-t p-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="w-full justify-start gap-2 text-muted-foreground"
-          >
-            <NavLink to="/">
-              <LogOut className="h-4 w-4 rotate-180" />
-              <span className="text-xs">Volver a la app</span>
-            </NavLink>
-          </Button>
-        </div>
+        {puedeVolverALaApp ? (
+          <div className="border-t p-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="w-full justify-start gap-2 text-muted-foreground"
+            >
+              <NavLink to="/">
+                <LogOut className="h-4 w-4 rotate-180" />
+                <span className="text-xs">Volver a la app</span>
+              </NavLink>
+            </Button>
+          </div>
+        ) : null}
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -138,14 +145,16 @@ export function PlatformShell(): React.JSX.Element {
             <span className="truncate text-sm text-muted-foreground md:hidden">Plataforma</span>
           </div>
           <div className="flex shrink-0 items-center gap-1 md:gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="hidden sm:inline-flex"
-            >
-              <NavLink to="/">Volver a la app</NavLink>
-            </Button>
+            {puedeVolverALaApp ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="hidden sm:inline-flex"
+              >
+                <NavLink to="/">Volver a la app</NavLink>
+              </Button>
+            ) : null}
             <ThemeToggle />
             <Button
               variant="ghost"
