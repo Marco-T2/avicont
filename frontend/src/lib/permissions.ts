@@ -92,6 +92,10 @@ export const PERMISSIONS = {
     chat: { interact: 'granja.chat.interact' },
   },
   organizacion: {
+    configuracion: {
+      read: 'organizacion.configuracion.read',
+      update: 'organizacion.configuracion.update',
+    },
     miembros: {
       read: 'organizacion.miembros.read',
       invite: 'organizacion.miembros.invite',
