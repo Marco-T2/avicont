@@ -23,6 +23,8 @@ import {
 } from '../granja/ports/tipo-registro-seeder.port';
 import { PrismaService } from '../common/prisma.service';
 
+import { isEmail } from 'class-validator';
+
 import { CreateTenantDto, ModuloOrganizacion } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
@@ -32,6 +34,8 @@ import {
   TenantSlugDuplicadoError,
   TipoEmpresaInmutableError,
   VerticalNoExclusivoError,
+  TenantNitInvalidoError,
+  TenantEmailInvalidoError,
 } from './domain/tenant-errors';
 import { TENANT_REPOSITORY_PORT, TenantRepositoryPort } from './ports/tenant.repository.port';
 
@@ -134,6 +138,22 @@ export class TenantsService {
         throw new TipoEmpresaInmutableError(id);
       }
     }
+
+    // Guard defensivo — el DTO ya filtró los tipos no-string.
+    // Esta segunda capa es defense-in-depth para llamadas directas al service.
+    if (dto.nit !== undefined && dto.nit !== null) {
+      // RND 10-0025-14: el NIT boliviano tiene entre 7 y 12 dígitos numéricos.
+      if (!/^\d{7,12}$/.test(dto.nit.trim())) {
+        throw new TenantNitInvalidoError(dto.nit);
+      }
+    }
+
+    if (dto.email !== undefined && dto.email !== null) {
+      if (!isEmail(dto.email)) {
+        throw new TenantEmailInvalidoError(dto.email);
+      }
+    }
+
     return this.repo.update(id, dto);
   }
 

@@ -86,3 +86,16 @@ export class TenantSlugInvalidoError extends ValidationError {
     super('TENANT_SLUG_INVALIDO', `Slug de organización inválido: ${motivo}`, detalle);
   }
 }
+
+// RND 10-0025-14: el NIT boliviano tiene entre 7 y 12 dígitos numéricos.
+export class TenantNitInvalidoError extends ValidationError {
+  constructor(nit: string) {
+    super('TENANT_NIT_INVALIDO', 'El NIT debe tener entre 7 y 12 dígitos', { nit });
+  }
+}
+
+export class TenantEmailInvalidoError extends ValidationError {
+  constructor(email: string) {
+    super('TENANT_EMAIL_INVALIDO', 'Email inválido', { email });
+  }
+}

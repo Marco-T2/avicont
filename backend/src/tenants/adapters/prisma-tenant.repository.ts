@@ -66,6 +66,15 @@ export class PrismaTenantRepository extends TenantRepositoryPort {
         ...(data.tipoEmpresaPrincipal !== undefined
           ? { tipoEmpresaPrincipal: toPrismaTipoEmpresa(data.tipoEmpresaPrincipal) }
           : {}),
+        // Campos fiscales — spread condicional: exactOptionalPropertyTypes (CLAUDE.md §2.5.1)
+        ...(data.razonSocial !== undefined ? { razonSocial: data.razonSocial } : {}),
+        ...(data.nit !== undefined ? { nit: data.nit } : {}),
+        ...(data.direccion !== undefined ? { direccion: data.direccion } : {}),
+        ...(data.representanteLegal !== undefined
+          ? { representanteLegal: data.representanteLegal }
+          : {}),
+        ...(data.telefono !== undefined ? { telefono: data.telefono } : {}),
+        ...(data.email !== undefined ? { email: data.email } : {}),
       },
     });
   }

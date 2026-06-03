@@ -197,6 +197,70 @@ describe('PrismaTenantRepository (integration)', () => {
     });
   });
 
+  describe('update — campos fiscales', () => {
+    it('persiste los 6 campos fiscales cuando están presentes', async () => {
+      const created = await repo.create({
+        slug: SLUG_A,
+        name: 'Tenant Fiscal',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+
+      const updated = await repo.update(created.id, {
+        razonSocial: 'Avicultura del Norte S.R.L.',
+        nit: '1234567',
+        direccion: 'Av. Ballivián 123',
+        representanteLegal: 'Juan Pérez',
+        telefono: '591-2-2123456',
+        email: 'contacto@norte.com',
+      });
+
+      expect(updated.razonSocial).toBe('Avicultura del Norte S.R.L.');
+      expect(updated.nit).toBe('1234567');
+      expect(updated.direccion).toBe('Av. Ballivián 123');
+      expect(updated.representanteLegal).toBe('Juan Pérez');
+      expect(updated.telefono).toBe('591-2-2123456');
+      expect(updated.email).toBe('contacto@norte.com');
+    });
+
+    it('NO sobrescribe campos fiscales cuando no están en el payload (spread condicional)', async () => {
+      const created = await repo.create({
+        slug: SLUG_A,
+        name: 'Tenant Fiscal',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+      await repo.update(created.id, {
+        razonSocial: 'Original S.R.L.',
+        nit: '9999999',
+      });
+
+      // Actualizar solo el name, los fiscales no deben cambiar
+      const updated = await repo.update(created.id, { name: 'Renombrado' });
+
+      expect(updated.razonSocial).toBe('Original S.R.L.');
+      expect(updated.nit).toBe('9999999');
+    });
+
+    it('setea un campo a null cuando el payload incluye null explícito', async () => {
+      const created = await repo.create({
+        slug: SLUG_A,
+        name: 'Tenant Fiscal',
+        ownerUserId: ownerId,
+        contabilidadEnabled: true,
+        granjaEnabled: false,
+      });
+      await repo.update(created.id, { nit: '1234567' });
+
+      // Desmapear: pasar null explícito
+      const updated = await repo.update(created.id, { nit: null });
+
+      expect(updated.nit).toBeNull();
+    });
+  });
+
   describe('updateFeatures', () => {
     it('aplica patch parcial — sólo los flags definidos cambian', async () => {
       const created = await repo.create({

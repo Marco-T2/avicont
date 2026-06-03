@@ -5481,6 +5481,41 @@
             "maxLength": 100,
             "description": "Organization name"
           },
+          "razonSocial": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200,
+            "description": "Razón social (nombre legal)"
+          },
+          "nit": {
+            "type": "string",
+            "nullable": true,
+            "description": "NIT de la organización (7-12 dígitos)"
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "Dirección fiscal"
+          },
+          "representanteLegal": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 150,
+            "description": "Representante legal"
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 30,
+            "description": "Teléfono de contacto"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 254,
+            "description": "Email de contacto"
+          },
           "tipoEmpresaPrincipal": {
             "type": "string",
             "enum": [
