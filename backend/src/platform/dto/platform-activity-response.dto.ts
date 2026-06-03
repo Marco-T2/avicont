@@ -6,7 +6,11 @@ export class ActivityActorDto {
   @ApiProperty({ description: 'Email del actor (super-admin)' })
   email!: string;
 
-  @ApiPropertyOptional({ description: 'Nombre para mostrar del actor', nullable: true, type: 'string' })
+  @ApiPropertyOptional({
+    description: 'Nombre para mostrar del actor',
+    nullable: true,
+    type: 'string',
+  })
   displayName!: string | null;
 }
 
