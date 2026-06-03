@@ -14,7 +14,12 @@ export class UpdateTenantDto {
   @MaxLength(100)
   name?: string;
 
-  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 200, description: 'Razón social (nombre legal)' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 200,
+    description: 'Razón social (nombre legal)',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
@@ -24,27 +29,46 @@ export class UpdateTenantDto {
   // RND 10-0025-14: el NIT tiene entre 7 y 12 dígitos numéricos.
   // La validación de formato (regex) ocurre en el service para emitir el code
   // estable TENANT_NIT_INVALIDO. El DTO solo valida que sea string o null.
-  @ApiPropertyOptional({ type: String, nullable: true, description: 'NIT de la organización (7-12 dígitos)' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'NIT de la organización (7-12 dígitos)',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
   nit?: string | null;
 
-  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 300, description: 'Dirección fiscal' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 300,
+    description: 'Dirección fiscal',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
   @MaxLength(300)
   direccion?: string | null;
 
-  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 150, description: 'Representante legal' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 150,
+    description: 'Representante legal',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
   @MaxLength(150)
   representanteLegal?: string | null;
 
-  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 30, description: 'Teléfono de contacto' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 30,
+    description: 'Teléfono de contacto',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()
@@ -53,7 +77,12 @@ export class UpdateTenantDto {
 
   // El formato de email se valida en el service con TenantEmailInvalidoError
   // para emitir el code estable TENANT_EMAIL_INVALIDO (decisión de validación).
-  @ApiPropertyOptional({ type: String, nullable: true, maxLength: 254, description: 'Email de contacto' })
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    maxLength: 254,
+    description: 'Email de contacto',
+  })
   @IsOptional()
   @ValidateIf((_o, v) => v !== null)
   @IsString()

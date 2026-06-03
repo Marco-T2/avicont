@@ -87,6 +87,186 @@ describe('PATCH /api/tenants/current (e2e)', () => {
     expect(org?.status).toBe('ACTIVE');
   });
 
+  describe('perfil fiscal', () => {
+    it('GET /tenants/current devuelve los 6 campos con null cuando no se han configurado', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        razonSocial: null,
+        nit: null,
+        direccion: null,
+        representanteLegal: null,
+        telefono: null,
+        email: null,
+      });
+    });
+
+    it('PATCH con razonSocial único → 200, solo ese campo cambia', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ razonSocial: 'Avicultura del Norte S.R.L.' });
+      expect(res.status).toBe(200);
+      expect(res.body.razonSocial).toBe('Avicultura del Norte S.R.L.');
+      // Los otros siguen siendo null
+      expect(res.body.nit).toBeNull();
+    });
+
+    it('PATCH con nit válido (7 dígitos) → 200', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '1234567' });
+      expect(res.status).toBe(200);
+      expect(res.body.nit).toBe('1234567');
+    });
+
+    it('PATCH con nit válido (12 dígitos) → 200', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '123456789012' });
+      expect(res.status).toBe(200);
+      expect(res.body.nit).toBe('123456789012');
+    });
+
+    it('PATCH con nit inválido (letras) → 400 con error.code === "TENANT_NIT_INVALIDO"', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '12345AB' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('TENANT_NIT_INVALIDO');
+    });
+
+    it('PATCH con nit demasiado corto (< 7 dígitos) → 400 con code TENANT_NIT_INVALIDO', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '12345' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('TENANT_NIT_INVALIDO');
+    });
+
+    it('PATCH con nit demasiado largo (> 12 dígitos) → 400 con code TENANT_NIT_INVALIDO', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '1234567890123' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('TENANT_NIT_INVALIDO');
+    });
+
+    it('PATCH con email malformado → 400 con error.code === "TENANT_EMAIL_INVALIDO"', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ email: 'no-es-un-email' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('TENANT_EMAIL_INVALIDO');
+    });
+
+    it('PATCH con email válido → 200', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ email: 'contacto@empresa.com' });
+      expect(res.status).toBe(200);
+      expect(res.body.email).toBe('contacto@empresa.com');
+    });
+
+    it('PATCH con payload vacío {} → 200 y valores sin cambio', async () => {
+      // Primero setear un valor
+      await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ razonSocial: 'Test S.R.L.' });
+
+      // Luego enviar payload vacío: no debe cambiar nada
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({});
+      expect(res.status).toBe(200);
+      expect(res.body.razonSocial).toBe('Test S.R.L.');
+    });
+
+    it('PATCH con nit: null desmapea el campo (queda null en BD)', async () => {
+      // Primero setear nit
+      await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: '1234567' });
+
+      // Luego desmapear
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ nit: null });
+      expect(res.status).toBe(200);
+      expect(res.body.nit).toBeNull();
+    });
+
+    it('PATCH con razonSocial de 201 caracteres → 400', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ razonSocial: 'A'.repeat(201) });
+      expect(res.status).toBe(400);
+    });
+
+    it('aislamiento: solo afecta el tenant del JWT (tenantId del token)', async () => {
+      // Crear segunda org con su propio owner
+      const owner2 = await prisma.user.create({
+        data: {
+          email: 'owner2@tu.bo',
+          hashedPassword: await import('bcrypt').then((b) => b.hash('password123', 10)),
+          isEmailVerified: true,
+        },
+      });
+      const org2 = await prisma.organization.create({
+        data: {
+          slug: 'org-tu-2',
+          name: 'Org TU 2',
+          contabilidadEnabled: true,
+          granjaEnabled: false,
+          memberships: { create: { userId: owner2.id, systemRole: SystemRole.OWNER } },
+        },
+      });
+      const loginRes = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'owner2@tu.bo', password: 'password123' });
+      const token2 = loginRes.body.accessToken;
+
+      // owner2 edita su org2
+      await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${token2}`)
+        .set('X-Tenant-ID', org2.id)
+        .send({ razonSocial: 'Solo mía S.R.L.' });
+
+      // La org original no fue afectada
+      const org1 = await prisma.organization.findUnique({ where: { id: orgId } });
+      expect(org1?.razonSocial).toBeNull();
+    });
+  });
+
   it('defecto A: un miembro sin organizacion.configuracion.update → 403', async () => {
     const hashedPassword = await bcrypt.hash('password123', 10);
     const contador = await prisma.user.create({

@@ -552,9 +552,9 @@ describe('TenantsService (unit)', () => {
     });
 
     it('lanza TenantNitInvalidoError si el nit es demasiado largo (> 12 dígitos)', async () => {
-      await expect(
-        service.update(TENANT_ID, { nit: '1234567890123' }),
-      ).rejects.toBeInstanceOf(TenantNitInvalidoError);
+      await expect(service.update(TENANT_ID, { nit: '1234567890123' })).rejects.toBeInstanceOf(
+        TenantNitInvalidoError,
+      );
     });
 
     it('lanza TenantEmailInvalidoError si el email es malformado (guard defensivo)', async () => {
