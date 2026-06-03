@@ -3,6 +3,7 @@ import {
   BookMarked,
   BookOpen,
   BookText,
+  Building2,
   CalendarRange,
   ClipboardList,
   Contact,
@@ -124,6 +125,12 @@ export const NAV_ITEMS: NavItem[] = [
     vertical: 'CONTABILIDAD',
   },
   // ─── Administración (cross-vertical — sin campo vertical) ──────────────────
+  {
+    to: '/settings/empresa',
+    label: 'Datos de la empresa',
+    icon: Building2,
+    requiredPermission: PERMISSIONS.organizacion.configuracion.read,
+  },
   {
     to: '/settings/members',
     label: 'Miembros',
