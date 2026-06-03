@@ -34,3 +34,20 @@ if (
 ) {
   Element.prototype.scrollIntoView = (): void => {};
 }
+
+// theme-store lee window.matchMedia al cargar el módulo (detecta el tema del
+// sistema). JSDOM no lo implementa → cualquier test que monte un componente
+// con ThemeToggle (Topbar, PlatformShell) explota al importar. Shim no-op:
+// siempre "light", sin listeners reales.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: (): void => {},
+    removeEventListener: (): void => {},
+    addListener: (): void => {},
+    removeListener: (): void => {},
+    dispatchEvent: (): boolean => false,
+  })) as typeof window.matchMedia;
+}

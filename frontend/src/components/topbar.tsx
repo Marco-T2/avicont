@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { MobileSidebar } from '@/components/mobile-sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { PlatformPanelLink } from '@/features/platform-admin/components/platform-panel-link';
 import { OrgSwitcher } from '@/features/tenants/components/org-switcher';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
@@ -37,6 +38,8 @@ export function Topbar(): React.JSX.Element {
         <OrgSwitcher />
       </div>
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
+        {/* Solo visible para super-admins: acceso al panel de plataforma. */}
+        <PlatformPanelLink />
         <ThemeToggle />
         <Button
           variant="ghost"
