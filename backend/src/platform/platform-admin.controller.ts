@@ -8,11 +8,19 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -27,6 +35,9 @@ import { UpdateOrgStatusDto } from './dto/update-org-status.dto';
 import { UpdateEntitlementDto } from './dto/update-entitlement.dto';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
 import { PlatformOrgMemberResponseDto } from './dto/platform-org-member-response.dto';
+import { PlatformDashboardResponseDto } from './dto/platform-dashboard-response.dto';
+import { PlatformActivityResponseDto } from './dto/platform-activity-response.dto';
+import { PlatformActivityQueryDto } from './dto/platform-activity-query.dto';
 import { PlatformAdminService } from './platform-admin.service';
 
 /**
@@ -240,5 +251,63 @@ export class PlatformAdminController {
   ): Promise<OrgPackEntitlementResponseDto[]> {
     (req as unknown as Record<string, unknown>)['tenantId'] = id;
     return this.platformAdminService.listarPacks(id);
+  }
+
+  /**
+   * REQ-PCT-01: KPIs del dashboard de plataforma.
+   *
+   * Endpoint org-less, cross-tenant: agrega datos de TODAS las orgs sin filtrar
+   * por tenantId. El enforcement está en SuperAdminGuard (excepción Anti-31
+   * deliberada — CLAUDE.md §10.1).
+   */
+  @Get('dashboard')
+  @ApiOperation({ summary: 'KPIs del dashboard de plataforma (super-admin)' })
+  @ApiOkResponse({
+    description: 'Estadísticas globales de plataforma',
+    type: PlatformDashboardResponseDto,
+  })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  async getDashboard(): Promise<PlatformDashboardResponseDto> {
+    return this.platformAdminService.getDashboard();
+  }
+
+  /**
+   * REQ-PCT-03: Timeline de actividad de plataforma paginado por cursor.
+   *
+   * Endpoint org-less, cross-tenant: lee platform_audit sin filtrar por tenantId.
+   * El enforcement está en SuperAdminGuard (excepción Anti-31 deliberada).
+   *
+   * El campo `payload` NUNCA se expone (REQ-PCT-04 — dato sensible).
+   */
+  @Get('activity')
+  @ApiOperation({ summary: 'Timeline de actividad de plataforma (super-admin)' })
+  @ApiOkResponse({
+    description: 'Página de actividad de plataforma con cursor de paginación',
+    type: PlatformActivityResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Cursor inválido (PLATFORM_ACTIVITY_CURSOR_INVALIDO)' })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Ítems por página (1-100, default 20)',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    type: String,
+    description: 'Cursor opaco de paginación',
+  })
+  @ApiQuery({
+    name: 'orgId',
+    required: false,
+    type: String,
+    description: 'Filtrar por organización (UUID)',
+  })
+  async getActivity(
+    @Query() query: PlatformActivityQueryDto,
+  ): Promise<PlatformActivityResponseDto> {
+    return this.platformAdminService.getActivity(query);
   }
 }

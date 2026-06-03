@@ -7,7 +7,7 @@
  * cambian aunque el `message` evolucione (CLAUDE.md §6.3).
  */
 
-import { InvalidStateError, NotFoundError } from '@/common/errors';
+import { InvalidStateError, NotFoundError, ValidationError } from '@/common/errors';
 
 /**
  * El email del OWNER designado no existe en el sistema.
@@ -34,6 +34,21 @@ export class PlatformOrgOwnerNotFoundError extends InvalidStateError {
 export class PlatformOrgNoEncontradaError extends NotFoundError {
   constructor(orgId: string) {
     super('PLATFORM_ORG_NO_ENCONTRADA', 'La organización no existe en la plataforma', { orgId });
+  }
+}
+
+/**
+ * El cursor de paginación de actividad es inválido o fue alterado.
+ * Se lanza cuando `GET /admin/platform/activity` recibe un cursor que no
+ * puede decodificarse (REQ-PCT-03).
+ * HTTP 400: el cliente envió un valor que el sistema no puede procesar.
+ */
+export class PlatformActivityCursorInvalidoError extends ValidationError {
+  constructor() {
+    super(
+      'PLATFORM_ACTIVITY_CURSOR_INVALIDO',
+      'El cursor de paginación es inválido o ha sido alterado',
+    );
   }
 }
 

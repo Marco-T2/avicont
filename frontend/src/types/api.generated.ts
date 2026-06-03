@@ -1164,6 +1164,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/platform/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** KPIs del dashboard de plataforma (super-admin) */
+        get: operations["PlatformAdminController_getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/platform/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Timeline de actividad de plataforma (super-admin) */
+        get: operations["PlatformAdminController_getActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audit": {
         parameters: {
             query?: never;
@@ -2338,6 +2372,81 @@ export interface components {
              * @example contabilidad.adjuntos
              */
             clave?: string;
+        };
+        OrgStatusCountDto: {
+            /** @description Valor del status (ACTIVE, SUSPENDED, ARCHIVED) */
+            category: string;
+            /** @description Cantidad de orgs con ese status */
+            count: number;
+        };
+        OrgPlanCountDto: {
+            /** @description Valor del plan (FREE, PRO) */
+            category: string;
+            /** @description Cantidad de orgs con ese plan */
+            count: number;
+        };
+        OrgVerticalCountDto: {
+            /** @description Vertical (contabilidad, granja, otros) */
+            category: string;
+            /** @description Cantidad de orgs en ese vertical */
+            count: number;
+        };
+        UsuariosStatsDto: {
+            /** @description Total de usuarios registrados en la plataforma */
+            total: number;
+        };
+        AltasPorMesDto: {
+            /** @description Año (4 dígitos) */
+            year: number;
+            /** @description Mes (1-12) */
+            month: number;
+            /** @description Cantidad de orgs dadas de alta en ese mes */
+            count: number;
+        };
+        PlatformDashboardResponseDto: {
+            /** @description Conteo de orgs por status */
+            orgsPorStatus: components["schemas"]["OrgStatusCountDto"][];
+            /** @description Conteo de orgs por plan */
+            orgsPorPlan: components["schemas"]["OrgPlanCountDto"][];
+            /** @description Conteo de orgs por vertical activo */
+            orgsPorVertical: components["schemas"]["OrgVerticalCountDto"][];
+            /** @description Totales de usuarios */
+            usuarios: components["schemas"]["UsuariosStatsDto"];
+            /** @description Serie de altas de orgs por mes (últimos 12 meses) */
+            altasPorMes: components["schemas"]["AltasPorMesDto"][];
+        };
+        ActivityActorDto: {
+            /** @description Email del actor (super-admin) */
+            email: string;
+            /** @description Nombre para mostrar del actor */
+            displayName?: string | null;
+        };
+        ActivityTargetOrgDto: {
+            /** @description Nombre de la organización objetivo */
+            name: string;
+        };
+        PlatformActivityItemDto: {
+            /** @description ID único del registro de auditoría */
+            id: string;
+            /** @description Descriptor de la acción ejecutada */
+            action: string;
+            /** @description ID del actor (super-admin) */
+            actorUserId: string;
+            actor: components["schemas"]["ActivityActorDto"];
+            /** @description ID de la organización afectada */
+            targetOrganizationId?: string | null;
+            /** @description Organización afectada resuelta */
+            targetOrganization?: components["schemas"]["ActivityTargetOrgDto"] | null;
+            /**
+             * Format: date-time
+             * @description Timestamp UTC del registro de auditoría
+             */
+            createdAt: string;
+        };
+        PlatformActivityResponseDto: {
+            items: components["schemas"]["PlatformActivityItemDto"][];
+            /** @description Cursor opaco para obtener la siguiente página; null si no hay más */
+            nextCursor?: string | null;
         };
         CreateFeatureFlagDto: {
             /**
@@ -5219,6 +5328,74 @@ export interface operations {
             };
             /** @description Organización no encontrada */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_getDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Estadísticas globales de plataforma */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformDashboardResponseDto"];
+                };
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_getActivity: {
+        parameters: {
+            query?: {
+                /** @description Ítems por página (1-100, default 20) */
+                limit?: number;
+                /** @description Cursor opaco de paginación */
+                cursor?: string;
+                /** @description Filtrar por organización (UUID) */
+                orgId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de actividad de plataforma con cursor de paginación */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformActivityResponseDto"];
+                };
+            };
+            /** @description Cursor inválido (PLATFORM_ACTIVITY_CURSOR_INVALIDO) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -3,6 +3,7 @@ import type { OrganizationStatus } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 import { RedisService } from '@/cache/redis.service';
+import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import { USERS_READER_PORT, UsersReaderPort } from '@/users/ports/users-reader.port';
 import {
   PLAN_CUENTAS_SEEDER_PORT,
@@ -29,8 +30,22 @@ import {
 } from '@/packs/dto/org-pack-entitlement-response.dto';
 import { ORGS_READER_PORT, OrgsReaderPort } from './ports/orgs-reader.port';
 import { ORGS_WRITER_PORT, OrgsWriterPort } from './ports/orgs-writer.port';
+import {
+  PLATFORM_STATS_READER_PORT,
+  PlatformStatsReaderPort,
+} from './ports/platform-stats-reader.port';
+import {
+  PLATFORM_ACTIVITY_READER_PORT,
+  PlatformActivityReaderPort,
+} from './ports/platform-activity-reader.port';
 import { PlatformOrgResponseDto } from './dto/platform-org-response.dto';
 import { PlatformOrgMemberResponseDto } from './dto/platform-org-member-response.dto';
+import { PlatformDashboardResponseDto } from './dto/platform-dashboard-response.dto';
+import {
+  PlatformActivityResponseDto,
+  PlatformActivityItemDto,
+} from './dto/platform-activity-response.dto';
+import { PlatformActivityQueryDto } from './dto/platform-activity-query.dto';
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateEntitlementDto } from './dto/update-entitlement.dto';
 import {
@@ -38,6 +53,7 @@ import {
   PlatformOrgOwnerNotFoundError,
   PlatformVerticalNoExclusivoError,
 } from './domain/platform-errors';
+import { ActivityCursor } from './lib/activity-cursor';
 import { ModuloOrganizacion } from '@/tenants/dto/create-tenant.dto';
 
 @Injectable()
@@ -57,6 +73,11 @@ export class PlatformAdminService {
     private readonly packs: PackService,
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    @Inject(PLATFORM_STATS_READER_PORT)
+    private readonly statsReader: PlatformStatsReaderPort,
+    @Inject(PLATFORM_ACTIVITY_READER_PORT)
+    private readonly activityReader: PlatformActivityReaderPort,
+    @Inject(CLOCK_PORT) private readonly clock: ClockPort,
   ) {}
 
   async listarOrgs(): Promise<PlatformOrgResponseDto[]> {
@@ -250,6 +271,51 @@ export class PlatformAdminService {
     await this.assertOrgExiste(orgId);
     const entitlements = await this.packs.listarEntitlementsDeOrg(orgId);
     return entitlements.map(toOrgPackEntitlementResponse);
+  }
+
+  /**
+   * KPIs del dashboard de plataforma (REQ-PCT-01, REQ-PCT-02).
+   *
+   * Ensambla estadísticas de orgs (vía PlatformStatsReaderPort) con el conteo
+   * global de usuarios (vía prisma.user.count). ClockPort calcula la ventana
+   * de 12 meses para cumplir Anti-20 (new Date() prohibido en servicios).
+   */
+  async getDashboard(): Promise<PlatformDashboardResponseDto> {
+    const now = this.clock.now();
+    // Ventana de 12 meses: inicio = primer día de hace 11 meses (para incluir el mes actual).
+    const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
+
+    const [dashboardData, totalUsuarios] = await Promise.all([
+      this.statsReader.readDashboard(windowStart),
+      this.prisma.user.count(),
+    ]);
+
+    return PlatformDashboardResponseDto.fromData(dashboardData, totalUsuarios);
+  }
+
+  /**
+   * Timeline de actividad de plataforma paginado por cursor (REQ-PCT-03).
+   *
+   * Decodifica el cursor opaco (si existe) y delega al PlatformActivityReaderPort.
+   * El cursor inválido propaga PlatformActivityCursorInvalidoError → HTTP 400.
+   */
+  async getActivity(
+    query: Pick<PlatformActivityQueryDto, 'limit' | 'cursor' | 'orgId'>,
+  ): Promise<PlatformActivityResponseDto> {
+    const limit = query.limit ?? 20;
+
+    const cursor = query.cursor !== undefined ? ActivityCursor.decode(query.cursor) : undefined;
+
+    const page = await this.activityReader.findRecent({
+      limit,
+      ...(cursor !== undefined ? { cursor } : {}),
+      ...(query.orgId !== undefined ? { orgId: query.orgId } : {}),
+    });
+
+    const dto = new PlatformActivityResponseDto();
+    dto.items = page.items.map((item) => PlatformActivityItemDto.fromItem(item));
+    dto.nextCursor = page.nextCursor;
+    return dto;
   }
 
   /** Valida que la org exista; lanza 404 friendly antes de tocar el dominio de packs. */

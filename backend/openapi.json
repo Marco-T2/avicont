@@ -3310,6 +3310,101 @@
         ]
       }
     },
+    "/api/admin/platform/dashboard": {
+      "get": {
+        "operationId": "PlatformAdminController_getDashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Estadísticas globales de plataforma",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformDashboardResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "KPIs del dashboard de plataforma (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      }
+    },
+    "/api/admin/platform/activity": {
+      "get": {
+        "operationId": "PlatformAdminController_getActivity",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Ítems por página (1-100, default 20)",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Cursor opaco de paginación",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orgId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por organización (UUID)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de actividad de plataforma con cursor de paginación",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformActivityResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cursor inválido (PLATFORM_ACTIVITY_CURSOR_INVALIDO)"
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Timeline de actividad de plataforma (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      }
+    },
     "/api/audit": {
       "get": {
         "operationId": "AuditController_list",
@@ -6622,6 +6717,234 @@
             "example": "contabilidad.adjuntos"
           }
         }
+      },
+      "OrgStatusCountDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Valor del status (ACTIVE, SUSPENDED, ARCHIVED)"
+          },
+          "count": {
+            "type": "number",
+            "description": "Cantidad de orgs con ese status"
+          }
+        },
+        "required": [
+          "category",
+          "count"
+        ]
+      },
+      "OrgPlanCountDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Valor del plan (FREE, PRO)"
+          },
+          "count": {
+            "type": "number",
+            "description": "Cantidad de orgs con ese plan"
+          }
+        },
+        "required": [
+          "category",
+          "count"
+        ]
+      },
+      "OrgVerticalCountDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Vertical (contabilidad, granja, otros)"
+          },
+          "count": {
+            "type": "number",
+            "description": "Cantidad de orgs en ese vertical"
+          }
+        },
+        "required": [
+          "category",
+          "count"
+        ]
+      },
+      "UsuariosStatsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Total de usuarios registrados en la plataforma"
+          }
+        },
+        "required": [
+          "total"
+        ]
+      },
+      "AltasPorMesDto": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "number",
+            "description": "Año (4 dígitos)"
+          },
+          "month": {
+            "type": "number",
+            "description": "Mes (1-12)"
+          },
+          "count": {
+            "type": "number",
+            "description": "Cantidad de orgs dadas de alta en ese mes"
+          }
+        },
+        "required": [
+          "year",
+          "month",
+          "count"
+        ]
+      },
+      "PlatformDashboardResponseDto": {
+        "type": "object",
+        "properties": {
+          "orgsPorStatus": {
+            "description": "Conteo de orgs por status",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgStatusCountDto"
+            }
+          },
+          "orgsPorPlan": {
+            "description": "Conteo de orgs por plan",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgPlanCountDto"
+            }
+          },
+          "orgsPorVertical": {
+            "description": "Conteo de orgs por vertical activo",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgVerticalCountDto"
+            }
+          },
+          "usuarios": {
+            "description": "Totales de usuarios",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UsuariosStatsDto"
+              }
+            ]
+          },
+          "altasPorMes": {
+            "description": "Serie de altas de orgs por mes (últimos 12 meses)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AltasPorMesDto"
+            }
+          }
+        },
+        "required": [
+          "orgsPorStatus",
+          "orgsPorPlan",
+          "orgsPorVertical",
+          "usuarios",
+          "altasPorMes"
+        ]
+      },
+      "ActivityActorDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email del actor (super-admin)"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Nombre para mostrar del actor",
+            "nullable": true
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ActivityTargetOrgDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre de la organización objetivo"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "PlatformActivityItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID único del registro de auditoría"
+          },
+          "action": {
+            "type": "string",
+            "description": "Descriptor de la acción ejecutada"
+          },
+          "actorUserId": {
+            "type": "string",
+            "description": "ID del actor (super-admin)"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/ActivityActorDto"
+          },
+          "targetOrganizationId": {
+            "type": "string",
+            "description": "ID de la organización afectada",
+            "nullable": true
+          },
+          "targetOrganization": {
+            "description": "Organización afectada resuelta",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActivityTargetOrgDto"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Timestamp UTC del registro de auditoría"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "actorUserId",
+          "actor",
+          "createdAt"
+        ]
+      },
+      "PlatformActivityResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformActivityItemDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Cursor opaco para obtener la siguiente página; null si no hay más",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items"
+        ]
       },
       "CreateFeatureFlagDto": {
         "type": "object",
