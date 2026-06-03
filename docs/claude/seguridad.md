@@ -1,9 +1,10 @@
 <!--
-Última edición: 2026-06-02
+Última edición: 2026-06-03
 Última revisión contra core: 2026-06-02
 Owner: backend-lead
 -->
 <!-- Actualizado: enforcement de Organization.status vía OrgStatusGuard APP_GUARD (change org-status-enforcement 2026-06-02) -->
+<!-- Actualizado: removida referencia a AuditLog en switch-tenant (audit genérico eliminado, PR #166 2026-06-03) -->
 <!-- Actualizado: revocación de access tokens generalizada a todos los usuarios (change logout-all 2026-06-02) -->
 
 # Seguridad y permisos — detalle
@@ -73,7 +74,6 @@ Body: { tenantId: string }
 Flujo:
 1. Verificar que el usuario tiene `Membership` en ese tenant.
 2. Emitir nuevo access token con `activeTenantId` actualizado.
-3. Registrar en `AuditLog` el switch: `{ userId, fromTenantId, toTenantId, timestamp }`.
 
 Los refresh tokens existentes no se invalidan. El cliente descarta el access token viejo.
 
