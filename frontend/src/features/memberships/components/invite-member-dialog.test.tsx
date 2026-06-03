@@ -198,6 +198,57 @@ describe('InviteMemberDialog', () => {
     expect(screen.getByText(/no se pudieron cargar los roles/i)).toBeInTheDocument();
   });
 
+  it('tras invitar con éxito — muestra el enlace de aceptación con el token', async () => {
+    mockUseAssignableRoles.mockReturnValue({ data: rolesBase, isLoading: false, isError: false });
+    mockMutate.mockImplementation(
+      (_body: unknown, opts: { onSuccess: (d: unknown) => void }) => {
+        opts.onSuccess({ invitation: {}, token: 'tok-abc-123' });
+      },
+    );
+    renderDialog();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/email/i), 'nuevo@empresa.bo');
+    await user.click(screen.getByRole('button', { name: /enviar/i }));
+
+    const linkInput = await screen.findByLabelText(/enlace de invitación/i);
+    expect((linkInput as HTMLInputElement).value).toContain(
+      '/accept-invite?token=tok-abc-123',
+    );
+    // El email del invitado se muestra en el resumen de éxito.
+    expect(screen.getByText(/nuevo@empresa\.bo/i)).toBeInTheDocument();
+  });
+
+  it('el botón copiar escribe el enlace en el portapapeles', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockUseAssignableRoles.mockReturnValue({ data: rolesBase, isLoading: false, isError: false });
+    mockMutate.mockImplementation(
+      (_body: unknown, opts: { onSuccess: (d: unknown) => void }) => {
+        opts.onSuccess({ invitation: {}, token: 'tok-xyz' });
+      },
+    );
+    renderDialog();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/email/i), 'nuevo@empresa.bo');
+    await user.click(screen.getByRole('button', { name: /enviar/i }));
+    await screen.findByLabelText(/enlace de invitación/i);
+
+    // defineProperty DESPUÉS del setup de userEvent (que stubea su propio
+    // clipboard); navigator.clipboard es getter-only, no admite Object.assign.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    await user.click(screen.getByRole('button', { name: /copiar enlace/i }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining('/accept-invite?token=tok-xyz'),
+      );
+    });
+  });
+
   it('con hook devolviendo solo roles system (sin custom) — grupo Sistema funciona; sin grupo Personalizados', async () => {
     mockUseAssignableRoles.mockReturnValue({ data: rolesBase, isLoading: false, isError: false });
     renderDialog();
