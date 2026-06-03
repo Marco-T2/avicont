@@ -246,10 +246,13 @@ export function CuentaForm({
       </div>
 
       <Field label="Descripción" error={errors.descripcion?.message}>
+        {/* Anti-F-14: dentro de un Sheet, la textarea necesita
+            [field-sizing:fixed] — sin esto se expande horizontal al pegar
+            texto sin espacios y empuja el contenido fuera de pantalla. */}
         <Textarea
           {...register('descripcion')}
-          rows={2}
           placeholder="Opcional — notas para auditoría o uso."
+          className="w-full max-w-full resize-y [field-sizing:fixed] min-h-[80px] text-base md:text-sm"
         />
       </Field>
 
