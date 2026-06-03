@@ -42,8 +42,19 @@ export class MembershipsController {
   @ApiResponse({ status: 201, description: 'Invitation created' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 409, description: 'User already a member' })
-  async invite(@Body() dto: InviteUserDto) {
-    return this.membershipsService.invite(dto);
+  async invite(@CurrentTenant() tenantId: string, @Body() dto: InviteUserDto) {
+    return this.membershipsService.invite(tenantId, dto);
+  }
+
+  // La ruta literal `leave` debe declararse ANTES que la paramétrica `:id`:
+  // NestJS matchea por orden de registro, así que `:id` capturaría `leave`
+  // como un id y este handler quedaría inalcanzable.
+  @Delete('leave')
+  @ApiOperation({ summary: 'Leave the current tenant' })
+  @ApiResponse({ status: 200, description: 'Left tenant successfully' })
+  @ApiResponse({ status: 403, description: 'Owner cannot leave' })
+  async leave(@CurrentTenant() tenantId: string, @CurrentUser() user: { sub: string }) {
+    return this.membershipsService.leave(tenantId, user.sub);
   }
 
   @Patch(':id')
@@ -53,11 +64,12 @@ export class MembershipsController {
   @ApiResponse({ status: 200, description: 'Membership updated' })
   @ApiResponse({ status: 403, description: 'Cannot change owner role' })
   async updateRole(
+    @CurrentTenant() tenantId: string,
     @Param('id') id: string,
     @Body() dto: UpdateMembershipDto,
     @CurrentUser() user: { sub: string },
   ) {
-    return this.membershipsService.updateRole(id, dto, user.sub);
+    return this.membershipsService.updateRole(tenantId, id, dto, user.sub);
   }
 
   @Delete(':id')
@@ -66,15 +78,11 @@ export class MembershipsController {
   @ApiOperation({ summary: 'Remove a member from the tenant' })
   @ApiResponse({ status: 200, description: 'Member removed' })
   @ApiResponse({ status: 403, description: 'Cannot remove owner' })
-  async remove(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
-    return this.membershipsService.remove(id, user.sub);
-  }
-
-  @Delete('leave')
-  @ApiOperation({ summary: 'Leave the current tenant' })
-  @ApiResponse({ status: 200, description: 'Left tenant successfully' })
-  @ApiResponse({ status: 403, description: 'Owner cannot leave' })
-  async leave(@CurrentTenant() tenantId: string, @CurrentUser() user: { sub: string }) {
-    return this.membershipsService.leave(tenantId, user.sub);
+  async remove(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return this.membershipsService.remove(tenantId, id, user.sub);
   }
 }

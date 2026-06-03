@@ -773,6 +773,32 @@
         ]
       }
     },
+    "/api/memberships/leave": {
+      "delete": {
+        "operationId": "MembershipsController_leave",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Left tenant successfully"
+          },
+          "403": {
+            "description": "Owner cannot leave"
+          }
+        },
+        "security": [
+          {
+            "X-Tenant-ID": []
+          },
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Leave the current tenant",
+        "tags": [
+          "Memberships"
+        ]
+      }
+    },
     "/api/memberships/{id}": {
       "patch": {
         "operationId": "MembershipsController_updateRole",
@@ -846,32 +872,6 @@
           }
         ],
         "summary": "Remove a member from the tenant",
-        "tags": [
-          "Memberships"
-        ]
-      }
-    },
-    "/api/memberships/leave": {
-      "delete": {
-        "operationId": "MembershipsController_leave",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Left tenant successfully"
-          },
-          "403": {
-            "description": "Owner cannot leave"
-          }
-        },
-        "security": [
-          {
-            "X-Tenant-ID": []
-          },
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Leave the current tenant",
         "tags": [
           "Memberships"
         ]
