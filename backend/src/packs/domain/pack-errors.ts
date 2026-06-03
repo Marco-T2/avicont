@@ -16,10 +16,14 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/common/errors'
  * El Owner intenta activar (o el guard chequea) un pack que la plataforma no
  * habilitó para su organización. Frontera de oro (§4.5 diseño): la activación
  * es siempre un subconjunto del entitlement. HTTP 403.
+ *
+ * Recibe el `packId` (UUID interno): en el único call site (`activar`) solo se
+ * dispone del id, no de la clave estable — `activarPorClave` ya resolvió la clave
+ * al id antes de delegar. El details expone el mismo identificador que se usó.
  */
 export class PackNoHabilitadoError extends ForbiddenError {
-  constructor(clave: string) {
-    super('PACK_NO_HABILITADO', 'Este pack no está habilitado para tu organización', { clave });
+  constructor(packId: string) {
+    super('PACK_NO_HABILITADO', 'Este pack no está habilitado para tu organización', { packId });
   }
 }
 

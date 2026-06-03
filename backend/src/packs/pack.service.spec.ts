@@ -193,6 +193,23 @@ describe('PackService', () => {
       );
       expect(repo.setActivo).not.toHaveBeenCalled();
     });
+
+    it('el PackNoHabilitadoError expone el packId real en details (no un campo mal nombrado)', async () => {
+      const { service, repo } = makeService();
+      repo.findByOrgYPack.mockResolvedValue(null);
+
+      let error: PackNoHabilitadoError | undefined;
+      try {
+        await service.activar(ORG_ID, PACK_ID, true);
+      } catch (e) {
+        error = e as PackNoHabilitadoError;
+      }
+
+      expect(error).toBeInstanceOf(PackNoHabilitadoError);
+      // El details debe exponer 'packId', NO 'clave' — cuando se lanza desde activar()
+      // solo está disponible el UUID del pack, no la clave estable.
+      expect(error?.details).toEqual({ packId: PACK_ID });
+    });
   });
 
   describe('activarPorClave (resolución clave → packId + frontera)', () => {

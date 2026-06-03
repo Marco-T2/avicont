@@ -55,4 +55,22 @@ describe('SystemRolesGuard', () => {
     const guard = new SystemRolesGuard(makeReflector(['OWNER']));
     expect(() => guard.canActivate(makeContext({ roles: ['ADMIN'] }))).toThrow(ForbiddenError);
   });
+
+  // Candado anti-escalada de privilegios: un tenant que cree un custom role con
+  // slug 'owner' o 'admin' (minúsculas) NO debe satisfacer @RequireSystemRole(OWNER/ADMIN).
+  // SystemRole usa MAYÚSCULAS ('OWNER', 'ADMIN'); custom-role slugs son minúsculas →
+  // la comparación case-sensitive del guard impide la colisión. Este test blinda
+  // la invariante contra una regresión futura (ej. agregar .toUpperCase() por error).
+  it.each([
+    { slug: 'owner', requiere: ['OWNER'] as SystemRole[] },
+    { slug: 'admin', requiere: ['ADMIN'] as SystemRole[] },
+    { slug: 'owner', requiere: ['OWNER', 'ADMIN'] as SystemRole[] },
+    { slug: 'admin', requiere: ['OWNER', 'ADMIN'] as SystemRole[] },
+  ])(
+    'rechaza con 403 un slug en minúscula "$slug" contra @RequireSystemRole($requiere) — anti-escalada',
+    ({ slug, requiere }) => {
+      const guard = new SystemRolesGuard(makeReflector(requiere));
+      expect(() => guard.canActivate(makeContext({ roles: [slug] }))).toThrow(ForbiddenError);
+    },
+  );
 });
