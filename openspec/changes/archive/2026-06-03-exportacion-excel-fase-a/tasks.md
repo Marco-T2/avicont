@@ -13,9 +13,9 @@
 
 ### T-00: Instalar `write-excel-file` en frontend
 
-- [ ] Desde `frontend/`, ejecutar `pnpm add write-excel-file`.
-- [ ] Verificar que el paquete aparece en `frontend/package.json` bajo `dependencies`.
-- [ ] Verificar que no introduce CVE conocido (`pnpm audit`).
+- [x] Desde `frontend/`, ejecutar `pnpm add write-excel-file`.
+- [x] Verificar que el paquete aparece en `frontend/package.json` bajo `dependencies`.
+- [x] Verificar que no introduce CVE conocido (`pnpm audit`).
 
 > **Riesgo**: librería equivocada. Instalar ÚNICAMENTE `write-excel-file` (client build). NO instalar `xlsx`/SheetJS (CVE conocido) ni `exceljs` (~1 MB browser build). Ver Proposal §Librería elegida.
 
@@ -406,24 +406,24 @@ Modificar `frontend/src/features/libro-diario/pages/libro-diario-page.tsx`:
 > Convención del repo: en `frontend/`, el comando correcto es `pnpm exec tsc -b` (no `--noEmit`).
 > Ver CLAUDE.md §11.4 y la nota en el MEMORY del proyecto.
 
-- [ ] Desde `frontend/`: `pnpm exec tsc -b`
-- [ ] Resultado: cero errores.
-- [ ] Si hay errores de tipos (ej. `EmpresaPerfil` con campo undefined), corregir en el archivo correspondiente sin usar `any` ni `!`.
+- [x] Desde `frontend/`: `pnpm exec tsc -b`
+- [x] Resultado: cero errores.
+- [x] Si hay errores de tipos (ej. `EmpresaPerfil` con campo undefined), corregir en el archivo correspondiente sin usar `any` ni `!`.
 
 ### T-16: Lint — `pnpm run lint`
 
 > Correr COMPLETO, no solo sobre los archivos modificados.
 > GOTCHA documentado en el MEMORY: el CI caza prettier/lint que un run parcial no ve.
 
-- [ ] Desde `frontend/`: `pnpm run lint`
-- [ ] Resultado: cero errores, cero warnings en los archivos nuevos.
-- [ ] Si hay warnings de `no-explicit-any` o `no-floating-promises`: corregir antes de commit.
+- [x] Desde `frontend/`: `pnpm run lint`
+- [x] Resultado: cero errores, cero warnings en los archivos nuevos.
+- [x] Si hay warnings de `no-explicit-any` o `no-floating-promises`: corregir antes de commit.
 
 ### T-17: Tests — `pnpm exec vitest run`
 
-- [ ] Desde `frontend/`: `pnpm exec vitest run`
-- [ ] Resultado: todos los tests pasan (incluyendo los preexistentes — sin regresión).
-- [ ] Conteo esperado de tests nuevos por archivo:
+- [x] Desde `frontend/`: `pnpm exec vitest run`
+- [x] Resultado: todos los tests pasan (incluyendo los preexistentes — sin regresión).
+- [x] Conteo esperado de tests nuevos por archivo:
   - `formato-celda.test.ts`: 8 its (4 fechas + 4 montos)
   - `cabecera-fiscal.test.ts`: 5 its
   - `construir-hoja.test.ts`: 5 its
@@ -431,7 +431,7 @@ Modificar `frontend/src/features/libro-diario/pages/libro-diario-page.tsx`:
   - `exportar-libro-diario.test.ts`: 7 its
   - `boton-exportar-libro-diario.test.tsx`: 5 its
   - **Total mínimo**: ~33 its nuevos.
-- [ ] Cobertura de los 25 escenarios del spec: verificar que cada escenario tiene al menos un `it` correspondiente.
+- [x] Cobertura de los 25 escenarios del spec: verificar que cada escenario tiene al menos un `it` correspondiente.
 
 ---
 
