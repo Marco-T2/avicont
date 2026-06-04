@@ -1,10 +1,13 @@
 import { useState } from 'react';
 
+// Cross-feature: perfil fiscal para la cabecera del export a Excel.
+import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
 import type { LibroDiarioParams } from '@/types/api';
 
 import { useLibroDiario } from '../hooks/use-libro-diario';
 import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
 
+import { BotonExportarLibroDiario } from '../components/boton-exportar-libro-diario';
 import { LibroDiarioFiltros } from '../components/libro-diario-filtros';
 import { LibroDiarioTabla } from '../components/libro-diario-tabla';
 
@@ -28,6 +31,8 @@ export function LibroDiarioPage(): React.JSX.Element {
   const [params, setParams] = useState<LibroDiarioParams>({});
 
   const { data, isLoading, isError, isFetching } = useLibroDiario(params);
+  // Cross-feature: perfil fiscal para la cabecera del export a Excel.
+  const { data: empresa } = useEmpresa();
 
   function handleBuscar(values: LibroDiarioFiltroValues): void {
     if (values.modo === 'periodo') {
@@ -50,6 +55,12 @@ export function LibroDiarioPage(): React.JSX.Element {
     params.periodoFiscalId !== undefined ||
     (params.fechaDesde !== undefined && params.fechaHasta !== undefined);
 
+  // Rango para el nombre del archivo de export.
+  const rango: string =
+    params.fechaDesde !== undefined && params.fechaHasta !== undefined
+      ? `${params.fechaDesde}_${params.fechaHasta}`
+      : (params.periodoFiscalId ?? 'sin-rango');
+
   return (
     <div className="space-y-6">
       {/* Header canónico (CLAUDE.md frontend §13.1) */}
@@ -59,6 +70,9 @@ export function LibroDiarioPage(): React.JSX.Element {
           <p className="text-sm md:text-base text-muted-foreground">
             Asientos contabilizados y bloqueados en orden cronológico
           </p>
+        </div>
+        <div className="self-start">
+          <BotonExportarLibroDiario data={data} perfil={empresa} rango={rango} />
         </div>
       </div>
 

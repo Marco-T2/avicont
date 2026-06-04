@@ -1,0 +1,78 @@
+import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
+import { armarCabeceraFiscal, formatearFechaCelda } from '@/lib/export-excel';
+import type { Celda } from '@/lib/export-excel';
+import type { LibroDiarioResponse } from '@/types/api';
+
+/**
+ * Mapea una respuesta del Libro Diario a la matriz de celdas para el Excel.
+ *
+ * Estructura del resultado:
+ * 1. Filas de cabecera fiscal (armarCabeceraFiscal — tolera null por campo).
+ * 2. Fila de encabezados de columna.
+ * 3. Por cada asiento → por cada línea: fila de detalle.
+ * 4. Fila de totales con totalDebeBob / totalHaberBob del backend.
+ *
+ * §4.5: debeBob/haberBob/totalDebeBob/totalHaberBob se pasan como CeldaNumero
+ * con el string del backend. El builder (construir-hoja) hace el único boundary
+ * string→Number. NUNCA se suman columnas en cliente.
+ *
+ * §4.6: fechaContable se convierte vía formatearFechaCelda (sin Date/UTC).
+ */
+export function mapearLibroDiarioAFilas(
+  response: LibroDiarioResponse,
+  perfil: EmpresaPerfil,
+): Celda[][] {
+  const filas: Celda[][] = [];
+
+  // 1. Cabecera fiscal (campos no-null del perfil)
+  const cabeceraFiscal = armarCabeceraFiscal(perfil);
+  filas.push(...cabeceraFiscal);
+
+  // 2. Fila de encabezados de columna
+  filas.push([
+    { type: 'texto', value: 'Fecha' },
+    { type: 'texto', value: 'Código' },
+    { type: 'texto', value: 'Cuenta' },
+    { type: 'texto', value: 'Glosa' },
+    { type: 'texto', value: 'Debe (BOB)' },
+    { type: 'texto', value: 'Haber (BOB)' },
+    { type: 'texto', value: 'Estado' },
+  ]);
+
+  // 3. Filas de detalle: aplanar asientos → líneas
+  for (const asiento of response.asientos) {
+    const fechaCelda = formatearFechaCelda(asiento.fechaContable);
+    const estadoCelda: Celda = {
+      type: 'texto',
+      // §4.7: asientos anulados se marcan visualmente en el informe
+      value: asiento.anulado ? 'Anulado' : '',
+    };
+
+    for (const linea of asiento.lineas) {
+      filas.push([
+        { type: 'texto', value: fechaCelda },
+        { type: 'texto', value: linea.codigoCuenta },
+        { type: 'texto', value: linea.nombreCuenta },
+        // §null-safety: glosa puede ser null — nunca imprimir "null"
+        { type: 'texto', value: linea.glosa ?? '' },
+        // §4.5: los montos se pasan como string; el builder los convierte a Number
+        { type: 'numero', value: linea.debeBob },
+        { type: 'numero', value: linea.haberBob },
+        estadoCelda,
+      ]);
+    }
+  }
+
+  // 4. Fila de totales — valores del backend, SIN recalcular en cliente
+  filas.push([
+    { type: 'texto', value: 'TOTAL' },
+    { type: 'texto', value: '' },
+    { type: 'texto', value: '' },
+    { type: 'texto', value: '' },
+    { type: 'numero', value: response.totalDebeBob },
+    { type: 'numero', value: response.totalHaberBob },
+    { type: 'texto', value: '' },
+  ]);
+
+  return filas;
+}
