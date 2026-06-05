@@ -130,11 +130,16 @@ describe('mapearBalanceGeneralAFilas', () => {
     });
     const filas = mapearBalanceGeneralAFilas(response, perfilTodoNull);
 
-    // Debe haber filas con los totales del backend
-    const allValues = filas.flatMap((f) => f).map((c) => c.value);
-    expect(allValues).toContain('88888.88');
-    expect(allValues).toContain('33333.33');
-    expect(allValues).toContain('55555.55');
+    // Las filas de cuadre son las 4 últimas: TOTAL ACTIVO, TOTAL PASIVO, TOTAL PATRIMONIO, cuadre/diferencia.
+    // La celda de importe (columna 1) debe ser { type: 'numero', value: '...' } para que un mutante
+    // que cambie el tipo a 'texto' haga fallar este test.
+    const filaActivo = filas.find((f) => f[0]?.value === 'TOTAL ACTIVO');
+    const filaPasivo = filas.find((f) => f[0]?.value === 'TOTAL PASIVO');
+    const filaPatrimonio = filas.find((f) => f[0]?.value === 'TOTAL PATRIMONIO');
+
+    expect(filaActivo?.[1]).toEqual({ type: 'numero', value: '88888.88' });
+    expect(filaPasivo?.[1]).toEqual({ type: 'numero', value: '33333.33' });
+    expect(filaPatrimonio?.[1]).toEqual({ type: 'numero', value: '55555.55' });
   });
 
   it('marca la cuenta contraria (esContraria true) en la hoja', () => {

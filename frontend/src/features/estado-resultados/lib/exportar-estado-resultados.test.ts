@@ -100,11 +100,18 @@ describe('mapearEstadoResultadosAFilas', () => {
     });
     const filas = mapearEstadoResultadosAFilas(response, perfilTodoNull);
 
-    const allValues = filas.flatMap((f) => f).map((c) => c.value);
-    // Los 3 valores del backend deben estar en la hoja
-    expect(allValues).toContain('99999.99');
-    expect(allValues).toContain('44444.44');
-    expect(allValues).toContain('55555.55');
+    // Las filas de resultado son las 3 últimas: TOTAL INGRESOS, TOTAL EGRESOS, Resultado del Ejercicio.
+    // La celda de importe (columna 1) debe ser { type: 'numero', value: '...' } para que un mutante
+    // que cambie el tipo a 'texto' haga fallar este test.
+    const filaIngresos = filas.find((f) => f[0]?.value === 'TOTAL INGRESOS');
+    const filaEgresos = filas.find((f) => f[0]?.value === 'TOTAL EGRESOS');
+    const filaResultado = filas.find(
+      (f) => typeof f[0]?.value === 'string' && f[0].value.startsWith('Resultado del Ejercicio'),
+    );
+
+    expect(filaIngresos?.[1]).toEqual({ type: 'numero', value: '99999.99' });
+    expect(filaEgresos?.[1]).toEqual({ type: 'numero', value: '44444.44' });
+    expect(filaResultado?.[1]).toEqual({ type: 'numero', value: '55555.55' });
   });
 
   it('indica Ganancia cuando esGanancia true y Pérdida cuando false', () => {
