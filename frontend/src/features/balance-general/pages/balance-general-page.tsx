@@ -1,5 +1,9 @@
 import { useState } from 'react';
 
+// Cross-feature: perfil fiscal para la cabecera del export a Excel.
+import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
+
+import { BotonExportarBalanceGeneral } from '../components/boton-exportar-balance-general';
 import { BalanceGeneralFiltros } from '../components/balance-general-filtros';
 import { BalanceGeneralTabla } from '../components/balance-general-tabla';
 import { useBalanceGeneral } from '../hooks/use-balance-general';
@@ -21,14 +25,24 @@ export function BalanceGeneralPage(): React.JSX.Element {
   const [filtros, setFiltros] = useState<BalanceGeneralFiltroValues | null>(null);
 
   const { data, isLoading, isFetching, isError } = useBalanceGeneral(filtros);
+  // Cross-feature: perfil fiscal para la cabecera del export a Excel.
+  const { data: empresa } = useEmpresa();
+
+  // Rango para el nombre del archivo: usa la fechaCorte del response o el filtro.
+  const rango: string = data?.fechaCorte ?? filtros?.fecha ?? 'sin-fecha';
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Balance General</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Estado de Situación Financiera a una fecha de corte: Activo, Pasivo y Patrimonio.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Balance General</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Estado de Situación Financiera a una fecha de corte: Activo, Pasivo y Patrimonio.
+          </p>
+        </div>
+        <div className="self-start">
+          <BotonExportarBalanceGeneral data={data} perfil={empresa} rango={rango} />
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4">
