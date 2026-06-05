@@ -43,6 +43,15 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/prisma ./prisma
 
+# Regenerar el Prisma Client EN el stage runner, sobre el filesystem final.
+# El generate del builder produce un client que, al copiarse entre stages con
+# COPY --from, queda desincronizado: require('@prisma/client') resuelve a
+# default.js con un DMMF viejo (sin los campos nuevos del schema) aunque
+# .prisma/client/index.js sí los tenga → PrismaClientValidationError "Unknown
+# argument" en runtime, incluso tras un build --no-cache. Regenerar acá ata el
+# client al filesystem exacto que lo ejecuta. Ver gotcha docker-stale-prisma-client.
+RUN node_modules/.bin/prisma generate
+
 EXPOSE 3000
 
 # El runner no instala pnpm: se invoca el binario local de prisma directamente
