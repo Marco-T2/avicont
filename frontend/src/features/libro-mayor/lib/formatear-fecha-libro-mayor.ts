@@ -1,5 +1,8 @@
-// CLAUDE.md §4.6: FechaContable es calendario puro YYYY-MM-DD;
-// renderizar en America/La_Paz en la capa de presentación.
+// SOLO para display en la UI: convierte la fecha usando America/La_Paz porque la capa de
+// presentación debe mostrar la hora local del usuario (CLAUDE.md §4.6).
+// Para exportar a Excel, usar `formatearFechaCelda` de `@/lib/export-excel` en su lugar:
+// ese helper hace string-split puro (sin Date ni zona horaria) y garantiza que no hay
+// corrimiento de día por UTC — crítico para celdas numéricas de fecha en el archivo .xlsx.
 const FECHA_FORMAT = new Intl.DateTimeFormat('es-BO', {
   timeZone: 'America/La_Paz',
   day: '2-digit',

@@ -21,6 +21,25 @@ export interface CeldaTexto {
 
 export type Celda = CeldaNumero | CeldaTexto;
 
+/** Configuración de ancho de columna para la hoja Excel. */
+export interface ColumnaHoja {
+  width: number;
+}
+
+/**
+ * Columnas por defecto del Libro Diario (Fase A).
+ * Parametrizar `construirHoja` con `columns` para otros informes (Fase B).
+ */
+const COLUMNS_LIBRO_DIARIO: ColumnaHoja[] = [
+  { width: 14 }, // Fecha
+  { width: 12 }, // Código
+  { width: 35 }, // Cuenta
+  { width: 40 }, // Glosa
+  { width: 16 }, // Debe (BOB)
+  { width: 16 }, // Haber (BOB)
+  { width: 10 }, // Estado
+];
+
 /**
  * Convierte la matriz de celdas tipadas a un Blob .xlsx.
  *
@@ -29,8 +48,13 @@ export type Celda = CeldaNumero | CeldaTexto;
  *
  * El builder NO realiza aritmética. Los valores de cada celda se escriben
  * tal cual del input (§4.5 Anti-recálculo).
+ *
+ * @param columns - Anchos de columna. Default = 7 columnas del Libro Diario (retrocompatible).
  */
-export async function construirHoja(filas: Celda[][]): Promise<Blob> {
+export async function construirHoja(
+  filas: Celda[][],
+  columns: ColumnaHoja[] = COLUMNS_LIBRO_DIARIO,
+): Promise<Blob> {
   const datos = filas.map((fila) =>
     fila.map((celda) => {
       if (celda.type === 'numero') {
@@ -47,17 +71,7 @@ export async function construirHoja(filas: Celda[][]): Promise<Blob> {
     }),
   );
 
-  const resultado = await writeXlsxFile(datos, {
-    columns: [
-      { width: 14 }, // Fecha
-      { width: 12 }, // Código
-      { width: 35 }, // Cuenta
-      { width: 40 }, // Glosa
-      { width: 16 }, // Debe (BOB)
-      { width: 16 }, // Haber (BOB)
-      { width: 10 }, // Estado
-    ],
-  });
+  const resultado = await writeXlsxFile(datos, { columns });
 
   return resultado.toBlob();
 }

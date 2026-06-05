@@ -1,10 +1,13 @@
 import { useState } from 'react';
 
+// Cross-feature: perfil fiscal para la cabecera del export a Excel.
+import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
 import type { LibroMayorParams } from '@/types/api';
 
 import { useLibroMayor } from '../hooks/use-libro-mayor';
 import type { LibroMayorFiltroValues } from '../schemas/libro-mayor-filtro-schema';
 
+import { BotonExportarLibroMayor } from '../components/boton-exportar-libro-mayor';
 import { LibroMayorFiltros } from '../components/libro-mayor-filtros';
 import { LibroMayorTabla } from '../components/libro-mayor-tabla';
 
@@ -25,6 +28,8 @@ export function LibroMayorPage(): React.JSX.Element {
   const [params, setParams] = useState<LibroMayorParams>({});
 
   const { data, isLoading, isError, isFetching } = useLibroMayor(params);
+  // Cross-feature: perfil fiscal para la cabecera del export a Excel.
+  const { data: empresa } = useEmpresa();
 
   function handleBuscar(values: LibroMayorFiltroValues): void {
     if (values.modo === 'periodo') {
@@ -49,6 +54,12 @@ export function LibroMayorPage(): React.JSX.Element {
     params.periodoFiscalId !== undefined ||
     (params.fechaDesde !== undefined && params.fechaHasta !== undefined);
 
+  // Rango para el nombre del archivo de export.
+  const rango: string =
+    params.fechaDesde !== undefined && params.fechaHasta !== undefined
+      ? `${params.fechaDesde}_${params.fechaHasta}`
+      : (params.periodoFiscalId ?? 'sin-rango');
+
   return (
     <div className="space-y-6">
       {/* Header canónico (CLAUDE.md frontend §13.1) */}
@@ -58,6 +69,9 @@ export function LibroMayorPage(): React.JSX.Element {
           <p className="text-sm md:text-base text-muted-foreground">
             Movimientos por cuenta con saldo inicial, corriente y final
           </p>
+        </div>
+        <div className="self-start">
+          <BotonExportarLibroMayor data={data} perfil={empresa} rango={rango} />
         </div>
       </div>
 
