@@ -1,5 +1,9 @@
 import { useState } from 'react';
 
+// Cross-feature: perfil fiscal para la cabecera del export a Excel.
+import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
+
+import { BotonExportarEstadoResultados } from '../components/boton-exportar-estado-resultados';
 import { EstadoResultadosFiltros } from '../components/estado-resultados-filtros';
 import { EstadoResultadosTabla } from '../components/estado-resultados-tabla';
 import { useEstadoResultados } from '../hooks/use-estado-resultados';
@@ -22,14 +26,29 @@ export function EstadoResultadosPage(): React.JSX.Element {
   const [filtros, setFiltros] = useState<EstadoResultadosFiltroValues | null>(null);
 
   const { data, isLoading, isFetching, isError } = useEstadoResultados(filtros);
+  // Cross-feature: perfil fiscal para la cabecera del export a Excel.
+  const { data: empresa } = useEmpresa();
+
+  // Rango para el nombre del archivo: fechaDesde_fechaHasta del response o filtro.
+  const rango: string =
+    data !== undefined
+      ? `${data.fechaDesde}_${data.fechaHasta}`
+      : filtros !== null
+        ? `${filtros.fechaDesde}_${filtros.fechaHasta}`
+        : 'sin-rango';
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Estado de Resultados</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Ingresos y Egresos del período, con el Resultado del Ejercicio (ganancia o pérdida).
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Estado de Resultados</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Ingresos y Egresos del período, con el Resultado del Ejercicio (ganancia o pérdida).
+          </p>
+        </div>
+        <div className="self-start">
+          <BotonExportarEstadoResultados data={data} perfil={empresa} rango={rango} />
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-4">
