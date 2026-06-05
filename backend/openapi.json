@@ -4090,6 +4090,109 @@
         ]
       }
     },
+    "/api/comprobantes/export": {
+      "get": {
+        "operationId": "ComprobantesController_exportar",
+        "parameters": [
+          {
+            "name": "periodoFiscalId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APERTURA",
+                "DIARIO",
+                "INGRESO",
+                "EGRESO",
+                "AJUSTE",
+                "TRASPASO",
+                "CIERRE"
+              ]
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BORRADOR",
+                "CONTABILIZADO",
+                "BLOQUEADO"
+              ]
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Busca en numero y glosa (case-insensitive)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluirAnulados",
+            "required": false,
+            "in": "query",
+            "description": "Incluir comprobantes anulados en el export (default: false)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportarComprobantesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
     "/api/comprobantes/{id}": {
       "get": {
         "operationId": "ComprobantesController_obtener",
@@ -7401,6 +7504,20 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "ExportarComprobantesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComprobanteListItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "EditarContabilizadoDto": {

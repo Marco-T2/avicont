@@ -307,6 +307,21 @@ export class CuentaNoDetalleError extends InvalidStateError {
   }
 }
 
+/**
+ * El rango filtrado contiene más comprobantes que el límite defensivo del export.
+ * El caller debe acotar los filtros antes de exportar.
+ * REQ cap: si count > COMPROBANTES_EXPORT_MAX → HTTP 422 explícito.
+ */
+export class ComprobanteExportRangoExcedidoError extends InvalidStateError {
+  constructor(cantidad: number, limite: number) {
+    super(
+      'COMPROBANTE_EXPORT_RANGO_EXCEDIDO',
+      `El export contiene ${cantidad} comprobantes, que supera el límite de ${limite}. Acotá los filtros.`,
+      { cantidad, limite },
+    );
+  }
+}
+
 export class CuentaInactivaError extends InvalidStateError {
   constructor(orden: number, cuentaId: string, codigoInterno: string) {
     super(

@@ -211,16 +211,17 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     return res.count;
   }
 
-  async listar(
+  /**
+   * Helper privado que construye el WHERE compartido entre listar, listarParaExport
+   * y contarParaExport. Centraliza el Anti-31 (organizationId: tenantId siempre) y
+   * toda la lógica de filtros para evitar drift de seguridad entre los tres métodos.
+   */
+  private construirWhereListado(
     tenantId: string,
     filtros: ListarFiltros,
-    pagination: { page: number; limit: number },
-    tx?: Prisma.TransactionClient,
-  ): Promise<{ items: ComprobanteListRow[]; total: number }> {
-    const client = tx ?? this.prisma;
-
-    const where: Prisma.ComprobanteWhereInput = {
-      organizationId: tenantId,
+  ): Prisma.ComprobanteWhereInput {
+    return {
+      organizationId: tenantId, // Anti-31 — SIEMPRE
       // REQ-COMP-REPORTES-01: por default excluye anulados; toggle los incluye.
       ...(!filtros.incluirAnulados ? { anulado: false } : {}),
       ...(filtros.periodoFiscalId ? { periodoFiscalId: filtros.periodoFiscalId } : {}),
@@ -243,6 +244,16 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
           }
         : {}),
     };
+  }
+
+  async listar(
+    tenantId: string,
+    filtros: ListarFiltros,
+    pagination: { page: number; limit: number },
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ items: ComprobanteListRow[]; total: number }> {
+    const client = tx ?? this.prisma;
+    const where = this.construirWhereListado(tenantId, filtros);
 
     const [items, total] = await Promise.all([
       client.comprobante.findMany({
@@ -255,6 +266,31 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
       client.comprobante.count({ where }),
     ]);
     return { items, total };
+  }
+
+  async contarParaExport(
+    tenantId: string,
+    filtros: ListarFiltros,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    const client = tx ?? this.prisma;
+    return client.comprobante.count({ where: this.construirWhereListado(tenantId, filtros) });
+  }
+
+  async listarParaExport(
+    tenantId: string,
+    filtros: ListarFiltros,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteListRow[]> {
+    const client = tx ?? this.prisma;
+    return client.comprobante.findMany({
+      where: this.construirWhereListado(tenantId, filtros),
+      include: LIST_INCLUDE,
+      // Orden ASCENDENTE para export de auditoría — OPUESTO al listado paginado (DESC).
+      // Borradores (numero NULL) al final dentro de la misma fecha (NULLS LAST).
+      orderBy: [{ fechaContable: 'asc' }, { numero: { sort: 'asc', nulls: 'last' } }],
+      // SIN skip/take — trae todo el rango
+    });
   }
 
   /**

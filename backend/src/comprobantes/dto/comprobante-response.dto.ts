@@ -104,6 +104,11 @@ export class ListarComprobantesResponseDto {
   @ApiProperty() limit!: number;
 }
 
+/** Respuesta del endpoint de export — lista completa sin paginar. */
+export class ExportarComprobantesResponseDto {
+  @ApiProperty({ type: () => [ComprobanteListItemDto] }) items!: ComprobanteListItemDto[];
+}
+
 export function toComprobanteListItem(c: ComprobanteListRow): ComprobanteListItemDto {
   // Contactos DISTINTOS de las líneas: dedupe por id, ignorando las sin contacto.
   // Un mismo contacto en varias líneas cuenta una sola vez.

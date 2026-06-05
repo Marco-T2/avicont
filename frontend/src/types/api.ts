@@ -644,6 +644,8 @@ export type ComprobanteListItem = Schemas['ComprobanteListItemDto'];
 
 export type ListarComprobantesResponse = Schemas['ListarComprobantesResponseDto'];
 
+export type ExportarComprobantesResponse = Schemas['ExportarComprobantesResponseDto'];
+
 // Query params para GET /api/comprobantes (client-only).
 export interface ListarComprobantesParams {
   page?: number;
@@ -652,6 +654,17 @@ export interface ListarComprobantesParams {
   estado?: EstadoComprobante;
   periodoFiscalId?: string;
   // Texto libre: el backend busca en número + glosa (case-insensitive).
+  q?: string;
+  incluirAnulados?: boolean;
+}
+
+// Query params para GET /api/comprobantes/export (client-only — sin page/limit).
+export interface ExportarComprobantesParams {
+  tipo?: TipoComprobante;
+  estado?: EstadoComprobante;
+  periodoFiscalId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
   q?: string;
   incluirAnulados?: boolean;
 }
