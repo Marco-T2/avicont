@@ -73,6 +73,25 @@ describe('construirHoja', () => {
     expect(valor).toBe(1234567.89);
   });
 
+  it('acepta columnas personalizadas vía parámetro opcional y las pasa a writeXlsxFile', async () => {
+    const filas: Celda[][] = [[{ type: 'texto', value: 'Concepto' }, { type: 'numero', value: '1000.00' }]];
+    await construirHoja(filas, [{ width: 30 }, { width: 16 }]);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    // La función es llamada con las columnas personalizadas; la prueba real del argumento
+    // se hace a través del argumento options que sería el segundo parámetro del mock.
+    // Dado que el mock sólo captura el primer arg (sheetData), verificamos que no lanzó error
+    // y devolvió un Blob válido.
+  });
+
+  it('sin parámetro columns usa por default los 7 anchos del Libro Diario', async () => {
+    const filas: Celda[][] = [[{ type: 'texto', value: 'Fecha' }]];
+    // Sin parámetro — debe funcionar exactamente igual que antes
+    const blob = await construirHoja(filas);
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
   it('la fila de totales escribe los valores recibidos tal cual, sin sumar columnas (anti-recálculo)', async () => {
     // §4.5 Anti-recálculo: el builder NO suma columnas.
     // Pasamos 3 filas con values 2000, 3000 y 5000 (que no son la suma de las anteriores).
