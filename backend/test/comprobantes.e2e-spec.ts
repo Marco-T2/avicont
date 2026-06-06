@@ -1045,4 +1045,210 @@ describe('Comprobantes (e2e)', () => {
       expect(auditRes.status).toBe(404);
     });
   });
+
+  // ==========================================================
+  // GET /api/comprobantes/export (T6.1 RED → T6.2 GREEN)
+  // ==========================================================
+
+  describe('GET /api/comprobantes/export', () => {
+    it('sin token → 401', async () => {
+      const res = await request(app.getHttpServer()).get('/api/comprobantes/export');
+      expect(res.status).toBe(401);
+    });
+
+    it('200 con items en orden ASC y estructura correcta', async () => {
+      const { token, cajaId, ventasId } = await seed('org-export-ok');
+
+      // Crear y contabilizar 2 comprobantes
+      const crear1 = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-03-10',
+          glosa: 'Asiento A (primero)',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      expect(crear1.status).toBe(201);
+      const cont1 = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${crear1.body.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(cont1.status).toBe(201);
+
+      const crear2 = await request(app.getHttpServer())
+        .post('/api/comprobantes')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          tipo: TipoComprobante.DIARIO,
+          fechaContable: '2026-04-15',
+          glosa: 'Asiento B (segundo)',
+          lineas: lineasBasicas(cajaId, ventasId),
+        });
+      expect(crear2.status).toBe(201);
+      const cont2 = await request(app.getHttpServer())
+        .post(`/api/comprobantes/${crear2.body.id}/contabilizar`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(cont2.status).toBe(201);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/comprobantes/export')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      // Orden ASC por fechaContable
+      expect(res.body.items[0].fechaContable).toBe('2026-03-10');
+      expect(res.body.items[1].fechaContable).toBe('2026-04-15');
+      // Estructura del item
+      const item = res.body.items[0];
+      expect(item).toHaveProperty('id');
+      expect(item).toHaveProperty('numero');
+      expect(item).toHaveProperty('tipo');
+      expect(item).toHaveProperty('estado');
+      expect(item).toHaveProperty('glosa');
+      expect(item).toHaveProperty('totalDebitoBob');
+      expect(item).toHaveProperty('documentosRespaldo');
+      expect(item).toHaveProperty('contactos');
+      // §4.5: dinero cruza HTTP como string, nunca float (protege invariante decimal)
+      expect(typeof item.totalDebitoBob).toBe('string');
+    });
+
+    it('403 si el usuario no tiene el permiso contabilidad.asientos.read', async () => {
+      // OWNER/ADMIN tienen todos los permisos; para probar 403 creamos un miembro
+      // con CustomRole que NO incluye contabilidad.asientos.read.
+      const { token: ownerToken, orgId } = await seed('org-export-403');
+
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      const memberUser = await prisma.user.create({
+        data: { email: 'member-export@c.bo', hashedPassword, isEmailVerified: true },
+      });
+      // CustomRole con permiso de contabilizar pero NO de leer asientos
+      const role = await prisma.customRole.create({
+        data: {
+          organizationId: orgId,
+          slug: 'solo-post-export',
+          name: 'Solo post (sin read)',
+          permissions: ['contabilidad.asientos.post'],
+        },
+      });
+      await prisma.membership.create({
+        data: { organizationId: orgId, userId: memberUser.id, customRoleId: role.id },
+      });
+
+      // El miembro hace login — como su único tenant es org-export-403,
+      // el JWT ya lleva activeTenantId de esa org.
+      const loginRes = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'member-export@c.bo', password: 'password123' });
+      expect(loginRes.status).toBe(200);
+      const memberToken = loginRes.body.accessToken as string;
+
+      const res = await request(app.getHttpServer())
+        .get('/api/comprobantes/export')
+        .set('Authorization', `Bearer ${memberToken}`);
+
+      // Sin permiso contabilidad.asientos.read → 403
+      expect(res.status).toBe(403);
+      void ownerToken;
+    });
+
+    it('422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO cuando supera el cap', async () => {
+      const { token } = await seed('org-export-cap');
+      // El cap por defecto es 1000. Para este test forzamos el cap a 0
+      // sobreescribiendo la env var temporalmente — o bien creamos suficientes
+      // comprobantes. Como 1000 es alto, usamos process.env override vía
+      // la variable de entorno en el propio test (el módulo ya está cargado).
+      // Alternativa: verificar que el endpoint existe y devuelve la estructura
+      // correcta del error cuando el count > cap. Para ello usamos el env var
+      // COMPROBANTES_EXPORT_MAX=0 que NO podemos cambiar en caliente en un app
+      // ya inicializado. En su lugar verificamos el formato del error tirando
+      // el cap a 1 y creando 2 comprobantes.
+      //
+      // El AppModule se inicializa ONCE en beforeAll. Para testar el 422
+      // necesitamos un sub-app con cap reducido o simplemente confiar en el
+      // unit test del service (T5.1) que cubre este caso exhaustivamente.
+      // Aquí validamos el contrato HTTP: si el service lanza
+      // ComprobanteExportRangoExcedidoError, el GlobalExceptionFilter devuelve 422.
+      //
+      // Estrategia: setear process.env ANTES del init del app ya no funciona.
+      // Creamos un segundo app con la variable sobreescrita para este bloque.
+      const { Test: NestTest } = await import('@nestjs/testing');
+      const { AppModule: AppMod } = await import('../src/app.module');
+      const { ValidationPipe: VP } = await import('@nestjs/common');
+
+      const prevEnv = process.env['COMPROBANTES_EXPORT_MAX'];
+      process.env['COMPROBANTES_EXPORT_MAX'] = '1';
+
+      const modFixture = await NestTest.createTestingModule({
+        imports: [AppMod],
+      }).compile();
+      const capApp = modFixture.createNestApplication();
+      capApp.setGlobalPrefix('api');
+      capApp.useGlobalPipes(new VP({ whitelist: true, transform: true, forbidUnknownValues: true }));
+      await capApp.init();
+
+      // Login con el token del org ya creado
+      const loginRes = await request(capApp.getHttpServer())
+        .post('/api/auth/login')
+        .send({ email: 'owner+org-export-cap@c.bo', password: 'password123' });
+      const capToken = loginRes.body.accessToken as string;
+
+      // Necesitamos un comprobante con fechaContable → seedear cuentas de nuevo
+      // (ya existen en DB desde el seed de arriba en el mismo beforeEach cycle).
+      // No es necesario crear comprobantes: count=1 > cap=1 → no lanza 422.
+      // count=2 > cap=1 → lanza 422. Ya tenemos 0 comprobantes en org-export-cap
+      // (los seeds anteriores son de otras orgs). Crear 2 y exportar.
+      const capPrisma = modFixture.get(PrismaService);
+      const capOrg = await capPrisma.organization.findUniqueOrThrow({
+        where: { slug: 'org-export-cap' },
+        include: { cuentas: { where: { esDetalle: true }, take: 2 } },
+      });
+      const [cc, cv] = capOrg.cuentas;
+
+      if (cc && cv) {
+        const c1 = await request(capApp.getHttpServer())
+          .post('/api/comprobantes')
+          .set('Authorization', `Bearer ${capToken}`)
+          .send({
+            tipo: TipoComprobante.DIARIO,
+            fechaContable: '2026-03-01',
+            glosa: 'Cap test 1',
+            lineas: lineasBasicas(cc.id, cv.id),
+          });
+        expect(c1.status).toBe(201);
+        await request(capApp.getHttpServer())
+          .post(`/api/comprobantes/${c1.body.id}/contabilizar`)
+          .set('Authorization', `Bearer ${capToken}`);
+
+        const c2 = await request(capApp.getHttpServer())
+          .post('/api/comprobantes')
+          .set('Authorization', `Bearer ${capToken}`)
+          .send({
+            tipo: TipoComprobante.DIARIO,
+            fechaContable: '2026-03-02',
+            glosa: 'Cap test 2',
+            lineas: lineasBasicas(cc.id, cv.id),
+          });
+        expect(c2.status).toBe(201);
+        await request(capApp.getHttpServer())
+          .post(`/api/comprobantes/${c2.body.id}/contabilizar`)
+          .set('Authorization', `Bearer ${capToken}`);
+      }
+
+      const res = await request(capApp.getHttpServer())
+        .get('/api/comprobantes/export')
+        .set('Authorization', `Bearer ${capToken}`);
+
+      // Restore env
+      if (prevEnv === undefined) {
+        delete process.env['COMPROBANTES_EXPORT_MAX'];
+      } else {
+        process.env['COMPROBANTES_EXPORT_MAX'] = prevEnv;
+      }
+      await capApp.close();
+
+      expect(res.status).toBe(422);
+      expect(res.body.error?.code).toBe('COMPROBANTE_EXPORT_RANGO_EXCEDIDO');
+    });
+  });
 });

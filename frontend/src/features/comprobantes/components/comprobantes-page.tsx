@@ -5,10 +5,12 @@ import type { EstadoComprobante, TipoComprobante } from '@/types/api';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
 import { PermissionButton } from '@/components/shared/permission-button';
+import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { useComprobantes } from '../hooks/use-comprobantes';
 
+import { BotonExportarComprobantes } from './boton-exportar-comprobantes';
 import { ComprobantesFilters } from './comprobantes-filters';
 import { ComprobantesTable } from './comprobantes-table';
 
@@ -44,6 +46,19 @@ export function ComprobantesPage(): React.JSX.Element {
   };
 
   const { data, isLoading, isError } = useComprobantes(params);
+  const { data: empresa } = useEmpresa();
+
+  // Filtros de export: iguales que params sin page/limit
+  const filtrosExport = {
+    ...(tipo !== null ? { tipo } : {}),
+    ...(estado !== null ? { estado } : {}),
+    ...(periodoFiscalId !== null ? { periodoFiscalId } : {}),
+    ...(q !== null && q !== '' ? { q } : {}),
+    ...(incluirAnulados ? { incluirAnulados } : {}),
+  };
+
+  // Rango para el nombre del archivo: período si hay filtro activo, o "todos"
+  const rangoArchivo = periodoFiscalId ?? 'todos';
 
   function handlePageChange(nextPage: number): void {
     setSearchParams((prev) => {
@@ -63,15 +78,21 @@ export function ComprobantesPage(): React.JSX.Element {
             Asientos contables del libro diario
           </p>
         </div>
-        <PermissionButton
-          permission={PERMISSIONS.contabilidad.asientos.create}
-          deniedReason="No tenés permiso para crear asientos"
-          onClick={() => void navigate('/comprobantes/nuevo')}
-          className="self-start"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo comprobante
-        </PermissionButton>
+        <div className="flex gap-2 self-start">
+          <BotonExportarComprobantes
+            filtros={filtrosExport}
+            perfil={empresa ?? null}
+            rango={rangoArchivo}
+          />
+          <PermissionButton
+            permission={PERMISSIONS.contabilidad.asientos.create}
+            deniedReason="No tenés permiso para crear asientos"
+            onClick={() => void navigate('/comprobantes/nuevo')}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo comprobante
+          </PermissionButton>
+        </div>
       </div>
 
       {/* Filtros */}

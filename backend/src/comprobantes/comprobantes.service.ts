@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   type ComprobanteDocumentoFisico,
   EstadoComprobante,
@@ -46,18 +47,24 @@ import {
 } from './dto/create-comprobante.dto';
 import {
   ComprobanteResponseDto,
+  ExportarComprobantesResponseDto,
   ListarComprobantesResponseDto,
   toComprobanteListItem,
   toComprobanteResponse,
 } from './dto/comprobante-response.dto';
 import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
-import { LIST_DEFAULT_LIMIT, ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
+import {
+  ExportarComprobantesQueryDto,
+  LIST_DEFAULT_LIMIT,
+  ListarComprobantesQueryDto,
+} from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
   ComprobanteAnuladoNoAnulableError,
   ComprobanteAnuladoNoEditableError,
   ComprobanteAnularBorradorNoPermitidoError,
   ComprobanteAnularMotivoInvalidoError,
+  ComprobanteExportRangoExcedidoError,
   ComprobanteAnularPeriodoCerradoError,
   ComprobanteCampoInvalidoError,
   ComprobanteDocumentoAsociacionPeriodoCerradoError,
@@ -115,8 +122,16 @@ interface DatosResueltos {
   lineas: LineaPersistData[];
 }
 
+/** Nombre de la variable de entorno para el tope de export de comprobantes. */
+export const COMPROBANTES_EXPORT_MAX_ENV = 'COMPROBANTES_EXPORT_MAX';
+
+/** Tope defensivo por defecto cuando la env no está configurada. */
+export const COMPROBANTES_EXPORT_MAX_DEFAULT = 1_000;
+
 @Injectable()
 export class ComprobantesService {
+  private readonly exportMax: number;
+
   constructor(
     @Inject(COMPROBANTE_REPOSITORY_PORT)
     private readonly repo: ComprobanteRepositoryPort,
@@ -140,7 +155,13 @@ export class ComprobantesService {
     // RBAC checker para verificar permisos de acciones específicas
     // (e.g. contabilidad.asientos.edit-posted) desde el service.
     private readonly rbac: RbacService,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    this.exportMax = this.config.get<number>(
+      COMPROBANTES_EXPORT_MAX_ENV,
+      COMPROBANTES_EXPORT_MAX_DEFAULT,
+    );
+  }
 
   // ============================================================
   // Lectura
@@ -190,6 +211,34 @@ export class ComprobantesService {
       page,
       limit,
     };
+  }
+
+  async exportar(
+    tenantId: string,
+    query: ExportarComprobantesQueryDto,
+  ): Promise<ExportarComprobantesResponseDto> {
+    const filtros: ListarFiltros = {
+      ...(query.periodoFiscalId ? { periodoFiscalId: query.periodoFiscalId } : {}),
+      ...(query.tipo ? { tipo: query.tipo } : {}),
+      ...(query.estado ? { estado: query.estado } : {}),
+      ...(query.fechaDesde
+        ? { fechaDesde: FechaContable.fromIso(query.fechaDesde).toDbDate() }
+        : {}),
+      ...(query.fechaHasta
+        ? { fechaHasta: FechaContable.fromIso(query.fechaHasta).toDbDate() }
+        : {}),
+      ...(query.q ? { q: query.q } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    };
+
+    // Tope defensivo: count previo antes de listar (no traer miles de rows al server).
+    const cantidad = await this.repo.contarParaExport(tenantId, filtros);
+    if (cantidad > this.exportMax) {
+      throw new ComprobanteExportRangoExcedidoError(cantidad, this.exportMax);
+    }
+
+    const items = await this.repo.listarParaExport(tenantId, filtros);
+    return { items: items.map(toComprobanteListItem) };
   }
 
   // ============================================================

@@ -6,6 +6,7 @@ import {
   Prisma,
   TipoComprobante,
 } from '@prisma/client';
+import type { ConfigService } from '@nestjs/config';
 
 import type { ClockPort } from '@/common/clock/clock.port';
 import type { PrismaService } from '@/common/prisma.service';
@@ -25,6 +26,7 @@ import { ComprobantesService } from './comprobantes.service';
 import { ComprobanteDocumentoAsociacionPeriodoCerradoError } from './domain/comprobante-errors';
 import type {
   ComprobanteConLineas,
+  ComprobanteListRow,
   ComprobanteRepositoryPort,
 } from './ports/comprobante.repository.port';
 import type { SecuenciaComprobantePort } from './ports/secuencia-comprobante.port';
@@ -60,6 +62,8 @@ function makeRepoMock(): MockRepo {
     eliminarBorrador: jest.fn(),
     listar: jest.fn(),
     listarAuditoria: jest.fn(),
+    contarParaExport: jest.fn(),
+    listarParaExport: jest.fn(),
   };
 }
 
@@ -225,6 +229,16 @@ function dtoCreateDiarioBOB() {
 // Setup del service
 // ============================================================
 
+/** Mock de ConfigService para el tope de export. */
+function makeConfigMock(exportMax = 1000): { get: jest.Mock } {
+  return {
+    get: jest.fn((key: string, defaultVal?: number) => {
+      if (key === 'COMPROBANTES_EXPORT_MAX') return exportMax;
+      return defaultVal;
+    }),
+  };
+}
+
 function buildService(overrides?: {
   repo?: Partial<MockRepo>;
   periodos?: Partial<MockPeriodos>;
@@ -236,6 +250,7 @@ function buildService(overrides?: {
   asociacionRepo?: Partial<MockAsociacionRepo>;
   rbac?: Partial<MockRbac>;
   auditedRunner?: ReturnType<typeof makeAuditedRunnerMock>;
+  exportMax?: number;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -252,6 +267,7 @@ function buildService(overrides?: {
   // this.prisma.$transaction (crearBorrador, actualizarBorrador, etc.) antes
   // de que task 5.5 los migre.
   const prisma = makePrismaMock();
+  const config = makeConfigMock(overrides?.exportMax ?? 1000);
 
   const service = new ComprobantesService(
     repo as unknown as ComprobanteRepositoryPort,
@@ -265,6 +281,7 @@ function buildService(overrides?: {
     prisma,
     auditedRunner as unknown as AuditedTransactionRunner,
     rbac as unknown as RbacService,
+    config as unknown as ConfigService,
   );
   return {
     service,
@@ -279,6 +296,7 @@ function buildService(overrides?: {
     rbac,
     auditedRunner,
     prisma,
+    config,
   };
 }
 
@@ -2540,6 +2558,124 @@ describe('ComprobantesService', () => {
       expect(persist.lineas[0]?.tipoCambio).toBe('1');
       expect(persist.lineas[1]?.creditoBob).toBe('500');
       expect(persist.lineas[1]?.tipoCambio).toBe('1');
+    });
+  });
+
+  // ============================================================
+  // exportar — T5.1 (RED) → T5.2 (GREEN)
+  // ============================================================
+
+  describe('exportar', () => {
+    function makeListRow(numero: string | null = 'D2604-000001'): ComprobanteListRow {
+      return {
+        id: 'comp-1',
+        organizationId: TENANT_ID,
+        tipo: TipoComprobante.DIARIO,
+        numero,
+        estado: EstadoComprobante.CONTABILIZADO,
+        fechaContable: new Date(Date.UTC(2026, 3, 22)),
+        periodoFiscalId: PERIODO_ID,
+        glosa: 'Venta al contado',
+        monedaPrincipal: Moneda.BOB,
+        tipoCambioReexpresion: new Prisma.Decimal(1),
+        totalDebitoBob: new Prisma.Decimal('1000.00'),
+        totalCreditoBob: new Prisma.Decimal('1000.00'),
+        anulado: false,
+        fechaAnulacion: null,
+        anuladoPorUserId: null,
+        motivoAnulacion: null,
+        origenTipo: null,
+        origenId: null,
+        createdByUserId: 'user-1',
+        createdAt: new Date('2026-04-22T10:00:00Z'),
+        updatedAt: new Date('2026-04-22T10:00:00Z'),
+        lineas: [],
+        documentosFisicosAsociados: [],
+      } as unknown as ComprobanteListRow;
+    }
+
+    it('(a) cap excedido → lanza ComprobanteExportRangoExcedidoError', async () => {
+      const { service, repo } = buildService({ exportMax: 10 });
+      // El count supera el cap
+      repo.contarParaExport.mockResolvedValue(11);
+
+      await expect(service.exportar(TENANT_ID, {})).rejects.toMatchObject({
+        code: 'COMPROBANTE_EXPORT_RANGO_EXCEDIDO',
+        details: { cantidad: 11, limite: 10 },
+      });
+    });
+
+    it('(b) cap no excedido → devuelve items mapeados', async () => {
+      const { service, repo } = buildService({ exportMax: 1000 });
+      repo.contarParaExport.mockResolvedValue(3);
+      repo.listarParaExport.mockResolvedValue([
+        makeListRow('D2604-000001'),
+        makeListRow('D2604-000002'),
+        makeListRow('D2604-000003'),
+      ]);
+
+      const result = await service.exportar(TENANT_ID, {});
+
+      expect(result.items).toHaveLength(3);
+      expect(result.items[0]).toMatchObject({ numero: 'D2604-000001' });
+    });
+
+    it('(c) los filtros se pasan correctamente al port (count y listar reciben el mismo ListarFiltros)', async () => {
+      const { service, repo } = buildService({ exportMax: 1000 });
+      repo.contarParaExport.mockResolvedValue(1);
+      repo.listarParaExport.mockResolvedValue([makeListRow()]);
+
+      await service.exportar(TENANT_ID, {
+        tipo: TipoComprobante.DIARIO,
+        estado: EstadoComprobante.CONTABILIZADO,
+        incluirAnulados: true,
+      });
+
+      const filtrosEsperados = expect.objectContaining({
+        tipo: TipoComprobante.DIARIO,
+        estado: EstadoComprobante.CONTABILIZADO,
+        incluirAnulados: true,
+      });
+      expect(repo.contarParaExport).toHaveBeenCalledWith(TENANT_ID, filtrosEsperados);
+      expect(repo.listarParaExport).toHaveBeenCalledWith(TENANT_ID, filtrosEsperados);
+    });
+
+    it('(d) el count se invoca ANTES de listarParaExport', async () => {
+      const { service, repo } = buildService({ exportMax: 1000 });
+      const orden: string[] = [];
+      repo.contarParaExport.mockImplementation(async () => {
+        orden.push('count');
+        return 1;
+      });
+      repo.listarParaExport.mockImplementation(async () => {
+        orden.push('listar');
+        return [makeListRow()];
+      });
+
+      await service.exportar(TENANT_ID, {});
+
+      expect(orden).toEqual(['count', 'listar']);
+    });
+
+    it('cap excedido por exactamente 1 (> no >=) — count === cap+1 lanza error', async () => {
+      const { service, repo } = buildService({ exportMax: 100 });
+      repo.contarParaExport.mockResolvedValue(101);
+
+      await expect(service.exportar(TENANT_ID, {})).rejects.toMatchObject({
+        code: 'COMPROBANTE_EXPORT_RANGO_EXCEDIDO',
+      });
+    });
+
+    it('count exactamente en el cap (count === cap) no lanza error', async () => {
+      const { service, repo } = buildService({ exportMax: 100 });
+      repo.contarParaExport.mockResolvedValue(100);
+      repo.listarParaExport.mockResolvedValue(
+        Array.from({ length: 100 }, (_, i) => makeListRow(`D2604-${String(i).padStart(6, '0')}`)),
+      );
+
+      await expect(service.exportar(TENANT_ID, {})).resolves.toMatchObject({
+        items: expect.arrayContaining([]),
+      });
     });
   });
 });

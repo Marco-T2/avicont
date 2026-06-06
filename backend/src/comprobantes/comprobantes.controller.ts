@@ -34,8 +34,14 @@ import { ComprobantesService } from './comprobantes.service';
 import { AnularComprobanteDto } from './dto/anular-comprobante.dto';
 import { CreateComprobanteDto } from './dto/create-comprobante.dto';
 import { EditarContabilizadoDto } from './dto/editar-contabilizado.dto';
-import { ListarComprobantesResponseDto } from './dto/comprobante-response.dto';
-import { ListarComprobantesQueryDto } from './dto/listar-comprobantes.dto';
+import {
+  ExportarComprobantesResponseDto,
+  ListarComprobantesResponseDto,
+} from './dto/comprobante-response.dto';
+import {
+  ExportarComprobantesQueryDto,
+  ListarComprobantesQueryDto,
+} from './dto/listar-comprobantes.dto';
 
 // ---- Resolución de tenantId desde JWT + header opcional ----------------
 // Mismo patrón que los otros controllers (ver gestiones/cuentas). El header
@@ -83,6 +89,19 @@ export class ComprobantesController {
   @ApiOkResponse({ type: ListarComprobantesResponseDto })
   listar(@Req() req: AuthenticatedRequest, @Query() query: ListarComprobantesQueryDto) {
     return this.service.listar(resolveTenantId(req), query);
+  }
+
+  @Get('export')
+  @RequirePermissions('contabilidad.asientos.read')
+  @ApiOperation({
+    summary:
+      'Exportar todos los comprobantes que coincidan con los filtros, sin paginar. ' +
+      'Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. ' +
+      'Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO.',
+  })
+  @ApiOkResponse({ type: ExportarComprobantesResponseDto })
+  exportar(@Req() req: AuthenticatedRequest, @Query() query: ExportarComprobantesQueryDto) {
+    return this.service.exportar(resolveTenantId(req), query);
   }
 
   @Get(':id')

@@ -820,6 +820,7 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
     const mockAsociacionRepo = { asociar: jest.fn() };
     const mockPrismaService = {}; // editarContabilizado no llama this.prisma directamente
 
+    const mockConfig = { get: jest.fn((key: string, defaultVal: unknown) => defaultVal) };
     const service = new ComprobantesService(
       repo,
       periodosReader,
@@ -832,6 +833,7 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
       mockPrismaService as never,
       auditedTx,
       mockRbac as never,
+      mockConfig as never,
     );
 
     // Act & Assert: PATCH con TCR en período cerrado → error de period-lock (§4.4).
@@ -840,5 +842,299 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
         tipoCambioReexpresion: '7.50',
       }),
     ).rejects.toThrow(ComprobanteEditarContabilizadoEnPeriodoCerradoError);
+  });
+});
+
+// ============================================================
+// Describe: listarParaExport / contarParaExport — T2.1 (RED)
+// ============================================================
+describe('PrismaComprobanteRepository — listarParaExport / contarParaExport (integration vs Postgres)', () => {
+  const SLUG = 'org-test-export';
+
+  let prisma: PrismaClient;
+  let repo: PrismaComprobanteRepository;
+  let tenantIdA: string;
+  let tenantIdB: string;
+  let periodoIdA: string;
+  let periodoIdA2: string;
+
+  beforeAll(async () => {
+    prisma = new PrismaClient();
+    await prisma.$connect();
+    repo = new PrismaComprobanteRepository(prisma as never);
+  });
+
+  afterAll(async () => {
+    await prisma.organization.deleteMany({ where: { slug: { startsWith: SLUG } } });
+    await prisma.$disconnect();
+  });
+
+  beforeEach(async () => {
+    await prisma.organization.deleteMany({ where: { slug: { startsWith: SLUG } } });
+
+    // Tenant A — principal
+    const orgA = await prisma.organization.create({
+      data: { slug: `${SLUG}-a`, name: 'Org Export A' },
+    });
+    tenantIdA = orgA.id;
+
+    const gestionA = await prisma.gestionFiscal.create({
+      data: {
+        organizationId: tenantIdA,
+        year: 2026,
+        mesInicio: 4,
+        status: GestionFiscalStatus.ABIERTA,
+      },
+    });
+    const periodoA = await prisma.periodoFiscal.create({
+      data: {
+        organizationId: tenantIdA,
+        gestionId: gestionA.id,
+        year: 2026,
+        month: 4,
+        ordenEnGestion: 4,
+        status: PeriodoFiscalStatus.ABIERTO,
+      },
+    });
+    periodoIdA = periodoA.id;
+
+    const periodoA2 = await prisma.periodoFiscal.create({
+      data: {
+        organizationId: tenantIdA,
+        gestionId: gestionA.id,
+        year: 2026,
+        month: 5,
+        ordenEnGestion: 5,
+        status: PeriodoFiscalStatus.ABIERTO,
+      },
+    });
+    periodoIdA2 = periodoA2.id;
+
+    // Tenant B — para prueba de aislamiento Anti-31
+    const orgB = await prisma.organization.create({
+      data: { slug: `${SLUG}-b`, name: 'Org Export B' },
+    });
+    tenantIdB = orgB.id;
+
+    const gestionB = await prisma.gestionFiscal.create({
+      data: {
+        organizationId: tenantIdB,
+        year: 2026,
+        mesInicio: 4,
+        status: GestionFiscalStatus.ABIERTA,
+      },
+    });
+    const periodoB = await prisma.periodoFiscal.create({
+      data: {
+        organizationId: tenantIdB,
+        gestionId: gestionB.id,
+        year: 2026,
+        month: 4,
+        ordenEnGestion: 4,
+        status: PeriodoFiscalStatus.ABIERTO,
+      },
+    });
+
+    // Crear comprobantes del tenant B para la prueba de aislamiento
+    await prisma.comprobante.create({
+      data: {
+        organizationId: tenantIdB,
+        tipo: TipoComprobante.DIARIO,
+        numero: 'D2604-999001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        fechaContable: new Date(Date.UTC(2026, 3, 1)),
+        periodoFiscalId: periodoB.id,
+        glosa: 'Comprobante del tenant B',
+        monedaPrincipal: Moneda.BOB,
+        totalDebitoBob: new Prisma.Decimal('500.00'),
+        totalCreditoBob: new Prisma.Decimal('500.00'),
+        createdByUserId: 'user-b',
+      },
+    });
+  });
+
+  async function crearComprobante(opts: {
+    numero: string | null;
+    fecha: Date;
+    tipo?: TipoComprobante;
+    estado?: EstadoComprobante;
+    anulado?: boolean;
+    periodoId?: string;
+  }) {
+    return prisma.comprobante.create({
+      data: {
+        organizationId: tenantIdA,
+        tipo: opts.tipo ?? TipoComprobante.DIARIO,
+        numero: opts.numero,
+        estado: opts.estado ?? EstadoComprobante.CONTABILIZADO,
+        anulado: opts.anulado ?? false,
+        fechaContable: opts.fecha,
+        periodoFiscalId: opts.periodoId ?? periodoIdA,
+        glosa: `Comprobante ${opts.numero ?? 'BORRADOR'}`,
+        monedaPrincipal: Moneda.BOB,
+        totalDebitoBob: new Prisma.Decimal('1000.00'),
+        totalCreditoBob: new Prisma.Decimal('1000.00'),
+        createdByUserId: 'user-test',
+      },
+    });
+  }
+
+  it('(a) trae todas las filas sin paginar para el tenant', async () => {
+    await crearComprobante({ numero: 'D2604-000001', fecha: new Date(Date.UTC(2026, 3, 1)) });
+    await crearComprobante({ numero: 'D2604-000002', fecha: new Date(Date.UTC(2026, 3, 2)) });
+    await crearComprobante({ numero: 'D2604-000003', fecha: new Date(Date.UTC(2026, 3, 3)) });
+
+    const rows = await repo.listarParaExport(tenantIdA, {});
+    expect(rows.length).toBe(3);
+  });
+
+  it('(b) ordena cronológicamente ASCENDENTE por fechaContable', async () => {
+    await crearComprobante({ numero: 'D2604-000003', fecha: new Date(Date.UTC(2026, 3, 3)) });
+    await crearComprobante({ numero: 'D2604-000001', fecha: new Date(Date.UTC(2026, 3, 1)) });
+    await crearComprobante({ numero: 'D2604-000002', fecha: new Date(Date.UTC(2026, 3, 2)) });
+
+    const rows = await repo.listarParaExport(tenantIdA, {});
+    expect(rows.length).toBe(3);
+    // Debe venir en orden cronológico ASC
+    expect(rows[0]!.fechaContable.getTime()).toBeLessThanOrEqual(rows[1]!.fechaContable.getTime());
+    expect(rows[1]!.fechaContable.getTime()).toBeLessThanOrEqual(rows[2]!.fechaContable.getTime());
+  });
+
+  it('(c) borradores (numero NULL) van al final dentro de la misma fecha — NULLS LAST', async () => {
+    const fechaComun = new Date(Date.UTC(2026, 3, 10));
+    await crearComprobante({
+      numero: 'D2604-000002',
+      fecha: fechaComun,
+      estado: EstadoComprobante.CONTABILIZADO,
+    });
+    await crearComprobante({ numero: null, fecha: fechaComun, estado: EstadoComprobante.BORRADOR });
+    await crearComprobante({
+      numero: 'D2604-000001',
+      fecha: fechaComun,
+      estado: EstadoComprobante.CONTABILIZADO,
+    });
+
+    const rows = await repo.listarParaExport(tenantIdA, {});
+    expect(rows.length).toBe(3);
+    // El borrador con numero=null debe ser el último
+    expect(rows[2]!.numero).toBeNull();
+    // Los numerados deben ir primero en orden ASC
+    expect(rows[0]!.numero).toBe('D2604-000001');
+    expect(rows[1]!.numero).toBe('D2604-000002');
+  });
+
+  it('(d) Anti-31: el export del tenant A no ve los comprobantes del tenant B', async () => {
+    await crearComprobante({ numero: 'D2604-000001', fecha: new Date(Date.UTC(2026, 3, 1)) });
+
+    const rowsA = await repo.listarParaExport(tenantIdA, {});
+    // Solo debe ver los suyos
+    for (const row of rowsA) {
+      expect(row.organizationId).toBe(tenantIdA);
+    }
+
+    const rowsB = await repo.listarParaExport(tenantIdB, {});
+    // Tenant B solo ve sus propios
+    for (const row of rowsB) {
+      expect(row.organizationId).toBe(tenantIdB);
+    }
+
+    // Los conteos no se mezclan
+    expect(rowsA.length).toBe(1);
+    expect(rowsB.length).toBe(1);
+  });
+
+  it('(e) incluirAnulados=false excluye anulados; true los incluye', async () => {
+    await crearComprobante({
+      numero: 'D2604-000001',
+      fecha: new Date(Date.UTC(2026, 3, 1)),
+      anulado: false,
+    });
+    await crearComprobante({
+      numero: 'D2604-000002',
+      fecha: new Date(Date.UTC(2026, 3, 2)),
+      anulado: true,
+    });
+
+    const sinAnulados = await repo.listarParaExport(tenantIdA, { incluirAnulados: false });
+    expect(sinAnulados.length).toBe(1);
+    expect(sinAnulados[0]!.anulado).toBe(false);
+
+    const conAnulados = await repo.listarParaExport(tenantIdA, { incluirAnulados: true });
+    expect(conAnulados.length).toBe(2);
+  });
+
+  it('(f) filtra por tipo, estado, periodoFiscalId y q', async () => {
+    await crearComprobante({
+      numero: 'D2604-000001',
+      fecha: new Date(Date.UTC(2026, 3, 1)),
+      tipo: TipoComprobante.DIARIO,
+    });
+    await crearComprobante({
+      numero: 'I2604-000001',
+      fecha: new Date(Date.UTC(2026, 3, 2)),
+      tipo: TipoComprobante.INGRESO,
+    });
+
+    const filtroDiario = await repo.listarParaExport(tenantIdA, { tipo: TipoComprobante.DIARIO });
+    expect(filtroDiario.length).toBe(1);
+    expect(filtroDiario[0]!.tipo).toBe(TipoComprobante.DIARIO);
+
+    // filtro por periodoFiscalId
+    await crearComprobante({
+      numero: 'D2605-000001',
+      fecha: new Date(Date.UTC(2026, 4, 1)),
+      periodoId: periodoIdA2,
+    });
+    const filtroPeriodo = await repo.listarParaExport(tenantIdA, { periodoFiscalId: periodoIdA2 });
+    expect(filtroPeriodo.length).toBe(1);
+    expect(filtroPeriodo[0]!.periodoFiscalId).toBe(periodoIdA2);
+
+    // filtro por q (glosa)
+    await prisma.comprobante.updateMany({
+      where: { organizationId: tenantIdA, numero: 'D2604-000001' },
+      data: { glosa: 'Venta especial' },
+    });
+    const filtroQ = await repo.listarParaExport(tenantIdA, { q: 'especial' });
+    expect(filtroQ.length).toBeGreaterThanOrEqual(1);
+    expect(filtroQ[0]!.glosa).toContain('especial');
+  });
+
+  it('(g) contarParaExport devuelve el count con el mismo WHERE', async () => {
+    await crearComprobante({
+      numero: 'D2604-000001',
+      fecha: new Date(Date.UTC(2026, 3, 1)),
+      anulado: false,
+    });
+    await crearComprobante({
+      numero: 'D2604-000002',
+      fecha: new Date(Date.UTC(2026, 3, 2)),
+      anulado: true,
+    });
+    await crearComprobante({
+      numero: 'I2604-000001',
+      fecha: new Date(Date.UTC(2026, 3, 3)),
+      tipo: TipoComprobante.INGRESO,
+    });
+
+    // Sin filtros, incluirAnulados=false (default)
+    const countSinAnulados = await repo.contarParaExport(tenantIdA, {});
+    const rowsSinAnulados = await repo.listarParaExport(tenantIdA, {});
+    expect(countSinAnulados).toBe(rowsSinAnulados.length);
+
+    // Con incluirAnulados=true
+    const countConAnulados = await repo.contarParaExport(tenantIdA, { incluirAnulados: true });
+    const rowsConAnulados = await repo.listarParaExport(tenantIdA, { incluirAnulados: true });
+    expect(countConAnulados).toBe(rowsConAnulados.length);
+
+    // Filtro por tipo
+    const countTipo = await repo.contarParaExport(tenantIdA, {
+      tipo: TipoComprobante.DIARIO,
+      incluirAnulados: true,
+    });
+    const rowsTipo = await repo.listarParaExport(tenantIdA, {
+      tipo: TipoComprobante.DIARIO,
+      incluirAnulados: true,
+    });
+    expect(countTipo).toBe(rowsTipo.length);
   });
 });

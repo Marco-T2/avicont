@@ -1458,6 +1458,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/comprobantes/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO. */
+        get: operations["ComprobantesController_exportar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/comprobantes/{id}": {
         parameters: {
             query?: never;
@@ -2620,6 +2637,9 @@ export interface components {
             total: number;
             page: number;
             limit: number;
+        };
+        ExportarComprobantesResponseDto: {
+            items: components["schemas"]["ComprobanteListItemDto"][];
         };
         EditarContabilizadoDto: {
             /**
@@ -5795,6 +5815,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ComprobantesController_exportar: {
+        parameters: {
+            query?: {
+                periodoFiscalId?: string;
+                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+                estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+                fechaDesde?: string;
+                fechaHasta?: string;
+                /** @description Busca en numero y glosa (case-insensitive) */
+                q?: string;
+                /** @description Incluir comprobantes anulados en el export (default: false) */
+                incluirAnulados?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportarComprobantesResponseDto"];
+                };
             };
         };
     };

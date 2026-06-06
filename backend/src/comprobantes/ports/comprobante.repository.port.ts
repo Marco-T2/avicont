@@ -190,6 +190,28 @@ export abstract class ComprobanteRepositoryPort {
   ): Promise<{ items: ComprobanteListRow[]; total: number }>;
 
   /**
+   * Cuenta los comprobantes del tenant que matchean los filtros, sin paginar.
+   * Para el tope defensivo del export (REQ cap). Mismo WHERE que listarParaExport.
+   */
+  abstract contarParaExport(
+    tenantId: string,
+    filtros: ListarFiltros,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number>;
+
+  /**
+   * Lista TODOS los comprobantes del tenant que matchean los filtros, SIN paginar.
+   * Orden cronológico ASCENDENTE (fechaContable ASC, numero ASC NULLS LAST) — para
+   * lectura de auditoría. DISTINTO del orden DESC del listado paginado.
+   * El caller (service) ya validó el tope vía contarParaExport.
+   */
+  abstract listarParaExport(
+    tenantId: string,
+    filtros: ListarFiltros,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ComprobanteListRow[]>;
+
+  /**
    * Lista el historial de auditoría de un comprobante desde la tabla raw
    * comprobantes_audit (Postgres triggers). Scopeado al tenant. Orden
    * cronológico ascendente (ts ASC, id ASC). No pagina — volumen esperado bajo.
