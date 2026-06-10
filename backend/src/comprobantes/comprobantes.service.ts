@@ -8,6 +8,8 @@ import {
   Prisma,
   TipoComprobante,
 } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 
 import { CLOCK_PORT, ClockPort } from '@/common/clock/clock.port';
 import { FechaContable } from '@/common/domain/fecha-contable';
@@ -39,6 +41,20 @@ import { RbacService } from '@/rbac/rbac.service';
 
 import { toDominioMoneda, toDominioTipoComprobante } from './adapters/enum-mappers';
 import { AuditoriaEntryDto, toAuditoriaEntry } from './dto/auditoria-response.dto';
+import { AdjuntoResponseDto, toAdjuntoResponseDto } from './dto/adjunto-response.dto';
+import {
+  AdjuntoComprobanteAnuladoError,
+  AdjuntoNoEncontradoError,
+  AdjuntoPeriodoCerradoError,
+  AdjuntoTamanoExcedidoError,
+  AdjuntoTopeExcedidoError,
+} from './domain/adjunto-errors';
+import { validarMimeMagicBytes } from './domain/mime-whitelist';
+import {
+  ADJUNTO_COMPROBANTE_REPOSITORY_PORT,
+  AdjuntoComprobanteRepositoryPort,
+} from './ports/adjunto-comprobante.repository.port';
+import { STORAGE_PORT, StoragePort } from './ports/storage.port';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import {
   CreateComprobanteDto,
@@ -125,6 +141,12 @@ interface DatosResueltos {
 /** Nombre de la variable de entorno para el tope de export de comprobantes. */
 export const COMPROBANTES_EXPORT_MAX_ENV = 'COMPROBANTES_EXPORT_MAX';
 
+/** Máximo de adjuntos por comprobante (Pack "contabilidad.adjuntos"). */
+export const ADJUNTOS_TOPE_POR_COMPROBANTE = 10;
+
+/** Límite de tamaño en bytes para adjuntos (25 MB). */
+export const ADJUNTO_LIMITE_BYTES = 25 * 1024 * 1024;
+
 /** Tope defensivo por defecto cuando la env no está configurada. */
 export const COMPROBANTES_EXPORT_MAX_DEFAULT = 1_000;
 
@@ -156,6 +178,10 @@ export class ComprobantesService {
     // (e.g. contabilidad.asientos.edit-posted) desde el service.
     private readonly rbac: RbacService,
     private readonly config: ConfigService,
+    @Inject(STORAGE_PORT)
+    private readonly storage: StoragePort,
+    @Inject(ADJUNTO_COMPROBANTE_REPOSITORY_PORT)
+    private readonly adjuntoRepo: AdjuntoComprobanteRepositoryPort,
   ) {
     this.exportMax = this.config.get<number>(
       COMPROBANTES_EXPORT_MAX_ENV,
@@ -1298,6 +1324,219 @@ export class ComprobantesService {
       tipoCambioReexpresion: dto.tipoCambioReexpresion ?? actual.tipoCambioReexpresion.toString(),
       lineas: dto.lineas ?? lineasActualesComoDto,
     };
+  }
+
+  // ============================================================
+  // Adjuntos (Pack "contabilidad.adjuntos")
+  // ============================================================
+
+  /**
+   * Sube un adjunto al comprobante indicado.
+   *
+   * Guarda: D-01 (comprobante anulado → read-only), D-02 (período cerrado →
+   * no se admiten mutaciones), tope de 10 adjuntos, whitelist MIME por magic
+   * bytes, límite de 25 MB.
+   *
+   * El `storageKey` sigue la convención: `{tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}`.
+   * En v1 el campo `sha256` es null.
+   */
+  async subirAdjunto(
+    tenantId: string,
+    comprobanteId: string,
+    userId: string,
+    payload: { buffer: Buffer; nombreOriginal: string; tamanoBytes: number },
+  ): Promise<AdjuntoResponseDto> {
+    const comprobante = await this.repo.findById(tenantId, comprobanteId);
+    if (!comprobante) throw new AdjuntoNoEncontradoError(comprobanteId);
+
+    // D-01: comprobante anulado → adjuntos en READ-ONLY (CLAUDE.md §4.7).
+    if (comprobante.anulado) {
+      throw new AdjuntoComprobanteAnuladoError(comprobanteId);
+    }
+
+    // D-02: período cerrado/bloqueado → no se admiten mutaciones (CLAUDE.md §4.4).
+    await this.validarPeriodoAdjuntos(
+      tenantId,
+      comprobante.fechaContable,
+      comprobante.periodoFiscalId,
+    );
+
+    // Tope de adjuntos: máximo ADJUNTOS_TOPE_POR_COMPROBANTE por comprobante.
+    const cantidadActual = await this.adjuntoRepo.contarPorComprobante(tenantId, comprobanteId);
+    if (cantidadActual >= ADJUNTOS_TOPE_POR_COMPROBANTE) {
+      throw new AdjuntoTopeExcedidoError(ADJUNTOS_TOPE_POR_COMPROBANTE, cantidadActual);
+    }
+
+    // Límite de tamaño: 25 MB.
+    if (payload.tamanoBytes > ADJUNTO_LIMITE_BYTES) {
+      throw new AdjuntoTamanoExcedidoError(payload.tamanoBytes, ADJUNTO_LIMITE_BYTES);
+    }
+
+    // Validar tipo MIME por magic bytes (previene bypass de extensión).
+    // Se pasa nombreOriginal para resolver OOXML (xlsx/docx) detectados como ZIP.
+    const mimeDetectado = await validarMimeMagicBytes(payload.buffer, payload.nombreOriginal);
+
+    // Generar storageKey: {tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}
+    const nombreSaneado = payload.nombreOriginal.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
+    const storageKey = `${tenantId}/${comprobanteId}/${randomUUID()}-${nombreSaneado}`;
+
+    // Subir al storage.
+    await this.storage.put(storageKey, payload.buffer, mimeDetectado);
+
+    // Persistir metadatos en la BD.
+    const adjunto = await this.adjuntoRepo.crear({
+      organizationId: tenantId,
+      comprobanteId,
+      storageKey,
+      nombreOriginal: payload.nombreOriginal,
+      mimeType: mimeDetectado,
+      tamanoBytes: payload.tamanoBytes,
+      subidoPorUserId: userId,
+    });
+
+    return toAdjuntoResponseDto(adjunto);
+  }
+
+  /**
+   * Lista los adjuntos de un comprobante.
+   * La lectura siempre es libre — D-01/D-02 solo aplican a mutaciones.
+   */
+  async listarAdjuntos(tenantId: string, comprobanteId: string): Promise<AdjuntoResponseDto[]> {
+    const comprobante = await this.repo.findById(tenantId, comprobanteId);
+    if (!comprobante) throw new AdjuntoNoEncontradoError(comprobanteId);
+
+    const adjuntos = await this.adjuntoRepo.listar(tenantId, comprobanteId);
+    return adjuntos.map(toAdjuntoResponseDto);
+  }
+
+  /**
+   * Devuelve el stream de descarga y los metadatos del adjunto.
+   * La lectura siempre es libre — D-01/D-02 solo aplican a mutaciones.
+   */
+  async obtenerStreamAdjunto(
+    tenantId: string,
+    comprobanteId: string,
+    adjuntoId: string,
+  ): Promise<{ stream: Readable; adjunto: AdjuntoResponseDto }> {
+    const comprobante = await this.repo.findById(tenantId, comprobanteId);
+    if (!comprobante) throw new AdjuntoNoEncontradoError(comprobanteId);
+
+    const adjunto = await this.adjuntoRepo.obtenerPorId(tenantId, adjuntoId);
+    if (!adjunto) throw new AdjuntoNoEncontradoError(adjuntoId);
+
+    const stream = await this.storage.getStream(adjunto.storageKey);
+    return { stream, adjunto: toAdjuntoResponseDto(adjunto) };
+  }
+
+  /**
+   * Reemplaza el archivo de un adjunto existente.
+   * Borra el objeto anterior del storage, sube el nuevo y actualiza metadatos.
+   *
+   * Guarda: D-01 (comprobante anulado → read-only) y D-02 (período cerrado).
+   */
+  async reemplazarAdjunto(
+    tenantId: string,
+    comprobanteId: string,
+    adjuntoId: string,
+    payload: { buffer: Buffer; nombreOriginal: string; tamanoBytes: number },
+  ): Promise<AdjuntoResponseDto> {
+    const comprobante = await this.repo.findById(tenantId, comprobanteId);
+    if (!comprobante) throw new AdjuntoNoEncontradoError(comprobanteId);
+
+    // D-01: comprobante anulado → adjuntos en READ-ONLY (CLAUDE.md §4.7).
+    if (comprobante.anulado) {
+      throw new AdjuntoComprobanteAnuladoError(comprobanteId);
+    }
+
+    // D-02: período cerrado/bloqueado → no se admiten mutaciones (CLAUDE.md §4.4).
+    await this.validarPeriodoAdjuntos(
+      tenantId,
+      comprobante.fechaContable,
+      comprobante.periodoFiscalId,
+    );
+
+    const adjuntoExistente = await this.adjuntoRepo.obtenerPorId(tenantId, adjuntoId);
+    if (!adjuntoExistente) throw new AdjuntoNoEncontradoError(adjuntoId);
+
+    // Límite de tamaño: 25 MB.
+    if (payload.tamanoBytes > ADJUNTO_LIMITE_BYTES) {
+      throw new AdjuntoTamanoExcedidoError(payload.tamanoBytes, ADJUNTO_LIMITE_BYTES);
+    }
+
+    // Validar tipo MIME por magic bytes.
+    // Se pasa nombreOriginal para resolver OOXML (xlsx/docx) detectados como ZIP.
+    const mimeDetectado = await validarMimeMagicBytes(payload.buffer, payload.nombreOriginal);
+
+    // Generar nuevo storageKey para el reemplazo.
+    const nombreSaneado = payload.nombreOriginal.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
+    const nuevoStorageKey = `${tenantId}/${comprobanteId}/${randomUUID()}-${nombreSaneado}`;
+
+    // Borrar el objeto anterior del storage (idempotente — no falla si no existe).
+    await this.storage.delete(adjuntoExistente.storageKey);
+
+    // Subir el nuevo objeto.
+    await this.storage.put(nuevoStorageKey, payload.buffer, mimeDetectado);
+
+    // Actualizar metadatos en la BD.
+    const adjuntoActualizado = await this.adjuntoRepo.actualizar(tenantId, adjuntoId, {
+      storageKey: nuevoStorageKey,
+      nombreOriginal: payload.nombreOriginal,
+      mimeType: mimeDetectado,
+      tamanoBytes: payload.tamanoBytes,
+    });
+
+    return toAdjuntoResponseDto(adjuntoActualizado);
+  }
+
+  /**
+   * Elimina un adjunto: borra el objeto del storage y la fila en BD.
+   *
+   * Guarda: D-01 (comprobante anulado → read-only) y D-02 (período cerrado).
+   */
+  async eliminarAdjunto(tenantId: string, comprobanteId: string, adjuntoId: string): Promise<void> {
+    const comprobante = await this.repo.findById(tenantId, comprobanteId);
+    if (!comprobante) throw new AdjuntoNoEncontradoError(comprobanteId);
+
+    // D-01: comprobante anulado → adjuntos en READ-ONLY (CLAUDE.md §4.7).
+    if (comprobante.anulado) {
+      throw new AdjuntoComprobanteAnuladoError(comprobanteId);
+    }
+
+    // D-02: período cerrado/bloqueado → no se admiten mutaciones (CLAUDE.md §4.4).
+    await this.validarPeriodoAdjuntos(
+      tenantId,
+      comprobante.fechaContable,
+      comprobante.periodoFiscalId,
+    );
+
+    const adjunto = await this.adjuntoRepo.obtenerPorId(tenantId, adjuntoId);
+    if (!adjunto) throw new AdjuntoNoEncontradoError(adjuntoId);
+
+    // Borrar del storage (idempotente) y luego de la BD.
+    await this.storage.delete(adjunto.storageKey);
+    await this.adjuntoRepo.eliminar(tenantId, adjuntoId);
+  }
+
+  /**
+   * Valida que el período fiscal del comprobante no esté CERRADO ni BLOQUEADO.
+   * Se usa como guardia D-02 (CLAUDE.md §4.4) antes de cualquier mutación de adjunto.
+   *
+   * La lectura (listar/descargar) siempre es libre; solo las mutaciones (subir,
+   * reemplazar, eliminar) requieren período ABIERTO.
+   */
+  private async validarPeriodoAdjuntos(
+    tenantId: string,
+    fechaContableRaw: Date,
+    periodoId: string,
+  ): Promise<void> {
+    const fechaContable = FechaContable.fromDbDate(fechaContableRaw);
+    const periodo = await this.periodos.obtenerPorFecha(tenantId, fechaContable);
+    if (!periodo) return; // Sin período → no bloqueamos (gestión no configurada)
+
+    // §4.4: cualquier estado ≠ ABIERTO bloquea mutaciones (incluye CERRADO y cualquier estado futuro no-abierto).
+    if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+      throw new AdjuntoPeriodoCerradoError(periodoId, periodo.status);
+    }
   }
 }
 

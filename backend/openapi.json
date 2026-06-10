@@ -4496,6 +4496,235 @@
         ]
       }
     },
+    "/api/comprobantes/{comprobanteId}/adjuntos": {
+      "post": {
+        "operationId": "ComprobantesController_subirAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Subir un adjunto al comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "get": {
+        "operationId": "ComprobantesController_listarAdjuntos",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdjuntoResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
+      "get": {
+        "operationId": "ComprobantesController_descargarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
+      "put": {
+        "operationId": "ComprobantesController_reemplazarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "delete": {
+        "operationId": "ComprobantesController_eliminarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Adjunto eliminado."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
     "/api/contactos": {
       "post": {
         "operationId": "ContactosController_crear",
@@ -7609,6 +7838,48 @@
         },
         "required": [
           "documentoFisicoIds"
+        ]
+      },
+      "AdjuntoResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreOriginal": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "number"
+          },
+          "subidoPorUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "comprobanteId",
+          "nombreOriginal",
+          "mimeType",
+          "tamanoBytes",
+          "subidoPorUserId",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CreateContactoDto": {

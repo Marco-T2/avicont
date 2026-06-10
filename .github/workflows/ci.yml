@@ -28,7 +28,6 @@ jobs:
         ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -60,6 +59,22 @@ jobs:
       - name: Copy env
         run: cp .env.example .env
 
+      - name: Start MinIO server
+        # El service container de MinIO no soporta `command:` en GitHub Actions.
+        # Lo levantamos como proceso en background en el step directamente.
+        # MinIO necesita MINIO_ROOT_USER/PASSWORD como env vars y el comando server.
+        run: |
+          docker run -d --name minio-ci \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          # Esperar a que MinIO esté listo
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+
       - name: Generate Prisma Client
         run: pnpm exec prisma generate
 
@@ -75,6 +90,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: "9000"
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
+          MINIO_BUCKET: avicont-adjuntos
+          MINIO_USE_SSL: "false"
+          # file-type v16 es ESM puro; NODE_OPTIONS habilita import() dinámico en Jest.
+          NODE_OPTIONS: --experimental-vm-modules
         run: pnpm exec jest src/ --runInBand
 
       # E2E full-stack a través de HTTP (Supertest + AppModule). Ver CLAUDE.md §11.3.
@@ -83,6 +106,16 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
           REDIS_HOST: localhost
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: "9000"
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
+          MINIO_BUCKET: avicont-adjuntos
+          MINIO_USE_SSL: "false"
+          JWT_ACCESS_SECRET: ci-access-secret
+          JWT_REFRESH_SECRET: ci-refresh-secret
+          # file-type v16 es ESM puro; NODE_OPTIONS habilita import() dinámico en Jest.
+          NODE_OPTIONS: --experimental-vm-modules
         run: pnpm exec jest test/ --runInBand --forceExit
 
   frontend:
@@ -186,6 +219,19 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
         run: pnpm exec prisma migrate deploy
 
+      - name: Start MinIO server
+        # AppModule bootstraps MinioStorageAdapter.onModuleInit → ensureBucket → necesita MinIO.
+        run: |
+          docker run -d --name minio-drift \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+
       - name: Dump OpenAPI spec
         working-directory: backend
         env:
@@ -193,6 +239,12 @@ jobs:
           REDIS_HOST: localhost
           JWT_ACCESS_SECRET: ci-access-secret
           JWT_REFRESH_SECRET: ci-refresh-secret
+          MINIO_ENDPOINT: localhost
+          MINIO_PORT: "9000"
+          MINIO_ACCESS_KEY: minioadmin
+          MINIO_SECRET_KEY: minioadmin
+          MINIO_BUCKET: avicont-adjuntos
+          MINIO_USE_SSL: "false"
         run: pnpm run openapi:dump
 
       - name: Install frontend dependencies

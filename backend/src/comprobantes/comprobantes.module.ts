@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
@@ -7,14 +8,19 @@ import { CuentasModule } from '@/cuentas/cuentas.module';
 import { DocumentosFisicosModule } from '@/documentos-fisicos/documentos-fisicos.module';
 import { PeriodosReaderModule } from '@/periodos-fiscales/periodos-reader.module';
 import { RbacModule } from '@/rbac/rbac.module';
+import { PacksModule } from '@/packs/pack.module';
 
+import { MinioStorageAdapter } from './adapters/minio-storage.adapter';
+import { PrismaAdjuntoComprobanteRepository } from './adapters/prisma-adjunto-comprobante.repository';
 import { PrismaComprobanteRepository } from './adapters/prisma-comprobante.repository';
 import { PrismaSecuenciaComprobanteAdapter } from './adapters/prisma-secuencia-comprobante';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
+import { ADJUNTO_COMPROBANTE_REPOSITORY_PORT } from './ports/adjunto-comprobante.repository.port';
 import { COMPROBANTE_REPOSITORY_PORT } from './ports/comprobante.repository.port';
 import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
+import { STORAGE_PORT } from './ports/storage.port';
 
 // Fase 1.3: módulo completo de comprobantes — CRUD + contabilizar + anular +
 // auditoría, expuesto vía HTTP.
@@ -36,6 +42,9 @@ import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
     // y ASOCIACION_COMPROBANTE_REPOSITORY_PORT para asociar/desasociar/listar
     // documentos físicos. SIN forwardRef — documentos-fisicos NO importa comprobantes.
     DocumentosFisicosModule,
+    // Riel de packs (eje 2): exporta ORG_PACKS_READER_PORT que consume
+    // PackEnabledGuard para verificar si 'contabilidad.adjuntos' está activo.
+    PacksModule,
   ],
   controllers: [ComprobantesController],
   providers: [
@@ -53,6 +62,22 @@ import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
     // Secuencia atómica de numeración — ON CONFLICT DO UPDATE RETURNING.
     PrismaSecuenciaComprobanteAdapter,
     { provide: SECUENCIA_COMPROBANTE_PORT, useExisting: PrismaSecuenciaComprobanteAdapter },
+
+    // Storage de adjuntos (MinIO). ConfigService inyectado para leer vars MINIO_*.
+    // Separado de la app Docker a propósito: el adapter se configura desde env.
+    {
+      provide: MinioStorageAdapter,
+      useFactory: (config: ConfigService) => new MinioStorageAdapter(config),
+      inject: [ConfigService],
+    },
+    { provide: STORAGE_PORT, useExisting: MinioStorageAdapter },
+
+    // Repositorio de adjuntos (Prisma).
+    PrismaAdjuntoComprobanteRepository,
+    {
+      provide: ADJUNTO_COMPROBANTE_REPOSITORY_PORT,
+      useExisting: PrismaAdjuntoComprobanteRepository,
+    },
   ],
   exports: [ComprobantesService],
 })

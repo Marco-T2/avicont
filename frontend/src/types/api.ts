@@ -669,6 +669,9 @@ export interface ExportarComprobantesParams {
   incluirAnulados?: boolean;
 }
 
+// Adjunto de comprobante (Pack contabilidad.adjuntos — CLAUDE.md §10.1).
+export type AdjuntoComprobante = Schemas['AdjuntoResponseDto'];
+
 // Client-only: AuditoriaEntryDto no entra al OpenAPI (sin @ApiOkResponse).
 export interface AuditoriaEntry {
   id: string;
