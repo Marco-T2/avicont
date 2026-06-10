@@ -2,13 +2,16 @@
 
 > **Estado: CONSTRUIDO** (2026-06-02, change `packs-riel`, PRs #150–#157, main
 > `86105e8`) — El RIEL completo del eje 2 está implementado. Este documento pasó de
-> plano de diseño a referencia de lo construido. **Ningún pack concreto fue
-> construido en esta fase**: el catálogo contiene claves placeholder
-> (`contabilidad.adjuntos`, `contabilidad.rag`, `granja.rag`). La siguiente fase
-> consiste en enchufar el PRIMER PACK CONCRETO (Marco decide cuál): ver §9 para la
-> guía de "cómo enchufar un pack".
+> plano de diseño a referencia de lo construido.
 >
-> **Spec viva**: `openspec/specs/packs-riel/spec.md` (reconciliada contra el código).
+> **Primer pack concreto: ✅ CONSTRUIDO** — **"Adjuntos a comprobantes"**
+> (`contabilidad.adjuntos`) fue el primer pack enchufado al riel (change
+> `pack-adjuntos-comprobantes`, PR #187, 2026-06-10). `AdjuntoComprobante` +
+> `StoragePort`/`MinioStorageAdapter` + 5 endpoints sub-recurso + frontend
+> `AdjuntosSection`. Spec viva: `openspec/specs/pack-adjuntos-comprobantes/spec.md`.
+> Los packs `contabilidad.rag` y `granja.rag` siguen siendo placeholders.
+>
+> **Spec viva del riel**: `openspec/specs/packs-riel/spec.md` (reconciliada contra el código).
 >
 > Este doc **presupone** el `CLAUDE.md` raíz (multi-tenancy flat §4.2, defense in
 > depth §4.8, seguridad §5/§10.4), `docs/claude/seguridad.md`,
@@ -18,7 +21,7 @@
 > core → va al core primero, acá después (regla anti-drift §12 core).
 >
 > **Fuente de verdad de implementación**: el código y `schema.prisma`.
-> Las referencias de archivos reflejan el estado al 2026-06-02.
+> Las referencias de archivos reflejan el estado al 2026-06-02 (riel) / 2026-06-10 (adjuntos).
 
 ---
 
