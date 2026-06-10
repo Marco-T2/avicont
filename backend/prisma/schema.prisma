@@ -194,6 +194,7 @@ model Organization {
   tiposDocumentoFisico          TipoDocumentoFisico[]
   documentosFisicos             DocumentoFisico[]
   comprobantesDocumentosFisicos ComprobanteDocumentoFisico[]
+  adjuntosComprobante           AdjuntoComprobante[]
 
   // Relaciones del vertical Granja
   lotes                Lote[]
@@ -703,6 +704,7 @@ model Comprobante {
   periodoFiscal  PeriodoFiscal          @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
   lineas         LineaComprobante[]
   documentosFisicosAsociados ComprobanteDocumentoFisico[]
+  adjuntos       AdjuntoComprobante[]
 
   // Unicidad del número por (tenant, tipo). numero es NULL en BORRADOR y
   // Postgres permite múltiples NULL en un UNIQUE, así que no colisiona.
@@ -972,6 +974,41 @@ model ComprobanteDocumentoFisico {
   @@index([comprobanteId])
   @@index([documentoFisicoId])
   @@map("comprobante_documento_fisico")
+}
+
+// Adjuntos digitales a comprobantes (Pack "contabilidad.adjuntos").
+// El binario vive en MinIO (StoragePort); acá solo la metadata.
+// Aislamiento multi-tenant estricto (CLAUDE.md §4.2): organizationId en toda query.
+// 1-N directa: un adjunto pertenece a UN comprobante (no compartido como DocumentoFisico).
+// storageKey convención: {tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}
+model AdjuntoComprobante {
+  id              String   @id @default(uuid())
+  organizationId  String
+  comprobanteId   String
+
+  // Clave única en el storage (MinIO). Convención: {tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}.
+  // @unique para detectar duplicados y evitar colisiones.
+  storageKey      String   @unique
+
+  nombreOriginal  String
+  mimeType        String
+  // CLAUDE.md §4.5: tamanoBytes como Int (max 25 MB << 2^31 = 2 GB — no necesita Decimal).
+  tamanoBytes     Int
+  // sha256: previsto para deduplicación futura (v2+). En v1 siempre NULL.
+  sha256          String?
+
+  subidoPorUserId String
+  // CLAUDE.md §4.6: timestamps de auditoría en UTC (@db.Timestamptz). No son FechaContable de dominio.
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt     @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Cascade desde Comprobante: la metadata se borra con el comprobante.
+  // El objeto binario en MinIO queda huérfano — limpieza diferida (job futuro, v1 acepta huérfanos).
+  comprobante  Comprobante  @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, comprobanteId])
+  @@map("adjuntos_comprobante")
 }
 
 // =====================================================================

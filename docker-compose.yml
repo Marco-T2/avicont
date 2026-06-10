@@ -220,6 +220,28 @@ services:
     networks:
       - saas_network
 
+  minio:
+    image: minio/minio:latest
+    container_name: saas_minio
+    restart: unless-stopped
+    ports:
+      - '9000:9000'   # API S3-compatible
+      - '9001:9001'   # Consola web MinIO
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - saas_network
+
 volumes:
   postgres_data:
     driver: local
@@ -234,6 +256,8 @@ volumes:
   tempo_data:
     driver: local
   grafana_data:
+    driver: local
+  minio_data:
     driver: local
 
 networks:

@@ -226,6 +226,20 @@ export function mensajeComprobantes(err: unknown): string {
     case 'COMPROBANTE_DOCUMENTO_FISICO_NO_EXISTE':
       return 'El documento físico referenciado no existe en esta organización.';
 
+    // Adjuntos de comprobante (pack contabilidad.adjuntos)
+    case 'ADJUNTO_NO_ENCONTRADO':
+      return 'El adjunto no existe o pertenece a otra organización.';
+    case 'ADJUNTO_TOPE_COMPROBANTE':
+      return 'Se alcanzó el límite de 10 adjuntos por comprobante.';
+    case 'ADJUNTO_MIME_NO_PERMITIDO':
+      return 'Tipo de archivo no permitido. Solo se aceptan PDF, Excel, Word, texto e imágenes.';
+    case 'ADJUNTO_TAMANO_EXCEDIDO':
+      return 'El archivo supera el límite de 25 MB.';
+    case 'ADJUNTO_PERIODO_CERRADO':
+      return 'El período fiscal está cerrado. No se pueden modificar adjuntos.';
+    case 'ADJUNTO_COMPROBANTE_ANULADO':
+      return 'El comprobante está anulado. Solo se pueden consultar sus adjuntos.';
+
     // Fallback: cubre cualquier código desconocido.
     default:
       return p.message ?? FALLBACK_GENERICO;

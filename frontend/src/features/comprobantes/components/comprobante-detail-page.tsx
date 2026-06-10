@@ -31,6 +31,7 @@ import { ContabilizarComprobanteDialog } from './contabilizar-comprobante-dialog
 import { EliminarComprobanteDialog } from './eliminar-comprobante-dialog';
 import { EstadoComprobanteBadge } from './estado-comprobante-badge';
 import { MontoCell } from './monto-cell';
+import { AdjuntosSection } from './adjuntos-section';
 import { DocumentosRespaldoSection } from './documentos-respaldo-section';
 
 const TIPO_LABELS: Record<string, string> = {
@@ -386,17 +387,23 @@ export function ComprobanteDetailPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Documentos de respaldo — D5: editable solo si no anulado y estado permite */}
+        {/* Documentos de respaldo y adjuntos — D5: editable solo si no anulado y estado permite */}
         {(() => {
           const editableEnDetail =
             !comprobante.anulado &&
             (comprobante.estado === 'BORRADOR' ||
               (comprobante.estado === 'CONTABILIZADO' && puedeEditarContabilizado));
           return (
-            <DocumentosRespaldoSection
-              comprobante={comprobante}
-              editable={editableEnDetail}
-            />
+            <>
+              <DocumentosRespaldoSection
+                comprobante={comprobante}
+                editable={editableEnDetail}
+              />
+              <AdjuntosSection
+                comprobante={comprobante}
+                editable={editableEnDetail}
+              />
+            </>
           );
         })()}
       </div>

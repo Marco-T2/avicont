@@ -8,23 +8,34 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
+import { RequirePack } from '@/common/decorators/require-pack.decorator';
 import { ForbiddenError } from '@/common/errors';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
+import { PackEnabledGuard } from '@/common/guards/pack-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
@@ -42,6 +53,8 @@ import {
   ExportarComprobantesQueryDto,
   ListarComprobantesQueryDto,
 } from './dto/listar-comprobantes.dto';
+import { AdjuntoResponseDto } from './dto/adjunto-response.dto';
+import { ADJUNTO_LIMITE_BYTES } from './comprobantes.service';
 
 // ---- Resolución de tenantId desde JWT + header opcional ----------------
 // Mismo patrón que los otros controllers (ver gestiones/cuentas). El header
@@ -245,5 +258,147 @@ export class ComprobantesController {
       comprobanteId,
       documentoFisicoId,
     );
+  }
+
+  // ================================================================
+  // Adjuntos — Pack "contabilidad.adjuntos"
+  // ================================================================
+  //
+  // Todos los endpoints de adjuntos están gateados por PackEnabledGuard con
+  // la clave 'contabilidad.adjuntos'. El guard responde con 404 deliberado
+  // cuando el pack no está activo para la org (CLAUDE.md §10.1 — riel packs).
+  //
+  // PermissionsGuard ya está activo a nivel de clase. La arquitectura:
+  //   AuthGuard → ModuleEnabledGuard → PermissionsGuard → PackEnabledGuard
+  //
+  // Spec de arquitectura (require-pack-tenant-guard.arch.spec.ts): todo
+  // controller que use @RequirePack también debe referenciar TenantGuard o
+  // PermissionsGuard. PermissionsGuard está presente a nivel de clase ✅.
+
+  @Post(':comprobanteId/adjuntos')
+  @UseGuards(PackEnabledGuard)
+  @RequirePack('contabilidad.adjuntos')
+  @RequirePermissions('contabilidad.asientos.update')
+  @HttpCode(201)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ADJUNTO_LIMITE_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiOperation({ summary: 'Subir un adjunto al comprobante (Pack contabilidad.adjuntos).' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiCreatedResponse({ type: AdjuntoResponseDto })
+  async subirAdjunto(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.subirAdjunto(resolveTenantId(req), comprobanteId, req.user.sub, {
+      buffer: file.buffer,
+      nombreOriginal: file.originalname,
+      tamanoBytes: file.size,
+    });
+  }
+
+  @Get(':comprobanteId/adjuntos')
+  @UseGuards(PackEnabledGuard)
+  @RequirePack('contabilidad.adjuntos')
+  @RequirePermissions('contabilidad.asientos.read')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiOperation({ summary: 'Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos).' })
+  @ApiOkResponse({ type: [AdjuntoResponseDto] })
+  async listarAdjuntos(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+  ) {
+    return this.service.listarAdjuntos(resolveTenantId(req), comprobanteId);
+  }
+
+  @Get(':comprobanteId/adjuntos/:adjuntoId/download')
+  @UseGuards(PackEnabledGuard)
+  @RequirePack('contabilidad.adjuntos')
+  @RequirePermissions('contabilidad.asientos.read')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiParam({ name: 'adjuntoId', format: 'uuid' })
+  @ApiOperation({
+    summary: 'Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos).',
+  })
+  async descargarAdjunto(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @Param('adjuntoId', new ParseUUIDPipe()) adjuntoId: string,
+  ): Promise<StreamableFile> {
+    const { stream, adjunto } = await this.service.obtenerStreamAdjunto(
+      resolveTenantId(req),
+      comprobanteId,
+      adjuntoId,
+    );
+    return new StreamableFile(stream, {
+      type: adjunto.mimeType,
+      // RFC 5987: filename*=UTF-8''<percent-encoded> para soportar tildes y ñ.
+      // filename= como fallback ASCII para clientes que no soporten RFC 5987.
+      disposition: `attachment; filename="${encodeURIComponent(adjunto.nombreOriginal)}"; filename*=UTF-8''${encodeURIComponent(adjunto.nombreOriginal)}`,
+    });
+  }
+
+  @Put(':comprobanteId/adjuntos/:adjuntoId')
+  @UseGuards(PackEnabledGuard)
+  @RequirePack('contabilidad.adjuntos')
+  @RequirePermissions('contabilidad.asientos.update')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: ADJUNTO_LIMITE_BYTES },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiParam({ name: 'adjuntoId', format: 'uuid' })
+  @ApiOperation({
+    summary: 'Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos).',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({ type: AdjuntoResponseDto })
+  async reemplazarAdjunto(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @Param('adjuntoId', new ParseUUIDPipe()) adjuntoId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.reemplazarAdjunto(resolveTenantId(req), comprobanteId, adjuntoId, {
+      buffer: file.buffer,
+      nombreOriginal: file.originalname,
+      tamanoBytes: file.size,
+    });
+  }
+
+  @Delete(':comprobanteId/adjuntos/:adjuntoId')
+  @UseGuards(PackEnabledGuard)
+  @RequirePack('contabilidad.adjuntos')
+  @RequirePermissions('contabilidad.asientos.update')
+  @HttpCode(204)
+  @ApiParam({ name: 'comprobanteId', format: 'uuid' })
+  @ApiParam({ name: 'adjuntoId', format: 'uuid' })
+  @ApiOperation({ summary: 'Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos).' })
+  @ApiNoContentResponse({ description: 'Adjunto eliminado.' })
+  async eliminarAdjunto(
+    @Req() req: AuthenticatedRequest,
+    @Param('comprobanteId', new ParseUUIDPipe()) comprobanteId: string,
+    @Param('adjuntoId', new ParseUUIDPipe()) adjuntoId: string,
+  ): Promise<void> {
+    await this.service.eliminarAdjunto(resolveTenantId(req), comprobanteId, adjuntoId);
   }
 }

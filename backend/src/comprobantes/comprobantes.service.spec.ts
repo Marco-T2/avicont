@@ -1,4 +1,5 @@
 import {
+  type AdjuntoComprobante,
   type ComprobanteDocumentoFisico,
   EstadoComprobante,
   Moneda,
@@ -6,6 +7,7 @@ import {
   Prisma,
   TipoComprobante,
 } from '@prisma/client';
+import { Readable } from 'stream';
 import type { ConfigService } from '@nestjs/config';
 
 import type { ClockPort } from '@/common/clock/clock.port';
@@ -24,6 +26,16 @@ import type { RbacService } from '@/rbac/rbac.service';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobanteDocumentoAsociacionPeriodoCerradoError } from './domain/comprobante-errors';
+import {
+  AdjuntoComprobanteAnuladoError,
+  AdjuntoMimeNoPermitidoError,
+  AdjuntoNoEncontradoError,
+  AdjuntoPeriodoCerradoError,
+  AdjuntoTamanoExcedidoError,
+  AdjuntoTopeExcedidoError,
+} from './domain/adjunto-errors';
+import type { AdjuntoComprobanteRepositoryPort } from './ports/adjunto-comprobante.repository.port';
+import type { StoragePort } from './ports/storage.port';
 import type {
   ComprobanteConLineas,
   ComprobanteListRow,
@@ -51,6 +63,8 @@ type MockSecuencia = { [K in keyof SecuenciaComprobantePort]: jest.Mock };
 type MockDocsReader = { [K in keyof DocumentosFisicosReaderPort]: jest.Mock };
 type MockAsociacionRepo = { [K in keyof AsociacionComprobanteRepositoryPort]: jest.Mock };
 type MockRbac = { hasPermission: jest.Mock };
+type MockStoragePort = { [K in keyof StoragePort]: jest.Mock };
+type MockAdjuntoRepo = { [K in keyof AdjuntoComprobanteRepositoryPort]: jest.Mock };
 
 function makeRepoMock(): MockRepo {
   return {
@@ -142,6 +156,44 @@ function makeClockMock(hoyIso = '2026-04-22'): MockClock {
     now: jest.fn(() => new Date(`${hoyIso}T12:00:00Z`)),
     currentYearLaPaz: jest.fn(() => Number(hoyIso.slice(0, 4))),
     currentDateLaPaz: jest.fn(() => hoyIso),
+  };
+}
+
+function makeStoragePortMock(): MockStoragePort {
+  return {
+    put: jest.fn().mockResolvedValue(undefined),
+    getStream: jest.fn().mockResolvedValue(Readable.from(Buffer.from('test'))),
+    delete: jest.fn().mockResolvedValue(undefined),
+    exists: jest.fn().mockResolvedValue(true),
+  };
+}
+
+function makeAdjuntoRepoMock(): MockAdjuntoRepo {
+  return {
+    crear: jest.fn(),
+    listar: jest.fn().mockResolvedValue([]),
+    obtenerPorId: jest.fn().mockResolvedValue(null),
+    actualizar: jest.fn(),
+    eliminar: jest.fn().mockResolvedValue(true),
+    contarPorComprobante: jest.fn().mockResolvedValue(0),
+  };
+}
+
+/** Construye un AdjuntoComprobante mock para usar en tests. */
+function adjuntoFactory(overrides: Partial<AdjuntoComprobante> = {}): AdjuntoComprobante {
+  return {
+    id: 'adj-1',
+    organizationId: TENANT_ID,
+    comprobanteId: 'comp-1',
+    storageKey: `${TENANT_ID}/comp-1/uuid-factura.pdf`,
+    nombreOriginal: 'factura.pdf',
+    mimeType: 'application/pdf',
+    tamanoBytes: 25_000,
+    sha256: null,
+    subidoPorUserId: USER_ID,
+    createdAt: new Date('2026-01-15T10:30:00.000Z'),
+    updatedAt: new Date('2026-01-15T10:30:00.000Z'),
+    ...overrides,
   };
 }
 
@@ -251,6 +303,8 @@ function buildService(overrides?: {
   rbac?: Partial<MockRbac>;
   auditedRunner?: ReturnType<typeof makeAuditedRunnerMock>;
   exportMax?: number;
+  storagePort?: Partial<MockStoragePort>;
+  adjuntoRepo?: Partial<MockAdjuntoRepo>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -268,6 +322,8 @@ function buildService(overrides?: {
   // de que task 5.5 los migre.
   const prisma = makePrismaMock();
   const config = makeConfigMock(overrides?.exportMax ?? 1000);
+  const storagePort = { ...makeStoragePortMock(), ...(overrides?.storagePort ?? {}) };
+  const adjuntoRepo = { ...makeAdjuntoRepoMock(), ...(overrides?.adjuntoRepo ?? {}) };
 
   const service = new ComprobantesService(
     repo as unknown as ComprobanteRepositoryPort,
@@ -282,6 +338,8 @@ function buildService(overrides?: {
     auditedRunner as unknown as AuditedTransactionRunner,
     rbac as unknown as RbacService,
     config as unknown as ConfigService,
+    storagePort as unknown as StoragePort,
+    adjuntoRepo as unknown as AdjuntoComprobanteRepositoryPort,
   );
   return {
     service,
@@ -297,6 +355,8 @@ function buildService(overrides?: {
     auditedRunner,
     prisma,
     config,
+    storagePort,
+    adjuntoRepo,
   };
 }
 
@@ -2676,6 +2736,387 @@ describe('ComprobantesService', () => {
       await expect(service.exportar(TENANT_ID, {})).resolves.toMatchObject({
         items: expect.arrayContaining([]),
       });
+    });
+  });
+
+  // ============================================================
+  // Adjuntos (Pack "contabilidad.adjuntos")
+  // ============================================================
+
+  describe('subirAdjunto', () => {
+    /** Buffer mínimo con magic bytes de PDF para pasar la validación MIME. */
+    const PDF_BUFFER = Buffer.from([
+      0x25,
+      0x50,
+      0x44,
+      0x46,
+      0x2d,
+      0x31,
+      0x2e,
+      0x34, // %PDF-1.4
+      0x0a,
+      0x25,
+      0xe2,
+      0xe3,
+      0xcf,
+      0xd3,
+      0x0a,
+      0x31, // comentario binario
+      0x20,
+      0x30,
+      0x20,
+      0x6f,
+      0x62,
+      0x6a,
+      0x0a,
+      0x3c, // 1 0 obj\n<
+      0x3c,
+      0x0a,
+      0x2f,
+      0x54,
+      0x79,
+      0x70,
+      0x65,
+      0x20, // </Type
+    ]);
+
+    it('happy path — devuelve AdjuntoResponseDto con los campos correctos', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+      adjuntoRepo.crear.mockResolvedValue(
+        adjuntoFactory({ id: 'adj-nuevo', nombreOriginal: 'factura.pdf' }),
+      );
+
+      const result = await service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+        buffer: PDF_BUFFER,
+        nombreOriginal: 'factura.pdf',
+        tamanoBytes: PDF_BUFFER.length,
+      });
+
+      expect(result.id).toBe('adj-nuevo');
+      expect(result.nombreOriginal).toBe('factura.pdf');
+      expect(result.mimeType).toBe('application/pdf');
+    });
+
+    it('tope excedido (10 adjuntos) — lanza AdjuntoTopeExcedidoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: false }));
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(10);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoTopeExcedidoError);
+    });
+
+    it('MIME inválido (EXE renombrado a .pdf) — lanza AdjuntoMimeNoPermitidoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: false }));
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+
+      // Magic bytes de un EXE (MZ header)
+      const exeBuffer = Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00]);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: exeBuffer,
+          nombreOriginal: 'malware.pdf',
+          tamanoBytes: exeBuffer.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoMimeNoPermitidoError);
+    });
+
+    it('tamaño excedido (> 25 MB) — lanza AdjuntoTamanoExcedidoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: false }));
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+
+      const LIMITE_25MB = 25 * 1024 * 1024;
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'enorme.pdf',
+          tamanoBytes: LIMITE_25MB + 1,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoTamanoExcedidoError);
+    });
+
+    it('período cerrado (D-02) — lanza AdjuntoPeriodoCerradoError', async () => {
+      const { service, repo, periodos, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.CERRADO,
+      });
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoPeriodoCerradoError);
+    });
+
+    it('período bloqueado (D-02 BLOQUEADO) — lanza AdjuntoPeriodoCerradoError', async () => {
+      // §4.4: cualquier estado ≠ ABIERTO (incluido un futuro BLOQUEADO) debe rechazar mutaciones.
+      // Usamos cast a PeriodoFiscalStatus porque el enum hoy solo tiene ABIERTO/CERRADO;
+      // el fix `!== ABIERTO` cubre cualquier valor no-abierto presente o futuro.
+      // RED: con el código actual (solo chequea === CERRADO) este test FALLA.
+      const BLOQUEADO = 'BLOQUEADO' as PeriodoFiscalStatus;
+      const { service, repo, periodos, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: BLOQUEADO,
+      });
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoPeriodoCerradoError);
+    });
+
+    it('comprobante anulado (D-01) — lanza AdjuntoComprobanteAnuladoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: true }));
+      adjuntoRepo.contarPorComprobante.mockResolvedValue(0);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-1', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoComprobanteAnuladoError);
+    });
+
+    it('comprobante de otro tenant (cross-tenant) — lanza AdjuntoNoEncontradoError', async () => {
+      const { service, repo } = buildService();
+      // findById devuelve null cuando el comprobante no pertenece al tenant (Anti-31)
+      repo.findById.mockResolvedValue(null);
+
+      await expect(
+        service.subirAdjunto(TENANT_ID, 'comp-otro-tenant', USER_ID, {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoNoEncontradoError);
+    });
+  });
+
+  describe('listarAdjuntos', () => {
+    it('devuelve array vacío si el comprobante no tiene adjuntos', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      adjuntoRepo.listar.mockResolvedValue([]);
+
+      const result = await service.listarAdjuntos(TENANT_ID, 'comp-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('devuelve array con DTOs de respuesta cuando hay adjuntos', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      adjuntoRepo.listar.mockResolvedValue([
+        adjuntoFactory({ id: 'adj-1' }),
+        adjuntoFactory({ id: 'adj-2', nombreOriginal: 'balance.xlsx' }),
+      ]);
+
+      const result = await service.listarAdjuntos(TENANT_ID, 'comp-1');
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.id).toBe('adj-1');
+      expect(result[1]?.id).toBe('adj-2');
+    });
+
+    it('comprobante no encontrado — lanza AdjuntoNoEncontradoError', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.listarAdjuntos(TENANT_ID, 'no-existe')).rejects.toBeInstanceOf(
+        AdjuntoNoEncontradoError,
+      );
+    });
+  });
+
+  describe('obtenerStreamAdjunto', () => {
+    it('devuelve el stream y metadata del adjunto', async () => {
+      const stream = Readable.from(Buffer.from('contenido-pdf'));
+      const { service, repo, adjuntoRepo, storagePort } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoFactory({ id: 'adj-1' }));
+      storagePort.getStream.mockResolvedValue(stream);
+
+      const result = await service.obtenerStreamAdjunto(TENANT_ID, 'comp-1', 'adj-1');
+
+      expect(result.stream).toBe(stream);
+      expect(result.adjunto.id).toBe('adj-1');
+      expect(result.adjunto.mimeType).toBe('application/pdf');
+    });
+
+    it('adjunto de otro tenant (cross-tenant) — lanza AdjuntoNoEncontradoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1' }));
+      // obtenerPorId devuelve null cuando el adjunto es de otro tenant (Anti-31)
+      adjuntoRepo.obtenerPorId.mockResolvedValue(null);
+
+      await expect(
+        service.obtenerStreamAdjunto(TENANT_ID, 'comp-1', 'adj-otro-tenant'),
+      ).rejects.toBeInstanceOf(AdjuntoNoEncontradoError);
+    });
+  });
+
+  describe('reemplazarAdjunto', () => {
+    const PDF_BUFFER = Buffer.from([
+      0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a, 0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a,
+      0x31, 0x20, 0x30, 0x20, 0x6f, 0x62, 0x6a, 0x0a, 0x3c, 0x3c, 0x0a, 0x2f, 0x54, 0x79, 0x70,
+      0x65, 0x20,
+    ]);
+
+    it('borra el storage anterior, sube el nuevo y actualiza metadata', async () => {
+      const adjuntoExistente = adjuntoFactory({
+        id: 'adj-1',
+        storageKey: `${TENANT_ID}/comp-1/old-uuid-factura.pdf`,
+      });
+      const adjuntoActualizado = adjuntoFactory({
+        id: 'adj-1',
+        nombreOriginal: 'factura-v2.pdf',
+        storageKey: `${TENANT_ID}/comp-1/new-uuid-factura-v2.pdf`,
+      });
+      const { service, repo, adjuntoRepo, storagePort } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoExistente);
+      adjuntoRepo.actualizar.mockResolvedValue(adjuntoActualizado);
+
+      const result = await service.reemplazarAdjunto(TENANT_ID, 'comp-1', 'adj-1', {
+        buffer: PDF_BUFFER,
+        nombreOriginal: 'factura-v2.pdf',
+        tamanoBytes: PDF_BUFFER.length,
+      });
+
+      // El storage anterior se borró
+      expect(storagePort.delete).toHaveBeenCalledWith(adjuntoExistente.storageKey);
+      // El nuevo se subió
+      expect(storagePort.put).toHaveBeenCalled();
+      // El resultado tiene el nombre actualizado
+      expect(result.nombreOriginal).toBe('factura-v2.pdf');
+    });
+
+    it('comprobante anulado (D-01) — lanza AdjuntoComprobanteAnuladoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: true }));
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoFactory({ id: 'adj-1' }));
+
+      await expect(
+        service.reemplazarAdjunto(TENANT_ID, 'comp-1', 'adj-1', {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura-v2.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoComprobanteAnuladoError);
+    });
+
+    it('período bloqueado (D-02 BLOQUEADO) — lanza AdjuntoPeriodoCerradoError', async () => {
+      // §4.4: cualquier estado ≠ ABIERTO debe rechazar mutaciones.
+      // RED: falla con el código actual (solo chequea === CERRADO).
+      const BLOQUEADO = 'BLOQUEADO' as PeriodoFiscalStatus;
+      const { service, repo, adjuntoRepo, periodos } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoFactory({ id: 'adj-1' }));
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: BLOQUEADO,
+      });
+
+      await expect(
+        service.reemplazarAdjunto(TENANT_ID, 'comp-1', 'adj-1', {
+          buffer: PDF_BUFFER,
+          nombreOriginal: 'factura-v2.pdf',
+          tamanoBytes: PDF_BUFFER.length,
+        }),
+      ).rejects.toBeInstanceOf(AdjuntoPeriodoCerradoError);
+    });
+  });
+
+  describe('eliminarAdjunto', () => {
+    it('llama StoragePort.delete y repo.eliminar', async () => {
+      const adjuntoExistente = adjuntoFactory({
+        id: 'adj-1',
+        storageKey: `${TENANT_ID}/comp-1/uuid-factura.pdf`,
+      });
+      const { service, repo, adjuntoRepo, storagePort } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoExistente);
+      adjuntoRepo.eliminar.mockResolvedValue(true);
+
+      await service.eliminarAdjunto(TENANT_ID, 'comp-1', 'adj-1');
+
+      expect(storagePort.delete).toHaveBeenCalledWith(adjuntoExistente.storageKey);
+      expect(adjuntoRepo.eliminar).toHaveBeenCalledWith(TENANT_ID, 'adj-1');
+    });
+
+    it('adjunto no encontrado — lanza AdjuntoNoEncontradoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: false }));
+      adjuntoRepo.obtenerPorId.mockResolvedValue(null);
+
+      await expect(
+        service.eliminarAdjunto(TENANT_ID, 'comp-1', 'adj-no-existe'),
+      ).rejects.toBeInstanceOf(AdjuntoNoEncontradoError);
+    });
+
+    it('comprobante anulado (D-01) — lanza AdjuntoComprobanteAnuladoError', async () => {
+      const { service, repo, adjuntoRepo } = buildService();
+      repo.findById.mockResolvedValue(comprobanteFactory({ id: 'comp-1', anulado: true }));
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoFactory({ id: 'adj-1' }));
+
+      await expect(service.eliminarAdjunto(TENANT_ID, 'comp-1', 'adj-1')).rejects.toBeInstanceOf(
+        AdjuntoComprobanteAnuladoError,
+      );
+    });
+
+    it('período bloqueado (D-02 BLOQUEADO) — lanza AdjuntoPeriodoCerradoError', async () => {
+      // §4.4: cualquier estado ≠ ABIERTO debe rechazar mutaciones.
+      // RED: falla con el código actual (solo chequea === CERRADO).
+      const BLOQUEADO = 'BLOQUEADO' as PeriodoFiscalStatus;
+      const { service, repo, adjuntoRepo, periodos } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ id: 'comp-1', anulado: false, periodoFiscalId: PERIODO_ID }),
+      );
+      adjuntoRepo.obtenerPorId.mockResolvedValue(adjuntoFactory({ id: 'adj-1' }));
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: BLOQUEADO,
+      });
+
+      await expect(service.eliminarAdjunto(TENANT_ID, 'comp-1', 'adj-1')).rejects.toBeInstanceOf(
+        AdjuntoPeriodoCerradoError,
+      );
     });
   });
 });

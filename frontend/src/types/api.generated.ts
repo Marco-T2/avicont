@@ -1580,6 +1580,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/comprobantes/{comprobanteId}/adjuntos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos). */
+        get: operations["ComprobantesController_listarAdjuntos"];
+        put?: never;
+        /** Subir un adjunto al comprobante (Pack contabilidad.adjuntos). */
+        post: operations["ComprobantesController_subirAdjunto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos). */
+        get: operations["ComprobantesController_descargarAdjunto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos). */
+        put: operations["ComprobantesController_reemplazarAdjunto"];
+        post?: never;
+        /** Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos). */
+        delete: operations["ComprobantesController_eliminarAdjunto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contactos": {
         parameters: {
             query?: never;
@@ -2688,6 +2741,19 @@ export interface components {
              *     ]
              */
             documentoFisicoIds: string[];
+        };
+        AdjuntoResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            comprobanteId: string;
+            nombreOriginal: string;
+            mimeType: string;
+            tamanoBytes: number;
+            /** Format: uuid */
+            subidoPorUserId: string;
+            createdAt: string;
+            updatedAt: string;
         };
         CreateContactoDto: {
             /** @example Granjas El Sol SRL */
@@ -6023,6 +6089,125 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_listarAdjuntos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"][];
+                };
+            };
+        };
+    };
+    ComprobantesController_subirAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_descargarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_reemplazarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_eliminarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Adjunto eliminado. */
             204: {
                 headers: {
                     [name: string]: unknown;

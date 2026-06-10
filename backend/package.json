@@ -20,6 +20,7 @@
     "openapi:dump": "ts-node -r tsconfig-paths/register scripts/dump-openapi.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1063.0",
     "@nestjs/common": "^11.1.12",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.12",
@@ -47,6 +48,7 @@
     "cookie-parser": "^1.4.7",
     "decimal.js": "^10.5.0",
     "express": "^5.2.1",
+    "file-type": "^16.5.4",
     "ioredis": "^5.9.2",
     "nodemailer": "^7.0.12",
     "passport": "^0.7.0",
@@ -70,6 +72,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^2.1.0",
     "@types/node": "^25.0.10",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.16.0",
@@ -81,6 +84,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "jest": "^30.2.0",
+    "multer": "^2.1.1",
     "prettier": "^3.8.1",
     "prisma": "^6.19.2",
     "supertest": "^7.2.2",
