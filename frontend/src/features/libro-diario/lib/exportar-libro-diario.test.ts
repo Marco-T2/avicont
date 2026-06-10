@@ -254,9 +254,33 @@ describe('mapearLibroDiarioAFilas', () => {
     const filas = mapearLibroDiarioAFilas(response, perfilCompleto);
 
     // Perfil completo = 6 filas de cabecera fiscal al inicio
-    // La primera fila debe contener la razón social
+    // La primera fila debe contener la razón social (en negrita desde Fase Estilos)
     const primeraFila = filas[0];
-    expect(primeraFila?.[0]).toEqual({ type: 'texto', value: 'Avicont S.R.L.' });
+    expect(primeraFila?.[0]).toMatchObject({ type: 'texto', value: 'Avicont S.R.L.' });
+  });
+
+  it('(estilo) fila de encabezados de columna → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseLibroDiario();
+    const filas = mapearLibroDiarioAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal (todo null), la fila 0 = encabezados de columna
+    const filaEncabezados = filas[0];
+    expect(filaEncabezados).toBeDefined();
+    filaEncabezados!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(estilo) fila TOTAL → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseLibroDiario();
+    const filas = mapearLibroDiarioAFilas(response, perfilTodoNull);
+
+    // La última fila es la de totales
+    const filaTotales = filas[filas.length - 1];
+    expect(filaTotales).toBeDefined();
+    filaTotales!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
   });
 
   it('no rompe cuando el perfil fiscal tiene todos los campos null', () => {
@@ -271,5 +295,19 @@ describe('mapearLibroDiarioAFilas', () => {
       .flatMap((fila) => fila)
       .map((celda) => celda.value);
     expect(todasLasValues.some((v) => v === 'null')).toBe(false);
+  });
+
+  it('(W2) filas de detalle (líneas de asiento) no llevan fontWeight en ninguna celda', () => {
+    const response = crearResponseLibroDiario();
+    const filas = mapearLibroDiarioAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal: fila 0 = encabezados, filas 1..5 = detalle, última = totales
+    // Tomamos la primera fila de detalle (índice 1)
+    const primeraFilaDetalle = filas[1];
+    expect(primeraFilaDetalle).toBeDefined();
+
+    primeraFilaDetalle!.forEach((celda) => {
+      expect('fontWeight' in celda).toBe(false);
+    });
   });
 });

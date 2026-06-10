@@ -60,32 +60,32 @@ export function mapearBalanceGeneralAFilas(
   // 1. Cabecera fiscal
   filas.push(...armarCabeceraFiscal(perfil));
 
-  // 2. Encabezados de columna
+  // 2. Encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([
-    { type: 'texto', value: 'Concepto' },
-    { type: 'texto', value: 'Saldo (BOB)' },
+    { type: 'texto', value: 'Concepto', fontWeight: 'bold' },
+    { type: 'texto', value: 'Saldo (BOB)', fontWeight: 'bold' },
   ]);
 
   // 3. Árbol aplanado de las 3 secciones
   filas.push(...aplanarArbol(adaptarSeccionesBalance(response)));
 
-  // 4. Filas de cuadre — valores del backend, sin recalcular
+  // 4. Filas de cuadre — valores del backend, sin recalcular; negrita para totales
   filas.push([
-    { type: 'texto', value: 'TOTAL ACTIVO' },
-    { type: 'numero', value: response.totalActivoBob },
+    { type: 'texto', value: 'TOTAL ACTIVO', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalActivoBob, fontWeight: 'bold' },
   ]);
   filas.push([
-    { type: 'texto', value: 'TOTAL PASIVO' },
-    { type: 'numero', value: response.totalPasivoBob },
+    { type: 'texto', value: 'TOTAL PASIVO', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalPasivoBob, fontWeight: 'bold' },
   ]);
   filas.push([
-    { type: 'texto', value: 'TOTAL PATRIMONIO' },
-    { type: 'numero', value: response.totalPatrimonioBob },
+    { type: 'texto', value: 'TOTAL PATRIMONIO', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalPatrimonioBob, fontWeight: 'bold' },
   ]);
   filas.push([
-    { type: 'texto', value: response.cuadra ? '✓ Cuadra' : '✗ No cuadra' },
+    { type: 'texto', value: response.cuadra ? '✓ Cuadra' : '✗ No cuadra', fontWeight: 'bold' },
     // §4.5: diferenciaBob del backend (0.00 si cuadra, otro valor si hay diferencia)
-    { type: 'numero', value: response.diferenciaBob },
+    { type: 'numero', value: response.diferenciaBob, fontWeight: 'bold' },
   ]);
 
   return filas;

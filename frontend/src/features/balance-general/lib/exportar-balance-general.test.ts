@@ -137,9 +137,9 @@ describe('mapearBalanceGeneralAFilas', () => {
     const filaPasivo = filas.find((f) => f[0]?.value === 'TOTAL PASIVO');
     const filaPatrimonio = filas.find((f) => f[0]?.value === 'TOTAL PATRIMONIO');
 
-    expect(filaActivo?.[1]).toEqual({ type: 'numero', value: '88888.88' });
-    expect(filaPasivo?.[1]).toEqual({ type: 'numero', value: '33333.33' });
-    expect(filaPatrimonio?.[1]).toEqual({ type: 'numero', value: '55555.55' });
+    expect(filaActivo?.[1]).toMatchObject({ type: 'numero', value: '88888.88' });
+    expect(filaPasivo?.[1]).toMatchObject({ type: 'numero', value: '33333.33' });
+    expect(filaPatrimonio?.[1]).toMatchObject({ type: 'numero', value: '55555.55' });
   });
 
   it('marca la cuenta contraria (esContraria true) en la hoja', () => {
@@ -210,12 +210,57 @@ describe('mapearBalanceGeneralAFilas', () => {
     expect(todasLasValues.some((v) => typeof v === 'string' && v.includes('Grupo Caja'))).toBe(true);
   });
 
+  it('(estilo) fila de encabezados de columna → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseBalance();
+    const filas = mapearBalanceGeneralAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal, la fila 0 = encabezados de columna
+    const filaEncabezados = filas[0];
+    expect(filaEncabezados).toBeDefined();
+    filaEncabezados!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(estilo) filas TOTAL ACTIVO, TOTAL PASIVO, TOTAL PATRIMONIO y cuadre → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseBalance();
+    const filas = mapearBalanceGeneralAFilas(response, perfilTodoNull);
+
+    const filaActivo = filas.find((f) => f[0]?.value === 'TOTAL ACTIVO');
+    const filaPasivo = filas.find((f) => f[0]?.value === 'TOTAL PASIVO');
+    const filaPatrimonio = filas.find((f) => f[0]?.value === 'TOTAL PATRIMONIO');
+    const filaCuadre = filas[filas.length - 1]; // última fila = cuadre
+
+    [filaActivo, filaPasivo, filaPatrimonio, filaCuadre].forEach((fila) => {
+      expect(fila).toBeDefined();
+      fila!.forEach((celda) => {
+        expect(celda).toMatchObject({ fontWeight: 'bold' });
+      });
+    });
+  });
+
+  it('(estilo) filas de cuenta de detalle → SIN fontWeight', () => {
+    const response = crearResponseBalance();
+    const filas = mapearBalanceGeneralAFilas(response, perfilTodoNull);
+
+    // Las cuentas de detalle tienen indentación de 4 espacios (de aplanarArbol)
+    const filasDetalle = filas.filter(
+      (f) => f[0]?.type === 'texto' && typeof f[0].value === 'string' && f[0].value.startsWith('    '),
+    );
+    expect(filasDetalle.length).toBeGreaterThan(0);
+    filasDetalle.forEach((fila) => {
+      fila.forEach((celda) => {
+        expect('fontWeight' in celda).toBe(false);
+      });
+    });
+  });
+
   it('incluye la cabecera fiscal al inicio cuando el perfil está completo', () => {
     const response = crearResponseBalance();
     const filas = mapearBalanceGeneralAFilas(response, perfilCompleto);
 
     const primeraFila = filas[0];
-    expect(primeraFila?.[0]).toEqual({ type: 'texto', value: 'Avicont S.R.L.' });
+    expect(primeraFila?.[0]).toMatchObject({ type: 'texto', value: 'Avicont S.R.L.' });
   });
 
   it('no rompe cuando el perfil fiscal tiene todos los campos null', () => {

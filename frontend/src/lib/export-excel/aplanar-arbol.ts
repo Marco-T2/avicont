@@ -57,17 +57,17 @@ export function aplanarArbol(secciones: SeccionArbol[]): Celda[][] {
   const filas: Celda[][] = [];
 
   for (const seccion of secciones) {
-    // Fila de título de sección
+    // Fila de título de sección — negrita (es encabezado de agrupación)
     filas.push([
-      { type: 'texto', value: seccion.titulo },
-      { type: 'texto', value: '' },
+      { type: 'texto', value: seccion.titulo, fontWeight: 'bold' },
+      { type: 'texto', value: '', fontWeight: 'bold' },
     ]);
 
     for (const sub of seccion.subsecciones) {
-      // Fila de título de subsección
+      // Fila de título de subsección — negrita (es encabezado de agrupación)
       filas.push([
-        { type: 'texto', value: `${SANGRIA_SUBSECCION}${sub.titulo}` },
-        { type: 'texto', value: '' },
+        { type: 'texto', value: `${SANGRIA_SUBSECCION}${sub.titulo}`, fontWeight: 'bold' },
+        { type: 'texto', value: '', fontWeight: 'bold' },
       ]);
 
       for (const cuenta of sub.cuentas) {
@@ -76,6 +76,7 @@ export function aplanarArbol(secciones: SeccionArbol[]): Celda[][] {
         const contrariaLabel = cuenta.esContraria ? ' (contraria)' : '';
         const concepto = `${SANGRIA_CUENTA}${codigoParte}${cuenta.nombre}${contrariaLabel}`;
 
+        // Filas de detalle: sin negrita (son datos, no agrupadores)
         filas.push([
           { type: 'texto', value: concepto },
           // §4.5: saldoBob es el string decimal del backend; lo pasamos como CeldaNumero
@@ -83,17 +84,17 @@ export function aplanarArbol(secciones: SeccionArbol[]): Celda[][] {
         ]);
       }
 
-      // Fila de subtotal de subsección — valor del backend, sin recalcular
+      // Fila de subtotal de subsección — negrita (es un total agrupador)
       filas.push([
-        { type: 'texto', value: `${SANGRIA_SUBSECCION}Total ${sub.titulo}` },
-        { type: 'numero', value: sub.totalBob },
+        { type: 'texto', value: `${SANGRIA_SUBSECCION}Total ${sub.titulo}`, fontWeight: 'bold' },
+        { type: 'numero', value: sub.totalBob, fontWeight: 'bold' },
       ]);
     }
 
-    // Fila de subtotal de sección — valor del backend, sin recalcular
+    // Fila de subtotal de sección — negrita (es un total agrupador)
     filas.push([
-      { type: 'texto', value: `Total ${seccion.titulo}` },
-      { type: 'numero', value: seccion.totalBob },
+      { type: 'texto', value: `Total ${seccion.titulo}`, fontWeight: 'bold' },
+      { type: 'numero', value: seccion.totalBob, fontWeight: 'bold' },
     ]);
   }
 

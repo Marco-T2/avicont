@@ -92,6 +92,76 @@ describe('construirHoja', () => {
     expect(blob).toBeInstanceOf(Blob);
   });
 
+  it('(estilo-a) CeldaNumero con fontWeight:"bold" → sheetData[r][c].fontWeight === "bold"', async () => {
+    const filas: Celda[][] = [[{ type: 'numero', value: '1000.00', fontWeight: 'bold' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    expect(sheetData[0]?.[0]?.fontWeight).toBe('bold');
+  });
+
+  it('(estilo-b) CeldaNumero SIN align → output tiene align === "right" (default numérico)', async () => {
+    const filas: Celda[][] = [[{ type: 'numero', value: '500.00' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    expect(sheetData[0]?.[0]?.align).toBe('right');
+  });
+
+  it('(estilo-c) CeldaTexto SIN estilo → output NO tiene fontWeight ni align (retrocompat)', async () => {
+    const filas: Celda[][] = [[{ type: 'texto', value: 'Concepto' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    const celda = sheetData[0]?.[0];
+    expect(celda).toBeDefined();
+    expect('fontWeight' in celda!).toBe(false);
+    expect('align' in celda!).toBe(false);
+  });
+
+  it('(estilo-d) override: CeldaNumero con align:"left" → output align === "left"', async () => {
+    const filas: Celda[][] = [[{ type: 'numero', value: '0.00', align: 'left' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    expect(sheetData[0]?.[0]?.align).toBe('left');
+  });
+
+  it('(estilo-e) §4.5 intacto con estilo: value === parsearMontoCelda(...) y format === "#,##0.00"', async () => {
+    const filas: Celda[][] = [[{ type: 'numero', value: '9876.54', fontWeight: 'bold' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    const celda = sheetData[0]?.[0];
+    expect(celda?.value).toBe(parsearMontoCelda('9876.54'));
+    expect(celda?.format).toBe('#,##0.00');
+  });
+
+  it('(S2) CeldaNumero SIN fontWeight → output tiene align:"right" pero NO tiene la prop fontWeight', async () => {
+    const filas: Celda[][] = [[{ type: 'numero', value: '750.00' }]];
+    await construirHoja(filas);
+
+    const last = capturedArgs[capturedArgs.length - 1];
+    expect(last).toBeDefined();
+    const sheetData = last!.sheetData as Record<string, unknown>[][];
+    const celda = sheetData[0]?.[0];
+    expect(celda).toBeDefined();
+    // Montos numéricos siempre van alineados a la derecha (§4.5)
+    expect(celda!.align).toBe('right');
+    // Sin fontWeight explícito no debe propagarse la prop al output (exactOptionalPropertyTypes)
+    expect('fontWeight' in celda!).toBe(false);
+  });
+
   it('la fila de totales escribe los valores recibidos tal cual, sin sumar columnas (anti-recálculo)', async () => {
     // §4.5 Anti-recálculo: el builder NO suma columnas.
     // Pasamos 3 filas con values 2000, 3000 y 5000 (que no son la suma de las anteriores).

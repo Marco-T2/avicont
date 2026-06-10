@@ -109,9 +109,9 @@ describe('mapearEstadoResultadosAFilas', () => {
       (f) => typeof f[0]?.value === 'string' && f[0].value.startsWith('Resultado del Ejercicio'),
     );
 
-    expect(filaIngresos?.[1]).toEqual({ type: 'numero', value: '99999.99' });
-    expect(filaEgresos?.[1]).toEqual({ type: 'numero', value: '44444.44' });
-    expect(filaResultado?.[1]).toEqual({ type: 'numero', value: '55555.55' });
+    expect(filaIngresos?.[1]).toMatchObject({ type: 'numero', value: '99999.99' });
+    expect(filaEgresos?.[1]).toMatchObject({ type: 'numero', value: '44444.44' });
+    expect(filaResultado?.[1]).toMatchObject({ type: 'numero', value: '55555.55' });
   });
 
   it('indica Ganancia cuando esGanancia true y Pérdida cuando false', () => {
@@ -138,12 +138,58 @@ describe('mapearEstadoResultadosAFilas', () => {
     expect(filaCuenta![0]!.value).toMatch(/^ {4}/); // 4 espacios de sangría para nivel de cuenta
   });
 
+  it('(estilo) fila de encabezados de columna → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseResultados();
+    const filas = mapearEstadoResultadosAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal, la fila 0 = encabezados de columna
+    const filaEncabezados = filas[0];
+    expect(filaEncabezados).toBeDefined();
+    filaEncabezados!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(estilo) filas TOTAL INGRESOS, TOTAL EGRESOS y Resultado del Ejercicio → fontWeight:"bold"', () => {
+    const response = crearResponseResultados();
+    const filas = mapearEstadoResultadosAFilas(response, perfilTodoNull);
+
+    const filaIngresos = filas.find((f) => f[0]?.value === 'TOTAL INGRESOS');
+    const filaEgresos = filas.find((f) => f[0]?.value === 'TOTAL EGRESOS');
+    const filaResultado = filas.find(
+      (f) => typeof f[0]?.value === 'string' && f[0].value.startsWith('Resultado del Ejercicio'),
+    );
+
+    [filaIngresos, filaEgresos, filaResultado].forEach((fila) => {
+      expect(fila).toBeDefined();
+      fila!.forEach((celda) => {
+        expect(celda).toMatchObject({ fontWeight: 'bold' });
+      });
+    });
+  });
+
+  it('(estilo) filas de cuenta de detalle → SIN fontWeight', () => {
+    const response = crearResponseResultados();
+    const filas = mapearEstadoResultadosAFilas(response, perfilTodoNull);
+
+    // Las cuentas de detalle tienen indentación de 4 espacios (de aplanarArbol)
+    const filasDetalle = filas.filter(
+      (f) => f[0]?.type === 'texto' && typeof f[0].value === 'string' && f[0].value.startsWith('    '),
+    );
+    expect(filasDetalle.length).toBeGreaterThan(0);
+    filasDetalle.forEach((fila) => {
+      fila.forEach((celda) => {
+        expect('fontWeight' in celda).toBe(false);
+      });
+    });
+  });
+
   it('incluye la cabecera fiscal al inicio cuando el perfil está completo', () => {
     const response = crearResponseResultados();
     const filas = mapearEstadoResultadosAFilas(response, perfilCompleto);
 
     const primeraFila = filas[0];
-    expect(primeraFila?.[0]).toEqual({ type: 'texto', value: 'Avicont S.R.L.' });
+    expect(primeraFila?.[0]).toMatchObject({ type: 'texto', value: 'Avicont S.R.L.' });
   });
 
   it('no rompe cuando el perfil fiscal tiene todos los campos null', () => {

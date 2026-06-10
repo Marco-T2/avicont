@@ -26,17 +26,17 @@ export function mapearComprobantesAFilas(
   // 1. Cabecera fiscal (campos no-null del perfil)
   filas.push(...armarCabeceraFiscal(perfil));
 
-  // 2. Fila de encabezados de columna
+  // 2. Fila de encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([
-    { type: 'texto', value: 'Fecha' },
-    { type: 'texto', value: 'Número' },
-    { type: 'texto', value: 'Tipo' },
-    { type: 'texto', value: 'Documento respaldo' },
-    { type: 'texto', value: 'Nro. Ref.' },
-    { type: 'texto', value: 'Contacto' },
-    { type: 'texto', value: 'Glosa' },
-    { type: 'texto', value: 'Estado' },
-    { type: 'texto', value: 'Total BOB' },
+    { type: 'texto', value: 'Fecha', fontWeight: 'bold' },
+    { type: 'texto', value: 'Número', fontWeight: 'bold' },
+    { type: 'texto', value: 'Tipo', fontWeight: 'bold' },
+    { type: 'texto', value: 'Documento respaldo', fontWeight: 'bold' },
+    { type: 'texto', value: 'Nro. Ref.', fontWeight: 'bold' },
+    { type: 'texto', value: 'Contacto', fontWeight: 'bold' },
+    { type: 'texto', value: 'Glosa', fontWeight: 'bold' },
+    { type: 'texto', value: 'Estado', fontWeight: 'bold' },
+    { type: 'texto', value: 'Total BOB', fontWeight: 'bold' },
   ]);
 
   // 3. Filas de detalle: un comprobante por fila

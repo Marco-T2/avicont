@@ -58,28 +58,28 @@ export function mapearEstadoResultadosAFilas(
   // 1. Cabecera fiscal
   filas.push(...armarCabeceraFiscal(perfil));
 
-  // 2. Encabezados de columna
+  // 2. Encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([
-    { type: 'texto', value: 'Concepto' },
-    { type: 'texto', value: 'Saldo (BOB)' },
+    { type: 'texto', value: 'Concepto', fontWeight: 'bold' },
+    { type: 'texto', value: 'Saldo (BOB)', fontWeight: 'bold' },
   ]);
 
   // 3. Árbol aplanado de las 2 secciones (reusa el mismo helper que el Balance)
   filas.push(...aplanarArbol(adaptarSeccionesResultados(response)));
 
-  // 4. Filas de resultado del ejercicio — valores del backend, sin calcular en cliente
+  // 4. Filas de resultado del ejercicio — valores del backend, sin calcular en cliente; negrita para totales
   filas.push([
-    { type: 'texto', value: 'TOTAL INGRESOS' },
-    { type: 'numero', value: response.totalIngresoBob },
+    { type: 'texto', value: 'TOTAL INGRESOS', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalIngresoBob, fontWeight: 'bold' },
   ]);
   filas.push([
-    { type: 'texto', value: 'TOTAL EGRESOS' },
-    { type: 'numero', value: response.totalEgresoBob },
+    { type: 'texto', value: 'TOTAL EGRESOS', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalEgresoBob, fontWeight: 'bold' },
   ]);
   filas.push([
     // §4.5: resultadoEjercicioBob del backend; la etiqueta refleja esGanancia del backend
-    { type: 'texto', value: response.esGanancia ? 'Resultado del Ejercicio: Ganancia' : 'Resultado del Ejercicio: Pérdida' },
-    { type: 'numero', value: response.resultadoEjercicioBob },
+    { type: 'texto', value: response.esGanancia ? 'Resultado del Ejercicio: Ganancia' : 'Resultado del Ejercicio: Pérdida', fontWeight: 'bold' },
+    { type: 'numero', value: response.resultadoEjercicioBob, fontWeight: 'bold' },
   ]);
 
   return filas;
