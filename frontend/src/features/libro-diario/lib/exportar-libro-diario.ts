@@ -28,15 +28,15 @@ export function mapearLibroDiarioAFilas(
   const cabeceraFiscal = armarCabeceraFiscal(perfil);
   filas.push(...cabeceraFiscal);
 
-  // 2. Fila de encabezados de columna
+  // 2. Fila de encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([
-    { type: 'texto', value: 'Fecha' },
-    { type: 'texto', value: 'Código' },
-    { type: 'texto', value: 'Cuenta' },
-    { type: 'texto', value: 'Glosa' },
-    { type: 'texto', value: 'Debe (BOB)' },
-    { type: 'texto', value: 'Haber (BOB)' },
-    { type: 'texto', value: 'Estado' },
+    { type: 'texto', value: 'Fecha', fontWeight: 'bold' },
+    { type: 'texto', value: 'Código', fontWeight: 'bold' },
+    { type: 'texto', value: 'Cuenta', fontWeight: 'bold' },
+    { type: 'texto', value: 'Glosa', fontWeight: 'bold' },
+    { type: 'texto', value: 'Debe (BOB)', fontWeight: 'bold' },
+    { type: 'texto', value: 'Haber (BOB)', fontWeight: 'bold' },
+    { type: 'texto', value: 'Estado', fontWeight: 'bold' },
   ]);
 
   // 3. Filas de detalle: aplanar asientos → líneas
@@ -63,15 +63,15 @@ export function mapearLibroDiarioAFilas(
     }
   }
 
-  // 4. Fila de totales — valores del backend, SIN recalcular en cliente
+  // 4. Fila de totales — valores del backend, SIN recalcular en cliente; negrita para totales
   filas.push([
-    { type: 'texto', value: 'TOTAL' },
-    { type: 'texto', value: '' },
-    { type: 'texto', value: '' },
-    { type: 'texto', value: '' },
-    { type: 'numero', value: response.totalDebeBob },
-    { type: 'numero', value: response.totalHaberBob },
-    { type: 'texto', value: '' },
+    { type: 'texto', value: 'TOTAL', fontWeight: 'bold' },
+    { type: 'texto', value: '', fontWeight: 'bold' },
+    { type: 'texto', value: '', fontWeight: 'bold' },
+    { type: 'texto', value: '', fontWeight: 'bold' },
+    { type: 'numero', value: response.totalDebeBob, fontWeight: 'bold' },
+    { type: 'numero', value: response.totalHaberBob, fontWeight: 'bold' },
+    { type: 'texto', value: '', fontWeight: 'bold' },
   ]);
 
   return filas;

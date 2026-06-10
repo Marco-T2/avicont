@@ -321,9 +321,32 @@ describe('mapearLibroMayorAFilas', () => {
     });
     const filas = mapearLibroMayorAFilas(response, perfilCompleto);
 
-    // Perfil completo → 6 filas de cabecera fiscal
+    // Perfil completo → 6 filas de cabecera fiscal (razón social en negrita desde Fase Estilos)
     const primeraFila = filas[0];
-    expect(primeraFila?.[0]).toEqual({ type: 'texto', value: 'Avicont S.R.L.' });
+    expect(primeraFila?.[0]).toMatchObject({ type: 'texto', value: 'Avicont S.R.L.' });
+  });
+
+  it('(estilo) fila de encabezados de columna → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseLibroMayor();
+    const filas = mapearLibroMayorAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal, la fila 0 = encabezados de columna
+    const filaEncabezados = filas[0];
+    expect(filaEncabezados).toBeDefined();
+    filaEncabezados!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(estilo) fila TOTAL → todas las celdas con fontWeight:"bold"', () => {
+    const response = crearResponseLibroMayor();
+    const filas = mapearLibroMayorAFilas(response, perfilTodoNull);
+
+    const filaTotales = filas[filas.length - 1];
+    expect(filaTotales).toBeDefined();
+    filaTotales!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
   });
 
   it('no rompe cuando el perfil fiscal tiene todos los campos null', () => {
@@ -333,5 +356,19 @@ describe('mapearLibroMayorAFilas', () => {
     const filas = mapearLibroMayorAFilas(response, perfilTodoNull);
     const todasLasValues = filas.flatMap((fila) => fila).map((c) => c.value);
     expect(todasLasValues.some((v) => v === 'null')).toBe(false);
+  });
+
+  it('(W2) filas de movimiento (detalle) no llevan fontWeight en ninguna celda', () => {
+    const response = crearResponseLibroMayor();
+    const filas = mapearLibroMayorAFilas(response, perfilTodoNull);
+
+    // Sin cabecera fiscal: fila 0 = encabezados columna, fila 1 = cabecera cuenta Caja,
+    // fila 2 = primer movimiento de Caja (detalle)
+    const primeraFilaMovimiento = filas[2];
+    expect(primeraFilaMovimiento).toBeDefined();
+
+    primeraFilaMovimiento!.forEach((celda) => {
+      expect('fontWeight' in celda).toBe(false);
+    });
   });
 });

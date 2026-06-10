@@ -46,20 +46,20 @@ describe('aplanarArbol', () => {
     const secciones: SeccionArbol[] = [crearSeccion()];
     const filas = aplanarArbol(secciones);
 
-    // Fila 0 = título de sección: sin sangría
+    // Fila 0 = título de sección: sin sangría (en negrita desde Fase Estilos)
     const filaSec = filas[0];
     expect(filaSec).toBeDefined();
-    expect(filaSec![0]).toEqual({ type: 'texto', value: 'ACTIVO' });
+    expect(filaSec![0]).toMatchObject({ type: 'texto', value: 'ACTIVO' });
 
-    // Fila 1 = título de subsección: 2 espacios de sangría
+    // Fila 1 = título de subsección: 2 espacios de sangría (en negrita desde Fase Estilos)
     const filaSub = filas[1];
     expect(filaSub).toBeDefined();
-    expect(filaSub![0]).toEqual({ type: 'texto', value: '  Activo Corriente' });
+    expect(filaSub![0]).toMatchObject({ type: 'texto', value: '  Activo Corriente' });
 
-    // Fila 2 = primera cuenta: 4 espacios de sangría
+    // Fila 2 = primera cuenta: 4 espacios de sangría (sin negrita — detalle)
     const filaCuenta = filas[2];
     expect(filaCuenta).toBeDefined();
-    expect(filaCuenta![0]).toEqual({ type: 'texto', value: '    1101 - Caja' });
+    expect(filaCuenta![0]).toMatchObject({ type: 'texto', value: '    1101 - Caja' });
   });
 
   it('usa los totalBob del backend en los subtotales, sin sumar las cuentas (anti-recálculo)', () => {
@@ -86,14 +86,14 @@ describe('aplanarArbol', () => {
       (f) => f[0]?.type === 'texto' && f[0].value.includes('Total Activo Corriente'),
     );
     expect(filaSubtotalSub).toBeDefined();
-    expect(filaSubtotalSub![1]).toEqual({ type: 'numero', value: '9999.99' });
+    expect(filaSubtotalSub![1]).toMatchObject({ type: 'numero', value: '9999.99' });
 
     // La fila de subtotal de sección debe usar '88888.88' del backend
     const filaSubtotalSec = filas.find(
       (f) => f[0]?.type === 'texto' && f[0].value.includes('Total ACTIVO'),
     );
     expect(filaSubtotalSec).toBeDefined();
-    expect(filaSubtotalSec![1]).toEqual({ type: 'numero', value: '88888.88' });
+    expect(filaSubtotalSec![1]).toMatchObject({ type: 'numero', value: '88888.88' });
   });
 
   it('una sección sin subsecciones aparece con su subtotal y sin filas de detalle, sin error', () => {
@@ -104,7 +104,59 @@ describe('aplanarArbol', () => {
 
     // Título + subtotal = 2 filas
     expect(filas.length).toBe(2);
-    expect(filas[0]![0]).toEqual({ type: 'texto', value: 'SECCIÓN VACÍA' });
+    expect(filas[0]![0]).toMatchObject({ type: 'texto', value: 'SECCIÓN VACÍA' });
+  });
+
+  it('(estilo) filas de sección y subsección llevan fontWeight:"bold" en todas sus celdas', () => {
+    const secciones: SeccionArbol[] = [crearSeccion()];
+    const filas = aplanarArbol(secciones);
+
+    // Fila 0 = título de sección
+    const filaSec = filas[0];
+    expect(filaSec).toBeDefined();
+    filaSec!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+
+    // Fila 1 = título de subsección
+    const filaSub = filas[1];
+    expect(filaSub).toBeDefined();
+    filaSub!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+
+    // Fila 4 = subtotal de subsección (índice: título-sec + título-sub + 2 cuentas + subtotal-sub)
+    const filaSubtotalSub = filas[4];
+    expect(filaSubtotalSub).toBeDefined();
+    filaSubtotalSub!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+
+    // Fila 5 = subtotal de sección
+    const filaSubtotalSec = filas[5];
+    expect(filaSubtotalSec).toBeDefined();
+    filaSubtotalSec!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(estilo) filas de cuenta de detalle NO llevan fontWeight', () => {
+    const secciones: SeccionArbol[] = [crearSeccion()];
+    const filas = aplanarArbol(secciones);
+
+    // Fila 2 = primera cuenta (índice: título-sec + título-sub + cuenta)
+    const filaCuenta1 = filas[2];
+    expect(filaCuenta1).toBeDefined();
+    filaCuenta1!.forEach((celda) => {
+      expect('fontWeight' in celda).toBe(false);
+    });
+
+    // Fila 3 = segunda cuenta
+    const filaCuenta2 = filas[3];
+    expect(filaCuenta2).toBeDefined();
+    filaCuenta2!.forEach((celda) => {
+      expect('fontWeight' in celda).toBe(false);
+    });
   });
 
   it('una subsección sin cuentas aparece con su subtotal y sin filas de cuenta', () => {
@@ -154,6 +206,6 @@ describe('aplanarArbol', () => {
     // Debe contener el nombre
     expect(concepto!.value).toContain('Cuenta Sintética');
     // El saldo debe ser CeldaNumero con el valor del backend
-    expect(filaCuenta![1]).toEqual({ type: 'numero', value: '5000.00' });
+    expect(filaCuenta![1]).toMatchObject({ type: 'numero', value: '5000.00' });
   });
 });

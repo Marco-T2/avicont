@@ -3,10 +3,20 @@ import writeXlsxFile from 'write-excel-file/browser';
 import { parsearMontoCelda } from './formato-celda';
 
 /**
+ * Props de estilo compartidas entre CeldaNumero y CeldaTexto.
+ * Opcionales: sin estilo explícito el output es byte-idéntico al anterior.
+ */
+export interface CeldaEstilo {
+  fontWeight?: 'bold';
+  align?: 'left' | 'center' | 'right';
+}
+
+/**
  * Celda numérica: el value es un string decimal del backend.
  * El boundary string→Number ocurre AQUÍ (§4.5). Nunca para aritmética.
+ * `align` default 'right' en construirHoja (montos siempre a la derecha).
  */
-export interface CeldaNumero {
+export interface CeldaNumero extends CeldaEstilo {
   type: 'numero';
   value: string;
 }
@@ -14,7 +24,7 @@ export interface CeldaNumero {
 /**
  * Celda de texto: value se escribe tal cual.
  */
-export interface CeldaTexto {
+export interface CeldaTexto extends CeldaEstilo {
   type: 'texto';
   value: string;
 }
@@ -57,16 +67,30 @@ export async function construirHoja(
 ): Promise<Blob> {
   const datos = filas.map((fila) =>
     fila.map((celda) => {
+      // Propaga fontWeight solo si está definido (exactOptionalPropertyTypes)
+      const estilo = {
+        ...(celda.fontWeight !== undefined ? { fontWeight: celda.fontWeight } : {}),
+        // align por default 'right' en numérico (montos siempre a la derecha, §4.5);
+        // el override explícito gana. Texto: solo si fue seteado explícitamente.
+        ...(celda.type === 'numero'
+          ? { align: celda.align ?? 'right' }
+          : celda.align !== undefined
+            ? { align: celda.align }
+            : {}),
+      };
+
       if (celda.type === 'numero') {
         return {
           type: Number,
           value: parsearMontoCelda(celda.value),
           format: '#,##0.00',
+          ...estilo,
         };
       }
       return {
         type: String,
         value: celda.value,
+        ...estilo,
       };
     }),
   );

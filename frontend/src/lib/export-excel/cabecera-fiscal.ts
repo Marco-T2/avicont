@@ -1,14 +1,23 @@
 import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
 
+import type { CeldaTexto } from './construir-hoja';
+
 /**
- * Celda de texto para la cabecera fiscal.
- * Definida localmente para no depender de construir-hoja.ts en este módulo.
- * El tipo completo Celda/CeldaTexto se exporta desde construir-hoja.ts y el index.
+ * Mapa ordenado de campos del perfil fiscal a su etiqueta de presentación.
+ * razonSocial: sin etiqueta (encabezado en negrita).
+ * Resto: "Etiqueta: valor".
  */
-interface CeldaTextoLocal {
-  type: 'texto';
-  value: string;
-}
+const CAMPOS_FISCALES: ReadonlyArray<{
+  etiqueta?: string;
+  campo: keyof EmpresaPerfil;
+}> = [
+  { campo: 'razonSocial' },
+  { campo: 'nit', etiqueta: 'NIT' },
+  { campo: 'direccion', etiqueta: 'Dirección' },
+  { campo: 'representanteLegal', etiqueta: 'Representante Legal' },
+  { campo: 'telefono', etiqueta: 'Teléfono' },
+  { campo: 'email', etiqueta: 'Email' },
+];
 
 /**
  * Convierte el perfil fiscal de la organización en filas de cabecera para el informe Excel.
@@ -16,20 +25,21 @@ interface CeldaTextoLocal {
  * - Los campos null se omiten (no generan fila).
  * - Nunca escribe la cadena literal "null".
  * - Nunca rompe ante cualquier combinación de campos null.
+ * - razonSocial: encabezado en negrita (fontWeight:'bold'), sin etiqueta.
+ * - Demás campos: "Etiqueta: valor" (sin negrita).
  *
  * Orden de campos: razonSocial, nit, direccion, representanteLegal, telefono, email.
  */
-export function armarCabeceraFiscal(perfil: EmpresaPerfil): CeldaTextoLocal[][] {
-  const campos: Array<string | null> = [
-    perfil.razonSocial,
-    perfil.nit,
-    perfil.direccion,
-    perfil.representanteLegal,
-    perfil.telefono,
-    perfil.email,
-  ];
-
-  return campos
-    .filter((campo): campo is string => campo !== null)
-    .map((campo) => [{ type: 'texto' as const, value: campo }]);
+export function armarCabeceraFiscal(perfil: EmpresaPerfil): CeldaTexto[][] {
+  return CAMPOS_FISCALES
+    .filter(({ campo }) => perfil[campo] !== null)
+    .map(({ campo, etiqueta }) => {
+      const valor = perfil[campo] as string;
+      const value = etiqueta !== undefined ? `${etiqueta}: ${valor}` : valor;
+      // Solo la razón social (sin etiqueta) lleva negrita — es el encabezado del informe
+      const celda: CeldaTexto = etiqueta === undefined
+        ? { type: 'texto', value, fontWeight: 'bold' }
+        : { type: 'texto', value };
+      return [celda];
+    });
 }

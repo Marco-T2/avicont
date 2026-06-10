@@ -173,6 +173,30 @@ describe('mapearComprobantesAFilas', () => {
     expect(filaDatos[8]).toEqual({ type: 'numero', value: '1250.50' });
   });
 
+  it('(12) fila de encabezados de columna → todas las celdas con fontWeight:"bold"', () => {
+    const filas = mapearComprobantesAFilas([], perfilTodoNull);
+
+    // Sin cabecera fiscal (todo null), la fila 0 = encabezados
+    const filaEncabezados = filas[0];
+    expect(filaEncabezados).toBeDefined();
+    filaEncabezados!.forEach((celda) => {
+      expect(celda).toMatchObject({ fontWeight: 'bold' });
+    });
+  });
+
+  it('(13) NO existe fila de totales — este informe no agrega montos', () => {
+    // El informe de comprobantes lista sin totalizar. Las filas de datos no son negrita.
+    const item = crearItem();
+    const filas = mapearComprobantesAFilas([item], perfilTodoNull);
+
+    // La última fila es de datos, no de totales
+    const ultimaFila = filas[filas.length - 1];
+    // Si existiera una fila de totales, tendría 'fontWeight' en TODAS sus celdas.
+    // Una fila de datos normal no tiene fontWeight en sus celdas (pueden variar).
+    // Verificar que la celda de Tipo (índice 2) NO tiene fontWeight (es un dato normal)
+    expect(ultimaFila?.[2]).not.toMatchObject({ fontWeight: 'bold' });
+  });
+
   it('(10) cabecera fiscal presente cuando el perfil tiene datos', () => {
     const filas = mapearComprobantesAFilas([], perfilCompleto);
     // armarCabeceraFiscal agrega filas antes de los encabezados de columna
