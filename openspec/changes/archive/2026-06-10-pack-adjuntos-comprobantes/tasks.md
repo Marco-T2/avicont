@@ -95,4 +95,4 @@
 - [x] 12.2 Frontend — correr `pnpm exec vitest run`; confirmar 0 regresiones
 - [x] 12.3 Backend — `pnpm exec tsc --noEmit` + `pnpm run lint`; 0 errores
 - [x] 12.4 Frontend — `pnpm exec tsc -b` + `pnpm run lint`; 0 errores
-- [ ] 12.5 🪣 Smoke manual (Marco) — levantar `docker compose up -d` con MinIO; activar pack `contabilidad.adjuntos` en org de prueba; subir PDF real → listar → descargar → reemplazar → eliminar; intentar subir desde org sin pack → confirmar 404; intentar subir con usuario solo-read → confirmar 403
+- [x] 12.5 🪣 Smoke manual (Marco) — levantar `docker compose up -d` con MinIO; activar pack `contabilidad.adjuntos` en org de prueba; subir PDF real → listar → descargar → reemplazar → eliminar; intentar subir desde org sin pack → confirmar 404; intentar subir con usuario solo-read → confirmar 403
