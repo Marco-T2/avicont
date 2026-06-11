@@ -2943,6 +2943,39 @@
         ]
       }
     },
+    "/api/admin/platform/packs": {
+      "get": {
+        "operationId": "PlatformAdminController_listarCatalogoPacks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Catálogo de packs vendibles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PackResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es super-admin de plataforma"
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar el catálogo global de packs (super-admin)",
+        "tags": [
+          "Platform Admin"
+        ]
+      }
+    },
     "/api/admin/platform/orgs": {
       "get": {
         "operationId": "PlatformAdminController_listarOrgs",

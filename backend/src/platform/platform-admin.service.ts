@@ -28,6 +28,7 @@ import {
   OrgPackEntitlementResponseDto,
   toOrgPackEntitlementResponse,
 } from '@/packs/dto/org-pack-entitlement-response.dto';
+import { PackResponseDto, toPackResponse } from '@/packs/dto/pack-response.dto';
 import { ORGS_READER_PORT, OrgsReaderPort } from './ports/orgs-reader.port';
 import { ORGS_WRITER_PORT, OrgsWriterPort } from './ports/orgs-writer.port';
 import {
@@ -271,6 +272,16 @@ export class PlatformAdminService {
     await this.assertOrgExiste(orgId);
     const entitlements = await this.packs.listarEntitlementsDeOrg(orgId);
     return entitlements.map(toOrgPackEntitlementResponse);
+  }
+
+  /**
+   * Lista el catálogo global de packs vendibles para el panel super-admin.
+   * Delega a PackService (frontera de módulo); mapea Pack (dominio) → DTO HTTP.
+   * Org-less: el catálogo es global, no depende de ninguna org.
+   */
+  async listarCatalogoPacks(): Promise<PackResponseDto[]> {
+    const packs = await this.packs.listarCatalogo();
+    return packs.map(toPackResponse);
   }
 
   /**
