@@ -212,7 +212,7 @@ describe('OrgPacksSheet', () => {
       await waitFor(() => expect(mutateRevocar).toHaveBeenCalledTimes(1));
       expect(mutateRevocar).toHaveBeenCalledWith({
         orgId: ORG_CONTABILIDAD.id,
-        packId: ENTITLEMENT_ADJUNTOS.id,
+        packId: PACK_CONTABILIDAD_ADJUNTOS.id,
       });
     });
 

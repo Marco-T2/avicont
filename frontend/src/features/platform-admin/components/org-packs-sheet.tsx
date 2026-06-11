@@ -177,7 +177,7 @@ function OrgPackRow({
             className="h-11 md:h-9"
             disabled={isPending}
             onClick={() =>
-              revocarMutation.mutate({ orgId, packId: entitlement.id })
+              revocarMutation.mutate({ orgId, packId: pack.id })
             }
           >
             Revocar
