@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 import { RequirePermission } from '@/components/shared/require-permission';
+import { RequireSystemRole } from '@/components/shared/require-system-role';
 import { RequireSuperAdmin } from '@/components/shared/require-super-admin';
 import { AuthShell } from '@/components/shells/auth-shell';
 import { DashboardShell } from '@/components/shells/dashboard-shell';
@@ -27,6 +28,7 @@ import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodo
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { EmpresaPage } from '@/features/tenants/pages/empresa-page';
+import { ComplementosPage } from '@/features/packs/pages/complementos-page';
 import { FeaturesPage } from '@/features/tenants/pages/features-page';
 import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-page';
 import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
@@ -187,6 +189,14 @@ export const router = createBrowserRouter([
               <RequirePermission permission={PERMISSIONS.organizacion.features.read}>
                 <FeaturesPage />
               </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/complementos',
+            element: (
+              <RequireSystemRole roles={['OWNER', 'ADMIN']}>
+                <ComplementosPage />
+              </RequireSystemRole>
             ),
           },
           // ─── Granja ──────────────────────────────────────────────────────

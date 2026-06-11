@@ -841,3 +841,23 @@ export interface PlatformActivityParams {
   cursor?: string;
   orgId?: string;
 }
+
+// ============================================================
+// Packs (eje 2) — catálogo, entitlement y activación
+// ============================================================
+
+// Catálogo global (GET /admin/platform/packs + embebido en entitlement).
+export type Pack = Schemas['PackResponseDto'];
+
+// Entitlement de un pack para una org (GET mis-packs, GET orgs/:id/packs, POST).
+// Incluye `activo` + `pack` embebido.
+export type OrgPackEntitlement = Schemas['OrgPackEntitlementResponseDto'];
+
+// Respuesta del PATCH /api/packs/:clave — NO incluye `pack` embebido.
+export type ActivacionPack = Schemas['ActivacionPackResponseDto'];
+
+// Body de POST /admin/platform/orgs/:id/packs — packId? OR clave? (al menos uno).
+export type HabilitarPackRequest = Schemas['HabilitarPackDto'];
+
+// Body de PATCH /api/packs/:clave — { activo: boolean }.
+export type ActivarPackRequest = Schemas['ActivarPackDto'];

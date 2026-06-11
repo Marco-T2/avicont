@@ -29,6 +29,7 @@ import { PlatformAuditInterceptor } from '@/audit/platform-audit.interceptor';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { HabilitarPackDto } from '@/packs/dto/habilitar-pack.dto';
 import { OrgPackEntitlementResponseDto } from '@/packs/dto/org-pack-entitlement-response.dto';
+import { PackResponseDto } from '@/packs/dto/pack-response.dto';
 
 import { CreateOrgDto } from './dto/create-org.dto';
 import { UpdateOrgStatusDto } from './dto/update-org-status.dto';
@@ -60,6 +61,22 @@ import { PlatformAdminService } from './platform-admin.service';
 @UseInterceptors(PlatformAuditInterceptor)
 export class PlatformAdminController {
   constructor(private readonly platformAdminService: PlatformAdminService) {}
+
+  /**
+   * Catálogo global de packs vendibles (eje 2) para el panel super-admin.
+   *
+   * Endpoint org-less: el catálogo no pertenece a ninguna org. Sin TenantGuard.
+   * El super-admin lo consulta para saber qué packs puede habilitar a una org
+   * (POST orgs/:id/packs). El filtro por vertical de la org se hace en el cliente
+   * (UX); el backend valida el vertical al habilitar (PackService.habilitar §8).
+   */
+  @Get('packs')
+  @ApiOperation({ summary: 'Listar el catálogo global de packs (super-admin)' })
+  @ApiOkResponse({ description: 'Catálogo de packs vendibles', type: [PackResponseDto] })
+  @ApiResponse({ status: 403, description: 'No es super-admin de plataforma' })
+  async listarCatalogoPacks(): Promise<PackResponseDto[]> {
+    return this.platformAdminService.listarCatalogoPacks();
+  }
 
   /**
    * REQ-SA-12: Lista todas las organizaciones de la plataforma.

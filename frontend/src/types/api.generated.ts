@@ -1060,6 +1060,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/platform/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar el catálogo global de packs (super-admin) */
+        get: operations["PlatformAdminController_listarCatalogoPacks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/platform/orgs": {
         parameters: {
             query?: never;
@@ -5086,6 +5103,33 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_listarCatalogoPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catálogo de packs vendibles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackResponseDto"][];
+                };
+            };
+            /** @description No es super-admin de plataforma */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
