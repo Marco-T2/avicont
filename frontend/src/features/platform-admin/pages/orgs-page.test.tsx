@@ -31,6 +31,22 @@ vi.mock('../hooks/use-update-entitlement', () => ({
   useUpdateEntitlement: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+vi.mock('../hooks/use-packs-catalogo', () => ({
+  usePacksCatalogo: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
+}));
+
+vi.mock('../hooks/use-org-packs', () => ({
+  useOrgPacks: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
+}));
+
+vi.mock('../hooks/use-habilitar-pack', () => ({
+  useHabilitarPack: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
+vi.mock('../hooks/use-revocar-pack', () => ({
+  useRevocarPack: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
+
 import { useOrgs } from '../hooks/use-orgs';
 
 const orgs: PlatformOrg[] = [
@@ -171,6 +187,31 @@ describe('OrgsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('¿Suspender esta organización?')).toBeInTheDocument();
+    });
+  });
+
+  it('el menú de acciones ofrece el ítem "Gestionar packs"', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    renderOrgsPage();
+
+    await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
+
+    expect(
+      await screen.findByRole('menuitem', { name: /gestionar packs/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('al elegir "Gestionar packs" abre el sheet de packs', async () => {
+    mockUseOrgs({ data: orgs });
+    const user = userEvent.setup();
+    renderOrgsPage();
+
+    await user.click(screen.getByRole('button', { name: /acciones para avícola del valle/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /gestionar packs/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/packs de «avícola del valle»/i)).toBeInTheDocument();
     });
   });
 });

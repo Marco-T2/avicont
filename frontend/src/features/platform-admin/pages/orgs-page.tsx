@@ -24,6 +24,7 @@ import type { OrgStatus, PlatformOrg } from '@/types/api';
 
 import { CreateOrgSheet } from '../components/create-org-sheet';
 import { EntitlementSheet } from '../components/entitlement-sheet';
+import { OrgPacksSheet } from '../components/org-packs-sheet';
 import { OrgPlanBadge } from '../components/org-plan-badge';
 import { OrgStatusBadge } from '../components/org-status-badge';
 import { OrgStatusDialog } from '../components/org-status-dialog';
@@ -58,6 +59,8 @@ export function OrgsPage(): React.JSX.Element {
   } | null>(null);
   // Org cuyo entitlement se está editando.
   const [entitlementOrg, setEntitlementOrg] = useState<PlatformOrg | null>(null);
+  // Org cuyos packs se están gestionando.
+  const [packsOrg, setPacksOrg] = useState<PlatformOrg | null>(null);
 
   return (
     <div className="space-y-6">
@@ -80,6 +83,7 @@ export function OrgsPage(): React.JSX.Element {
         isError={isError}
         onChangeStatus={(org, target) => setStatusTarget({ org, target })}
         onEditEntitlement={setEntitlementOrg}
+        onManagePacks={setPacksOrg}
       />
 
       <CreateOrgSheet open={createOpen} onOpenChange={setCreateOpen} />
@@ -100,6 +104,14 @@ export function OrgsPage(): React.JSX.Element {
           if (!open) setEntitlementOrg(null);
         }}
       />
+
+      <OrgPacksSheet
+        org={packsOrg}
+        open={packsOrg !== null}
+        onOpenChange={(open) => {
+          if (!open) setPacksOrg(null);
+        }}
+      />
     </div>
   );
 }
@@ -110,6 +122,7 @@ interface OrgsContentProps {
   isError: boolean;
   onChangeStatus: (org: PlatformOrg, target: OrgStatus) => void;
   onEditEntitlement: (org: PlatformOrg) => void;
+  onManagePacks: (org: PlatformOrg) => void;
 }
 
 function OrgsContent({
@@ -118,6 +131,7 @@ function OrgsContent({
   isError,
   onChangeStatus,
   onEditEntitlement,
+  onManagePacks,
 }: OrgsContentProps): React.JSX.Element {
   if (isError) {
     return (
@@ -195,6 +209,7 @@ function OrgsContent({
                   org={org}
                   onChangeStatus={onChangeStatus}
                   onEditEntitlement={onEditEntitlement}
+                  onManagePacks={onManagePacks}
                 />
               </TableCell>
             </TableRow>
@@ -209,6 +224,7 @@ interface OrgRowActionsProps {
   org: PlatformOrg;
   onChangeStatus: (org: PlatformOrg, target: OrgStatus) => void;
   onEditEntitlement: (org: PlatformOrg) => void;
+  onManagePacks: (org: PlatformOrg) => void;
 }
 
 // Transiciones de status disponibles según el estado actual de la org. El
@@ -230,6 +246,7 @@ function OrgRowActions({
   org,
   onChangeStatus,
   onEditEntitlement,
+  onManagePacks,
 }: OrgRowActionsProps): React.JSX.Element {
   const transiciones = TRANSICIONES_STATUS[org.status] ?? [];
 
@@ -255,6 +272,9 @@ function OrgRowActions({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onEditEntitlement(org)}>
           Editar entitlement
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onManagePacks(org)}>
+          Gestionar packs
         </DropdownMenuItem>
         {transiciones.length > 0 ? <DropdownMenuSeparator /> : null}
         {transiciones.map((t) => (
