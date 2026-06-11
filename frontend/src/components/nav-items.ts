@@ -3,6 +3,7 @@ import {
   BookMarked,
   BookOpen,
   BookText,
+  Boxes,
   Building2,
   CalendarRange,
   ClipboardList,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { PERMISSIONS } from '@/lib/permissions';
+import type { SystemRole } from '@/types/api';
 
 export interface NavItem {
   to: string;
@@ -47,6 +49,12 @@ export interface NavItem {
    * Coincide con la clave que el backend exige vía `@RequirePack`.
    */
   pack?: string;
+  /**
+   * SystemRoles que pueden ver el ítem. Si está ausente, sin gate de rol de
+   * sistema. Si está presente, el ítem solo se muestra si el usuario tiene al
+   * menos uno (useHasSystemRole). Coincide con el @RequireSystemRole del backend.
+   */
+  requiredSystemRole?: SystemRole[];
 }
 
 // Única fuente de verdad del menú principal. Consumida por AppSidebar
@@ -148,6 +156,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Módulos activos',
     icon: ToggleRight,
     requiredPermission: PERMISSIONS.organizacion.features.read,
+  },
+  {
+    to: '/settings/complementos',
+    label: 'Complementos',
+    icon: Boxes,
+    // Sin requiredPermission: el gating es por SystemRole, no por permiso RBAC.
+    // La pantalla de gestión de packs no se gatea por pack (sería circular —
+    // el Owner necesita entrar para ACTIVAR el pack; gatearlo sería un deadlock).
+    requiredSystemRole: ['OWNER', 'ADMIN'] as SystemRole[],
   },
   // Configuración contable: ítem deshabilitado, pertenece a CONTABILIDAD.
   // Lleva vertical: 'CONTABILIDAD' para que el granjero no lo vea aunque esté disabled.

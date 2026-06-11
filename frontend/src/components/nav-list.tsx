@@ -5,6 +5,8 @@ import { useMisPacks } from '@/lib/use-packs';
 import { usePermissions } from '@/lib/use-permissions';
 import { useVerticalActivo } from '@/lib/use-vertical';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
+import type { SystemRole } from '@/types/api';
 
 import { NAV_ITEMS, type NavItem } from './nav-items';
 
@@ -32,12 +34,19 @@ export function NavList({
   const { has } = usePermissions();
   const { vertical: verticalActivo } = useVerticalActivo();
   const { packsActivos } = useMisPacks();
+  // Leer `user.roles` UNA vez (selector estable — Anti-F-15).
+  // NO llamar useHasSystemRole por-item: rompe reglas de hooks.
+  // El `?? false` va afuera del selector (Anti-F-15: evita array nuevo en cada render).
+  const userRoles = useAuthStore((s) => s.user?.roles);
   const visibleItems = NAV_ITEMS.filter((item) => {
     const pasaPermiso = item.requiredPermission === undefined || has(item.requiredPermission);
     const pasaVertical = item.vertical === undefined || item.vertical === verticalActivo;
     const pasaPack =
       item.pack === undefined || (packsActivos?.includes(item.pack) ?? false);
-    return pasaPermiso && pasaVertical && pasaPack;
+    const pasaSystemRole =
+      item.requiredSystemRole === undefined ||
+      (userRoles?.some((r) => item.requiredSystemRole!.includes(r as SystemRole)) ?? false);
+    return pasaPermiso && pasaVertical && pasaPack && pasaSystemRole;
   });
 
   return (

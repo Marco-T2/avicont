@@ -1,3 +1,4 @@
+import { act } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
@@ -6,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as usePermissionsModule from '@/lib/use-permissions';
 import * as usePacksModule from '@/lib/use-packs';
 import * as useVerticalModule from '@/lib/use-vertical';
+import { useAuthStore } from '@/stores/auth-store';
 import type { VerticalActivo } from '@/types/api';
 
 import * as navItemsModule from './nav-items';
@@ -44,6 +46,17 @@ function mockPacks(packsActivos: string[] | undefined) {
   });
 }
 
+/** Pone roles en el auth store directamente (para testear el filtro SystemRole). */
+function setAuthRoles(roles: string[] | undefined) {
+  act(() => {
+    useAuthStore.setState({
+      user: roles !== undefined
+        ? { id: 'u1', email: 'test@test.com', roles }
+        : null,
+    });
+  });
+}
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient();
   return (
@@ -57,10 +70,13 @@ beforeEach(() => {
   // Default: sin packs activos. Como ningún NAV_ITEM real declara `pack`,
   // los ítems de producción no se ven afectados por este default.
   mockPacks([]);
+  // Default: sin roles de sistema (fail-closed para el filtro SystemRole).
+  setAuthRoles([]);
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  useAuthStore.setState({ user: null, accessToken: null });
 });
 
 describe('NavList — filtrado por requiredPermission', () => {
@@ -149,19 +165,21 @@ describe('NavList — filtrado por requiredPermission', () => {
   });
 });
 
-// Guard anti-drift: un ítem de nav nuevo sin permiso queda visible para todos sin
-// que nadie lo note. Este test obliga a declarar requiredPermission salvo en los
-// ítems públicos (Panel) o deshabilitados.
+// Guard anti-drift: un ítem de nav nuevo sin gate queda visible para todos sin
+// que nadie lo note. Este test obliga a declarar requiredPermission O
+// requiredSystemRole salvo en los ítems públicos (Panel) o deshabilitados.
 describe('NAV_ITEMS — cobertura de gating', () => {
   const RUTAS_PUBLICAS = new Set(['/']);
 
-  it('todo ítem no-público y no-disabled declara requiredPermission', () => {
+  it('todo ítem no-público y no-disabled declara requiredPermission o requiredSystemRole', () => {
     for (const item of NAV_ITEMS) {
       if (RUTAS_PUBLICAS.has(item.to) || item.disabled === true) continue;
+      const tieneGate =
+        item.requiredPermission !== undefined || item.requiredSystemRole !== undefined;
       expect(
-        item.requiredPermission,
-        `"${item.label}" (${item.to}) debe declarar requiredPermission`,
-      ).toBeDefined();
+        tieneGate,
+        `"${item.label}" (${item.to}) debe declarar requiredPermission o requiredSystemRole`,
+      ).toBe(true);
     }
   });
 
@@ -410,6 +428,65 @@ describe('NavList — filtrado por pack (riel eje 2)', () => {
       </Wrapper>,
     );
     expect(screen.queryByText(PROBE_LABEL)).not.toBeInTheDocument();
+  });
+});
+
+describe('NavList — filtrado por requiredSystemRole', () => {
+  // Para aislar el filtro de SystemRole, damos isOwner=true + vertical CONTABILIDAD
+  // (para que pasen los filtros de permiso y vertical), y variamos solo los roles.
+  beforeEach(() => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+  });
+
+  it('ítem "Complementos" visible cuando user.roles incluye OWNER', () => {
+    setAuthRoles(['OWNER']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Complementos').length).toBeGreaterThan(0);
+  });
+
+  it('ítem "Complementos" visible cuando user.roles incluye ADMIN', () => {
+    setAuthRoles(['ADMIN']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Complementos').length).toBeGreaterThan(0);
+  });
+
+  it('ítem "Complementos" oculto con rol custom sin OWNER/ADMIN (fail-closed)', () => {
+    setAuthRoles(['contador-slug']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Complementos')).not.toBeInTheDocument();
+  });
+
+  it('ítem "Complementos" oculto sin user.roles (fail-closed)', () => {
+    setAuthRoles(undefined); // user null → roles undefined
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Complementos')).not.toBeInTheDocument();
+  });
+
+  it('ítem "Complementos" oculto con roles vacío (fail-closed)', () => {
+    setAuthRoles([]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Complementos')).not.toBeInTheDocument();
   });
 });
 
