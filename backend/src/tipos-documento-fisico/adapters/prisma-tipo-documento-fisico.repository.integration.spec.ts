@@ -102,6 +102,8 @@ describe('PrismaTipoDocumentoFisicoRepository (integration)', () => {
     esTributario: true,
     tiposComprobanteAplicables: [TipoComprobante.EGRESO] as TipoComprobante[],
     createdByUserId: userIdA,
+    numeracionAutomatica: false,
+    numeroInicial: null,
     ...overrides,
   });
 

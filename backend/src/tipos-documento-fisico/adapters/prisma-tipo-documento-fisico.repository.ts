@@ -37,6 +37,10 @@ export class PrismaTipoDocumentoFisicoRepository extends TipoDocumentoFisicoRepo
           esTributario: data.esTributario,
           tiposComprobanteAplicables: data.tiposComprobanteAplicables,
           createdByUserId: data.createdByUserId,
+          numeracionAutomatica: data.numeracionAutomatica,
+          // exactOptionalPropertyTypes: spread condicional para campo nullable
+          // (CLAUDE.md §2.5.1). null = tipo manual; Int = número inicial de secuencia.
+          ...(data.numeroInicial !== null ? { numeroInicial: data.numeroInicial } : {}),
         },
       });
     } catch (err) {

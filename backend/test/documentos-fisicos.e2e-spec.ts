@@ -692,4 +692,143 @@ describe('DocumentosFisicos (e2e)', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('DOCUMENTO_FISICO_REFERENCIADO_POR_COMPROBANTE');
   });
+
+  // ==========================================================
+  // E-D-AUTO-01..05 — numeración automática (change numeracion-tipo-documento)
+  // ==========================================================
+
+  // Helper para crear un tipo con numeracion automática vía API.
+  async function crearTipoAuto(
+    token: string,
+    overrides: { nombre?: string; codigo?: string; numeroInicial?: number } = {},
+  ): Promise<string> {
+    const res = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: overrides.nombre ?? 'Recibo auto',
+        codigo: overrides.codigo ?? 'recibo-auto',
+        esTributario: false,
+        tiposComprobanteAplicables: ['INGRESO', 'DIARIO'],
+        numeracionAutomatica: true,
+        numeroInicial: overrides.numeroInicial ?? 1,
+      });
+    expect(res.status).toBe(201);
+    return res.body.id as string;
+  }
+
+  it('E-D-AUTO-01: crear documento de tipo auto sin numero → sistema asigna numero desde numeroInicial', async () => {
+    const { token } = await seed('org-auto-01');
+    const tipoId = await crearTipoAuto(token, { codigo: 'recibo-auto-01', numeroInicial: 100 });
+
+    const res = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipoId,
+      fechaEmision: '2026-06-14',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.numero).toBe('100');
+    // El tipo embebido expone numeracionAutomatica
+    expect(res.body.tipoDocumentoFisico.numeracionAutomatica).toBe(true);
+  });
+
+  it('E-D-AUTO-02: segundo documento del tipo auto → número consecutivo', async () => {
+    const { token } = await seed('org-auto-02');
+    const tipoId = await crearTipoAuto(token, { codigo: 'recibo-auto-02', numeroInicial: 100 });
+
+    // Primero: número 100
+    const res1 = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipoId,
+      fechaEmision: '2026-06-14',
+    });
+    expect(res1.status).toBe(201);
+    expect(res1.body.numero).toBe('100');
+
+    // Segundo: número 101
+    const res2 = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipoId,
+      fechaEmision: '2026-06-14',
+    });
+    expect(res2.status).toBe(201);
+    expect(res2.body.numero).toBe('101');
+  });
+
+  it('E-D-AUTO-03: enviar numero en tipo auto → 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO', async () => {
+    const { token } = await seed('org-auto-03');
+    const tipoId = await crearTipoAuto(token, { codigo: 'recibo-auto-03' });
+
+    const res = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipoId,
+      numero: 'MI-NUM',
+      fechaEmision: '2026-06-14',
+    });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO');
+  });
+
+  it('E-D-AUTO-04: tipo manual → comportamiento actual intacto (con numero → 201)', async () => {
+    const { token } = await seed('org-auto-04');
+    const tipo = await crearTipo(token, {
+      nombre: 'Factura recibida',
+      codigo: 'factura-auto04',
+      esTributario: true,
+    });
+
+    const res = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipo.id,
+      numero: 'FC-0001',
+      fechaEmision: '2026-06-14',
+      monto: '1150.00',
+      moneda: 'BOB',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.numero).toBe('FC-0001');
+    // El tipo embebido también expone numeracionAutomatica=false
+    expect(res.body.tipoDocumentoFisico.numeracionAutomatica).toBe(false);
+  });
+
+  it('E-D-AUTO-05: tipo manual sin numero → 400 (campo requerido por DTO)', async () => {
+    const { token } = await seed('org-auto-05');
+    const tipo = await crearTipo(token, {
+      nombre: 'Recibo manual sin num',
+      codigo: 'recibo-sin-num',
+      esTributario: false,
+    });
+
+    const res = await postDocumento(token, {
+      tipoDocumentoFisicoId: tipo.id,
+      fechaEmision: '2026-06-14',
+    });
+    // La rama manual exige numero; como el DTO lo tiene @IsOptional, el service lo chequea
+    // y lanza DocumentoFisicoNumeroRequeridoError (422)
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DOCUMENTO_FISICO_NUMERO_REQUERIDO');
+  });
+
+  it('E-D-AUTO: aislamiento multi-tenant — secuencias independientes por tenant', async () => {
+    const a = await seed('org-auto-mt-a');
+    const b = await seed('org-auto-mt-b');
+
+    // Ambos tenants crean el mismo tipo (mismo codigo, tenants distintos)
+    const tipoIdA = await crearTipoAuto(a.token, {
+      codigo: 'recibo-comun-auto',
+      numeroInicial: 1,
+    });
+    const tipoIdB = await crearTipoAuto(b.token, {
+      codigo: 'recibo-comun-auto',
+      numeroInicial: 1,
+    });
+
+    // Tenant A crea 3 documentos
+    await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' }).expect(201);
+    await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' }).expect(201);
+    const resA3 = await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' });
+    expect(resA3.status).toBe(201);
+    expect(resA3.body.numero).toBe('3');
+
+    // Tenant B crea 2 documentos — contador independiente
+    await postDocumento(b.token, { tipoDocumentoFisicoId: tipoIdB, fechaEmision: '2026-06-14' }).expect(201);
+    const resB2 = await postDocumento(b.token, { tipoDocumentoFisicoId: tipoIdB, fechaEmision: '2026-06-14' });
+    expect(resB2.status).toBe(201);
+    expect(resB2.body.numero).toBe('2'); // contador B independiente de A
+  });
 });

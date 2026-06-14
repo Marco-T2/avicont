@@ -4,7 +4,7 @@
 > Fase: spec
 > Slice: 2 de Fase 1.4
 > Proyecto: avicont
-> Última edición: 2026-05-29 (delta: documento-fisico-asociacion-post-contabilizado — REQ-A-02/03/06/12/13/14 y REQ-P-09/10)
+> Última edición: 2026-06-14 (delta: numeracion-tipo-documento — REQ-T-11/12/13 + REQ-D-01 MODIFIED + REQ-D-AUTO-01..08)
 
 ---
 
@@ -48,9 +48,15 @@
 
 - **REQ-T-10**: El sistema DEBE almacenar `tiposComprobanteAplicables: TipoComprobante[]` en cada `TipoDocumentoFisico`. La lista es **explícita siempre**: array vacío `[]` significa que este tipo no aplica a ningún tipo de comprobante (no es un wildcard). Todos los elementos del array DEBEN ser miembros válidos del enum `TipoComprobante`. El admin del tenant puede editar esta lista vía `PATCH /api/tipos-documento-fisico/:id`.
 
+- **REQ-T-11**: El sistema DEBE aceptar dos nuevos campos opcionales al crear un `TipoDocumentoFisico`: `numeracionAutomatica` (boolean, default `false`) y `numeroInicial` (integer, nullable). Si `numeracionAutomatica = false` (o ausente), el tipo es **manual**: comportamiento actual idéntico. Si `numeracionAutomatica = true`, `numeroInicial` define el primer número de la secuencia (default `1` si ausente, MUST ser ≥ 1). Si `numeracionAutomatica = false`, el valor de `numeroInicial` enviado DEBE ignorarse (no rechazar). Los tipos existentes siguen siendo manuales (`numeracionAutomatica = false` por defecto en BD). Cero regresión.
+
+- **REQ-T-12**: El sistema MUST NOT permitir crear ni editar un `TipoDocumentoFisico` con `numeracionAutomatica = true` y `esTributario = true` simultáneamente. Los tipos tributarios (facturas recibidas) tienen número asignado por el emisor tercero, no por el sistema. Retorna DomainError `TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA` (422).
+
+- **REQ-T-13**: `numeroInicial` y `numeracionAutomatica` son **set-once**: una vez persistidos al crear el tipo, MUST NOT poder modificarse. Cualquier intento de editarlos — incluso enviando el mismo valor — retorna DomainError `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE` (422). La razón: la secuencia puede haber emitido números desde `numeroInicial`; cambiarlo retroactivamente generaría huecos o colisiones. `UpdateTipoDocumentoFisicoDto` expone ambos campos como opcionales; el service los rechaza con 422 ante cualquier presencia (defense-in-depth: DTO expone para rechazar explícitamente, no para silenciar por whitelist).
+
 ### 2.2 DocumentoFisico (registro)
 
-- **REQ-D-01**: El sistema DEBE permitir que un usuario con permiso `contabilidad.documentos-fisicos.create` cree un `DocumentoFisico` con los campos: `tipoDocumentoFisicoId` (UUID, obligatorio), `numero` (NumeroDocumento, obligatorio), `fechaEmision` (FechaContable, obligatorio), `monto` (Decimal(18,2), nullable — obligatorio solo si `tipo.esTributario = true`, debe ser > 0 cuando se provee), `moneda` (enum `BOB|USD`, nullable — obligatorio solo si `tipo.esTributario = true`), `contactoId` (UUID, opcional), `glosa` (string 0..300, opcional). Ver REQ-D-13 y REQ-D-14 para las reglas de obligatoriedad condicional.
+- **REQ-D-01**: El sistema DEBE permitir que un usuario con permiso `contabilidad.documentos-fisicos.create` cree un `DocumentoFisico` con los campos: `tipoDocumentoFisicoId` (UUID, obligatorio), `numero` (NumeroDocumento, **obligatorio solo si el tipo es manual**), `fechaEmision` (FechaContable, obligatorio), `monto` (Decimal(18,2), nullable — obligatorio solo si `tipo.esTributario = true`, debe ser > 0 cuando se provee), `moneda` (enum `BOB|USD`, nullable — obligatorio solo si `tipo.esTributario = true`), `contactoId` (UUID, opcional), `glosa` (string 0..300, opcional). Ver REQ-D-13 y REQ-D-14 para las reglas de obligatoriedad condicional. **Rama auto**: si `tipo.numeracionAutomatica = true`, el sistema DEBE asignar `numero` usando el contador atómico de la secuencia `(organizationId, tipoDocumentoFisicoId)`. Si el cliente envía `numero` en el body, el sistema DEBE rechazarlo con `DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO` (422). El número asignado sigue siendo normalizado y sujeto al VO `NumeroDocumento`. **Rama manual**: si `tipo.numeracionAutomatica = false`, el comportamiento actual es idéntico: `numero` es obligatorio, se normaliza (REQ-D-02) y se valida unicidad (REQ-D-03).
 
 - **REQ-D-02**: El sistema DEBE normalizar el `numero` antes de persistir: `trim()` + `toUpperCase()`. La validación de unicidad opera sobre el valor normalizado.
 
@@ -77,6 +83,10 @@
 - **REQ-D-13**: Si `tipo.esTributario = true` y `monto` es `null` en el body del request (crear o editar), el sistema DEBE rechazar con **422** `DOCUMENTO_FISICO_MONTO_REQUERIDO_PARA_TRIBUTARIO`. La misma regla aplica para `moneda`: si `moneda` es `null` y `esTributario = true`, rechazar con **422** `DOCUMENTO_FISICO_MONTO_REQUERIDO_PARA_TRIBUTARIO` (con `details.campo: "moneda"`).
 
 - **REQ-D-14**: Si `tipo.esTributario = false` y `monto` NO es `null` en el body del request (crear o editar), el sistema DEBE rechazar con **422** `DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO`. La misma regla aplica para `moneda`: si `moneda` NO es `null` y `esTributario = false`, rechazar con **422** `DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO` (con `details.campo: "moneda"`).
+
+- **REQ-D-15**: El sistema MUST garantizar que N creaciones simultáneas de documentos del mismo tipo automático en el mismo tenant produzcan exactamente N números distintos, consecutivos desde el último asignado, sin gaps ni duplicados. El contador se implementa con upsert atómico `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` sobre la tabla `secuencias_documento_fisico`. PROHIBIDO `SELECT MAX(numero)+1` o equivalentes (§4.9 CLAUDE.md).
+
+- **REQ-D-16**: El contador de secuencia es por `(organizationId, tipoDocumentoFisicoId)`. Dos tenants con el mismo tipo NO comparten contador. Dos tipos distintos dentro del mismo tenant tampoco comparten contador. Tabla `secuencias_documento_fisico` PK compuesta `(organizationId, tipoDocumentoFisicoId)`, sin `year` — secuencia continua (a diferencia de `SecuenciaComprobante` que tiene `year`/`month`).
 
 ### 2.3 Asociación Comprobante ↔ DocumentoFisico
 
@@ -233,6 +243,73 @@
 - **Then** respuesta **201 Created** con `tiposComprobanteAplicables: []`
 - _Nota: array vacío es válido — significa que el admin ha deshabilitado este tipo para toda asociación_
 
+### 3.1b Numeración automática de TipoDocumentoFisico (E-TN-*)
+
+**E-TN-01: Crear tipo auto no-tributario con numeroInicial**
+- **Given** OWNER autenticado en tenant `acme` con permiso `contabilidad.tipos-documento-fisico.create`
+- **When** envía `POST /api/tipos-documento-fisico` con `{ nombre: "Recibo interno", codigo: "recibo-interno", esTributario: false, numeracionAutomatica: true, numeroInicial: 100 }`
+- **Then** respuesta **201 Created** con `{ numeracionAutomatica: true, numeroInicial: 100 }`
+- **And** el tipo persiste en BD con `numeracionAutomatica = true` y `numeroInicial = 100`
+
+**E-TN-02: Crear tipo sin numeracionAutomatica → manual por defecto**
+- **Given** OWNER autenticado en tenant `acme`
+- **When** envía `POST /api/tipos-documento-fisico` con `{ nombre: "Vale de caja", codigo: "vale-caja", esTributario: false }` (sin `numeracionAutomatica`)
+- **Then** respuesta **201 Created** con `{ numeracionAutomatica: false, numeroInicial: null }`
+- **And** tipos pre-existentes no se ven afectados
+
+**E-TN-03: Crear tipo auto sin numeroInicial → default 1**
+- **Given** OWNER autenticado en tenant `acme`
+- **When** envía `POST /api/tipos-documento-fisico` con `{ numeracionAutomatica: true, esTributario: false, ... }` sin `numeroInicial`
+- **Then** respuesta **201 Created** con `{ numeracionAutomatica: true, numeroInicial: 1 }`
+
+**E-TN-04: numeroInicial enviado con tipo manual es ignorado**
+- **When** OWNER envía `POST /api/tipos-documento-fisico` con `{ esTributario: false, numeracionAutomatica: false, numeroInicial: 50, ... }`
+- **Then** respuesta **201 Created** con `{ numeracionAutomatica: false, numeroInicial: null }`
+- **And** el valor 50 se descarta silenciosamente
+
+**E-TN-05: Crear tipo auto-tributario → rechazo**
+- **When** OWNER envía `POST /api/tipos-documento-fisico` con `{ esTributario: true, numeracionAutomatica: true, ... }`
+- **Then** respuesta **422** con `{ error: { code: "TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA", message: "Un tipo tributario no puede tener numeración automática" } }`
+
+**E-TN-06: Intentar cambiar numeracionAutomatica vía PATCH → rechazo set-once**
+- **Given** existe tipo con `esTributario: true, numeracionAutomatica: false`
+- **When** OWNER envía `PATCH /api/tipos-documento-fisico/:id` con `{ numeracionAutomatica: true }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE`
+- _Nota: el endpoint expone `numeracionAutomatica` en el DTO de actualización y el service lo rechaza con INMUTABLE (set-once) por presencia del campo, independientemente de su valor. El código INMUTABLE prevalece porque el rechazo se efectúa por PRESENCIA del campo antes de evaluar la regla auto⇒¬tributario._
+
+**E-TN-07: Editar tipo manual→auto post-create → rechazo (set-once)**
+- **Given** existe tipo con `esTributario: false, numeracionAutomatica: false`
+- **When** OWNER envía `PATCH /api/tipos-documento-fisico/:id` con `{ numeracionAutomatica: true, numeroInicial: 1 }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE`
+- **And** el modo de numeración solo se define al crear el tipo (togglearlo post-create está prohibido)
+
+**E-TN-08: Editar numeroInicial post-create → rechazo 422 vía HTTP**
+- **Given** existe tipo con `numeracionAutomatica: true, numeroInicial: 100` (puede tener o no documentos)
+- **When** OWNER envía `PATCH /api/tipos-documento-fisico/:id` con `{ numeroInicial: 200 }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE`
+- _Nota: el DTO de actualización expone `numeroInicial` para que el rechazo suceda vía HTTP (no silenciosamente por whitelist). El set-once se enforza en el service._
+
+**E-TN-09: Enviar mismo numeroInicial existente → rechazo igual**
+- **Given** tipo con `numeroInicial: 100`
+- **When** OWNER envía `PATCH` con `{ numeroInicial: 100 }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE` (set-once sin excepción de idempotencia)
+
+**E-TN-10: Togglear numeracionAutomatica de true a false → rechazo**
+- **Given** tipo con `numeracionAutomatica: true`
+- **When** OWNER envía `PATCH` con `{ numeracionAutomatica: false }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE`
+
+**E-TN-11: Editar otros campos del tipo auto → permitido**
+- **Given** tipo con `numeracionAutomatica: true, numeroInicial: 1`
+- **When** OWNER envía `PATCH` con `{ nombre: "Recibo digital v2", descripcion: "Actualizado" }` (sin tocar numeroInicial ni numeracionAutomatica)
+- **Then** respuesta **200 OK** — los demás campos son editables normalmente
+
+**E-TN-12: Intentar convertir tipo auto en tributario vía PATCH → rechazo**
+- **Given** existe tipo con `numeracionAutomatica: true, esTributario: false`
+- **When** OWNER envía `PATCH /api/tipos-documento-fisico/:id` con `{ esTributario: true }`
+- **Then** respuesta **422** `TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA`
+- _Nota: el set-once se chequea PRIMERO (por presencia de numeracionAutomatica/numeroInicial); como en este caso NO vienen esos campos, el service evalúa la regla auto⇒¬tributario y retorna AUTO_TRIBUTARIO_INVALIDA (guardas en orden: set-once → auto⇒¬tributario)._
+
 ### 3.2 Crear DocumentoFisico
 
 **E-D-01: Crear documento físico no-tributario exitoso**
@@ -315,6 +392,52 @@
 - **Given** existe `TipoDocumentoFisico` id=`tipo-recibo-egreso` con `esTributario: false` en tenant `acme`
 - **When** CONTADOR envía `POST /api/documentos-fisicos` con `{ tipoDocumentoFisicoId: "tipo-recibo-egreso", numero: "RE-002", fechaEmision: "2026-04-01", monto: "500.00", moneda: "BOB" }`
 - **Then** respuesta **422 Unprocessable Entity** con `{ error: { code: "DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO", ... } }`
+
+### 3.2b Numeración automática de DocumentoFisico (E-D-AUTO-*)
+
+**E-D-AUTO-01: Crear documento de tipo auto → sistema asigna numero**
+- **Given** existe `TipoDocumentoFisico` id=`tipo-recibo-auto` con `numeracionAutomatica: true, numeroInicial: 100, esTributario: false, activo: true`
+- **And** no existe ningún documento de ese tipo en tenant `acme`
+- **When** CONTADOR de `acme` con permiso `contabilidad.documentos-fisicos.create` envía `POST /api/documentos-fisicos` con `{ tipoDocumentoFisicoId: "tipo-recibo-auto", fechaEmision: "2026-06-14" }` (sin `numero`)
+- **Then** respuesta **201 Created** con `{ numero: "100", tipoDocumentoFisico: { id, numeracionAutomatica: true } }`
+- **And** el documento persiste en BD con `numero = "100"`
+
+**E-D-AUTO-02: Segundo documento auto → número consecutivo**
+- **Given** tipo `tipo-recibo-auto` con `numeroInicial: 100` y ya existe un documento con `numero: "100"`
+- **When** CONTADOR crea segundo documento del mismo tipo
+- **Then** respuesta **201 Created** con `{ numero: "101" }`
+
+**E-D-AUTO-03: Enviar numero en tipo auto → rechazo**
+- **Given** tipo `tipo-recibo-auto` con `numeracionAutomatica: true`
+- **When** CONTADOR envía `POST /api/documentos-fisicos` con `{ tipoDocumentoFisicoId: "tipo-recibo-auto", numero: "MI-NUM", fechaEmision: "2026-06-14" }`
+- **Then** respuesta **422** con `{ error: { code: "DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO", message: "El número lo asigna el sistema para este tipo de documento" } }`
+
+**E-D-AUTO-04: Crear documento de tipo manual sin cambios → comportamiento actual**
+- **Given** tipo `tipo-factura-recibida` con `numeracionAutomatica: false, esTributario: true, activo: true`
+- **When** CONTADOR envía `POST /api/documentos-fisicos` con `{ tipoDocumentoFisicoId: "tipo-factura-recibida", numero: "FC-0001", fechaEmision: "2026-06-14", monto: "1150.00", moneda: "BOB" }`
+- **Then** respuesta **201 Created** con `{ numero: "FC-0001" }` — flujo actual idéntico
+- **And** `numero` fue normalizado (trim + uppercase) según REQ-D-02
+
+**E-D-AUTO-05: Tipo manual sin numero → rechazo (comportamiento actual)**
+- **Given** tipo con `numeracionAutomatica: false`
+- **When** CONTADOR envía `POST /api/documentos-fisicos` sin campo `numero`
+- **Then** respuesta **400 Bad Request** (DTO class-validator: campo requerido en tipo manual)
+
+**E-D-AUTO-06: Concurrencia — N simultáneos → N números sin duplicados**
+- **Given** tipo `tipo-recibo-auto` con `numeroInicial: 1` y sin documentos previos en tenant `acme`
+- **When** 5 requests simultáneos crean documentos de ese tipo
+- **Then** los 5 documentos tienen números `{ 1, 2, 3, 4, 5 }` (sin repetición, sin gaps)
+- **And** la tabla `secuencias_documento_fisico` registra `ultimoNumero = 5`
+
+**E-D-AUTO-07: Multi-tenant: secuencias independientes**
+- **Given** tenant `acme` y tenant `beta` ambos tienen tipo `tipo-recibo-interno` con `numeracionAutomatica: true, numeroInicial: 1`
+- **When** `acme` crea 3 documentos y `beta` crea 2 documentos de ese tipo
+- **Then** `acme` tiene documentos `{ 1, 2, 3 }` y `beta` tiene documentos `{ 1, 2 }` — contadores independientes
+
+**E-D-AUTO-08: Dos tipos distintos en mismo tenant: secuencias independientes**
+- **Given** tenant `acme` tiene `tipo-A` y `tipo-B` ambos con `numeracionAutomatica: true, numeroInicial: 1`
+- **When** crea un documento de `tipo-A` y un documento de `tipo-B`
+- **Then** ambos documentos tienen `numero: "1"` — sin colisión (la unicidad es por `(org, tipo, numero)`)
 
 ### 3.3 Asociar y desasociar a Comprobante
 
@@ -578,6 +701,8 @@ Todos extienden `DomainError`. El `GlobalExceptionFilter` los mapea al formato e
 | `TIPO_DOCUMENTO_FISICO_NOMBRE_DUPLICADO` | 409 | Ya existe un tipo con el nombre '{nombre}' en esta organización | UNIQUE `(organizationId, nombre)` violation |
 | `TIPO_DOCUMENTO_FISICO_CON_DOCUMENTOS` | 409 | No se puede eliminar el tipo porque tiene documentos físicos asociados. Desactivalo en su lugar. | DELETE con FK activa (DocumentoFisico.tipoDocumentoFisicoId) |
 | `TIPO_DOCUMENTO_FISICO_INACTIVO` | 422 | El tipo de documento físico está inactivo y no acepta documentos nuevos | Crear DocumentoFisico con tipo `activo = false` |
+| `TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA` | 422 | Un tipo tributario no puede tener numeración automática | Crear o editar con `esTributario=true` y `numeracionAutomatica=true` (REQ-T-12) |
+| `TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE` | 422 | El número inicial y el modo de numeración no pueden modificarse una vez configurados | Editar `numeroInicial` o togglear `numeracionAutomatica` en tipo ya persistido (REQ-T-13) |
 
 ### 4.2 DocumentoFisico
 
@@ -591,6 +716,7 @@ Todos extienden `DomainError`. El `GlobalExceptionFilter` los mapea al formato e
 | `DOCUMENTO_FISICO_NUMERO_FORMATO_INVALIDO` | 400 | El número del documento solo puede contener letras mayúsculas, dígitos y los caracteres . / - | Valor no coincide con `^[A-Z0-9./-]+$` post-normalización |
 | `DOCUMENTO_FISICO_MONTO_REQUERIDO_PARA_TRIBUTARIO` | 422 | El tipo de documento tributario requiere monto y moneda | Crear/editar doc con `tipo.esTributario=true` y `monto` o `moneda` nulos — incluir `details.campo` indicando qué faltó |
 | `DOCUMENTO_FISICO_MONTO_NO_PERMITIDO_PARA_NO_TRIBUTARIO` | 422 | El tipo de documento no tributario no debe llevar monto ni moneda | Crear/editar doc con `tipo.esTributario=false` y `monto` o `moneda` no nulos — incluir `details.campo` indicando cuál sobra |
+| `DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO` | 422 | El número lo asigna el sistema para este tipo de documento | Crear documento de tipo auto enviando `numero` en el body (REQ-D-01 rama auto) |
 
 ### 4.3 Asociación Comprobante ↔ DocumentoFisico
 
@@ -678,17 +804,19 @@ Viven en `comprobantes/domain/comprobante-errors.ts`:
 
 ```typescript
 // CreateTipoDocumentoFisicoDto
-{ nombre: string; codigo: string; esTributario: boolean; descripcion?: string; tiposComprobanteAplicables: TipoComprobante[]; }
+{ nombre: string; codigo: string; esTributario: boolean; descripcion?: string; tiposComprobanteAplicables: TipoComprobante[]; numeracionAutomatica?: boolean; numeroInicial?: number; }
+// Nota: numeracionAutomatica default false; numeroInicial solo aplica si numeracionAutomatica=true; ignorado si numeracionAutomatica=false
 
-// UpdateTipoDocumentoFisicoDto (codigo ausente — inmutable)
-{ nombre?: string; esTributario?: boolean; activo?: boolean; descripcion?: string; tiposComprobanteAplicables?: TipoComprobante[]; }
+// UpdateTipoDocumentoFisicoDto (codigo ausente — inmutable; numeracionAutomatica/numeroInicial expuestos para rechazar con 422 set-once)
+{ nombre?: string; esTributario?: boolean; activo?: boolean; descripcion?: string; tiposComprobanteAplicables?: TipoComprobante[]; numeracionAutomatica?: boolean; numeroInicial?: number; }
+// IMPORTANT: numeracionAutomatica y numeroInicial en UpdateDto son set-once — el service los rechaza con TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE (422) ante cualquier presencia
 
 // TipoDocumentoFisicoDto (respuesta)
-{ id: string; nombre: string; codigo: string; esTributario: boolean; activo: boolean; descripcion?: string; tiposComprobanteAplicables: TipoComprobante[]; organizationId: string; createdAt: string; updatedAt: string; }
+{ id: string; nombre: string; codigo: string; esTributario: boolean; activo: boolean; descripcion?: string; tiposComprobanteAplicables: TipoComprobante[]; numeracionAutomatica: boolean; numeroInicial: number | null; organizationId: string; createdAt: string; updatedAt: string; }
 
 // CreateDocumentoFisicoDto
-{ tipoDocumentoFisicoId: string; numero: string; fechaEmision: string; monto?: string | null; moneda?: "BOB" | "USD" | null; contactoId?: string; glosa?: string; }
-// Nota: monto y moneda son opcionales en el DTO (validación condicional en service según esTributario)
+{ tipoDocumentoFisicoId: string; numero?: string; fechaEmision: string; monto?: string | null; moneda?: "BOB" | "USD" | null; contactoId?: string; glosa?: string; }
+// Nota: numero es opcional en DTO (@IsOptional) — obligatorio en service solo si tipo manual; ignorado si tipo auto (rechaza si presente). monto y moneda son opcionales en el DTO (validación condicional en service según esTributario)
 
 // UpdateDocumentoFisicoDto (todos opcionales)
 { tipoDocumentoFisicoId?: string; numero?: string; fechaEmision?: string; monto?: string | null; moneda?: "BOB" | "USD" | null; contactoId?: string; glosa?: string; }

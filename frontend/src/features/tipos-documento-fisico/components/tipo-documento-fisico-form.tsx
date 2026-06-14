@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import type { TipoDocumentoFisico } from '@/types/api';
 
@@ -54,12 +55,38 @@ export function TipoDocumentoFisicoForm({
   const seleccionados = useWatch({ control, name: 'tiposComprobanteAplicables' });
   const esTributario = useWatch({ control, name: 'esTributario' });
   const activo = useWatch({ control, name: 'activo' });
+  const numeracionAutomatica = useWatch({ control, name: 'numeracionAutomatica' });
+  const numeroInicialValue = useWatch({ control, name: 'numeroInicial' });
 
   function toggleTipoComprobante(value: string, checked: boolean): void {
     const next = checked
       ? [...seleccionados, value as TipoDocumentoFisicoFormValues['tiposComprobanteAplicables'][number]]
       : seleccionados.filter((v) => v !== value);
     setValue('tiposComprobanteAplicables', next, { shouldDirty: true });
+  }
+
+  function handleNumeracionAutomaticaChange(checked: boolean): void {
+    // Regla auto⇒¬tributario: si se activa auto y el tipo es tributario, no se permite.
+    // El gating está en el JSX (disabled), pero como doble red de seguridad: si esTributario
+    // está activo, no permitir activar auto.
+    if (checked && esTributario) return;
+    setValue('numeracionAutomatica', checked, { shouldDirty: true });
+    if (!checked) {
+      // Al desactivar auto, limpiar numeroInicial.
+      setValue('numeroInicial', null, { shouldDirty: true });
+    } else {
+      // Al activar auto, poner default 1 si no tiene valor.
+      setValue('numeroInicial', 1, { shouldDirty: true });
+    }
+  }
+
+  function handleEsTributarioChange(checked: boolean): void {
+    setValue('esTributario', checked, { shouldDirty: true });
+    // Si se activa tributario con auto encendido → apagar auto (regla auto⇒¬tributario).
+    if (checked && numeracionAutomatica) {
+      setValue('numeracionAutomatica', false, { shouldDirty: true });
+      setValue('numeroInicial', null, { shouldDirty: true });
+    }
   }
 
   return (
@@ -116,9 +143,7 @@ export function TipoDocumentoFisicoForm({
           <Checkbox
             id="esTributario"
             checked={esTributario}
-            onCheckedChange={(v) =>
-              setValue('esTributario', v === true, { shouldDirty: true })
-            }
+            onCheckedChange={(v) => handleEsTributarioChange(v === true)}
             className="mt-0.5"
           />
           <div className="flex-1">
@@ -131,6 +156,85 @@ export function TipoDocumentoFisicoForm({
           </div>
         </div>
       </div>
+
+      {/* Numeración automática — set-once (disabled en edit) */}
+      <div className="space-y-1.5">
+        <div className={cn(
+          'flex items-start gap-3 rounded-md border px-3 py-3',
+          (esTributario || mode === 'edit') && 'opacity-60',
+        )}>
+          <Switch
+            id="numeracionAutomatica"
+            checked={numeracionAutomatica}
+            onCheckedChange={handleNumeracionAutomaticaChange}
+            disabled={esTributario || mode === 'edit'}
+            aria-label="Numeración automática"
+          />
+          <div className="flex-1">
+            <Label htmlFor="numeracionAutomatica" className={cn('cursor-pointer', (esTributario || mode === 'edit') && 'cursor-not-allowed')}>
+              Numeración automática
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              {mode === 'edit'
+                ? 'La numeración no se puede cambiar una vez creado el tipo.'
+                : esTributario
+                  ? 'No disponible para tipos tributarios.'
+                  : 'El sistema asigna el número correlativo del documento automáticamente.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Número inicial — solo visible cuando numeracionAutomatica=true y mode=create */}
+      {numeracionAutomatica && mode === 'create' ? (
+        <Field
+          label="Número inicial"
+          htmlFor="numeroInicial"
+          error={errors.numeroInicial?.message}
+        >
+          <Input
+            id="numeroInicial"
+            type="number"
+            min={1}
+            step={1}
+            placeholder="1"
+            className="text-base md:text-sm"
+            aria-invalid={errors.numeroInicial !== undefined}
+            value={numeroInicialValue ?? 1}
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              setValue(
+                'numeroInicial',
+                isNaN(parsed) ? null : parsed,
+                { shouldValidate: true },
+              );
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Primer número de la secuencia correlativa. Mínimo 1.
+          </p>
+        </Field>
+      ) : null}
+
+      {/* Número inicial — solo lectura en modo edit con numeracionAutomatica=true */}
+      {numeracionAutomatica && mode === 'edit' ? (
+        <Field
+          label="Número inicial"
+          htmlFor="numeroInicial-readonly"
+        >
+          <Input
+            id="numeroInicial-readonly"
+            type="number"
+            value={numeroInicialValue ?? 1}
+            disabled
+            className="text-base md:text-sm"
+            aria-label="Número inicial"
+          />
+          <p className="text-xs text-muted-foreground">
+            El número inicial no puede modificarse una vez creado el tipo.
+          </p>
+        </Field>
+      ) : null}
 
       {/* Checkbox activo — solo visible en modo edit */}
       {mode === 'edit' ? (

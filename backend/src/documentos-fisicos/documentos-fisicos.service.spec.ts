@@ -15,6 +15,7 @@ import type {
   DocumentoFisicoListarFiltros,
   DocumentoFisicoListarPagination,
 } from './ports/documento-fisico.repository.port';
+import type { SecuenciaDocumentoFisicoPort } from './ports/secuencia-documento-fisico.port';
 import type { TiposDocumentoFisicoReaderPort } from '@/tipos-documento-fisico/ports/tipos-documento-fisico-reader.port';
 import {
   TipoDocumentoFisicoNoEncontradoError,
@@ -36,6 +37,7 @@ const CONTACTO_ID = 'contacto-1';
 type MockRepo = { [K in keyof DocumentoFisicoRepositoryPort]: jest.Mock };
 type MockTiposReader = { [K in keyof TiposDocumentoFisicoReaderPort]: jest.Mock };
 type MockContactosReader = { [K in keyof ContactosReaderPort]: jest.Mock };
+type MockSecuencia = { [K in keyof SecuenciaDocumentoFisicoPort]: jest.Mock };
 
 function makeRepoMock(): MockRepo {
   return {
@@ -62,6 +64,12 @@ function makeTiposReaderMock(): MockTiposReader {
 function makeContactosReaderMock(): MockContactosReader {
   return {
     obtenerBatch: jest.fn(),
+  };
+}
+
+function makeSecuenciaMock(): MockSecuencia {
+  return {
+    siguienteNumero: jest.fn(),
   };
 }
 
@@ -92,19 +100,42 @@ function makeTipoParaValidacion(overrides: Record<string, unknown> = {}) {
     esTributario: true,
     activo: true,
     tiposComprobanteAplicables: [],
+    // Campos de numeración automática (change numeracion-tipo-documento):
+    // default manual para retrocompatibilidad de los tests existentes.
+    numeracionAutomatica: false,
+    numeroInicial: null,
     ...overrides,
   };
+}
+
+/**
+ * Mock mínimo de PrismaService que expone `$transaction` para la rama auto.
+ * El callback de `$transaction` recibe un objeto que simula ser un TransactionClient;
+ * en unit tests el `tx` no se usa para queries reales — solo se verifica que
+ * secuenciaPort y repo.create reciban el mismo objeto (atomicidad).
+ */
+function makePrismaMock() {
+  const tx = { _tag: 'mock-tx-client' };
+  const prismaMock = {
+    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => fn(tx)),
+    _mockTx: tx,
+  };
+  return prismaMock;
 }
 
 function buildService(
   repo: MockRepo,
   tiposReader: MockTiposReader,
   contactosReader: MockContactosReader,
+  secuencia?: MockSecuencia,
+  prismaMock?: ReturnType<typeof makePrismaMock>,
 ): DocumentosFisicosService {
   return new DocumentosFisicosService(
     repo as unknown as DocumentoFisicoRepositoryPort,
     tiposReader as unknown as TiposDocumentoFisicoReaderPort,
     contactosReader as unknown as ContactosReaderPort,
+    secuencia as unknown as SecuenciaDocumentoFisicoPort,
+    (prismaMock ?? makePrismaMock()) as unknown as import('@/common/prisma.service').PrismaService,
   );
 }
 
@@ -116,13 +147,17 @@ describe('DocumentosFisicosService', () => {
   let repo: MockRepo;
   let tiposReader: MockTiposReader;
   let contactosReader: MockContactosReader;
+  let secuencia: MockSecuencia;
+  let prismaMock: ReturnType<typeof makePrismaMock>;
   let service: DocumentosFisicosService;
 
   beforeEach(() => {
     repo = makeRepoMock();
     tiposReader = makeTiposReaderMock();
     contactosReader = makeContactosReaderMock();
-    service = buildService(repo, tiposReader, contactosReader);
+    secuencia = makeSecuenciaMock();
+    prismaMock = makePrismaMock();
+    service = buildService(repo, tiposReader, contactosReader, secuencia, prismaMock);
   });
 
   // ==========================================================
@@ -417,6 +452,196 @@ describe('DocumentosFisicosService', () => {
       ).rejects.toThrow(DocumentoFisicoNumeroFormatoInvalidoError);
 
       expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    // ----------------------------------------------------------
+    // Numeración automática (change numeracion-tipo-documento)
+    // ----------------------------------------------------------
+
+    describe('numeración automática (tipo auto)', () => {
+      const NUMERO_INICIAL = 100;
+
+      it('E-D-AUTO-03: tipo auto + cliente envía numero → DocumentoFisicoNumeroNoPermitidoEnTipoAutoError (422)', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({
+            esTributario: false,
+            numeracionAutomatica: true,
+            numeroInicial: NUMERO_INICIAL,
+          }),
+        );
+
+        await expect(
+          service.create(TENANT_ID, {
+            tipoDocumentoFisicoId: TIPO_ID,
+            numero: 'REC-001',
+            fechaEmision: FECHA_EMISION,
+            monto: null,
+            moneda: null,
+            glosa: null,
+            contactoId: null,
+            createdByUserId: USER_ID,
+          }),
+        ).rejects.toMatchObject({
+          code: 'DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO',
+        });
+
+        expect(repo.create).not.toHaveBeenCalled();
+        expect(secuencia.siguienteNumero).not.toHaveBeenCalled();
+      });
+
+      it('E-D-AUTO-01: tipo auto + sin numero → asigna numeroInicial, persiste el número generado', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({
+            esTributario: false,
+            numeracionAutomatica: true,
+            numeroInicial: NUMERO_INICIAL,
+          }),
+        );
+        // La secuencia devuelve el primer número (= numeroInicial)
+        secuencia.siguienteNumero.mockResolvedValue(NUMERO_INICIAL);
+        const creado = makeDocumento({ numero: String(NUMERO_INICIAL), monto: null, moneda: null });
+        repo.create.mockResolvedValue(creado);
+
+        const result = await service.create(TENANT_ID, {
+          tipoDocumentoFisicoId: TIPO_ID,
+          numero: null,
+          fechaEmision: FECHA_EMISION,
+          monto: null,
+          moneda: null,
+          glosa: null,
+          contactoId: null,
+          createdByUserId: USER_ID,
+        });
+
+        expect(result).toBe(creado);
+        // Verificar que el número generado llega al repo como string normalizado
+        const createCall = repo.create.mock.calls[0] as [string, DocumentoFisicoCreateData];
+        expect(createCall[1].numero).toBe(String(NUMERO_INICIAL));
+        // Verificar que la secuencia recibió el numeroInicial correcto
+        expect(secuencia.siguienteNumero).toHaveBeenCalledWith(
+          TENANT_ID,
+          TIPO_ID,
+          NUMERO_INICIAL,
+          expect.anything(), // tx — el client de la transacción
+        );
+      });
+
+      it('E-D-AUTO-02: tipo auto + segundo documento → número consecutivo (numeroInicial + 1)', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({
+            esTributario: false,
+            numeracionAutomatica: true,
+            numeroInicial: NUMERO_INICIAL,
+          }),
+        );
+        // Simula el segundo documento: secuencia devuelve 101
+        secuencia.siguienteNumero.mockResolvedValue(NUMERO_INICIAL + 1);
+        const creado = makeDocumento({
+          numero: String(NUMERO_INICIAL + 1),
+          monto: null,
+          moneda: null,
+        });
+        repo.create.mockResolvedValue(creado);
+
+        const result = await service.create(TENANT_ID, {
+          tipoDocumentoFisicoId: TIPO_ID,
+          numero: null,
+          fechaEmision: FECHA_EMISION,
+          monto: null,
+          moneda: null,
+          glosa: null,
+          contactoId: null,
+          createdByUserId: USER_ID,
+        });
+
+        expect(result).toBe(creado);
+        const createCall = repo.create.mock.calls[0] as [string, DocumentoFisicoCreateData];
+        expect(createCall[1].numero).toBe(String(NUMERO_INICIAL + 1));
+      });
+
+      it('atomicidad: secuencia y repo.create reciben el mismo tx (MISMA transacción)', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({
+            esTributario: false,
+            numeracionAutomatica: true,
+            numeroInicial: NUMERO_INICIAL,
+          }),
+        );
+        secuencia.siguienteNumero.mockResolvedValue(NUMERO_INICIAL);
+        repo.create.mockResolvedValue(
+          makeDocumento({ numero: String(NUMERO_INICIAL), monto: null, moneda: null }),
+        );
+
+        await service.create(TENANT_ID, {
+          tipoDocumentoFisicoId: TIPO_ID,
+          numero: null,
+          fechaEmision: FECHA_EMISION,
+          monto: null,
+          moneda: null,
+          glosa: null,
+          contactoId: null,
+          createdByUserId: USER_ID,
+        });
+
+        // El tx que recibe secuencia.siguienteNumero debe ser el mismo objeto
+        // que recibe repo.create (referencia idéntica — garantía de atomicidad).
+        const txDeLaSecuencia = (secuencia.siguienteNumero.mock.calls[0] as unknown[])[3];
+        const txDelRepo = (repo.create.mock.calls[0] as unknown[])[2];
+        // El mockTx es el objeto que $transaction pasa al callback — ambos deben ser el mismo
+        expect(txDeLaSecuencia).toBe(prismaMock._mockTx);
+        expect(txDelRepo).toBe(prismaMock._mockTx);
+        expect(txDeLaSecuencia).toBe(txDelRepo);
+      });
+    });
+
+    describe('numeración manual (tipo manual)', () => {
+      it('E-D-AUTO-04: tipo manual + numero presente → flujo actual, no llama secuencia', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({ esTributario: true, numeracionAutomatica: false }),
+        );
+        contactosReader.obtenerBatch.mockResolvedValue(new Map());
+        repo.findByNumero.mockResolvedValue(null);
+        const creado = makeDocumento();
+        repo.create.mockResolvedValue(creado);
+
+        const result = await service.create(TENANT_ID, {
+          tipoDocumentoFisicoId: TIPO_ID,
+          numero: 'FC-0001',
+          fechaEmision: FECHA_EMISION,
+          monto: '1250.00',
+          moneda: Moneda.BOB,
+          glosa: null,
+          contactoId: null,
+          createdByUserId: USER_ID,
+        });
+
+        expect(result).toBe(creado);
+        expect(secuencia.siguienteNumero).not.toHaveBeenCalled();
+      });
+
+      it('E-D-AUTO-05: tipo manual + sin numero → DocumentoFisicoNumeroRequeridoError (422)', async () => {
+        tiposReader.findById.mockResolvedValue(
+          makeTipoParaValidacion({ esTributario: true, numeracionAutomatica: false }),
+        );
+
+        await expect(
+          service.create(TENANT_ID, {
+            tipoDocumentoFisicoId: TIPO_ID,
+            numero: null,
+            fechaEmision: FECHA_EMISION,
+            monto: '1250.00',
+            moneda: Moneda.BOB,
+            glosa: null,
+            contactoId: null,
+            createdByUserId: USER_ID,
+          }),
+        ).rejects.toMatchObject({
+          code: 'DOCUMENTO_FISICO_NUMERO_REQUERIDO',
+        });
+
+        expect(repo.create).not.toHaveBeenCalled();
+        expect(secuencia.siguienteNumero).not.toHaveBeenCalled();
+      });
     });
   });
 

@@ -1,11 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
+  IsOptional,
   IsString,
   Matches,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { TipoComprobante } from '@prisma/client';
@@ -47,4 +50,23 @@ export class CreateTipoDocumentoFisicoDto {
   @IsArray()
   @IsEnum(TipoComprobante, { each: true })
   tiposComprobanteAplicables!: TipoComprobante[];
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Si true, el sistema asigna el número correlativo automáticamente. Incompatible con esTributario=true. Inmutable post-creación.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  numeracionAutomatica?: boolean;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Número desde el que comienza la secuencia automática. Solo aplica cuando numeracionAutomatica=true. Inmutable post-creación.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  numeroInicial?: number;
 }

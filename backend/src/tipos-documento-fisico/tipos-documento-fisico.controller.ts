@@ -132,6 +132,11 @@ export class TiposDocumentoFisicoController {
       esTributario: dto.esTributario,
       tiposComprobanteAplicables: dto.tiposComprobanteAplicables,
       createdByUserId: req.user.sub,
+      // exactOptionalPropertyTypes: spread condicional (CLAUDE.md §2.5.1).
+      ...(dto.numeracionAutomatica !== undefined
+        ? { numeracionAutomatica: dto.numeracionAutomatica }
+        : {}),
+      ...(dto.numeroInicial !== undefined ? { numeroInicial: dto.numeroInicial } : {}),
     });
     return toTipoDocumentoFisicoResponse(tipo);
   }
@@ -162,6 +167,12 @@ export class TiposDocumentoFisicoController {
       ...(dto.tiposComprobanteAplicables !== undefined
         ? { tiposComprobanteAplicables: dto.tiposComprobanteAplicables }
         : {}),
+      // Set-once: se propagan al service para que éste rechace con 422 si están presentes.
+      // El service lanza TipoDocumentoFisicoNumeroInicialInmutableError ante cualquier presencia.
+      ...(dto.numeracionAutomatica !== undefined
+        ? { numeracionAutomatica: dto.numeracionAutomatica }
+        : {}),
+      ...(dto.numeroInicial !== undefined ? { numeroInicial: dto.numeroInicial } : {}),
     });
 
     return toTipoDocumentoFisicoResponse(tipo);

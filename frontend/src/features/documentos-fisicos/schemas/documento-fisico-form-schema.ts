@@ -8,15 +8,16 @@ const MONTO_REGEX = /^(?!0+(\.0+)?$)\d+(\.\d+)?$/;
 // D7: espeja FORMATO_INVALIDO del backend — solo mayúsculas, dígitos, punto, guion, barra.
 const NUMERO_REGEX = /^[A-Z0-9./-]+$/;
 
-// Schema base sin condicionalidad de monto/moneda.
+// Schema base sin condicionalidad de monto/moneda ni de numero.
+// numero es opcional aquí porque la condicionalidad (requerido/auto) se maneja en buildFormSchema.
 const base = z.object({
   tipoDocumentoFisicoId: z.string().uuid('Seleccioná un tipo de documento'),
   numero: z
     .string()
     .trim()
-    .min(1, 'El número es requerido')
     .max(50, 'El número no puede superar 50 caracteres')
-    .regex(NUMERO_REGEX, 'Solo letras mayúsculas, números, punto, guion y barra'),
+    .optional()
+    .nullable(),
   fechaEmision: z.string().min(1, 'La fecha de emisión es requerida'),
   monto: z.string().trim().optional().nullable(),
   moneda: z.enum(['BOB', 'USD']).optional().nullable(),
@@ -25,12 +26,31 @@ const base = z.object({
 });
 
 /**
- * Factory dinámica: recrea el schema según si el tipo seleccionado es tributario.
- * Usar con useMemo(() => buildFormSchema(esTributario), [esTributario]).
+ * Factory dinámica: recrea el schema según las condiciones del tipo seleccionado.
+ * Usar con useMemo(() => buildFormSchema(esTributario, esAutoNumerico), [esTributario, esAutoNumerico]).
  * D1: monto/moneda requeridos solo si tributario; campos ocultos si no.
+ * D-AUTO: numero no requerido (y no debe enviarse) si el tipo tiene numeración automática.
  */
-export function buildFormSchema(esTributario: boolean) {
+export function buildFormSchema(esTributario: boolean, esAutoNumerico = false) {
   return base.superRefine((v, ctx) => {
+    // D-AUTO: si el tipo es automático, el backend asigna el número — no se valida aquí.
+    if (!esAutoNumerico) {
+      const numeroTrimmed = v.numero?.trim() ?? '';
+      if (!numeroTrimmed) {
+        ctx.addIssue({
+          path: ['numero'],
+          code: 'custom',
+          message: 'El número es requerido',
+        });
+      } else if (!NUMERO_REGEX.test(numeroTrimmed)) {
+        ctx.addIssue({
+          path: ['numero'],
+          code: 'custom',
+          message: 'Solo letras mayúsculas, números, punto, guion y barra',
+        });
+      }
+    }
+
     if (esTributario) {
       if (!v.monto || !MONTO_REGEX.test(v.monto)) {
         ctx.addIssue({

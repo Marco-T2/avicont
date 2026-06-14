@@ -94,6 +94,8 @@ export async function cleanupTestData() {
   // los tipos. Todo ANTES de Contacto y Organization.
   await prisma.comprobanteDocumentoFisico.deleteMany({});
   await prisma.documentoFisico.deleteMany({});
+  // SecuenciaDocumentoFisico tiene FK hacia TipoDocumentoFisico → borrar antes
+  await prisma.secuenciaDocumentoFisico.deleteMany({});
   await prisma.tipoDocumentoFisico.deleteMany({});
   // Contactos (Fase 1.4): van DESPUÉS de comprobantes (LineaComprobante
   // tiene FK Restrict hacia Contacto) y ANTES de Organization (FK Cascade).

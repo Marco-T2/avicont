@@ -92,6 +92,7 @@ const doc1: DocumentoFisico = {
     nombre: 'Factura recibida',
     codigo: 'factura',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',
@@ -109,6 +110,7 @@ const doc2: DocumentoFisico = {
     nombre: 'Recibo interno',
     codigo: 'recibo',
     esTributario: false,
+    numeracionAutomatica: false,
   },
 };
 

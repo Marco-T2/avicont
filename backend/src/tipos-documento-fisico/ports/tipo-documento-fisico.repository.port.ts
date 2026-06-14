@@ -20,6 +20,13 @@ export interface TipoDocumentoFisicoCreateData {
   tiposComprobanteAplicables: TipoComprobante[];
   /** Nullable porque el seed corre sin user context. */
   createdByUserId: string | null;
+  /** Si true, el sistema asigna número correlativo al crear un DocumentoFisico. */
+  numeracionAutomatica: boolean;
+  /**
+   * Número inicial de la secuencia. Null cuando numeracionAutomatica=false.
+   * Inmutable post-create (set-once).
+   */
+  numeroInicial: number | null;
 }
 
 /**

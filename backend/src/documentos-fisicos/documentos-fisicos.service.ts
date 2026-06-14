@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { DocumentoFisico, Moneda } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
+import { PrismaService } from '@/common/prisma.service';
+
 import { NumeroDocumento } from './domain/numero-documento';
 import {
   DocumentoFisicoNoEncontradoError,
@@ -11,6 +13,8 @@ import {
   DocumentoFisicoReferenciadoPorComprobanteError,
   DocumentoFisicoMontoRequeridoParaTributarioError,
   DocumentoFisicoMontoNoPermitidoParaNoTributarioError,
+  DocumentoFisicoNumeroNoPermitidoEnTipoAutoError,
+  DocumentoFisicoNumeroRequeridoError,
 } from './domain/documento-fisico-errors';
 import {
   DOCUMENTO_FISICO_REPOSITORY_PORT,
@@ -21,6 +25,10 @@ import {
   DocumentoFisicoListarPagination,
   DocumentoFisicoUpdateData,
 } from './ports/documento-fisico.repository.port';
+import {
+  SECUENCIA_DOCUMENTO_FISICO_PORT,
+  SecuenciaDocumentoFisicoPort,
+} from './ports/secuencia-documento-fisico.port';
 import {
   TIPOS_DOCUMENTO_FISICO_READER_PORT,
   TiposDocumentoFisicoReaderPort,
@@ -41,8 +49,12 @@ import { ContactoNoEncontradoError } from '@/contactos/domain/contacto-errors';
 
 export interface CrearDocumentoFisicoInput {
   tipoDocumentoFisicoId: string;
-  /** Será normalizado (trim + uppercase) vía NumeroDocumento VO. */
-  numero: string;
+  /**
+   * Número del documento. Requerido para tipos manuales; prohibido para tipos
+   * automáticos (la secuencia lo asigna). Será normalizado (trim + uppercase)
+   * vía NumeroDocumento VO cuando aplique.
+   */
+  numero: string | null;
   fechaEmision: Date;
   /** `null` para tipos no-tributarios (Decisión 4). Para tributarios es obligatorio. */
   monto: string | null;
@@ -75,14 +87,22 @@ export class DocumentosFisicosService {
     private readonly tiposReader: TiposDocumentoFisicoReaderPort,
     @Inject(CONTACTOS_READER_PORT)
     private readonly contactosReader: ContactosReaderPort,
+    @Inject(SECUENCIA_DOCUMENTO_FISICO_PORT)
+    private readonly secuenciaPort: SecuenciaDocumentoFisicoPort,
+    // Prisma directo para envolver rama auto en $transaction (§4.9 atomicidad).
+    // Inyección directa dentro del mismo módulo — OK per CLAUDE.md §3.7.
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
    * Crea un documento físico aplicando las reglas de negocio:
    * - Valida que el tipo existe en el tenant y está activo (REQ-D-06/07).
    * - Valida regla de monto condicional según `esTributario` del tipo (REQ-D-13/14).
-   * - Normaliza el número vía `NumeroDocumento` VO (REQ-D-02).
-   * - Verifica unicidad de número amigable antes del UNIQUE de BD (cicatriz F-01).
+   * - Bifurca según `numeracionAutomatica` del tipo (change numeracion-tipo-documento):
+   *   · Tipo auto: rechaza si el cliente envía `numero`; genera el número dentro
+   *     de una `prisma.$transaction` compartida con `repo.create` (§4.9 atomicidad).
+   *   · Tipo manual: requiere `numero`; normaliza vía `NumeroDocumento` VO y valida
+   *     unicidad amigable antes del UNIQUE de BD (cicatriz F-01).
    * - Valida que el contacto, si se provee, existe en el tenant (REQ-D-10).
    *   Contacto inactivo se permite al crear — la validación de activo es al contabilizar (E-D-09).
    */
@@ -111,7 +131,59 @@ export class DocumentosFisicosService {
       }
     }
 
-    // 3. Normalizar número vía VO — lanza RangeError si el formato es inválido;
+    // 3. Validar contacto si se provee — solo existencia en el tenant (no activo)
+    if (input.contactoId !== null && input.contactoId !== undefined) {
+      const contactos = await this.contactosReader.obtenerBatch(tenantId, [input.contactoId]);
+      if (!contactos.has(input.contactoId)) {
+        throw new ContactoNoEncontradoError(input.contactoId);
+      }
+    }
+
+    // 4. Persistir — el monto cruza como Decimal (CLAUDE.md §4.5)
+    const montoDecimal =
+      input.monto !== null && input.monto !== undefined ? new Prisma.Decimal(input.monto) : null;
+
+    // 5. Bifurcación numeración: automática vs manual
+    if (tipo.numeracionAutomatica) {
+      // Rama AUTO: el sistema asigna el número; el cliente NO debe enviarlo (E-D-AUTO-03).
+      if (input.numero !== null && input.numero !== undefined && input.numero !== '') {
+        throw new DocumentoFisicoNumeroNoPermitidoEnTipoAutoError();
+      }
+
+      // Número generado DENTRO de la misma TX que el insert → atomicidad (§4.9).
+      // Si el insert falla, la TX revierte y el número no se consume.
+      const numeroInicial = tipo.numeroInicial ?? 1;
+      return this.prisma.$transaction(async (tx) => {
+        const n = await this.secuenciaPort.siguienteNumero(
+          tenantId,
+          input.tipoDocumentoFisicoId,
+          numeroInicial,
+          tx,
+        );
+        const numeroNormalizado = NumeroDocumento.of(String(n)).toString();
+        return this.repo.create(
+          tenantId,
+          {
+            tipoDocumentoFisicoId: input.tipoDocumentoFisicoId,
+            numero: numeroNormalizado,
+            fechaEmision: input.fechaEmision,
+            monto: montoDecimal,
+            moneda: input.moneda ?? null,
+            glosa: input.glosa ?? null,
+            contactoId: input.contactoId ?? null,
+            createdByUserId: input.createdByUserId,
+          },
+          tx,
+        );
+      });
+    }
+
+    // Rama MANUAL: el cliente debe enviar `numero`.
+    if (input.numero === null || input.numero === undefined || input.numero === '') {
+      throw new DocumentoFisicoNumeroRequeridoError();
+    }
+
+    // 6. Normalizar número vía VO — lanza RangeError si el formato es inválido;
     //    el service lo mapea al DomainError estable (CLAUDE.md §6.3).
     let numeroNormalizado: string;
     try {
@@ -120,7 +192,7 @@ export class DocumentosFisicosService {
       throw new DocumentoFisicoNumeroFormatoInvalidoError(input.numero);
     }
 
-    // 4. Pre-check amigable de unicidad (cicatriz F-01, CLAUDE.md §4.8)
+    // 7. Pre-check amigable de unicidad (cicatriz F-01, CLAUDE.md §4.8)
     const existente = await this.repo.findByNumero(
       tenantId,
       input.tipoDocumentoFisicoId,
@@ -129,18 +201,6 @@ export class DocumentosFisicosService {
     if (existente) {
       throw new DocumentoFisicoNumeroDuplicadoError(numeroNormalizado, input.tipoDocumentoFisicoId);
     }
-
-    // 5. Validar contacto si se provee — solo existencia en el tenant (no activo)
-    if (input.contactoId !== null && input.contactoId !== undefined) {
-      const contactos = await this.contactosReader.obtenerBatch(tenantId, [input.contactoId]);
-      if (!contactos.has(input.contactoId)) {
-        throw new ContactoNoEncontradoError(input.contactoId);
-      }
-    }
-
-    // 6. Persistir — el monto cruza como Decimal (CLAUDE.md §4.5)
-    const montoDecimal =
-      input.monto !== null && input.monto !== undefined ? new Prisma.Decimal(input.monto) : null;
 
     return this.repo.create(tenantId, {
       tipoDocumentoFisicoId: input.tipoDocumentoFisicoId,

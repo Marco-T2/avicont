@@ -23,6 +23,14 @@ export interface TipoDocumentoFisicoParaValidacion {
    * módulo de documentos-fisicos (proposal D11).
    */
   tiposComprobanteAplicables: TipoComprobante[];
+  /**
+   * Si true, el sistema asigna el número correlativo al crear el documento
+   * (change numeracion-tipo-documento). documentos-fisicos.service bifurca
+   * el flujo create sin un segundo query gracias a este campo.
+   */
+  numeracionAutomatica: boolean;
+  /** Número de inicio de la secuencia. Null cuando numeracionAutomatica=false. */
+  numeroInicial: number | null;
 }
 
 export abstract class TiposDocumentoFisicoReaderPort {

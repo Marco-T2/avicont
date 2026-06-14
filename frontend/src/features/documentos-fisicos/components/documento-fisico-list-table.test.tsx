@@ -20,6 +20,7 @@ const base: DocumentoFisico = {
     nombre: 'Factura recibida',
     codigo: 'factura-recibida',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: { id: 'cont-1', razonSocial: 'Proveedor S.R.L.' },
   organizationId: 'org-1',
@@ -38,6 +39,7 @@ const sinContacto: DocumentoFisico = {
     nombre: 'Comprobante interno',
     codigo: 'interno',
     esTributario: false,
+    numeracionAutomatica: false,
   },
 };
 

@@ -18,7 +18,13 @@ export const DOCUMENTO_FISICO_REPOSITORY_PORT = Symbol('DOCUMENTO_FISICO_REPOSIT
 
 /** Documento físico con tipo + contacto embebidos (sin comprobantes). */
 export type DocumentoFisicoConRelaciones = DocumentoFisico & {
-  tipoDocumento: { id: string; nombre: string; codigo: string; esTributario: boolean };
+  tipoDocumento: {
+    id: string;
+    nombre: string;
+    codigo: string;
+    esTributario: boolean;
+    numeracionAutomatica: boolean;
+  };
   contacto: { id: string; razonSocial: string } | null;
 };
 

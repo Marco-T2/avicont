@@ -18,6 +18,8 @@ export class TipoDocumentoFisicoEmbebidoDto {
   @ApiProperty() nombre!: string;
   @ApiProperty() codigo!: string;
   @ApiProperty() esTributario!: boolean;
+  @ApiProperty({ description: 'Si true, el sistema asigna número correlativo automáticamente.' })
+  numeracionAutomatica!: boolean;
 }
 
 export class ContactoEmbebidoDto {
@@ -87,6 +89,7 @@ export function toDocumentoFisicoDto(doc: DocumentoFisicoConRelaciones): Documen
       nombre: doc.tipoDocumento.nombre,
       codigo: doc.tipoDocumento.codigo,
       esTributario: doc.tipoDocumento.esTributario,
+      numeracionAutomatica: doc.tipoDocumento.numeracionAutomatica,
     },
     contacto:
       doc.contacto !== null && doc.contacto !== undefined

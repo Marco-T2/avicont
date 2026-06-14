@@ -24,17 +24,22 @@ export class CreateDocumentoFisicoDto {
   @IsUUID()
   tipoDocumentoFisicoId!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
+    type: String,
     description:
-      'Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.',
+      'Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. ' +
+      'Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática ' +
+      '(el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).',
     minLength: 1,
     maxLength: 50,
+    nullable: true,
     example: 'FAC-0042',
   })
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(50)
-  numero!: string;
+  numero?: string | null;
 
   @ApiProperty({
     description: 'Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).',

@@ -292,4 +292,194 @@ describe('TiposDocumentoFisico (e2e)', () => {
       .set('Authorization', `Bearer ${memberToken}`);
     expect(res.status).toBe(403);
   });
+
+  // ==========================================================
+  // E-TN-01..11 — numeración automática (change numeracion-tipo-documento)
+  // ==========================================================
+
+  it('E-TN-01: crea tipo auto no-tributario con numeroInicial → 201 con los campos', async () => {
+    const { token } = await seed();
+    const res = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo interno',
+        codigo: 'recibo-interno',
+        esTributario: false,
+        tiposComprobanteAplicables: ['INGRESO', 'DIARIO'],
+        numeracionAutomatica: true,
+        numeroInicial: 100,
+      });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ numeracionAutomatica: true, numeroInicial: 100 });
+  });
+
+  it('E-TN-02: crea tipo sin numeracionAutomatica → manual por defecto', async () => {
+    const { token } = await seed();
+    const res = await crearTipo(token, { nombre: 'Vale de caja', codigo: 'vale-caja' });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ numeracionAutomatica: false, numeroInicial: null });
+  });
+
+  it('E-TN-03: crea tipo auto sin numeroInicial → default 1', async () => {
+    const { token } = await seed();
+    const res = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo sin inicial',
+        codigo: 'recibo-sin-inicial',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        numeracionAutomatica: true,
+      });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ numeracionAutomatica: true, numeroInicial: 1 });
+  });
+
+  it('E-TN-04: tipo manual con numeroInicial enviado → campo descartado silenciosamente', async () => {
+    const { token } = await seed();
+    const res = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo manual',
+        codigo: 'recibo-manual',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        numeracionAutomatica: false,
+        numeroInicial: 50,
+      });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ numeracionAutomatica: false, numeroInicial: null });
+  });
+
+  it('E-TN-05: crear tipo auto con esTributario=true → 422 TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA', async () => {
+    const { token } = await seed();
+    const res = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Factura auto',
+        codigo: 'factura-auto',
+        esTributario: true,
+        tiposComprobanteAplicables: ['EGRESO'],
+        numeracionAutomatica: true,
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA');
+  });
+
+  it('E-TN-06: editar tipo tributario activando numeracionAutomatica → 422 TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA', async () => {
+    const { token } = await seed();
+    // Crear tipo tributario manual
+    const creado = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Factura recibida',
+        codigo: 'factura-recibida',
+        esTributario: true,
+        tiposComprobanteAplicables: ['EGRESO'],
+      })
+      .expect(201);
+
+    // El DTO de actualización no expone numeracionAutomatica (set-once);
+    // el service igual rechaza si se detecta esTributario=true + auto=true en BD.
+    // Simular PATCH con esTributario mantenido y campo no-permitido en DTO.
+    // Como UpdateTipoDocumentoFisicoDto no tiene numeracionAutomatica, se ignora vía whitelist.
+    // El test que cubre la regla es cuando se intenta setear esTributario=true en un tipo auto.
+    // Aquí validamos la regla E-TN-06: editar un tipo tributario para que "active" auto → rechazado.
+    // La surface real es intentar PATCH con esTributario=true en tipo que tiene numeracion auto.
+    // Primero creamos un tipo auto no-tributario, luego intentamos hacerlo tributario:
+    const creado2 = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo auto',
+        codigo: 'recibo-auto',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        numeracionAutomatica: true,
+      })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/tipos-documento-fisico/${creado2.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ esTributario: true });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA');
+    // creado no se usa más (suprime el warning de unused)
+    void creado;
+  });
+
+  it('E-TN-07: toggle numeracionAutomatica de false a true → 422 TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE', async () => {
+    const { token } = await seed();
+    const creado = await crearTipo(token, {
+      nombre: 'Recibo manual',
+      codigo: 'recibo-manual-toggle',
+    }).expect(201);
+
+    // UpdateTipoDocumentoFisicoDto ahora expone numeracionAutomatica (set-once).
+    // El service rechaza cualquier presencia del campo con 422 NUMERO_INICIAL_INMUTABLE.
+    const res = await request(app.getHttpServer())
+      .patch(`/api/tipos-documento-fisico/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ numeracionAutomatica: true, numeroInicial: 1 });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE');
+  });
+
+  it('E-TN-08: editar numeroInicial post-create → 422 TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE', async () => {
+    const { token } = await seed();
+    // Crear tipo auto con numeroInicial=100
+    const creado = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo auto-inmutable',
+        codigo: 'recibo-auto-inm',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        numeracionAutomatica: true,
+        numeroInicial: 100,
+      })
+      .expect(201);
+
+    // UpdateTipoDocumentoFisicoDto ahora expone numeroInicial (set-once).
+    // El service rechaza cualquier presencia del campo con 422 NUMERO_INICIAL_INMUTABLE.
+    const res = await request(app.getHttpServer())
+      .patch(`/api/tipos-documento-fisico/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ numeroInicial: 200 });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE');
+  });
+
+  it('E-TN-11: editar otros campos de un tipo auto → 200 (campos permitidos funcionan)', async () => {
+    const { token } = await seed();
+    const creado = await request(app.getHttpServer())
+      .post('/api/tipos-documento-fisico')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Recibo auto v1',
+        codigo: 'recibo-auto-v1',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        numeracionAutomatica: true,
+        numeroInicial: 1,
+      })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .patch(`/api/tipos-documento-fisico/${creado.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Recibo auto v2' });
+    expect(res.status).toBe(200);
+    expect(res.body.nombre).toBe('Recibo auto v2');
+    // Los campos de numeración no cambiaron
+    expect(res.body.numeracionAutomatica).toBe(true);
+    expect(res.body.numeroInicial).toBe(1);
+  });
 });

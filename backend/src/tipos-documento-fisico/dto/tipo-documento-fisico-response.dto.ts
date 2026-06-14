@@ -1,5 +1,5 @@
 import type { TipoDocumentoFisico } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoComprobante } from '@prisma/client';
 
 export class TipoDocumentoFisicoResponseDto {
@@ -13,6 +13,13 @@ export class TipoDocumentoFisicoResponseDto {
   @ApiProperty() organizationId!: string;
   @ApiProperty() createdAt!: string;
   @ApiProperty() updatedAt!: string;
+  @ApiProperty({ description: 'Si true, el sistema asigna número correlativo automáticamente.' })
+  numeracionAutomatica!: boolean;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Número inicial de la secuencia. Null si numeracionAutomatica=false.',
+  })
+  numeroInicial!: number | null;
 }
 
 export class ListarTiposDocumentoFisicoResponseDto {
@@ -36,5 +43,7 @@ export function toTipoDocumentoFisicoResponse(
     organizationId: t.organizationId,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+    numeracionAutomatica: t.numeracionAutomatica,
+    numeroInicial: t.numeroInicial,
   };
 }

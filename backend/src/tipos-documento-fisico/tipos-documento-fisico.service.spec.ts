@@ -7,6 +7,8 @@ import {
   TipoDocumentoFisicoConDocumentosError,
   TipoDocumentoFisicoNoEncontradoError,
   TipoDocumentoFisicoNombreDuplicadoError,
+  TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError,
+  TipoDocumentoFisicoNumeroInicialInmutableError,
 } from './domain/tipo-documento-fisico-errors';
 import type { TipoDocumentoFisicoRepositoryPort } from './ports/tipo-documento-fisico.repository.port';
 
@@ -44,6 +46,10 @@ function makeTipo(overrides: Partial<TipoDocumentoFisico> = {}): TipoDocumentoFi
     esTributario: true,
     activo: true,
     tiposComprobanteAplicables: [TipoComprobante.INGRESO],
+    // Campos de numeración automática (change numeracion-tipo-documento):
+    // default manual para retrocompatibilidad de los tests existentes.
+    numeracionAutomatica: false,
+    numeroInicial: null,
     createdAt: now,
     createdByUserId: USER_ID,
     updatedAt: now,
@@ -93,6 +99,8 @@ describe('TiposDocumentoFisicoService', () => {
         esTributario: true,
         tiposComprobanteAplicables: [TipoComprobante.INGRESO],
         createdByUserId: USER_ID,
+        numeracionAutomatica: false,
+        numeroInicial: null,
       });
     });
 
@@ -451,6 +459,225 @@ describe('TiposDocumentoFisicoService', () => {
       await expect(service.eliminar(TENANT_ID, TIPO_ID)).rejects.toThrow(
         TipoDocumentoFisicoConDocumentosError,
       );
+    });
+  });
+
+  // ==========================================================
+  // create — numeración automática (E-TN-01..E-TN-05)
+  // ==========================================================
+
+  describe('create — numeración automática', () => {
+    it('E-TN-01 (+) crea tipo auto no-tributario con numeroInicial explícito y lo persiste', async () => {
+      const creado = makeTipo({
+        esTributario: false,
+        numeracionAutomatica: true,
+        numeroInicial: 100,
+      });
+      repo.findByCodigo.mockResolvedValue(null);
+      repo.create.mockResolvedValue(creado);
+
+      const result = await service.create(TENANT_ID, {
+        nombre: 'Recibo de Caja',
+        codigo: 'recibo-caja',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        createdByUserId: USER_ID,
+        numeracionAutomatica: true,
+        numeroInicial: 100,
+      });
+
+      expect(result.numeracionAutomatica).toBe(true);
+      expect(result.numeroInicial).toBe(100);
+      expect(repo.create).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ numeracionAutomatica: true, numeroInicial: 100 }),
+      );
+    });
+
+    it('E-TN-02 (+) omitir numeracionAutomatica → persiste como false (retrocompat)', async () => {
+      const creado = makeTipo({ numeracionAutomatica: false, numeroInicial: null });
+      repo.findByCodigo.mockResolvedValue(null);
+      repo.create.mockResolvedValue(creado);
+
+      await service.create(TENANT_ID, {
+        nombre: 'Vale Caja',
+        codigo: 'vale-caja',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        createdByUserId: null,
+        // numeracionAutomatica ausente → default false
+      });
+
+      expect(repo.create).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ numeracionAutomatica: false, numeroInicial: null }),
+      );
+    });
+
+    it('E-TN-03 (+) auto sin numeroInicial → persiste numeroInicial=1 (default)', async () => {
+      const creado = makeTipo({
+        esTributario: false,
+        numeracionAutomatica: true,
+        numeroInicial: 1,
+      });
+      repo.findByCodigo.mockResolvedValue(null);
+      repo.create.mockResolvedValue(creado);
+
+      await service.create(TENANT_ID, {
+        nombre: 'Recibo de Caja 2',
+        codigo: 'recibo-caja-2',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        createdByUserId: USER_ID,
+        numeracionAutomatica: true,
+        // numeroInicial ausente → debe usar 1
+      });
+
+      expect(repo.create).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ numeracionAutomatica: true, numeroInicial: 1 }),
+      );
+    });
+
+    it('E-TN-04 (+) numeroInicial ignorado silenciosamente cuando numeracionAutomatica=false', async () => {
+      const creado = makeTipo({ numeracionAutomatica: false, numeroInicial: null });
+      repo.findByCodigo.mockResolvedValue(null);
+      repo.create.mockResolvedValue(creado);
+
+      await service.create(TENANT_ID, {
+        nombre: 'Cheque Recibido',
+        codigo: 'cheque-recibido',
+        esTributario: false,
+        tiposComprobanteAplicables: [],
+        createdByUserId: USER_ID,
+        numeracionAutomatica: false,
+        numeroInicial: 50, // debe ignorarse
+      });
+
+      // El repo recibe numeroInicial=null, no 50
+      expect(repo.create).toHaveBeenCalledWith(
+        TENANT_ID,
+        expect.objectContaining({ numeracionAutomatica: false, numeroInicial: null }),
+      );
+    });
+
+    it('E-TN-05 (−) auto+tributario en create → TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError', async () => {
+      repo.findByCodigo.mockResolvedValue(null);
+
+      await expect(
+        service.create(TENANT_ID, {
+          nombre: 'Factura Recibida Auto',
+          codigo: 'factura-auto',
+          esTributario: true,
+          tiposComprobanteAplicables: [],
+          createdByUserId: USER_ID,
+          numeracionAutomatica: true,
+        }),
+      ).rejects.toThrow(TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError);
+
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('E-TN-05 (−) error código correcto TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA', async () => {
+      repo.findByCodigo.mockResolvedValue(null);
+
+      await expect(
+        service.create(TENANT_ID, {
+          nombre: 'Factura Auto',
+          codigo: 'factura-auto-2',
+          esTributario: true,
+          tiposComprobanteAplicables: [],
+          createdByUserId: USER_ID,
+          numeracionAutomatica: true,
+        }),
+      ).rejects.toMatchObject({
+        code: 'TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA',
+      });
+    });
+  });
+
+  // ==========================================================
+  // update — set-once + toggle auto (E-TN-06..E-TN-11)
+  // ==========================================================
+
+  describe('update — set-once y toggles de numeración', () => {
+    it('E-TN-06 (−) patch esTributario=true en tipo ya auto → TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError', async () => {
+      // Tipo ya auto no-tributario; se intenta cambiar a tributario
+      repo.findById.mockResolvedValue(
+        makeTipo({ esTributario: false, numeracionAutomatica: true, numeroInicial: 1 }),
+      );
+
+      await expect(service.update(TENANT_ID, TIPO_ID, { esTributario: true })).rejects.toThrow(
+        TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError,
+      );
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('E-TN-07 (+) crear tipo manual no-tributario y luego hacerlo auto (toggle false→true) está prohibido (set-once aplica desde el primer create)', async () => {
+      // Nota: el spec dice que toggle numeracionAutomatica post-create → 422 siempre.
+      // Cambiar de false→true también es set-once: una vez emitido como false, no puede
+      // cambiar a true (sería crear una secuencia implícita sin numero inicial confirmado).
+      repo.findById.mockResolvedValue(
+        makeTipo({ esTributario: false, numeracionAutomatica: false, numeroInicial: null }),
+      );
+
+      await expect(
+        service.update(TENANT_ID, TIPO_ID, { numeracionAutomatica: true } as Parameters<
+          typeof service.update
+        >[2]),
+      ).rejects.toThrow(TipoDocumentoFisicoNumeroInicialInmutableError);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('E-TN-08 (−) editar numeroInicial → TipoDocumentoFisicoNumeroInicialInmutableError', async () => {
+      repo.findById.mockResolvedValue(makeTipo({ numeracionAutomatica: true, numeroInicial: 1 }));
+
+      await expect(
+        service.update(TENANT_ID, TIPO_ID, { numeroInicial: 50 } as Parameters<
+          typeof service.update
+        >[2]),
+      ).rejects.toThrow(TipoDocumentoFisicoNumeroInicialInmutableError);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('E-TN-09 (−) editar numeroInicial con mismo valor (set-once sin excepción de idempotencia)', async () => {
+      repo.findById.mockResolvedValue(makeTipo({ numeracionAutomatica: true, numeroInicial: 1 }));
+
+      await expect(
+        service.update(TENANT_ID, TIPO_ID, { numeroInicial: 1 } as Parameters<
+          typeof service.update
+        >[2]),
+      ).rejects.toThrow(TipoDocumentoFisicoNumeroInicialInmutableError);
+    });
+
+    it('E-TN-10 (−) toggle numeracionAutomatica false → TipoDocumentoFisicoNumeroInicialInmutableError', async () => {
+      repo.findById.mockResolvedValue(makeTipo({ numeracionAutomatica: true, numeroInicial: 1 }));
+
+      await expect(
+        service.update(TENANT_ID, TIPO_ID, { numeracionAutomatica: false } as Parameters<
+          typeof service.update
+        >[2]),
+      ).rejects.toThrow(TipoDocumentoFisicoNumeroInicialInmutableError);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('E-TN-11 (+) editar otros campos (nombre, tiposComprobanteAplicables) en tipo auto es válido', async () => {
+      const actualizado = makeTipo({
+        nombre: 'Nuevo Nombre',
+        numeracionAutomatica: true,
+        numeroInicial: 1,
+      });
+      repo.findById.mockResolvedValue(makeTipo({ numeracionAutomatica: true, numeroInicial: 1 }));
+      repo.update.mockResolvedValue(actualizado);
+
+      const result = await service.update(TENANT_ID, TIPO_ID, { nombre: 'Nuevo Nombre' });
+
+      expect(result.nombre).toBe('Nuevo Nombre');
+      expect(repo.update).toHaveBeenCalledWith(TENANT_ID, TIPO_ID, { nombre: 'Nuevo Nombre' });
     });
   });
 });

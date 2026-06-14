@@ -30,6 +30,7 @@ const DOCUMENTO: DocumentoFisico = {
     nombre: 'Factura recibida',
     codigo: 'factura-recibida',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',

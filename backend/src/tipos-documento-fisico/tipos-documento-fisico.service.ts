@@ -5,6 +5,8 @@ import {
   TipoDocumentoFisicoConDocumentosError,
   TipoDocumentoFisicoCodigoDuplicadoError,
   TipoDocumentoFisicoNoEncontradoError,
+  TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError,
+  TipoDocumentoFisicoNumeroInicialInmutableError,
 } from './domain/tipo-documento-fisico-errors';
 import { TipoDocumentoFisicoCodigo } from './domain/tipo-documento-fisico-codigo';
 import { TipoDocumentoFisicoNombre } from './domain/tipo-documento-fisico-nombre';
@@ -25,12 +27,25 @@ export interface CrearTipoDocumentoFisicoInput {
   esTributario: boolean;
   tiposComprobanteAplicables: TipoDocumentoFisicoCreateData['tiposComprobanteAplicables'];
   createdByUserId: string | null;
+  /** Omitir equivale a false (retrocompat). */
+  numeracionAutomatica?: boolean;
+  /**
+   * Solo aplica cuando numeracionAutomatica=true. Omitir usa default 1.
+   * Ignorado silenciosamente si numeracionAutomatica=false.
+   */
+  numeroInicial?: number;
 }
 
 export interface ActualizarTipoDocumentoFisicoInput {
   nombre?: string;
   esTributario?: boolean;
   tiposComprobanteAplicables?: TipoDocumentoFisicoUpdateData['tiposComprobanteAplicables'];
+  /**
+   * Defense-in-depth: aunque el DTO no expone estos campos, el service los
+   * rechaza si llegan vía el input crudo (set-once invariant — spec E-TN-08/09/10).
+   */
+  numeracionAutomatica?: boolean;
+  numeroInicial?: number;
 }
 
 export interface ListarTiposDocumentoFisicoFiltros {
@@ -76,6 +91,14 @@ export class TiposDocumentoFisicoService {
 
     const codigoNormalizado = codigoVo.toString();
 
+    const numeracionAutomatica = input.numeracionAutomatica ?? false;
+
+    // Los tipos tributarios (factura, NC, ND) tienen número asignado por el
+    // emisor externo; el sistema no puede generar ese número (E-TN-05).
+    if (numeracionAutomatica && input.esTributario) {
+      throw new TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError();
+    }
+
     // Pre-check amigable de unicidad de código (REQ-T-02 / cicatriz F-01):
     // produce un error descriptivo antes del UNIQUE de Postgres. Para el
     // nombre usamos la capa del adapter (P2002 → DomainError).
@@ -84,12 +107,19 @@ export class TiposDocumentoFisicoService {
       throw new TipoDocumentoFisicoCodigoDuplicadoError(codigoNormalizado);
     }
 
+    // Normalizar numeroInicial:
+    // - Si auto y no viene → default 1 (E-TN-03).
+    // - Si manual → null, ignorando silenciosamente lo que venga (E-TN-04).
+    const numeroInicial: number | null = numeracionAutomatica ? (input.numeroInicial ?? 1) : null;
+
     return this.repo.create(tenantId, {
       nombre: nombreVo.toString(),
       codigo: codigoNormalizado,
       esTributario: input.esTributario,
       tiposComprobanteAplicables: input.tiposComprobanteAplicables,
       createdByUserId: input.createdByUserId,
+      numeracionAutomatica,
+      numeroInicial,
     });
   }
 
@@ -116,9 +146,9 @@ export class TiposDocumentoFisicoService {
   }
 
   /**
-   * PATCH sobre un tipo existente. El campo `codigo` es inmutable
-   * post-create — no figura en `ActualizarTipoDocumentoFisicoInput` y
-   * el service no lo pasa al repo (E-T-07).
+   * PATCH sobre un tipo existente. El campo `codigo` es inmutable post-create.
+   * `numeracionAutomatica` y `numeroInicial` son set-once: cualquier intento
+   * de cambiarlos después de la creación lanza un DomainError (E-TN-08/09/10).
    */
   async update(
     tenantId: string,
@@ -127,6 +157,19 @@ export class TiposDocumentoFisicoService {
   ): Promise<TipoDocumentoFisico> {
     const existente = await this.repo.findById(tenantId, id);
     if (!existente) throw new TipoDocumentoFisicoNoEncontradoError(id);
+
+    // Set-once: `numeracionAutomatica` y `numeroInicial` son inmutables
+    // post-create. Cualquier intento de cambiarlos (incluso con el mismo
+    // valor) lanza error — no hay excepción de idempotencia (spec E-TN-09).
+    if (input.numeracionAutomatica !== undefined || input.numeroInicial !== undefined) {
+      throw new TipoDocumentoFisicoNumeroInicialInmutableError();
+    }
+
+    // Si el tipo ya tiene numeración automática y se intenta cambiar esTributario
+    // a true → viola la regla auto⇒¬tributario (E-TN-06).
+    if (existente.numeracionAutomatica && input.esTributario === true) {
+      throw new TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError();
+    }
 
     // exactOptionalPropertyTypes: spread condicional (CLAUDE.md §2.5.1).
     const data: TipoDocumentoFisicoUpdateData = {
