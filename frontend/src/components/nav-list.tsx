@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { NavLink } from 'react-router-dom';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -8,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import type { SystemRole } from '@/types/api';
 
-import { NAV_ITEMS, type NavItem } from './nav-items';
+import { NAV_SECTIONS, PANEL_ITEM, type NavItem, type NavSection } from './nav-items';
 
 interface NavListProps {
   /** Callback opcional para cerrar el drawer mobile al clickear un item. */
@@ -38,7 +40,9 @@ export function NavList({
   // NO llamar useHasSystemRole por-item: rompe reglas de hooks.
   // El `?? false` va afuera del selector (Anti-F-15: evita array nuevo en cada render).
   const userRoles = useAuthStore((s) => s.user?.roles);
-  const visibleItems = NAV_ITEMS.filter((item) => {
+
+  // Cascada AND fail-closed — MISMA lógica que la versión plana, movida a closure.
+  const pasaFiltro = (item: NavItem): boolean => {
     const pasaPermiso = item.requiredPermission === undefined || has(item.requiredPermission);
     const pasaVertical = item.vertical === undefined || item.vertical === verticalActivo;
     const pasaPack =
@@ -47,24 +51,79 @@ export function NavList({
       item.requiredSystemRole === undefined ||
       (userRoles?.some((r) => item.requiredSystemRole!.includes(r as SystemRole)) ?? false);
     return pasaPermiso && pasaVertical && pasaPack && pasaSystemRole;
-  });
+  };
+
+  // Por sección, computar ítems visibles y descartar secciones vacías (no header huérfano).
+  const seccionesVisibles = useMemo(
+    () =>
+      NAV_SECTIONS.map((s) => ({ section: s, visibleItems: s.items.filter(pasaFiltro) })).filter(
+        (s) => s.visibleItems.length > 0,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [has, verticalActivo, packsActivos, userRoles],
+  );
+
+  // Contar módulos visibles para decidir el header adaptativo (D-03).
+  const modulosVisibles = useMemo(
+    () => seccionesVisibles.filter((s) => s.section.kind === 'modulo').length,
+    [seccionesVisibles],
+  );
+
+  // ¿Mostrar el header de ESTA sección?
+  // - collapsed → nunca (riel de 64px)
+  // - transversal con ítems → SÍ (sección ya garantiza ≥1 ítem visible)
+  // - modulo → SÍ solo si hay ≥2 módulos visibles (contraste visual)
+  const debeMostrarHeader = (section: NavSection): boolean => {
+    if (collapsed) return false;
+    if (section.kind === 'transversal') return true;
+    return modulosVisibles >= 2;
+  };
 
   return (
     <nav className="flex-1 space-y-1 p-2">
-      {visibleItems.map((item) => {
-        const trigger = (
-          <NavItemRenderer item={item} onItemClick={onItemClick} collapsed={collapsed} />
-        );
-        // Tooltip SOLO cuando colapsado — con el label visible sería ruido.
-        if (!collapsed) return <div key={item.to}>{trigger}</div>;
-        return (
-          <Tooltip key={item.to}>
-            <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-            <TooltipContent side="right">{item.label}</TooltipContent>
-          </Tooltip>
-        );
-      })}
+      {/* Ítem suelto Panel — siempre arriba, sin header (D-01). */}
+      <NavItemSlot item={PANEL_ITEM} onItemClick={onItemClick} collapsed={collapsed} />
+
+      {seccionesVisibles.map(({ section, visibleItems }, idx) => (
+        <div key={section.id} className="space-y-1">
+          {debeMostrarHeader(section) && (
+            <h2 className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {section.label}
+            </h2>
+          )}
+          {/* Collapsed: divider sutil ENTRE bloques (no antes del primero) en vez de header (D-08 / OQ-2). */}
+          {collapsed && idx > 0 && (
+            <div className="mx-2 my-1 border-t border-sidebar-border" aria-hidden="true" />
+          )}
+          {visibleItems.map((item) => (
+            <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={collapsed} />
+          ))}
+        </div>
+      ))}
     </nav>
+  );
+}
+
+interface SlotProps {
+  item: NavItem;
+  onItemClick?: (() => void) | undefined;
+  collapsed: boolean | undefined;
+}
+
+// NavItemSlot — extracción del bloque div-vs-Tooltip (D-07).
+// Reusado tanto para PANEL_ITEM como para los ítems de cada sección.
+// NavItemRenderer (abajo) NO se toca.
+function NavItemSlot({ item, onItemClick, collapsed }: SlotProps): React.JSX.Element {
+  const trigger = (
+    <NavItemRenderer item={item} onItemClick={onItemClick} collapsed={collapsed ?? false} />
+  );
+  // Tooltip SOLO cuando colapsado — con el label visible sería ruido.
+  if (!collapsed) return <div key={item.to}>{trigger}</div>;
+  return (
+    <Tooltip key={item.to}>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
   );
 }
 
