@@ -623,6 +623,7 @@ describe('PrismaDocumentoFisicoRepository (integration)', () => {
       nombre: 'Factura',
       codigo: 'factura',
       esTributario: true,
+      numeracionAutomatica: false,
     });
     expect(found?.contacto).toEqual({ id: contactoId, razonSocial: 'Proveedor ABC SRL' });
   });

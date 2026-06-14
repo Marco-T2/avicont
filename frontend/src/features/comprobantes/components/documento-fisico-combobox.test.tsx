@@ -81,6 +81,8 @@ const tipoEgreso: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 const tipoIngreso: TipoDocumentoFisico = {
@@ -93,6 +95,8 @@ const tipoIngreso: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 const tipoNoTributario: TipoDocumentoFisico = {
@@ -105,6 +109,8 @@ const tipoNoTributario: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 const docEgreso: DocumentoFisico = {
@@ -119,6 +125,7 @@ const docEgreso: DocumentoFisico = {
     nombre: 'Factura recibida',
     codigo: 'factura-recibida',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',
@@ -137,6 +144,7 @@ const docIngreso: DocumentoFisico = {
     nombre: 'Factura emitida',
     codigo: 'factura-emitida',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',
@@ -388,6 +396,7 @@ const nuevoDocCreado: DocumentoFisico = {
     nombre: 'Recibo interno',
     codigo: 'recibo-interno',
     esTributario: false,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',

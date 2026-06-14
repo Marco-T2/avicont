@@ -6371,6 +6371,15 @@
           },
           "updatedAt": {
             "type": "string"
+          },
+          "numeracionAutomatica": {
+            "type": "boolean",
+            "description": "Si true, el sistema asigna número correlativo automáticamente."
+          },
+          "numeroInicial": {
+            "type": "object",
+            "nullable": true,
+            "description": "Número inicial de la secuencia. Null si numeracionAutomatica=false."
           }
         },
         "required": [
@@ -6382,7 +6391,8 @@
           "tiposComprobanteAplicables",
           "organizationId",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "numeracionAutomatica"
         ]
       },
       "ListarTiposDocumentoFisicoResponseDto": {
@@ -6451,6 +6461,16 @@
                 "CIERRE"
               ]
             }
+          },
+          "numeracionAutomatica": {
+            "type": "boolean",
+            "example": false,
+            "description": "Si true, el sistema asigna el número correlativo automáticamente. Incompatible con esTributario=true. Inmutable post-creación."
+          },
+          "numeroInicial": {
+            "type": "number",
+            "example": 1,
+            "description": "Número desde el que comienza la secuencia automática. Solo aplica cuando numeracionAutomatica=true. Inmutable post-creación."
           }
         },
         "required": [
@@ -6491,6 +6511,15 @@
                 "CIERRE"
               ]
             }
+          },
+          "numeracionAutomatica": {
+            "type": "boolean",
+            "description": "Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422."
+          },
+          "numeroInicial": {
+            "type": "number",
+            "description": "Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422.",
+            "minimum": 1
           }
         }
       },
@@ -8112,9 +8141,10 @@
           },
           "numero": {
             "type": "string",
-            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.",
+            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).",
             "minLength": 1,
             "maxLength": 50,
+            "nullable": true,
             "example": "FAC-0042"
           },
           "fechaEmision": {
@@ -8152,7 +8182,6 @@
         },
         "required": [
           "tipoDocumentoFisicoId",
-          "numero",
           "fechaEmision"
         ]
       },
@@ -8170,13 +8199,18 @@
           },
           "esTributario": {
             "type": "boolean"
+          },
+          "numeracionAutomatica": {
+            "type": "boolean",
+            "description": "Si true, el sistema asigna número correlativo automáticamente."
           }
         },
         "required": [
           "id",
           "nombre",
           "codigo",
-          "esTributario"
+          "esTributario",
+          "numeracionAutomatica"
         ]
       },
       "ContactoEmbebidoDto": {

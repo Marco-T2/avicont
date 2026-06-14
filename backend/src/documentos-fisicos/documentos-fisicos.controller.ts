@@ -89,7 +89,9 @@ export class DocumentosFisicosController {
 
     const doc = await this.service.create(tenantId, {
       tipoDocumentoFisicoId: dto.tipoDocumentoFisicoId,
-      numero: dto.numero,
+      // numero es opcional en el DTO (auto vs manual — bifurcación en el service).
+      // null cuando ausente: el service distingue null (auto=no enviar) de string (manual).
+      numero: dto.numero ?? null,
       fechaEmision: new Date(dto.fechaEmision),
       monto: dto.monto ?? null,
       moneda: dto.moneda ?? null,

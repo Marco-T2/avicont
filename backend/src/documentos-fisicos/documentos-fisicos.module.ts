@@ -9,11 +9,13 @@ import { TiposDocumentoFisicoModule } from '@/tipos-documento-fisico/tipos-docum
 import { PrismaAsociacionComprobanteRepository } from './adapters/prisma-asociacion-comprobante.repository';
 import { PrismaDocumentoFisicoRepository } from './adapters/prisma-documento-fisico.repository';
 import { PrismaDocumentosFisicosReaderAdapter } from './adapters/prisma-documentos-fisicos-reader.adapter';
+import { PrismaSecuenciaDocumentoFisicoAdapter } from './adapters/prisma-secuencia-documento-fisico';
 import { DocumentosFisicosController } from './documentos-fisicos.controller';
 import { DocumentosFisicosService } from './documentos-fisicos.service';
 import { ASOCIACION_COMPROBANTE_REPOSITORY_PORT } from './ports/asociacion-comprobante.repository.port';
 import { DOCUMENTO_FISICO_REPOSITORY_PORT } from './ports/documento-fisico.repository.port';
 import { DOCUMENTOS_FISICOS_READER_PORT } from './ports/documentos-fisicos-reader.port';
+import { SECUENCIA_DOCUMENTO_FISICO_PORT } from './ports/secuencia-documento-fisico.port';
 
 // Módulo del catálogo de documentos físicos que respaldan comprobantes contables.
 // Exporta los ports cross-módulo que consume `comprobantes` (asociar, validar,
@@ -45,6 +47,12 @@ import { DOCUMENTOS_FISICOS_READER_PORT } from './ports/documentos-fisicos-reade
 
     PrismaDocumentosFisicosReaderAdapter,
     { provide: DOCUMENTOS_FISICOS_READER_PORT, useExisting: PrismaDocumentosFisicosReaderAdapter },
+
+    PrismaSecuenciaDocumentoFisicoAdapter,
+    {
+      provide: SECUENCIA_DOCUMENTO_FISICO_PORT,
+      useExisting: PrismaSecuenciaDocumentoFisicoAdapter,
+    },
   ],
   // Exporta SOLO ports cross-módulo. ComprobantesModule consume:
   // - DOCUMENTOS_FISICOS_READER_PORT: para validar al asociar y contabilizar.

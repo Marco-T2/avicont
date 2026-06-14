@@ -30,6 +30,8 @@ export class PrismaTiposDocumentoFisicoReaderAdapter extends TiposDocumentoFisic
         esTributario: true,
         activo: true,
         tiposComprobanteAplicables: true,
+        numeracionAutomatica: true,
+        numeroInicial: true,
       },
     });
   }

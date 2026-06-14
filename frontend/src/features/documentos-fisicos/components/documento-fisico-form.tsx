@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useMemo } from 'react';
-import type { Resolver } from 'react-hook-form';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
@@ -54,8 +53,18 @@ export function DocumentoFisicoForm({
     mode === 'edit' &&
     comprobantesAsociados.some((c) => c.estado === 'CONTABILIZADO');
 
+  // Ref para capturar el estado dinámico de esAutoNumerico en el resolver estático.
+  // El resolver se crea una vez (useForm), pero necesita la bandera actual del tipo
+  // seleccionado. El ref actúa como "puerta trasera" estable para inyectarla.
+  const esAutoNumericoRef = useRef(false);
+
   const form = useForm<DocumentoFisicoFormValues>({
-    resolver: zodResolver(buildFormSchema(false)) as Resolver<DocumentoFisicoFormValues>,
+    // Resolver dinámico vía ref: captura el estado actual de esAutoNumerico en cada
+    // llamada al resolver, incluso cuando el tipo cambia post-mount.
+    resolver: (values, context, options) => {
+      const schema = buildFormSchema(false, esAutoNumericoRef.current);
+      return zodResolver(schema)(values, context, options);
+    },
     defaultValues,
   });
 
@@ -70,21 +79,31 @@ export function DocumentoFisicoForm({
   const tipoIdSeleccionado = useWatch({ control, name: 'tipoDocumentoFisicoId' });
   const contactoId = useWatch({ control, name: 'contactoId' });
 
-  // Deriva esTributario del tipo seleccionado.
+  // Deriva esTributario y esAutoNumerico del tipo seleccionado.
   const tipoSeleccionado = useMemo(
     () => tipos.find((t) => t.id === tipoIdSeleccionado),
     [tipos, tipoIdSeleccionado],
   );
   const esTributario = tipoSeleccionado?.esTributario ?? false;
+  // D-AUTO: cuando el tipo tiene numeración automática, el campo numero se oculta/deshabilita.
+  const esAutoNumerico = tipoSeleccionado?.numeracionAutomatica ?? false;
+  // Mantener el ref sincronizado con el valor actual.
+  // useLayoutEffect (no render body) para satisfacer react-hooks/refs.
+  useLayoutEffect(() => {
+    esAutoNumericoRef.current = esAutoNumerico;
+  }, [esAutoNumerico]);
 
   // D1: react-hook-form no soporta resolver dinámico nativo. Usamos el resolver
   // inicial del useForm y re-validamos con el schema correcto en handleFormSubmit.
   // La limpieza de monto/moneda al pasar a no-tributario ocurre en el onChange
   // del select de tipo (más abajo) y como red de seguridad en el submit.
-  const schema = useMemo(() => buildFormSchema(esTributario), [esTributario]);
+  const schema = useMemo(
+    () => buildFormSchema(esTributario, esAutoNumerico),
+    [esTributario, esAutoNumerico],
+  );
 
   function handleFormSubmit(values: DocumentoFisicoFormValues): void {
-    // Validar con el schema correcto (incluye condicionalidad esTributario).
+    // Validar con el schema correcto (incluye condicionalidad esTributario y esAutoNumerico).
     const result = schema.safeParse(values);
     if (!result.success) {
       // Setear errores manualmente. Zod v4: las issues están en `.issues` (no `.errors`).
@@ -97,10 +116,12 @@ export function DocumentoFisicoForm({
       return;
     }
     // Limpiar monto/moneda si no tributario antes de enviar.
-    const payload = esTributario
-      ? values
-      : { ...values, monto: null, moneda: null };
-    onSubmit(payload);
+    const base = esTributario ? values : { ...values, monto: null, moneda: null };
+    // D-AUTO: Omitir numero si el tipo es automático (el backend lo asigna — enviarlo produce 422).
+    const payload = esAutoNumerico
+      ? { ...base, numero: undefined }
+      : base;
+    onSubmit(payload as DocumentoFisicoFormValues);
   }
 
   return (
@@ -147,41 +168,52 @@ export function DocumentoFisicoForm({
         </select>
       </Field>
 
-      {/* Número — D7: uppercase en vivo + trim al blur */}
-      <Field
-        label="Número"
-        htmlFor="numero"
-        required
-        error={errors.numero?.message}
-      >
-        <Input
-          {...register('numero', {
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              setValue('numero', e.target.value.toUpperCase(), { shouldValidate: false });
-            },
-            onBlur: () => {
-              const current = form.getValues('numero');
-              setValue('numero', current.trim(), { shouldValidate: false });
-            },
-          })}
-          id="numero"
-          placeholder="Ej: F-001, REC-2026-01"
-          className="text-base md:text-sm"
-          aria-invalid={errors.numero !== undefined}
-          aria-label="Número"
-          // D2: inmutable si hay CONTABILIZADO
-          disabled={numeroEsInmutable}
-        />
-        {numeroEsInmutable ? (
-          <p className="text-xs text-muted-foreground">
-            El número no puede modificarse: el documento está en un comprobante contabilizado.
+      {/* Número — D7: uppercase en vivo + trim al blur. D-AUTO: oculto/disabled cuando auto. */}
+      {esAutoNumerico ? (
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1 text-muted-foreground">
+            Número
+          </Label>
+          <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
+            Número asignado automáticamente por el sistema.
           </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Solo letras mayúsculas, números, punto, guion y barra.
-          </p>
-        )}
-      </Field>
+        </div>
+      ) : (
+        <Field
+          label="Número"
+          htmlFor="numero"
+          required
+          error={errors.numero?.message}
+        >
+          <Input
+            {...register('numero', {
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                setValue('numero', e.target.value.toUpperCase(), { shouldValidate: false });
+              },
+              onBlur: () => {
+                const current = form.getValues('numero');
+                setValue('numero', (current ?? '').trim(), { shouldValidate: false });
+              },
+            })}
+            id="numero"
+            placeholder="Ej: F-001, REC-2026-01"
+            className="text-base md:text-sm"
+            aria-invalid={errors.numero !== undefined}
+            aria-label="Número"
+            // D2: inmutable si hay CONTABILIZADO
+            disabled={numeroEsInmutable}
+          />
+          {numeroEsInmutable ? (
+            <p className="text-xs text-muted-foreground">
+              El número no puede modificarse: el documento está en un comprobante contabilizado.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Solo letras mayúsculas, números, punto, guion y barra.
+            </p>
+          )}
+        </Field>
+      )}
 
       {/* Fecha de emisión */}
       <Field

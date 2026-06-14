@@ -23,7 +23,15 @@ const UNIQUE_NUMERO_INDEX = 'documentos_fisicos_organizationId_tipoDocumentoFisi
 // Tipado con `satisfies` para que el resultado de Prisma sea asignable a
 // `DocumentoFisicoConRelaciones` sin `any`.
 const RELACIONES_INCLUDE = {
-  tipoDocumento: { select: { id: true, nombre: true, codigo: true, esTributario: true } },
+  tipoDocumento: {
+    select: {
+      id: true,
+      nombre: true,
+      codigo: true,
+      esTributario: true,
+      numeracionAutomatica: true,
+    },
+  },
   contacto: { select: { id: true, razonSocial: true } },
 } satisfies Prisma.DocumentoFisicoInclude;
 

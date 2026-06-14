@@ -778,6 +778,23 @@ model SecuenciaComprobante {
   @@map("secuencias_comprobante")
 }
 
+// Contador atómico de numeración continua por (tenant, tipoDocumentoFisico).
+// Sin `year/month`: la secuencia NO reinicia (vs SecuenciaComprobante que
+// reinicia mensualmente). Upsert atómico `INSERT ... ON CONFLICT DO UPDATE
+// ... RETURNING ultimoNumero` garantiza números consecutivos sin gaps
+// bajo concurrencia (Anti-24, CLAUDE.md §4.9).
+// Solo relevante cuando TipoDocumentoFisico.numeracionAutomatica = true.
+model SecuenciaDocumentoFisico {
+  organizationId        String
+  tipoDocumentoFisicoId String
+  ultimoNumero          Int
+
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([organizationId, tipoDocumentoFisicoId])
+  @@map("secuencias_documento_fisico")
+}
+
 // comprobantes_audit (raw Postgres table — NOT in Prisma schema)
 // La auditoría de comprobantes y líneas la gestiona un trigger AFTER INSERT/UPDATE/DELETE
 // en la tabla `comprobantes` y `lineas_comprobante`. El trigger escribe en la tabla raw
@@ -859,6 +876,17 @@ model TipoDocumentoFisico {
   // Soft-toggle de visibilidad. NO es soft-delete (CLAUDE.md §4.7) — este
   // modelo es catálogo, no documento contable.
   activo         Boolean @default(true)
+
+  // Numeración automática (change numeracion-tipo-documento):
+  // Si true, el sistema asigna el número correlativo al crear el documento;
+  // el contador arranca en `numeroInicial` (default 1 si se omite al crear).
+  // Restricción: auto solo si NO es tributario — los tipos tributarios
+  // tienen número asignado por el emisor externo (factura, NC, ND).
+  // Set-once: una vez activado, ni `numeracionAutomatica` ni `numeroInicial`
+  // pueden modificarse (ver DomainError TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE).
+  numeracionAutomatica Boolean  @default(false)
+  // Null cuando numeracionAutomatica=false. Inmutable una vez persistido.
+  numeroInicial        Int?
 
   // Lista explícita de tipos de comprobante con los que este tipo de
   // documento puede asociarse (proposal D11). Lista vacía = ningún tipo

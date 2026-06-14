@@ -35,6 +35,8 @@ const TIPO_TRIBUTARIO: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 const TIPO_NO_TRIBUTARIO: TipoDocumentoFisico = {
@@ -47,6 +49,8 @@ const TIPO_NO_TRIBUTARIO: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 const DETALLE_SIN_CONTABILIZADO: Partial<DocumentoFisicoDetalle> = {
@@ -61,6 +65,7 @@ const DETALLE_SIN_CONTABILIZADO: Partial<DocumentoFisicoDetalle> = {
     nombre: 'Factura recibida',
     codigo: 'factura-recibida',
     esTributario: true,
+    numeracionAutomatica: false,
   },
   contacto: null,
   organizationId: 'org-1',
@@ -242,5 +247,108 @@ describe('DocumentoFisicoForm', () => {
     const numeroInput = screen.getByLabelText(/número/i);
     await user.type(numeroInput, 'f-001');
     expect(numeroInput).toHaveValue('F-001');
+  });
+
+  // ─── Task 6.4: campo numero oculto/disabled cuando tipo es auto ─────────────
+
+  const TIPO_AUTO: TipoDocumentoFisico = {
+    id: '323e4567-e89b-12d3-a456-426614174002',
+    nombre: 'Recibo interno',
+    codigo: 'recibo-interno',
+    esTributario: false,
+    activo: true,
+    tiposComprobanteAplicables: [],
+    organizationId: 'org-1',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    numeracionAutomatica: true,
+    numeroInicial: null,
+  };
+
+  it('tipo con numeracionAutomatica=true — campo numero NO visible como input', () => {
+    setupMocks([TIPO_AUTO]);
+    render(
+      <DocumentoFisicoForm
+        mode="create"
+        comprobantesAsociados={[]}
+        initialValues={{
+          tipoDocumentoFisicoId: TIPO_AUTO.id,
+          numero: '',
+          fechaEmision: '',
+          monto: null,
+          moneda: null,
+          contactoId: null,
+          glosa: null,
+        }}
+        onSubmit={vi.fn()}
+        isSubmitting={false}
+      />,
+      { wrapper: wrapper() },
+    );
+
+    // El input de número no debe estar presente; en su lugar hay el texto de hint automático.
+    expect(screen.queryByLabelText(/número/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/número asignado automáticamente por el sistema/i),
+    ).toBeInTheDocument();
+  });
+
+  it('tipo con numeracionAutomatica=true — el onSubmit NO recibe numero en el payload', async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    setupMocks([TIPO_AUTO]);
+    render(
+      <DocumentoFisicoForm
+        mode="create"
+        comprobantesAsociados={[]}
+        initialValues={{
+          tipoDocumentoFisicoId: TIPO_AUTO.id,
+          numero: '',
+          fechaEmision: '2026-06-14',
+          monto: null,
+          moneda: null,
+          contactoId: null,
+          glosa: null,
+        }}
+        onSubmit={onSubmit}
+        isSubmitting={false}
+      />,
+      { wrapper: wrapper() },
+    );
+
+    await user.click(screen.getByRole('button', { name: /crear documento/i }));
+
+    expect(onSubmit).toHaveBeenCalledOnce();
+    const payload = onSubmit.mock.calls[0]?.[0] as Record<string, unknown>;
+    // numero debe ser undefined o vacío — no enviado al backend
+    expect(payload['numero']).toBeUndefined();
+  });
+
+  it('tipo con numeracionAutomatica=false — campo numero visible y requerido (comportamiento manual)', () => {
+    setupMocks([TIPO_NO_TRIBUTARIO]);
+    render(
+      <DocumentoFisicoForm
+        mode="create"
+        comprobantesAsociados={[]}
+        initialValues={{
+          tipoDocumentoFisicoId: TIPO_NO_TRIBUTARIO.id,
+          numero: '',
+          fechaEmision: '',
+          monto: null,
+          moneda: null,
+          contactoId: null,
+          glosa: null,
+        }}
+        onSubmit={vi.fn()}
+        isSubmitting={false}
+      />,
+      { wrapper: wrapper() },
+    );
+
+    // El input de número sí debe estar visible cuando el tipo es manual
+    expect(screen.getByLabelText(/número/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/número asignado automáticamente/i),
+    ).not.toBeInTheDocument();
   });
 });

@@ -71,3 +71,28 @@ export class TipoDocumentoFisicoInactivoError extends InvalidStateError {
     );
   }
 }
+
+// Regla de dominio: numeración automática incompatible con tipos tributarios.
+// Los tipos tributarios (factura, NC, ND) tienen número asignado por el
+// emisor externo; el sistema no puede generar ese número.
+export class TipoDocumentoFisicoNumeracionAutoTributarioInvalidaError extends InvalidStateError {
+  constructor() {
+    super(
+      'TIPO_DOCUMENTO_FISICO_NUMERACION_AUTO_TRIBUTARIO_INVALIDA',
+      'Un tipo tributario no puede tener numeración automática',
+    );
+  }
+}
+
+// Regla set-once: una vez configurada la numeración automática, ni
+// `numeroInicial` ni el modo de numeración pueden modificarse. La secuencia
+// ya puede haber emitido números desde `numeroInicial`; cambiarlo generaría
+// huecos o colisiones. Aplica también al toggle numeracionAutomatica→false.
+export class TipoDocumentoFisicoNumeroInicialInmutableError extends InvalidStateError {
+  constructor() {
+    super(
+      'TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE',
+      'El número inicial y el modo de numeración no pueden modificarse una vez configurados',
+    );
+  }
+}

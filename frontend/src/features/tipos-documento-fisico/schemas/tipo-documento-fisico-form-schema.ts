@@ -31,6 +31,15 @@ export const tipoDocumentoFisicoFormSchema = z.object({
       ]),
     )
     .default([]),
+  // Regla auto⇒¬tributario: set-once, inmutable post-creación.
+  numeracionAutomatica: z.boolean().default(false),
+  // Solo aplica cuando numeracionAutomatica=true. Entero ≥ 1.
+  numeroInicial: z
+    .number()
+    .int('El número inicial debe ser un entero')
+    .min(1, 'El número inicial debe ser al menos 1')
+    .nullable()
+    .default(null),
 });
 
 export type TipoDocumentoFisicoFormValues = z.infer<typeof tipoDocumentoFisicoFormSchema>;
@@ -41,6 +50,8 @@ export const DEFAULT_CREATE_VALUES: TipoDocumentoFisicoFormValues = {
   esTributario: false,
   activo: true,
   tiposComprobanteAplicables: [],
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 export function mapTipoToFormValues(t: TipoDocumentoFisico): TipoDocumentoFisicoFormValues {
@@ -50,5 +61,9 @@ export function mapTipoToFormValues(t: TipoDocumentoFisico): TipoDocumentoFisico
     esTributario: t.esTributario,
     activo: t.activo,
     tiposComprobanteAplicables: t.tiposComprobanteAplicables,
+    numeracionAutomatica: t.numeracionAutomatica,
+    // api.generated.ts emite numeroInicial como Record<string,never>|null por quirk de
+    // openapi-typescript con nullable Int. En runtime es number|null. Cast seguro.
+    numeroInicial: (t.numeroInicial as number | null) ?? null,
   };
 }

@@ -53,7 +53,9 @@ export function DocumentoFisicoFormSheet({
   function handleSubmit(values: DocumentoFisicoFormValues): void {
     const payload = {
       tipoDocumentoFisicoId: values.tipoDocumentoFisicoId,
-      numero: values.numero,
+      // numero puede ser undefined cuando el tipo tiene numeración automática (el backend lo asigna).
+      // Spread condicional para evitar enviar null (que el backend rechazaría en tipos manuales).
+      ...(values.numero != null ? { numero: values.numero } : {}),
       fechaEmision: values.fechaEmision,
       ...(values.monto !== null ? { monto: values.monto } : {}),
       ...(values.moneda !== null ? { moneda: values.moneda } : {}),

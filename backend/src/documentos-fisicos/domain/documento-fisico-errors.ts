@@ -134,3 +134,34 @@ export class DocumentoFisicoMontoNoPermitidoParaNoTributarioError extends Invali
     );
   }
 }
+
+// ============================================================
+// 422 — Ajuste 2: numeración automática (change numeracion-tipo-documento)
+// ============================================================
+
+/**
+ * El cliente envió `numero` para un tipo con `numeracionAutomatica = true`.
+ * El sistema asigna el número; el cliente no debe enviarlo (E-D-AUTO-03).
+ * HTTP 422.
+ */
+export class DocumentoFisicoNumeroNoPermitidoEnTipoAutoError extends InvalidStateError {
+  constructor() {
+    super(
+      'DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO',
+      'El número de este documento lo asigna el sistema; no debe enviarse.',
+    );
+  }
+}
+
+/**
+ * El tipo tiene `numeracionAutomatica = false` (manual) y el cliente no
+ * envió `numero`. HTTP 422.
+ */
+export class DocumentoFisicoNumeroRequeridoError extends InvalidStateError {
+  constructor() {
+    super(
+      'DOCUMENTO_FISICO_NUMERO_REQUERIDO',
+      'El número del documento es obligatorio para este tipo.',
+    );
+  }
+}

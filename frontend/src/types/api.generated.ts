@@ -2175,6 +2175,10 @@ export interface components {
             organizationId: string;
             createdAt: string;
             updatedAt: string;
+            /** @description Si true, el sistema asigna número correlativo automáticamente. */
+            numeracionAutomatica: boolean;
+            /** @description Número inicial de la secuencia. Null si numeracionAutomatica=false. */
+            numeroInicial?: Record<string, never> | null;
         };
         ListarTiposDocumentoFisicoResponseDto: {
             items: components["schemas"]["TipoDocumentoFisicoResponseDto"][];
@@ -2203,6 +2207,16 @@ export interface components {
              *     ]
              */
             tiposComprobanteAplicables: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE")[];
+            /**
+             * @description Si true, el sistema asigna el número correlativo automáticamente. Incompatible con esTributario=true. Inmutable post-creación.
+             * @example false
+             */
+            numeracionAutomatica?: boolean;
+            /**
+             * @description Número desde el que comienza la secuencia automática. Solo aplica cuando numeracionAutomatica=true. Inmutable post-creación.
+             * @example 1
+             */
+            numeroInicial?: number;
         };
         UpdateTipoDocumentoFisicoDto: {
             nombre?: string;
@@ -2212,6 +2226,10 @@ export interface components {
             activo?: boolean;
             /** @description Reemplaza la lista completa de tipos de comprobante aplicables. */
             tiposComprobanteAplicables?: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE")[];
+            /** @description Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422. */
+            numeracionAutomatica?: boolean;
+            /** @description Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422. */
+            numeroInicial?: number;
         };
         CreateLoteDto: {
             /**
@@ -2831,10 +2849,10 @@ export interface components {
              */
             tipoDocumentoFisicoId: string;
             /**
-             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.
+             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).
              * @example FAC-0042
              */
-            numero: string;
+            numero?: string | null;
             /**
              * @description Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).
              * @example 2026-03-15
@@ -2863,6 +2881,8 @@ export interface components {
             nombre: string;
             codigo: string;
             esTributario: boolean;
+            /** @description Si true, el sistema asigna número correlativo automáticamente. */
+            numeracionAutomatica: boolean;
         };
         ContactoEmbebidoDto: {
             id: string;

@@ -105,7 +105,13 @@ export class PrismaDocumentosFisicosReaderAdapter extends DocumentosFisicosReade
         documentoFisico: {
           include: {
             tipoDocumento: {
-              select: { id: true, nombre: true, codigo: true, esTributario: true },
+              select: {
+                id: true,
+                nombre: true,
+                codigo: true,
+                esTributario: true,
+                numeracionAutomatica: true,
+              },
             },
             contacto: { select: { id: true, razonSocial: true } },
           },

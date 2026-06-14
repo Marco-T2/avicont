@@ -27,6 +27,8 @@ const SAMPLE: TipoDocumentoFisico = {
   organizationId: 'org-1',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
+  numeracionAutomatica: false,
+  numeroInicial: null,
 };
 
 describe('TipoDocumentoFisicoForm', () => {
@@ -160,5 +162,116 @@ describe('TipoDocumentoFisicoForm', () => {
 
     // El checkbox de activo solo aparece en modo edit
     expect(screen.queryByRole('checkbox', { name: /activo/i })).not.toBeInTheDocument();
+  });
+
+  // ─── Task 6.3: numeracionAutomatica + numeroInicial ─────────────────────────
+
+  // mode=create: switch de numeración automática presente y desactivado por default
+  it('en modo create muestra el switch de numeración automática desactivado por defecto', () => {
+    render(
+      <TipoDocumentoFisicoForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper: wrapper() },
+    );
+
+    const switchAuto = screen.getByRole('switch', { name: /numeración automática/i });
+    expect(switchAuto).toBeInTheDocument();
+    expect(switchAuto).not.toBeChecked();
+  });
+
+  // mode=create: campo numeroInicial NO visible cuando auto=false (default)
+  it('en modo create el campo número inicial no se muestra cuando auto está desactivado', () => {
+    render(
+      <TipoDocumentoFisicoForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper: wrapper() },
+    );
+
+    expect(screen.queryByLabelText(/número inicial/i)).not.toBeInTheDocument();
+  });
+
+  // mode=create: activar auto → campo numeroInicial aparece
+  it('en modo create activar numeración automática hace visible el campo número inicial', async () => {
+    const user = userEvent.setup();
+    render(
+      <TipoDocumentoFisicoForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper: wrapper() },
+    );
+
+    const switchAuto = screen.getByRole('switch', { name: /numeración automática/i });
+    await user.click(switchAuto);
+
+    expect(screen.getByLabelText(/número inicial/i)).toBeInTheDocument();
+  });
+
+  // mode=create: switch deshabilitado cuando esTributario=true
+  it('en modo create el switch de numeración automática está deshabilitado cuando esTributario=true', async () => {
+    const user = userEvent.setup();
+    render(
+      <TipoDocumentoFisicoForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper: wrapper() },
+    );
+
+    // Activar esTributario
+    const tribCheckbox = screen.getByRole('checkbox', { name: /es tributario/i });
+    await user.click(tribCheckbox);
+
+    const switchAuto = screen.getByRole('switch', { name: /numeración automática/i });
+    expect(switchAuto).toBeDisabled();
+  });
+
+  // mode=create: activar tributario con auto ya activo → auto se desactiva
+  it('en modo create activar esTributario con auto encendido desactiva auto', async () => {
+    const user = userEvent.setup();
+    render(
+      <TipoDocumentoFisicoForm mode="create" onSubmit={vi.fn()} isSubmitting={false} />,
+      { wrapper: wrapper() },
+    );
+
+    // Primero activar auto
+    const switchAuto = screen.getByRole('switch', { name: /numeración automática/i });
+    await user.click(switchAuto);
+    expect(switchAuto).toBeChecked();
+
+    // Luego activar tributario → auto debe apagarse
+    const tribCheckbox = screen.getByRole('checkbox', { name: /es tributario/i });
+    await user.click(tribCheckbox);
+
+    expect(switchAuto).not.toBeChecked();
+    // Campo numeroInicial desaparece también
+    expect(screen.queryByLabelText(/número inicial/i)).not.toBeInTheDocument();
+  });
+
+  // mode=edit: switch de numeración automática disabled (set-once)
+  it('en modo edit el switch de numeración automática está deshabilitado (set-once)', () => {
+    render(
+      <TipoDocumentoFisicoForm
+        mode="edit"
+        initialData={{ ...SAMPLE, numeracionAutomatica: false, numeroInicial: null }}
+        onSubmit={vi.fn()}
+        isSubmitting={false}
+      />,
+      { wrapper: wrapper() },
+    );
+
+    const switchAuto = screen.getByRole('switch', { name: /numeración automática/i });
+    expect(switchAuto).toBeDisabled();
+  });
+
+  // mode=edit con numeracionAutomatica=true: numeroInicial visible pero disabled
+  it('en modo edit con numeracionAutomatica=true muestra número inicial en solo lectura', () => {
+    render(
+      <TipoDocumentoFisicoForm
+        mode="edit"
+        // numeroInicial se tipea como Record<string,never>|null en api.generated.ts por un quirk de
+        // openapi-typescript con nullable Int. En runtime es number. Cast explícito aquí.
+        initialData={{ ...SAMPLE, numeracionAutomatica: true, numeroInicial: 100 as unknown as null }}
+        onSubmit={vi.fn()}
+        isSubmitting={false}
+      />,
+      { wrapper: wrapper() },
+    );
+
+    const inputNumeroInicial = screen.getByRole('spinbutton', { name: /número inicial/i });
+    expect(inputNumeroInicial).toBeDisabled();
+    expect(inputNumeroInicial).toHaveValue(100);
   });
 });
