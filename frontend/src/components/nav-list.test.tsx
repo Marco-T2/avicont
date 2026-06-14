@@ -9,9 +9,10 @@ import * as usePacksModule from '@/lib/use-packs';
 import * as useVerticalModule from '@/lib/use-vertical';
 import { useAuthStore } from '@/stores/auth-store';
 import type { VerticalActivo } from '@/types/api';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 import * as navItemsModule from './nav-items';
-import { NAV_ITEMS, type NavItem } from './nav-items';
+import { NAV_ITEMS, NAV_SECTIONS, PANEL_ITEM, type NavItem } from './nav-items';
 import { NavList } from './nav-list';
 
 function mockPermissions(overrides: {
@@ -61,10 +62,110 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient();
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <TooltipProvider delayDuration={0}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-01, T-02, T-03 — NAV_SECTIONS: estructura de datos (RED → GREEN en T-05/T-06)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NAV_SECTIONS — estructura de datos', () => {
+  // T-01: estructura básica
+  it('NAV_SECTIONS tiene exactamente 4 secciones con los ids correctos en orden', () => {
+    expect(NAV_SECTIONS.map((s) => s.id)).toEqual([
+      'contabilidad',
+      'granja',
+      'administracion',
+      'configuracion',
+    ]);
+  });
+
+  it('cada sección tiene id, label, kind e items', () => {
+    for (const s of NAV_SECTIONS) {
+      expect(s).toHaveProperty('id');
+      expect(s).toHaveProperty('label');
+      expect(s).toHaveProperty('kind');
+      expect(s).toHaveProperty('items');
+      expect(Array.isArray(s.items)).toBe(true);
+    }
+  });
+
+  it('kind de contabilidad y granja es "modulo"; administracion y configuracion es "transversal"', () => {
+    const byId = Object.fromEntries(NAV_SECTIONS.map((s) => [s.id, s]));
+    expect(byId['contabilidad']?.kind).toBe('modulo');
+    expect(byId['granja']?.kind).toBe('modulo');
+    expect(byId['administracion']?.kind).toBe('transversal');
+    expect(byId['configuracion']?.kind).toBe('transversal');
+  });
+
+  it('PANEL_ITEM.to === "/"', () => {
+    expect(PANEL_ITEM.to).toBe('/');
+  });
+
+  it('NAV_ITEMS derivado === [PANEL_ITEM, ...NAV_SECTIONS.flatMap(s => s.items)]', () => {
+    const expected = [PANEL_ITEM, ...NAV_SECTIONS.flatMap((s) => s.items)];
+    expect(NAV_ITEMS).toEqual(expected);
+  });
+
+  // T-02: orden interno de Contabilidad
+  it('sección contabilidad tiene los ítems en el orden correcto', () => {
+    const contabilidad = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
+    expect(contabilidad?.items.map((i) => i.to)).toEqual([
+      '/comprobantes',
+      '/libros/diario',
+      '/libros/mayor',
+      '/eeff/balance',
+      '/eeff/resultados',
+      '/plan-cuentas',
+      '/contactos',
+      '/documentos-fisicos',
+    ]);
+  });
+
+  // T-03: mapeo ítem → sección
+  it('sección configuracion contiene /periodos-fiscales y /tipos-documento-fisico', () => {
+    const config = NAV_SECTIONS.find((s) => s.id === 'configuracion');
+    const tos = config?.items.map((i) => i.to) ?? [];
+    expect(tos).toContain('/periodos-fiscales');
+    expect(tos).toContain('/tipos-documento-fisico');
+  });
+
+  it('sección contabilidad NO contiene /periodos-fiscales ni /tipos-documento-fisico', () => {
+    const cont = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
+    const tos = cont?.items.map((i) => i.to) ?? [];
+    expect(tos).not.toContain('/periodos-fiscales');
+    expect(tos).not.toContain('/tipos-documento-fisico');
+  });
+
+  it('sección granja contiene /granja, /granja/lotes, /granja/tipos-registro', () => {
+    const granja = NAV_SECTIONS.find((s) => s.id === 'granja');
+    const tos = granja?.items.map((i) => i.to) ?? [];
+    expect(tos).toContain('/granja');
+    expect(tos).toContain('/granja/lotes');
+    expect(tos).toContain('/granja/tipos-registro');
+  });
+
+  it('sección administracion contiene los 5 ítems de gestión de org', () => {
+    const admin = NAV_SECTIONS.find((s) => s.id === 'administracion');
+    const tos = admin?.items.map((i) => i.to) ?? [];
+    expect(tos).toContain('/settings/empresa');
+    expect(tos).toContain('/settings/members');
+    expect(tos).toContain('/settings/roles');
+    expect(tos).toContain('/settings/features');
+    expect(tos).toContain('/settings/complementos');
+  });
+
+  it('sección configuracion contiene /configuracion (disabled, vertical CONTABILIDAD)', () => {
+    const config = NAV_SECTIONS.find((s) => s.id === 'configuracion');
+    const item = config?.items.find((i) => i.to === '/configuracion');
+    expect(item).toBeDefined();
+    expect(item?.disabled).toBe(true);
+    expect(item?.vertical).toBe('CONTABILIDAD');
+  });
+});
 
 beforeEach(() => {
   // Default: sin packs activos. Como ningún NAV_ITEM real declara `pack`,
@@ -336,11 +437,174 @@ describe('NavList — filtrado por vertical', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// T-08 — Header adaptativo (RED → GREEN en T-11/T-12)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NAV_SECTIONS — header adaptativo', () => {
+  // Sonda de módulo extra — patrón análogo D-06: push a NAV_SECTIONS.
+  const sondaSeccionModulo: import('./nav-items').NavSection = {
+    id: 'ventas',
+    label: 'Ventas',
+    kind: 'modulo',
+    items: [
+      {
+        to: '/__probe-module__',
+        label: 'Sonda Módulo',
+        icon: navItemsModule.NAV_ITEMS[0]!.icon,
+        // Sin vertical ni pack → siempre visible (pasa todos los filtros)
+      },
+    ],
+  };
+
+  afterEach(() => {
+    const idx = NAV_SECTIONS.indexOf(sondaSeccionModulo);
+    if (idx !== -1) NAV_SECTIONS.splice(idx, 1);
+  });
+
+  // Caso 1 — 1 módulo visible NO renderiza header de módulo
+  it('Caso 1 — 1 módulo visible: NO renderiza header de módulo "Contabilidad"', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    // Header de módulo OCULTO cuando solo hay 1 módulo
+    expect(screen.queryByRole('heading', { name: 'Contabilidad' })).not.toBeInTheDocument();
+    // Ítems contables SÍ visibles (el filtro de visibilidad funciona)
+    expect(screen.getAllByText('Comprobantes').length).toBeGreaterThan(0);
+    // Headers transversales SÍ presentes
+    expect(screen.getByRole('heading', { name: 'Administración' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Configuración' })).toBeInTheDocument();
+  });
+
+  // Caso 2 — 2 módulos visibles SÍ renderiza ambos headers
+  it('Caso 2 — 2 módulos visibles: SÍ renderiza headers de módulo', () => {
+    NAV_SECTIONS.push(sondaSeccionModulo);
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('heading', { name: 'Contabilidad' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ventas' })).toBeInTheDocument();
+  });
+
+  // Caso 3 — sección sin ítems visibles no renderiza header
+  it('Caso 3 — sección sin ítems visibles no renderiza su header', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('GRANJA'); // contabilidad no visible
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    // Contabilidad no tiene ítems visibles en GRANJA → sin header
+    expect(screen.queryByRole('heading', { name: 'Contabilidad' })).not.toBeInTheDocument();
+  });
+
+  // Caso 4 — collapsed suprime todos los headers
+  it('Caso 4 — collapsed suprime todos los headers de sección', () => {
+    NAV_SECTIONS.push(sondaSeccionModulo);
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('heading', { name: 'Contabilidad' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Ventas' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Administración' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Configuración' })).not.toBeInTheDocument();
+  });
+
+  // Caso 9 — collapsed: divider ENTRE secciones, nunca antes de la primera (regresión W-1)
+  it('Caso 9 — collapsed renderiza divisores solo ENTRE secciones (no antes de la primera)', () => {
+    NAV_SECTIONS.push(sondaSeccionModulo);
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    // Secciones visibles en este setup: Contabilidad, Ventas(sonda), Administración,
+    // Configuración → 4 secciones → 3 divisores (uno entre cada par, ninguno arriba).
+    const { container } = render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    const dividers = container.querySelectorAll('div.border-t');
+    // Con el bug `idx >= 0` habría 4 (uno huérfano antes de la primera sección).
+    expect(dividers.length).toBe(3);
+  });
+
+  // Caso 5 — Panel siempre visible sin header propio
+  it('Caso 5 — Panel siempre visible sin header de sección', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Panel').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: 'Panel' })).not.toBeInTheDocument();
+  });
+
+  // Caso 6 — headers transversales siempre presentes con ítems
+  it('Caso 6 — headers transversales Administración y Configuración presentes con ítems', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('heading', { name: 'Administración' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Configuración' })).toBeInTheDocument();
+  });
+
+  // Caso 7 — headers transversales ausentes sin ítems visibles
+  it('Caso 7 — headers transversales ausentes cuando no hay ítems visibles', () => {
+    // Sin permisos + sin roles + vertical GRANJA:
+    //   Administración: todos tienen requiredPermission → sin permisos todos ocultos
+    //                   Complementos tiene requiredSystemRole → sin OWNER/ADMIN oculto
+    //   Configuración: periodos/tipos-doc tienen vertical CONTABILIDAD → ocultos en GRANJA
+    //                  Configuración contable tiene vertical CONTABILIDAD → oculta en GRANJA
+    // Resultado: ambas secciones transversales sin ítems visibles → sin headers.
+    mockPermissions({ allowedPermissions: [] });
+    mockVertical('GRANJA');
+    setAuthRoles([]); // sin OWNER/ADMIN → Complementos gateado
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('heading', { name: 'Administración' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Configuración' })).not.toBeInTheDocument();
+  });
+
+  // Caso 8 — Configuración contable ausente en vertical GRANJA
+  it('Caso 8 — "Configuración contable" ausente en vertical GRANJA', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('GRANJA');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Configuración contable')).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-09 — Pack sonde migrada a NAV_SECTIONS (D-06)
+// ─────────────────────────────────────────────────────────────────────────────
 describe('NavList — filtrado por pack (riel eje 2)', () => {
   // Ningún NAV_ITEM real declara `pack` todavía (no hay pack concreto construido).
-  // Para probar el tercer eje del riel inyectamos un ítem-sonda con `pack` en el
-  // array real de producción y lo removemos en cleanup — exactamente el patrón con
-  // el que se enchufará un pack futuro (item.pack === clave del Pack).
+  // Para probar el tercer eje del riel inyectamos un ítem-sonda con `pack` directamente
+  // en NAV_SECTIONS (sección 'contabilidad') — D-06: NavList itera NAV_SECTIONS, no NAV_ITEMS.
   const PROBE_LABEL = 'Sonda Pack';
   const PROBE_PACK = 'contabilidad.adjuntos';
   const probeItem: NavItem = {
@@ -356,12 +620,14 @@ describe('NavList — filtrado por pack (riel eje 2)', () => {
     // isOwner=true + vertical CONTABILIDAD para aislar el filtro de pack.
     mockPermissions({ isOwner: true });
     mockVertical('CONTABILIDAD');
-    NAV_ITEMS.push(probeItem);
+    // D-06: pushear a NAV_SECTIONS[contabilidad].items (no a NAV_ITEMS)
+    NAV_SECTIONS.find((s) => s.id === 'contabilidad')!.items.push(probeItem);
   });
 
   afterEach(() => {
-    const idx = NAV_ITEMS.indexOf(probeItem);
-    if (idx !== -1) NAV_ITEMS.splice(idx, 1);
+    const section = NAV_SECTIONS.find((s) => s.id === 'contabilidad')!;
+    const idx = section.items.indexOf(probeItem);
+    if (idx !== -1) section.items.splice(idx, 1);
   });
 
   it('ítem sin `pack` pasa el filtro de pack (visible aun sin packs activos)', () => {
