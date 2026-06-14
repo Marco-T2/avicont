@@ -15,6 +15,7 @@ import type { Comprobante } from '@/types/api';
 
 import { calcularMontoBob } from '../lib/calcular-monto-bob';
 import { hoyEnLaPaz } from '../lib/hoy-en-la-paz';
+import { mapComprobanteAForm } from '../lib/map-comprobante-a-form';
 import type { CrearComprobantePayload } from '../api/crear-comprobante';
 import type { EditarComprobantePayload } from '../api/editar-comprobante';
 import { useComprobante } from '../hooks/use-comprobante';
@@ -29,42 +30,11 @@ import {
   editarComprobanteSchema,
   type EditarComprobanteValues,
 } from '../schemas/editar-comprobante-schema';
-import type { ComprobanteMode, LineaFormValues } from '../types';
+import type { ComprobanteMode } from '../types';
 import { LINEA_VACIA } from '../types';
 import { ComprobanteCabeceraForm } from './comprobante-cabecera-form';
 import { DocumentosRespaldoSection } from './documentos-respaldo-section';
 import { LineasEditor } from './lineas-editor';
-
-// Mapea un comprobante del backend a los valores del form.
-// NO incluye debitoBob/creditoBob — son derived state que el LineaRow calcula
-// inline desde debito × tipoCambio, y se vuelven a calcular en onSubmit antes
-// de mandar al backend.
-// tipoCambioReexpresion se mapea para que el form lo refleje en edición.
-function mapComprobanteAForm(
-  comprobante: Comprobante,
-): Omit<CrearComprobanteValues, 'lineas'> & { lineas: LineaFormValues[]; motivo?: string } {
-  return {
-    tipo: comprobante.tipo,
-    fechaContable: comprobante.fechaContable,
-    glosa: comprobante.glosa,
-    // tipoCambioReexpresion: solo se incluye cuando no es el default (1), para
-    // no pre-rellenar el campo con "1.00000000" visualmente.
-    ...(comprobante.tipoCambioReexpresion !== '1' &&
-    comprobante.tipoCambioReexpresion !== '1.00000000'
-      ? { tipoCambioReexpresion: comprobante.tipoCambioReexpresion }
-      : {}),
-    lineas: comprobante.lineas.map((l) => ({
-      _localKey: crypto.randomUUID(),
-      cuentaId: l.cuentaId,
-      contactoId: l.contactoId ?? undefined,
-      moneda: l.moneda,
-      debito: l.debito,
-      credito: l.credito,
-      tipoCambio: l.tipoCambio,
-      glosaLinea: l.glosaLinea ?? '',
-    })),
-  };
-}
 
 // Popula debitoBob/creditoBob calculados desde debito/credito × tipoCambio.
 // Se aplica en el submit — el form NO los trackea para evitar re-mount del
