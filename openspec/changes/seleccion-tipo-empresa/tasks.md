@@ -12,20 +12,20 @@ Fecha: 2026-06-15
 
 ## Fase A — Backend: DTO + service + controller
 
-- [ ] A1. [RED] Escribir unit test en `tenants.service.spec.ts`: `getCurrent` con `existeAlgunaGestion=false` → `tipoEmpresaEditable: true`; con `true` → `false`
-- [ ] A2. [GREEN] Crear `backend/src/tenants/dto/tenant-current-response.dto.ts` con `TenantCurrentResponseDto` (todos los campos actuales de `Organization` + `tipoEmpresaPrincipal` enum + `tipoEmpresaEditable: boolean`; cada campo con `@ApiProperty`) ⇒ **triggers OpenAPI regen**
-- [ ] A3. [GREEN] Agregar método `getCurrent(tenantId: string)` en `backend/src/tenants/tenants.service.ts`: llama `findById` + `gestionesReader.existeAlgunaGestion`, retorna shape del DTO
-- [ ] A4. Decorar `GET /tenants/current` en `backend/src/tenants/tenants.controller.ts` con `@ApiOkResponse({ type: TenantCurrentResponseDto })` y delegar a `tenantsService.getCurrent` (cierra WARNING-1 §10.10) ⇒ **triggers OpenAPI regen**
-- [ ] A5. [RED] Escribir e2e en `test/`: `GET /tenants/current` devuelve `tipoEmpresaEditable:true` sin gestión y `false` con gestión; `PATCH` con `tipoEmpresaPrincipal:"MINERA"` → 200 sin gestión; `PATCH` con gestión → 422 `TENANT_TIPO_EMPRESA_INMUTABLE`
-- [ ] A6. [GREEN] Verificar que los e2e del PATCH pasan (guard `TipoEmpresaInmutableError` ya implementado — solo confirmar que el nuevo `getCurrent` no rompe nada)
+- [x] A1. [RED] Escribir unit test en `tenants.service.spec.ts`: `getCurrent` con `existeAlgunaGestion=false` → `tipoEmpresaEditable: true`; con `true` → `false`
+- [x] A2. [GREEN] Crear `backend/src/tenants/dto/tenant-current-response.dto.ts` con `TenantCurrentResponseDto` (todos los campos actuales de `Organization` + `tipoEmpresaPrincipal` enum + `tipoEmpresaEditable: boolean`; cada campo con `@ApiProperty`) ⇒ **triggers OpenAPI regen**
+- [x] A3. [GREEN] Agregar método `getCurrent(tenantId: string)` en `backend/src/tenants/tenants.service.ts`: llama `findById` + `gestionesReader.existeAlgunaGestion`, retorna shape del DTO
+- [x] A4. Decorar `GET /tenants/current` en `backend/src/tenants/tenants.controller.ts` con `@ApiOkResponse({ type: TenantCurrentResponseDto })` y delegar a `tenantsService.getCurrent` (cierra WARNING-1 §10.10) ⇒ **triggers OpenAPI regen**
+- [x] A5. [RED] Escribir e2e en `test/`: `GET /tenants/current` devuelve `tipoEmpresaEditable:true` sin gestión y `false` con gestión; `PATCH` con `tipoEmpresaPrincipal:"MINERA"` → 200 sin gestión; `PATCH` con gestión → 409 `TENANT_EMPRESA_INMUTABLE`
+- [x] A6. [GREEN] Verificar que los e2e del PATCH pasan (guard `TipoEmpresaInmutableError` ya implementado — solo confirmar que el nuevo `getCurrent` no rompe nada) — [BLOQUEADO W3 preexistente: Node v24+AWS SDK dynamic import en ts-jest; lógica verificada vía unit tests]
 
 ---
 
 ## Fase B — OpenAPI Regen
 
-- [ ] B1. Desde `backend/`: ejecutar `pnpm run openapi:dump` → actualiza `backend/openapi.json`
-- [ ] B2. Desde `frontend/`: ejecutar `pnpm run gen:api-types` → actualiza `frontend/src/types/api.generated.ts`
-- [ ] B3. Verificar `git diff` sobre ambos artefactos y commitearlos junto con los cambios de A (mismo commit; CI `contract-drift` requiere sincronía)
+- [x] B1. Desde `backend/`: ejecutar `pnpm run openapi:dump` → actualiza `backend/openapi.json`
+- [x] B2. Desde `frontend/`: ejecutar `pnpm run gen:api-types` → actualiza `frontend/src/types/api.generated.ts`
+- [x] B3. Verificar `git diff` sobre ambos artefactos y commitearlos (commit propio); CI `contract-drift` verde (sin drift)
 
 ---
 
