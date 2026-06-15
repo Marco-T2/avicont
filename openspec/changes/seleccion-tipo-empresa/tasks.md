@@ -1,0 +1,56 @@
+# Tasks: Selección de Tipo de Empresa
+
+<!--
+Change: seleccion-tipo-empresa
+Artifact store: hybrid
+Fecha: 2026-06-15
+-->
+
+> **Resolve-during-apply**: Confirmar shape exacto de `Organization` que devuelve `findById` hoy (campos ya expuestos en `GET /tenants/current`) para espejarlos en `TenantCurrentResponseDto` sin omisiones. NO bloqueante — `tipoEmpresaPrincipal`/`tipoEmpresaEditable` son aditivos.
+
+---
+
+## Fase A — Backend: DTO + service + controller
+
+- [ ] A1. [RED] Escribir unit test en `tenants.service.spec.ts`: `getCurrent` con `existeAlgunaGestion=false` → `tipoEmpresaEditable: true`; con `true` → `false`
+- [ ] A2. [GREEN] Crear `backend/src/tenants/dto/tenant-current-response.dto.ts` con `TenantCurrentResponseDto` (todos los campos actuales de `Organization` + `tipoEmpresaPrincipal` enum + `tipoEmpresaEditable: boolean`; cada campo con `@ApiProperty`) ⇒ **triggers OpenAPI regen**
+- [ ] A3. [GREEN] Agregar método `getCurrent(tenantId: string)` en `backend/src/tenants/tenants.service.ts`: llama `findById` + `gestionesReader.existeAlgunaGestion`, retorna shape del DTO
+- [ ] A4. Decorar `GET /tenants/current` en `backend/src/tenants/tenants.controller.ts` con `@ApiOkResponse({ type: TenantCurrentResponseDto })` y delegar a `tenantsService.getCurrent` (cierra WARNING-1 §10.10) ⇒ **triggers OpenAPI regen**
+- [ ] A5. [RED] Escribir e2e en `test/`: `GET /tenants/current` devuelve `tipoEmpresaEditable:true` sin gestión y `false` con gestión; `PATCH` con `tipoEmpresaPrincipal:"MINERA"` → 200 sin gestión; `PATCH` con gestión → 422 `TENANT_TIPO_EMPRESA_INMUTABLE`
+- [ ] A6. [GREEN] Verificar que los e2e del PATCH pasan (guard `TipoEmpresaInmutableError` ya implementado — solo confirmar que el nuevo `getCurrent` no rompe nada)
+
+---
+
+## Fase B — OpenAPI Regen
+
+- [ ] B1. Desde `backend/`: ejecutar `pnpm run openapi:dump` → actualiza `backend/openapi.json`
+- [ ] B2. Desde `frontend/`: ejecutar `pnpm run gen:api-types` → actualiza `frontend/src/types/api.generated.ts`
+- [ ] B3. Verificar `git diff` sobre ambos artefactos y commitearlos junto con los cambios de A (mismo commit; CI `contract-drift` requiere sincronía)
+
+---
+
+## Fase C — Frontend: schema + tipos + API
+
+- [ ] C1. [RED] Agregar test en `empresa-form-schema.test.ts`: `z.enum` acepta los 8 valores válidos; rechaza `"OTRO"` con error
+- [ ] C2. [GREEN] Actualizar `frontend/src/features/tenants/schemas/empresa-form-schema.ts`: agregar `tipoEmpresaPrincipal: z.enum(['COMERCIAL','SERVICIOS','TRANSPORTE','INDUSTRIAL','PETROLERA','CONSTRUCCION','AGROPECUARIA','MINERA'])`
+- [ ] C3. Actualizar `frontend/src/features/tenants/api/get-empresa.ts`: `EmpresaPerfil` += `tipoEmpresaPrincipal: TipoEmpresa` + `tipoEmpresaEditable: boolean`; extraerlos del response ⇒ consumes `api.generated.ts`
+- [ ] C4. Actualizar `frontend/src/features/tenants/api/update-empresa.ts`: incluir `tipoEmpresaPrincipal` en el payload del `PATCH`
+
+---
+
+## Fase D — Frontend: componente y página
+
+- [ ] D1. [RED] Agregar tests en `empresa-form.test.tsx`: `<Select>` renderiza 8 opciones; `disabled+tooltip` cuando `tipoEmpresaEditable=false`; botón guardar `disabled` mientras `isPending`; valor seleccionado llega a `onSubmit`
+- [ ] D2. [GREEN] Modificar `frontend/src/features/tenants/components/empresa-form.tsx`: agregar `<Select>` con 8 opciones + constante de etiquetas es-BO + prop `tipoEmpresaEditable: boolean` + `disabled` + tooltip cuando no editable; incluir en `defaultValues`
+- [ ] D3. Modificar `frontend/src/features/tenants/pages/empresa-page.tsx`: pasar `tipoEmpresaPrincipal` a `defaultValues` y `tipoEmpresaEditable` como prop al form; botón submit `disabled={isPending}`
+
+---
+
+## Fase E — Gates de verificación
+
+- [ ] E1. `cd backend && pnpm exec tsc --noEmit -p tsconfig.json` → 0 errores
+- [ ] E2. `cd backend && pnpm exec jest src/tenants/` → tests A1+A6 verdes
+- [ ] E3. `cd backend && DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit` → e2e A5 verdes + regresión completa verde
+- [ ] E4. `cd frontend && pnpm exec tsc -b` → 0 errores
+- [ ] E5. `cd frontend && pnpm exec vitest run` → tests C1+D1 verdes + regresión completa verde
+- [ ] E6. CI `contract-drift`: `openapi.json` + `api.generated.ts` sin diff (`git diff --exit-code`) — confirmar en PR
