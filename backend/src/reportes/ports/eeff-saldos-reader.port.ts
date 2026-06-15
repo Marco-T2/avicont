@@ -40,6 +40,30 @@ export interface CuentaEstructuraRow {
   nombre: string;
 }
 
+/**
+ * Saldos de una cuenta en un rango, con débitos/créditos separados por tipo de
+ * comprobante: ORDINARIO (todos los tipos excepto AJUSTE y CIERRE) vs AJUSTE.
+ *
+ * Usado exclusivamente por la Hoja de Trabajo de 12 columnas (cols 5–6 = ajustes,
+ * cols 1–2 = sumas ordinarias). El Balance de Comprobación usa `SaldoCuentaRow`
+ * sin separación porque allí no importa el tipo de comprobante.
+ *
+ * // §4.9 CLAUDE.md: CIERRE excluido de la Hoja de Trabajo — los asientos de
+ * // cierre distorsionan las secciones de ER y BG (llevan saldos a cero con
+ * // contrapartidas cruzadas que no corresponden al período analizado).
+ */
+export interface SaldoCuentaSeparadoRow {
+  cuentaId: string;
+  /** COALESCE(SUM(lc.debitoBob)  FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) */
+  debitoOrdinarioBob: Decimal;
+  /** COALESCE(SUM(lc.creditoBob) FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) */
+  creditoOrdinarioBob: Decimal;
+  /** COALESCE(SUM(lc.debitoBob)  FILTER (WHERE c.tipo = 'AJUSTE'), 0) */
+  debitoAjusteBob: Decimal;
+  /** COALESCE(SUM(lc.creditoBob) FILTER (WHERE c.tipo = 'AJUSTE'), 0) */
+  creditoAjusteBob: Decimal;
+}
+
 /** Filtros para las queries de saldos de corte histórico (Balance General). */
 export interface BalanceFiltros {
   /** Corte inclusive: líneas con c.fechaContable <= fechaCorte. */
@@ -111,4 +135,26 @@ export abstract class EeffSaldosReaderPort {
    * // organizationId SIEMPRE primer predicado (§4.2 Anti-31)
    */
   abstract obtenerEstructuraCuentas(tenantId: string): Promise<CuentaEstructuraRow[]>;
+
+  /**
+   * Suma de débitos/créditos por cuenta en [desde, hasta], separando comprobantes
+   * ORDINARIOS (tipos NO-AJUSTE, NO-CIERRE) de los de tipo AJUSTE.
+   *
+   * Usado por la Hoja de Trabajo de 12 columnas para alimentar:
+   *   - Cols 1–2 (Sumas): debitoOrdinarioBob / creditoOrdinarioBob
+   *   - Cols 5–6 (Ajustes): debitoAjusteBob / creditoAjusteBob
+   *
+   * Los comprobantes de tipo CIERRE son SIEMPRE excluidos (§4.9 CLAUDE.md):
+   * distorsionan los saldos ER/BG al hacer cero los resultados del ejercicio.
+   *
+   * Mismas condiciones base que `obtenerSaldosEnRango`: estados CONTABILIZADO/
+   * BLOQUEADO, organizationId SIEMPRE primer predicado (Anti-31).
+   * // organizationId SIEMPRE primer predicado (§4.2 Anti-31)
+   */
+  abstract obtenerSaldosEnRangoSeparandoAjustes(
+    tenantId: string,
+    desde: Date,
+    hasta: Date,
+    incluirAnulados: boolean,
+  ): Promise<SaldoCuentaSeparadoRow[]>;
 }

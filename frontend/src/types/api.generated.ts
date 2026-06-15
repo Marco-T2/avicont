@@ -1843,6 +1843,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eeff/hoja-trabajo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22. */
+        get: operations["EeffController_obtenerHojaTrabajo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3156,6 +3173,96 @@ export interface components {
             diferenciaSumas: string;
             /** @example 0.00 */
             diferenciaSaldos: string;
+            cuentasNaturalezaOpuesta: components["schemas"]["CuentaNaturalezaOpuestaDto"][];
+        };
+        LineaHojaTrabajoDto: {
+            cuentaId: string | null;
+            codigoInterno: string | null;
+            nombre: string;
+            naturaleza: string | null;
+            claseCuenta: string | null;
+            esContraria: boolean;
+            esSintetica: boolean;
+            /** @example 1000.00 */
+            sumasDebe: string;
+            /** @example 0.00 */
+            sumasHaber: string;
+            /** @example 1000.00 */
+            saldoDeudor: string;
+            /** @example 0.00 */
+            saldoAcreedor: string;
+            /** @example 0.00 */
+            ajustesDebe: string;
+            /** @example 0.00 */
+            ajustesHaber: string;
+            /** @example 1000.00 */
+            saldoAjustadoDeudor: string;
+            /** @example 0.00 */
+            saldoAjustadoAcreedor: string;
+            /** @example 0.00 */
+            erPerdidas: string;
+            /** @example 0.00 */
+            erGanancias: string;
+            /** @example 1000.00 */
+            bgActivo: string;
+            /** @example 0.00 */
+            bgPasPat: string;
+        };
+        TotalesHojaTrabajoDto: {
+            /** @example 5000.00 */
+            sumasDebe: string;
+            /** @example 5000.00 */
+            sumasHaber: string;
+            /** @example 5000.00 */
+            saldoDeudor: string;
+            /** @example 5000.00 */
+            saldoAcreedor: string;
+            /** @example 0.00 */
+            ajustesDebe: string;
+            /** @example 0.00 */
+            ajustesHaber: string;
+            /** @example 5000.00 */
+            saldoAjustadoDeudor: string;
+            /** @example 5000.00 */
+            saldoAjustadoAcreedor: string;
+            /** @example 5000.00 */
+            perdidas: string;
+            /** @example 5000.00 */
+            ganancias: string;
+            /** @example 5000.00 */
+            activo: string;
+            /** @example 5000.00 */
+            pasivoPatrimonio: string;
+        };
+        CuadresHojaTrabajoDto: {
+            cuadra: boolean;
+            cuadraSumas: boolean;
+            cuadraSaldos: boolean;
+            cuadraAjustes: boolean;
+            cuadraSaldosAjustados: boolean;
+            cuadraEstadoResultados: boolean;
+            cuadraBalanceGeneral: boolean;
+            /** @example 0.00 */
+            diferenciaSumas: string;
+            /** @example 0.00 */
+            diferenciaSaldos: string;
+            /** @example 0.00 */
+            diferenciaAjustes: string;
+            /** @example 0.00 */
+            diferenciaSaldosAjustados: string;
+            /** @example 0.00 */
+            diferenciaEstadoResultados: string;
+            /** @example 0.00 */
+            diferenciaBalanceGeneral: string;
+        };
+        HojaTrabajoResponseDto: {
+            /** @example 2026-04-01 */
+            fechaDesde: string;
+            /** @example 2026-04-30 */
+            fechaHasta: string;
+            lineas: components["schemas"]["LineaHojaTrabajoDto"][];
+            totales: components["schemas"]["TotalesHojaTrabajoDto"];
+            cuadres: components["schemas"]["CuadresHojaTrabajoDto"];
             cuentasNaturalezaOpuesta: components["schemas"]["CuentaNaturalezaOpuestaDto"][];
         };
         MePermissionsResponseDto: {
@@ -6701,6 +6808,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BalanceComprobacionResponseDto"];
+                };
+            };
+        };
+    };
+    EeffController_obtenerHojaTrabajo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HojaTrabajoResponseDto"];
                 };
             };
         };

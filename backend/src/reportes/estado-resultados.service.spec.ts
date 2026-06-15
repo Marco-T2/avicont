@@ -26,6 +26,7 @@ function makeEeffSaldosReaderMock(): MockEeffSaldosReader {
     obtenerSaldosHasta: jest.fn(),
     obtenerSaldosEnRango: jest.fn(),
     obtenerEstructuraCuentas: jest.fn(),
+    obtenerSaldosEnRangoSeparandoAjustes: jest.fn(),
   };
 }
 

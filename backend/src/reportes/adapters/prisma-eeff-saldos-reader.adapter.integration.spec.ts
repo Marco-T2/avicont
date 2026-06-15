@@ -208,11 +208,12 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
     montoBob = 1000,
     anulado = false,
     estado: EstadoComprobante = EstadoComprobante.CONTABILIZADO,
+    tipo: TipoComprobante = TipoComprobante.DIARIO,
   ) {
     const comp = await prisma.comprobante.create({
       data: {
         organizationId: tenantId,
-        tipo: TipoComprobante.DIARIO,
+        tipo,
         estado,
         numero: `D${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`,
         fechaContable: fecha,
@@ -709,6 +710,255 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
       );
       const ventasCon = conAnulados.find((s) => s.cuentaId === ventasAId);
       expect(ventasCon!.totalCreditoBob.toNumber()).toBe(5000);
+    });
+  });
+
+  // ============================================================
+  // obtenerSaldosEnRangoSeparandoAjustes (Hoja de Trabajo 12 cols)
+  // ============================================================
+
+  describe('obtenerSaldosEnRangoSeparandoAjustes', () => {
+    const rango = {
+      desde: new Date(Date.UTC(2026, 0, 1)),
+      hasta: new Date(Date.UTC(2026, 0, 31)),
+    };
+
+    it('split correcto: DIARIO y AJUSTE separados en columnas distintas', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+
+      // Comprobante DIARIO (ordinario)
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        1000,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+      // Comprobante AJUSTE
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        200,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.AJUSTE,
+      );
+
+      const rows = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        false,
+      );
+
+      const caja = rows.find((r) => r.cuentaId === cajaAId);
+      expect(caja).toBeDefined();
+      // DIARIO → ordinario
+      expect(caja!.debitoOrdinarioBob.toNumber()).toBe(1000);
+      expect(caja!.creditoOrdinarioBob.toNumber()).toBe(0);
+      // AJUSTE → ajuste
+      expect(caja!.debitoAjusteBob.toNumber()).toBe(200);
+      expect(caja!.creditoAjusteBob.toNumber()).toBe(0);
+    });
+
+    it('reconciliación: ordinario+ajuste === obtenerSaldosEnRango (excluyendo CIERRE)', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        3000,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        500,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.AJUSTE,
+      );
+
+      const [separados, combinados] = await Promise.all([
+        adapter.obtenerSaldosEnRangoSeparandoAjustes(tenantA, rango.desde, rango.hasta, false),
+        adapter.obtenerSaldosEnRango(tenantA, rango.desde, rango.hasta, false),
+      ]);
+
+      const cajaS = separados.find((r) => r.cuentaId === cajaAId);
+      const cajaC = combinados.find((r) => r.cuentaId === cajaAId);
+      expect(cajaS).toBeDefined();
+      expect(cajaC).toBeDefined();
+
+      // debitoOrdinario + debitoAjuste debe ser = totalDebito del combinado
+      const totalSeparado =
+        cajaS!.debitoOrdinarioBob.toNumber() + cajaS!.debitoAjusteBob.toNumber();
+      expect(totalSeparado).toBe(cajaC!.totalDebitoBob.toNumber());
+    });
+
+    it('CIERRE excluido: comprobante CIERRE no aparece en ninguna columna del split', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        5000,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        9999,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.CIERRE,
+      );
+
+      const rows = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        false,
+      );
+
+      const caja = rows.find((r) => r.cuentaId === cajaAId);
+      expect(caja).toBeDefined();
+      // Solo el DIARIO (5000) debe aparecer en ordinario
+      expect(caja!.debitoOrdinarioBob.toNumber()).toBe(5000);
+      // El CIERRE no debe aparecer ni en ordinario ni en ajuste
+      const totalDebito = caja!.debitoOrdinarioBob.toNumber() + caja!.debitoAjusteBob.toNumber();
+      expect(totalDebito).toBe(5000);
+    });
+
+    it('solo-ajuste: cuenta con únicamente AJUSTE aparece con ordinario=0', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        750,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.AJUSTE,
+      );
+
+      const rows = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        false,
+      );
+
+      const caja = rows.find((r) => r.cuentaId === cajaAId);
+      expect(caja).toBeDefined();
+      expect(caja!.debitoOrdinarioBob.toNumber()).toBe(0);
+      expect(caja!.creditoOrdinarioBob.toNumber()).toBe(0);
+      expect(caja!.debitoAjusteBob.toNumber()).toBe(750);
+    });
+
+    it('toggle anulados: anulado contado solo con incluirAnulados=true', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        1000,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        300,
+        true,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+
+      const sinAnulados = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        false,
+      );
+      const cajaS = sinAnulados.find((r) => r.cuentaId === cajaAId);
+      expect(cajaS!.debitoOrdinarioBob.toNumber()).toBe(1000);
+
+      const conAnulados = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        true,
+      );
+      const cajaC = conAnulados.find((r) => r.cuentaId === cajaAId);
+      expect(cajaC!.debitoOrdinarioBob.toNumber()).toBe(1300);
+    });
+
+    it('Anti-31: dos tenants en el mismo rango — sin fuga de datos', async () => {
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        5000,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+      await crearComprobanteContabilizado(
+        tenantB,
+        periodoBId,
+        cajaBId,
+        ventasBId,
+        fecha,
+        9999,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.DIARIO,
+      );
+
+      const rowsA = await adapter.obtenerSaldosEnRangoSeparandoAjustes(
+        tenantA,
+        rango.desde,
+        rango.hasta,
+        false,
+      );
+
+      const cuentaIds = rowsA.map((r) => r.cuentaId);
+      expect(cuentaIds).not.toContain(cajaBId);
+      expect(cuentaIds).not.toContain(ventasBId);
+      const cajaA = rowsA.find((r) => r.cuentaId === cajaAId);
+      expect(cajaA!.debitoOrdinarioBob.toNumber()).toBe(5000);
     });
   });
 });

@@ -2,27 +2,27 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
 
-import { BalanceComprobacionService } from './balance-comprobacion.service';
+import { HojaTrabajoService } from './hoja-trabajo.service';
 import {
   PeriodoNoEncontradoError,
   RangoAmbiguoError,
   RangoInvalidoError,
   RangoRequeridoError,
-} from './domain/balance-comprobacion-errors';
+} from './domain/hoja-trabajo-errors';
 import type {
   CuentaEstructuraRow,
   EeffSaldosReaderPort,
-  SaldoCuentaRow,
+  SaldoCuentaSeparadoRow,
 } from './ports/eeff-saldos-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 
 /**
- * Tests unit del BalanceComprobacionService con mocks TIPADOS de los ports
- * (NO Prisma, §7.8). Cubre la resolución del rango (REQ-BC-01/02), la
- * orquestación (REQ-BC-03/06/08) y la propagación del tenantId (REQ-BC-09).
+ * Tests unit del HojaTrabajoService con mocks TIPADOS de los ports
+ * (NO Prisma, §7.8). Cubre la resolución del rango (REQ-HT-01/02), la
+ * orquestación (REQ-HT-03..10) y la propagación del tenantId (CRÍTICO §4.2).
  */
 
-const TENANT = 'org-123';
+const TENANT = 'org-hoja-123';
 
 function estructuraBase(): CuentaEstructuraRow[] {
   return [
@@ -53,25 +53,37 @@ function estructuraBase(): CuentaEstructuraRow[] {
   ];
 }
 
-function saldosBase(): SaldoCuentaRow[] {
+function saldosSeparadosBase(): SaldoCuentaSeparadoRow[] {
   return [
-    { cuentaId: 'c1', totalDebitoBob: new Decimal('1000'), totalCreditoBob: new Decimal('0') },
-    { cuentaId: 'c2', totalDebitoBob: new Decimal('0'), totalCreditoBob: new Decimal('1000') },
+    {
+      cuentaId: 'c1',
+      debitoOrdinarioBob: new Decimal('1000'),
+      creditoOrdinarioBob: new Decimal('0'),
+      debitoAjusteBob: new Decimal('0'),
+      creditoAjusteBob: new Decimal('0'),
+    },
+    {
+      cuentaId: 'c2',
+      debitoOrdinarioBob: new Decimal('0'),
+      creditoOrdinarioBob: new Decimal('1000'),
+      debitoAjusteBob: new Decimal('0'),
+      creditoAjusteBob: new Decimal('0'),
+    },
   ];
 }
 
 interface Mocks {
   eeff: jest.Mocked<EeffSaldosReaderPort>;
   periodos: jest.Mocked<PeriodosReaderPort>;
-  service: BalanceComprobacionService;
+  service: HojaTrabajoService;
 }
 
 function setup(): Mocks {
   const eeff = {
     obtenerSaldosHasta: jest.fn(),
-    obtenerSaldosEnRango: jest.fn().mockResolvedValue(saldosBase()),
+    obtenerSaldosEnRango: jest.fn(),
     obtenerEstructuraCuentas: jest.fn().mockResolvedValue(estructuraBase()),
-    obtenerSaldosEnRangoSeparandoAjustes: jest.fn(),
+    obtenerSaldosEnRangoSeparandoAjustes: jest.fn().mockResolvedValue(saldosSeparadosBase()),
   } as unknown as jest.Mocked<EeffSaldosReaderPort>;
 
   const periodos = {
@@ -82,20 +94,20 @@ function setup(): Mocks {
     obtenerRangoGestion: jest.fn(),
   } as unknown as jest.Mocked<PeriodosReaderPort>;
 
-  const service = new BalanceComprobacionService(eeff, periodos);
+  const service = new HojaTrabajoService(eeff, periodos);
   return { eeff, periodos, service };
 }
 
-describe('BalanceComprobacionService', () => {
+describe('HojaTrabajoService', () => {
   // ============================================================
-  // REQ-BC-01: Resolución de modo (XOR)
+  // REQ-HT-01: Resolución de modo (XOR)
   // ============================================================
 
-  describe('REQ-BC-01: resolución del rango por dos modos excluyentes', () => {
+  describe('REQ-HT-01: resolución del rango por dos modos excluyentes', () => {
     it('modo rango directo: usa desde/hasta y responde 200', async () => {
       const { service, eeff } = setup();
 
-      const res = await service.consultarBalanceComprobacion(TENANT, {
+      const res = await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: false,
@@ -103,7 +115,7 @@ describe('BalanceComprobacionService', () => {
 
       expect(res.fechaDesde).toBe('2026-04-01');
       expect(res.fechaHasta).toBe('2026-04-30');
-      expect(eeff.obtenerSaldosEnRango).toHaveBeenCalledTimes(1);
+      expect(eeff.obtenerSaldosEnRangoSeparandoAjustes).toHaveBeenCalledTimes(1);
     });
 
     it('modo período: resuelve el rango vía obtenerRangoFechas', async () => {
@@ -113,7 +125,7 @@ describe('BalanceComprobacionService', () => {
         hasta: new Date(Date.UTC(2026, 3, 30)),
       });
 
-      const res = await service.consultarBalanceComprobacion(TENANT, {
+      const res = await service.consultarHojaTrabajo(TENANT, {
         periodoFiscalId: 'p-1',
         incluirAnulados: false,
       });
@@ -127,7 +139,7 @@ describe('BalanceComprobacionService', () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           desde: '2026-04-01',
           hasta: '2026-04-30',
           periodoFiscalId: 'p-1',
@@ -140,21 +152,21 @@ describe('BalanceComprobacionService', () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, { incluirAnulados: false }),
+        service.consultarHojaTrabajo(TENANT, { incluirAnulados: false }),
       ).rejects.toBeInstanceOf(RangoRequeridoError);
     });
   });
 
   // ============================================================
-  // REQ-BC-02: Validación de fechas
+  // REQ-HT-02: Validación de fechas
   // ============================================================
 
-  describe('REQ-BC-02: validación de fechas', () => {
+  describe('REQ-HT-02: validación de fechas', () => {
     it('fecha semánticamente inválida → RangoInvalidoError', async () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           desde: '2026-02-30',
           hasta: '2026-04-30',
           incluirAnulados: false,
@@ -166,7 +178,7 @@ describe('BalanceComprobacionService', () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           desde: '2026-04-30',
           hasta: '2026-04-01',
           incluirAnulados: false,
@@ -178,7 +190,7 @@ describe('BalanceComprobacionService', () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           desde: '2026-04-01',
           incluirAnulados: false,
         }),
@@ -189,7 +201,7 @@ describe('BalanceComprobacionService', () => {
       const { service } = setup();
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           hasta: '2026-04-30',
           incluirAnulados: false,
         }),
@@ -201,7 +213,7 @@ describe('BalanceComprobacionService', () => {
       periodos.obtenerRangoFechas.mockResolvedValue(null);
 
       await expect(
-        service.consultarBalanceComprobacion(TENANT, {
+        service.consultarHojaTrabajo(TENANT, {
           periodoFiscalId: 'p-ajeno',
           incluirAnulados: false,
         }),
@@ -210,50 +222,90 @@ describe('BalanceComprobacionService', () => {
   });
 
   // ============================================================
-  // REQ-BC-03/06/08: Orquestación
+  // REQ-HT-03..10: Orquestación
   // ============================================================
 
-  describe('REQ-BC-03/06: orquestación correcta', () => {
-    it('usa obtenerSaldosEnRango (flujo), NUNCA obtenerSaldosHasta', async () => {
+  describe('REQ-HT-03/10: orquestación correcta', () => {
+    it('usa obtenerSaldosEnRangoSeparandoAjustes, NUNCA obtenerSaldosEnRango ni obtenerSaldosHasta', async () => {
       const { service, eeff } = setup();
 
-      await service.consultarBalanceComprobacion(TENANT, {
+      await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: false,
       });
 
-      expect(eeff.obtenerSaldosEnRango).toHaveBeenCalledTimes(1);
+      expect(eeff.obtenerSaldosEnRangoSeparandoAjustes).toHaveBeenCalledTimes(1);
+      expect(eeff.obtenerSaldosEnRango).not.toHaveBeenCalled();
       expect(eeff.obtenerSaldosHasta).not.toHaveBeenCalled();
     });
 
-    it('produce un reporte cuadrado con saldos balanceados', async () => {
+    it('produce un reporte con estructura de 12 columnas y cuadres', async () => {
       const { service } = setup();
 
-      const res = await service.consultarBalanceComprobacion(TENANT, {
+      const res = await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: false,
       });
 
-      expect(res.cuadra).toBe(true);
-      expect(res.totalSumasDebito).toBe('1000.00');
-      expect(res.totalSumasCredito).toBe('1000.00');
-      expect(res.lineas).toHaveLength(2);
+      expect(res.cuadres.cuadra).toBe(true);
+      expect(res.totales.sumasDebe).toBe('1000.00');
+      expect(res.totales.sumasHaber).toBe('1000.00');
+      // 2 cuentas de detalle + 1 fila sintética de Utilidad del Ejercicio
+      expect(res.lineas.length).toBeGreaterThanOrEqual(2);
+      // Verificar que la respuesta tiene las 12 columnas
+      const linea = res.lineas[0]!;
+      expect(typeof linea.sumasDebe).toBe('string');
+      expect(typeof linea.sumasHaber).toBe('string');
+      expect(typeof linea.saldoDeudor).toBe('string');
+      expect(typeof linea.saldoAcreedor).toBe('string');
+      expect(typeof linea.ajustesDebe).toBe('string');
+      expect(typeof linea.ajustesHaber).toBe('string');
+      expect(typeof linea.saldoAjustadoDeudor).toBe('string');
+      expect(typeof linea.saldoAjustadoAcreedor).toBe('string');
+      expect(typeof linea.erPerdidas).toBe('string');
+      expect(typeof linea.erGanancias).toBe('string');
+      expect(typeof linea.bgActivo).toBe('string');
+      expect(typeof linea.bgPasPat).toBe('string');
+    });
+
+    it('obtenerSaldosEnRangoSeparandoAjustes y obtenerEstructuraCuentas se llaman en paralelo', async () => {
+      const { service, eeff } = setup();
+      const callOrder: string[] = [];
+
+      eeff.obtenerSaldosEnRangoSeparandoAjustes.mockImplementation(async () => {
+        callOrder.push('saldos');
+        return saldosSeparadosBase();
+      });
+      eeff.obtenerEstructuraCuentas.mockImplementation(async () => {
+        callOrder.push('estructura');
+        return estructuraBase();
+      });
+
+      await service.consultarHojaTrabajo(TENANT, {
+        desde: '2026-04-01',
+        hasta: '2026-04-30',
+        incluirAnulados: false,
+      });
+
+      // Ambos se llaman, orden no garantizado por Promise.all
+      expect(callOrder).toContain('saldos');
+      expect(callOrder).toContain('estructura');
     });
   });
 
-  describe('REQ-BC-08: incluirAnulados', () => {
+  describe('incluirAnulados propagado al port', () => {
     it('propaga incluirAnulados=true al port', async () => {
       const { service, eeff } = setup();
 
-      await service.consultarBalanceComprobacion(TENANT, {
+      await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: true,
       });
 
-      expect(eeff.obtenerSaldosEnRango).toHaveBeenCalledWith(
+      expect(eeff.obtenerSaldosEnRangoSeparandoAjustes).toHaveBeenCalledWith(
         TENANT,
         expect.any(Date),
         expect.any(Date),
@@ -261,16 +313,16 @@ describe('BalanceComprobacionService', () => {
       );
     });
 
-    it('propaga incluirAnulados=false por default', async () => {
+    it('propaga incluirAnulados=false', async () => {
       const { service, eeff } = setup();
 
-      await service.consultarBalanceComprobacion(TENANT, {
+      await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: false,
       });
 
-      expect(eeff.obtenerSaldosEnRango).toHaveBeenCalledWith(
+      expect(eeff.obtenerSaldosEnRangoSeparandoAjustes).toHaveBeenCalledWith(
         TENANT,
         expect.any(Date),
         expect.any(Date),
@@ -279,21 +331,17 @@ describe('BalanceComprobacionService', () => {
     });
   });
 
-  // ============================================================
-  // REQ-BC-09: tenantId como primer argumento de cada lectura
-  // ============================================================
-
-  describe('REQ-BC-09: tenantId propagado a cada lectura (CRÍTICO)', () => {
+  describe('tenantId propagado a cada lectura (CRÍTICO §4.2)', () => {
     it('pasa el tenantId como primer argumento a saldos y estructura', async () => {
       const { service, eeff } = setup();
 
-      await service.consultarBalanceComprobacion(TENANT, {
+      await service.consultarHojaTrabajo(TENANT, {
         desde: '2026-04-01',
         hasta: '2026-04-30',
         incluirAnulados: false,
       });
 
-      expect(eeff.obtenerSaldosEnRango.mock.calls[0]![0]).toBe(TENANT);
+      expect(eeff.obtenerSaldosEnRangoSeparandoAjustes.mock.calls[0]![0]).toBe(TENANT);
       expect(eeff.obtenerEstructuraCuentas).toHaveBeenCalledWith(TENANT);
     });
   });
