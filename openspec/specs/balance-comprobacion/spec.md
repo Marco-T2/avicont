@@ -1,7 +1,7 @@
 # Balance de Comprobación de Sumas y Saldos — Especificación
 
 <!--
-Última edición: 2026-06-15
+Última edición: 2026-06-15 (frontend agregado — PR #201)
 Última revisión contra core: 2026-06-15
 Owner: backend-lead
 -->
@@ -389,8 +389,13 @@ jerárquico — el cuadre es de período, no de balance permanente).
   NestJS/Prisma. Cobertura ≥95% (§7.5 CLAUDE.md).
 - **Cuadre con `Money.balanceadoEnBobCon`**: tolerancia ±Bs 0.01 ya implementada
   en el value object `Money`; se reutiliza sin reimplementar.
-- **Frontend pendiente**: la vista del reporte y la exportación a Excel son changes
-  posteriores. Este change es backend-only.
+- **Frontend** (PR #201, 2026-06-15): feature `frontend/src/features/balance-comprobacion/`
+  — filtro período XOR rango (clon de Libro Mayor, calza con los 2 modos del
+  endpoint) + toggle incluir anulados; tabla plana de 7 columnas con totales,
+  indicador de cuadre y sección destacada de `cuentasNaturalezaOpuesta`; export a
+  Excel vía `lib/export-excel` (cabecera fiscal, §4.5 monto string→celda numérica,
+  estilos), gateado por `contabilidad.eeff.read`. Ruta `/eeff/balance-comprobacion`
+  + ítem de sidebar en Contabilidad. Frontend-puro, sin backend ni migración.
 
 ## Notas regulatorias
 
