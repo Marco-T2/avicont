@@ -1,5 +1,5 @@
 import type { TipoDocumentoFisico } from '@prisma/client';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { TipoComprobante } from '@prisma/client';
 
 export class TipoDocumentoFisicoResponseDto {
@@ -15,7 +15,8 @@ export class TipoDocumentoFisicoResponseDto {
   @ApiProperty() updatedAt!: string;
   @ApiProperty({ description: 'Si true, el sistema asigna número correlativo automáticamente.' })
   numeracionAutomatica!: boolean;
-  @ApiPropertyOptional({
+  @ApiProperty({
+    type: Number,
     nullable: true,
     description: 'Número inicial de la secuencia. Null si numeracionAutomatica=false.',
   })

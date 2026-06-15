@@ -53,7 +53,13 @@ export function DocumentoFisicoMiniForm({
     [tiposCompatibles, tipoIdEnForm],
   );
   const esTributarioEnForm = tipoEnFormSeleccionado?.esTributario ?? false;
-  const miniFormSchema = useMemo(() => buildFormSchema(esTributarioEnForm), [esTributarioEnForm]);
+  // D-AUTO: cuando el tipo tiene numeración automática, el sistema asigna el número:
+  // el campo se oculta y el número no se valida ni se envía (el backend lo rechaza con 422).
+  const esAutoNumericoEnForm = tipoEnFormSeleccionado?.numeracionAutomatica ?? false;
+  const miniFormSchema = useMemo(
+    () => buildFormSchema(esTributarioEnForm, esAutoNumericoEnForm),
+    [esTributarioEnForm, esAutoNumericoEnForm],
+  );
 
   const miniForm = useForm<DocumentoFisicoFormValues>({
     resolver: zodResolver(miniFormSchema),
@@ -84,9 +90,11 @@ export function DocumentoFisicoMiniForm({
       });
       return;
     }
-    const payload = esTributarioEnForm
+    const base = esTributarioEnForm
       ? values
       : { ...values, monto: null, moneda: null };
+    // D-AUTO: omitir numero si el tipo es automático (el backend lo asigna; enviarlo → 422).
+    const payload = esAutoNumericoEnForm ? { ...base, numero: undefined } : base;
     onCrear(payload);
   }
 
@@ -137,26 +145,35 @@ export function DocumentoFisicoMiniForm({
         ) : null}
       </div>
 
-      {/* Número */}
-      <div className="space-y-1">
-        <Label htmlFor="mini-numero">
-          Número <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          {...regMini('numero', {
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              setMiniValue('numero', e.target.value.toUpperCase(), { shouldValidate: false });
-            },
-          })}
-          id="mini-numero"
-          placeholder="Ej: F-001"
-          className="text-base md:text-sm"
-          aria-invalid={miniErrors.numero !== undefined}
-        />
-        {miniErrors.numero !== undefined ? (
-          <p className="text-xs text-destructive">{miniErrors.numero.message}</p>
-        ) : null}
-      </div>
+      {/* Número — D-AUTO: oculto cuando el tipo tiene numeración automática */}
+      {esAutoNumericoEnForm ? (
+        <div className="space-y-1">
+          <Label className="text-muted-foreground">Número</Label>
+          <p className="text-xs text-muted-foreground rounded-md border border-dashed px-3 py-2">
+            Número asignado automáticamente por el sistema.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <Label htmlFor="mini-numero">
+            Número <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            {...regMini('numero', {
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                setMiniValue('numero', e.target.value.toUpperCase(), { shouldValidate: false });
+              },
+            })}
+            id="mini-numero"
+            placeholder="Ej: F-001"
+            className="text-base md:text-sm"
+            aria-invalid={miniErrors.numero !== undefined}
+          />
+          {miniErrors.numero !== undefined ? (
+            <p className="text-xs text-destructive">{miniErrors.numero.message}</p>
+          ) : null}
+        </div>
+      )}
 
       {/* Fecha */}
       <div className="space-y-1">
