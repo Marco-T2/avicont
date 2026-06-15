@@ -1,7 +1,7 @@
 # Hoja de Trabajo de 12 Columnas — Especificación
 
 <!--
-Última edición: 2026-06-15
+Última edición: 2026-06-15 (frontend agregado — PR #204)
 Última revisión contra core: 2026-06-15
 Owner: backend-lead
 -->
@@ -713,7 +713,15 @@ para garantizar la estabilidad pública del contrato de errores (§6.3 CLAUDE.md
 - **Cuadre con `Money.balanceadoEnBobCon`**: tolerancia ±Bs 0.01 ya implementada en el VO.
 - **`CuentaNaturalezaOpuestaDto` reutilizado** de `balance-comprobacion-response.dto.ts` (re-export).
 - **Contrato OpenAPI**: `backend/openapi.json` + `frontend/src/types/api.generated.ts` regenerados.
-- **Frontend pendiente**: vista + export a Excel en change futuro separado (la infra `lib/export-excel` ya existe).
+- **Frontend** (PR #204, 2026-06-15): feature `frontend/src/features/hoja-trabajo/`
+  (clon de balance-comprobacion-ui) — filtro período XOR rango + toggle incluir
+  anulados; tabla de 12 columnas con header agrupado en 2 niveles (6 pares:
+  Sumas/Saldos/Ajustes/Saldos Ajustados/ER/BG), fila sintética (`esSintetica`)
+  destacada, badge `esContraria`, footer con los 6 cuadres parciales + el global
+  `cuadra`, y sección `cuentasNaturalezaOpuesta`; export a Excel vía `lib/export-excel`
+  (14 columnas, cabecera fiscal, §4.5 monto string→celda numérica sin recalcular),
+  gateado por `contabilidad.eeff.read`. Ruta `/eeff/hoja-trabajo` + ítem de sidebar
+  en Contabilidad (icono `Columns3`). Frontend-puro, sin backend ni migración.
 
 ## Notas regulatorias
 
