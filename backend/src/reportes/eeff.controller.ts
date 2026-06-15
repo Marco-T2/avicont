@@ -15,7 +15,10 @@ import { BalanceResponseDto } from './dto/balance-response.dto';
 import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
 import { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
+import { HojaTrabajoQueryDto } from './dto/hoja-trabajo-query.dto';
+import { HojaTrabajoResponseDto } from './dto/hoja-trabajo-response.dto';
 import { EstadoResultadosService } from './estado-resultados.service';
+import { HojaTrabajoService } from './hoja-trabajo.service';
 import { resolveTenantId } from './tenant-id';
 import type { AuthenticatedRequest } from './tenant-id';
 
@@ -37,6 +40,7 @@ export class EeffController {
     private readonly balanceGeneralService: BalanceGeneralService,
     private readonly estadoResultadosService: EstadoResultadosService,
     private readonly balanceComprobacionService: BalanceComprobacionService,
+    private readonly hojaTrabajoService: HojaTrabajoService,
   ) {}
 
   @Get('balance')
@@ -103,6 +107,28 @@ export class EeffController {
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
     // para campos opcionales del DTO.
     return this.balanceComprobacionService.consultarBalanceComprobacion(tenantId, {
+      ...(query.desde !== undefined ? { desde: query.desde } : {}),
+      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('hoja-trabajo')
+  @RequirePermissions('contabilidad.eeff.read')
+  @ApiOperation({
+    summary:
+      'Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. ' +
+      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, ' +
+      'columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22.',
+  })
+  @ApiOkResponse({ type: HojaTrabajoResponseDto })
+  obtenerHojaTrabajo(@Req() req: AuthenticatedRequest, @Query() query: HojaTrabajoQueryDto) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.hojaTrabajoService.consultarHojaTrabajo(tenantId, {
       ...(query.desde !== undefined ? { desde: query.desde } : {}),
       ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),

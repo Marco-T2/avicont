@@ -761,6 +761,18 @@ export type CuentaNaturalezaOpuesta = Schemas['CuentaNaturalezaOpuestaDto'];
 export type BalanceComprobacionResponse = Schemas['BalanceComprobacionResponseDto'];
 
 // ============================================================
+// Hoja de Trabajo de 12 Columnas — GET /api/eeff/hoja-trabajo
+// ============================================================
+
+export type LineaHojaTrabajo = Schemas['LineaHojaTrabajoDto'];
+
+export type TotalesHojaTrabajo = Schemas['TotalesHojaTrabajoDto'];
+
+export type CuadresHojaTrabajo = Schemas['CuadresHojaTrabajoDto'];
+
+export type HojaTrabajoResponse = Schemas['HojaTrabajoResponseDto'];
+
+// ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
 // ============================================================
 

@@ -5412,6 +5412,33 @@
         ]
       }
     },
+    "/api/eeff/hoja-trabajo": {
+      "get": {
+        "operationId": "EeffController_obtenerHojaTrabajo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HojaTrabajoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22.",
+        "tags": [
+          "Estados Financieros"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -9056,6 +9083,276 @@
           "cuadra",
           "diferenciaSumas",
           "diferenciaSaldos",
+          "cuentasNaturalezaOpuesta"
+        ]
+      },
+      "LineaHojaTrabajoDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoInterno": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "naturaleza": {
+            "type": "string",
+            "nullable": true
+          },
+          "claseCuenta": {
+            "type": "string",
+            "nullable": true
+          },
+          "esContraria": {
+            "type": "boolean"
+          },
+          "esSintetica": {
+            "type": "boolean"
+          },
+          "sumasDebe": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "sumasHaber": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "saldoDeudor": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "saldoAcreedor": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "ajustesDebe": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "ajustesHaber": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "saldoAjustadoDeudor": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "saldoAjustadoAcreedor": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "erPerdidas": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "erGanancias": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "bgActivo": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "bgPasPat": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre",
+          "naturaleza",
+          "claseCuenta",
+          "esContraria",
+          "esSintetica",
+          "sumasDebe",
+          "sumasHaber",
+          "saldoDeudor",
+          "saldoAcreedor",
+          "ajustesDebe",
+          "ajustesHaber",
+          "saldoAjustadoDeudor",
+          "saldoAjustadoAcreedor",
+          "erPerdidas",
+          "erGanancias",
+          "bgActivo",
+          "bgPasPat"
+        ]
+      },
+      "TotalesHojaTrabajoDto": {
+        "type": "object",
+        "properties": {
+          "sumasDebe": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "sumasHaber": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "saldoDeudor": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "saldoAcreedor": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "ajustesDebe": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "ajustesHaber": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "saldoAjustadoDeudor": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "saldoAjustadoAcreedor": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "perdidas": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "ganancias": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "activo": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "pasivoPatrimonio": {
+            "type": "string",
+            "example": "5000.00"
+          }
+        },
+        "required": [
+          "sumasDebe",
+          "sumasHaber",
+          "saldoDeudor",
+          "saldoAcreedor",
+          "ajustesDebe",
+          "ajustesHaber",
+          "saldoAjustadoDeudor",
+          "saldoAjustadoAcreedor",
+          "perdidas",
+          "ganancias",
+          "activo",
+          "pasivoPatrimonio"
+        ]
+      },
+      "CuadresHojaTrabajoDto": {
+        "type": "object",
+        "properties": {
+          "cuadra": {
+            "type": "boolean"
+          },
+          "cuadraSumas": {
+            "type": "boolean"
+          },
+          "cuadraSaldos": {
+            "type": "boolean"
+          },
+          "cuadraAjustes": {
+            "type": "boolean"
+          },
+          "cuadraSaldosAjustados": {
+            "type": "boolean"
+          },
+          "cuadraEstadoResultados": {
+            "type": "boolean"
+          },
+          "cuadraBalanceGeneral": {
+            "type": "boolean"
+          },
+          "diferenciaSumas": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaSaldos": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaAjustes": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaSaldosAjustados": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaEstadoResultados": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaBalanceGeneral": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "cuadra",
+          "cuadraSumas",
+          "cuadraSaldos",
+          "cuadraAjustes",
+          "cuadraSaldosAjustados",
+          "cuadraEstadoResultados",
+          "cuadraBalanceGeneral",
+          "diferenciaSumas",
+          "diferenciaSaldos",
+          "diferenciaAjustes",
+          "diferenciaSaldosAjustados",
+          "diferenciaEstadoResultados",
+          "diferenciaBalanceGeneral"
+        ]
+      },
+      "HojaTrabajoResponseDto": {
+        "type": "object",
+        "properties": {
+          "fechaDesde": {
+            "type": "string",
+            "example": "2026-04-01"
+          },
+          "fechaHasta": {
+            "type": "string",
+            "example": "2026-04-30"
+          },
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineaHojaTrabajoDto"
+            }
+          },
+          "totales": {
+            "$ref": "#/components/schemas/TotalesHojaTrabajoDto"
+          },
+          "cuadres": {
+            "$ref": "#/components/schemas/CuadresHojaTrabajoDto"
+          },
+          "cuentasNaturalezaOpuesta": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CuentaNaturalezaOpuestaDto"
+            }
+          }
+        },
+        "required": [
+          "fechaDesde",
+          "fechaHasta",
+          "lineas",
+          "totales",
+          "cuadres",
           "cuentasNaturalezaOpuesta"
         ]
       },

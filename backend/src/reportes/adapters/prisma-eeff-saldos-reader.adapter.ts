@@ -11,6 +11,7 @@ import type {
   BalanceFiltros,
   CuentaEstructuraRow,
   SaldoCuentaRow,
+  SaldoCuentaSeparadoRow,
 } from '../ports/eeff-saldos-reader.port';
 import { EeffSaldosReaderPort } from '../ports/eeff-saldos-reader.port';
 import {
@@ -128,6 +129,69 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
       cuentaId: row.cuentaId,
       totalDebitoBob: new Decimal(row.totalDebitoBob),
       totalCreditoBob: new Decimal(row.totalCreditoBob),
+    }));
+  }
+
+  async obtenerSaldosEnRangoSeparandoAjustes(
+    tenantId: string,
+    desde: Date,
+    hasta: Date,
+    incluirAnulados: boolean,
+  ): Promise<SaldoCuentaSeparadoRow[]> {
+    // Defense in depth (CLAUDE.md §4.2): organizationId SIEMPRE primer predicado (Anti-31).
+    // Los comprobantes de tipo CIERRE se excluyen SIEMPRE (§4.9 CLAUDE.md): distorsionan
+    // las secciones ER/BG de la Hoja de Trabajo al llevar saldos a cero con
+    // contrapartidas cruzadas que no corresponden al período analizado.
+    // El FILTER (WHERE c.tipo = 'AJUSTE') y NOT IN ('AJUSTE','CIERRE') separan los movimientos.
+    type RawRow = {
+      cuentaId: string;
+      debitoOrdinarioBob: string;
+      creditoOrdinarioBob: string;
+      debitoAjusteBob: string;
+      creditoAjusteBob: string;
+    };
+
+    const rows: RawRow[] = incluirAnulados
+      ? await this.prisma.$queryRaw<RawRow[]>`
+          SELECT
+            lc."cuentaId"                                                              AS "cuentaId",
+            COALESCE(SUM(lc."debitoBob")  FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) AS "debitoOrdinarioBob",
+            COALESCE(SUM(lc."creditoBob") FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) AS "creditoOrdinarioBob",
+            COALESCE(SUM(lc."debitoBob")  FILTER (WHERE c.tipo = 'AJUSTE'), 0)         AS "debitoAjusteBob",
+            COALESCE(SUM(lc."creditoBob") FILTER (WHERE c.tipo = 'AJUSTE'), 0)         AS "creditoAjusteBob"
+          FROM lineas_comprobante lc
+          JOIN comprobantes c ON c.id = lc."comprobanteId"
+          WHERE lc."organizationId" = ${tenantId}
+            AND c.estado IN ('CONTABILIZADO','BLOQUEADO')
+            AND c."fechaContable" >= ${desde}
+            AND c."fechaContable" <= ${hasta}
+            AND c.tipo <> 'CIERRE'
+          GROUP BY lc."cuentaId"
+        `
+      : await this.prisma.$queryRaw<RawRow[]>`
+          SELECT
+            lc."cuentaId"                                                              AS "cuentaId",
+            COALESCE(SUM(lc."debitoBob")  FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) AS "debitoOrdinarioBob",
+            COALESCE(SUM(lc."creditoBob") FILTER (WHERE c.tipo NOT IN ('AJUSTE','CIERRE')), 0) AS "creditoOrdinarioBob",
+            COALESCE(SUM(lc."debitoBob")  FILTER (WHERE c.tipo = 'AJUSTE'), 0)         AS "debitoAjusteBob",
+            COALESCE(SUM(lc."creditoBob") FILTER (WHERE c.tipo = 'AJUSTE'), 0)         AS "creditoAjusteBob"
+          FROM lineas_comprobante lc
+          JOIN comprobantes c ON c.id = lc."comprobanteId"
+          WHERE lc."organizationId" = ${tenantId}
+            AND c.estado IN ('CONTABILIZADO','BLOQUEADO')
+            AND c."fechaContable" >= ${desde}
+            AND c."fechaContable" <= ${hasta}
+            AND c.tipo <> 'CIERRE'
+            AND c.anulado = false
+          GROUP BY lc."cuentaId"
+        `;
+
+    return rows.map((row) => ({
+      cuentaId: row.cuentaId,
+      debitoOrdinarioBob: new Decimal(row.debitoOrdinarioBob),
+      creditoOrdinarioBob: new Decimal(row.creditoOrdinarioBob),
+      debitoAjusteBob: new Decimal(row.debitoAjusteBob),
+      creditoAjusteBob: new Decimal(row.creditoAjusteBob),
     }));
   }
 

@@ -22,6 +22,7 @@ function makeBalanceReaderMock(): MockBalanceReader {
     obtenerSaldosHasta: jest.fn(),
     obtenerSaldosEnRango: jest.fn(),
     obtenerEstructuraCuentas: jest.fn(),
+    obtenerSaldosEnRangoSeparandoAjustes: jest.fn(),
   };
 }
 
