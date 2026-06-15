@@ -22,6 +22,7 @@ import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-pag
 import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { LibroMayorPage } from '@/features/libro-mayor/pages/libro-mayor-page';
 import { BalanceGeneralPage } from '@/features/balance-general/pages/balance-general-page';
+import { BalanceComprobacionPage } from '@/features/balance-comprobacion/pages/balance-comprobacion-page';
 import { EstadoResultadosPage } from '@/features/estado-resultados/pages/estado-resultados-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
@@ -116,6 +117,14 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
                 <BalanceGeneralPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/eeff/balance-comprobacion',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
+                <BalanceComprobacionPage />
               </RequirePermission>
             ),
           },
