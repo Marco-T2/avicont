@@ -5385,6 +5385,33 @@
         ]
       }
     },
+    "/api/eeff/balance-comprobacion": {
+      "get": {
+        "operationId": "EeffController_obtenerBalanceComprobacion",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceComprobacionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13.",
+        "tags": [
+          "Estados Financieros"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -8892,6 +8919,144 @@
           "totalIngresoBob",
           "totalEgresoBob",
           "esGanancia"
+        ]
+      },
+      "LineaBalanceComprobacionDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string"
+          },
+          "codigoInterno": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "naturaleza": {
+            "type": "string",
+            "example": "DEUDORA"
+          },
+          "sumasDebito": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "sumasCredito": {
+            "type": "string",
+            "example": "300.00"
+          },
+          "saldoDeudor": {
+            "type": "string",
+            "example": "700.00"
+          },
+          "saldoAcreedor": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre",
+          "naturaleza",
+          "sumasDebito",
+          "sumasCredito",
+          "saldoDeudor",
+          "saldoAcreedor"
+        ]
+      },
+      "CuentaNaturalezaOpuestaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string"
+          },
+          "codigoInterno": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "naturaleza": {
+            "type": "string",
+            "example": "DEUDORA"
+          },
+          "saldoOpuesto": {
+            "type": "string",
+            "example": "150.00"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre",
+          "naturaleza",
+          "saldoOpuesto"
+        ]
+      },
+      "BalanceComprobacionResponseDto": {
+        "type": "object",
+        "properties": {
+          "fechaDesde": {
+            "type": "string",
+            "example": "2026-04-01"
+          },
+          "fechaHasta": {
+            "type": "string",
+            "example": "2026-04-30"
+          },
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineaBalanceComprobacionDto"
+            }
+          },
+          "totalSumasDebito": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "totalSumasCredito": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "totalSaldoDeudor": {
+            "type": "string",
+            "example": "700.00"
+          },
+          "totalSaldoAcreedor": {
+            "type": "string",
+            "example": "700.00"
+          },
+          "cuadra": {
+            "type": "boolean"
+          },
+          "diferenciaSumas": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "diferenciaSaldos": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "cuentasNaturalezaOpuesta": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CuentaNaturalezaOpuestaDto"
+            }
+          }
+        },
+        "required": [
+          "fechaDesde",
+          "fechaHasta",
+          "lineas",
+          "totalSumasDebito",
+          "totalSumasCredito",
+          "totalSaldoDeudor",
+          "totalSaldoAcreedor",
+          "cuadra",
+          "diferenciaSumas",
+          "diferenciaSaldos",
+          "cuentasNaturalezaOpuesta"
         ]
       },
       "MePermissionsResponseDto": {
