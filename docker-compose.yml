@@ -135,6 +135,15 @@ services:
       OTEL_SERVICE_NAME: saas-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       METRICS_PREFIX: saas_
+      # Storage de adjuntos (pack contabilidad.adjuntos) — el MinioStorageAdapter
+      # las lee con getOrThrow; sin ellas el backend no arranca. Endpoint = nombre
+      # del servicio en la red docker (no localhost). Valores espejo del CI.
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: avicont-adjuntos
+      MINIO_USE_SSL: 'false'
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,6 +153,8 @@ services:
         condition: service_started
       tempo:
         condition: service_started
+      minio:
+        condition: service_healthy
     networks:
       - saas_network
     volumes:
