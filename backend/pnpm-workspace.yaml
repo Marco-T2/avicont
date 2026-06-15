@@ -24,3 +24,11 @@ allowBuilds:
 minimumReleaseAge: 4320
 # Strict: el cooldown aplica también a transitivas/peer, no solo a deps directas.
 minimumReleaseAgeStrict: true
+
+# Overrides de seguridad: fuerzan la versión parcheada de dependencias
+# transitivas con advisory HIGH (pnpm audit --audit-level high las bloquea).
+# - form-data <4.0.6 (vía supertest/@types/supertest): GHSA-hmw2-7cc7-3qxx (CRLF injection).
+# - protobufjs <=7.6.0 (vía @nestjs/terminus>@grpc, @opentelemetry): DoS por Any expansion.
+overrides:
+  form-data: '>=4.0.6'
+  protobufjs: '>=7.6.1'

@@ -12,3 +12,11 @@ allowBuilds: {}
 # 4320 = 72h. Igual que backend. Una versión publicada hace < 72h no se instala.
 minimumReleaseAge: 4320
 minimumReleaseAgeStrict: true
+
+# Overrides de seguridad: fuerzan la versión parcheada de dependencias
+# transitivas con advisory HIGH (pnpm audit --audit-level high las bloquea).
+# - form-data <4.0.6 (vía axios): GHSA-hmw2-7cc7-3qxx (CRLF injection).
+# - vite 8.0.0–8.0.15: GHSA-fx2h-pf6j-xcff (server.fs.deny bypass).
+overrides:
+  form-data: '>=4.0.6'
+  vite: '>=8.0.16'
