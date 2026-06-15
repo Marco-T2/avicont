@@ -751,6 +751,16 @@ export type SeccionBalance = Schemas['SeccionBalanceDto'];
 export type BalanceGeneralResponse = Schemas['BalanceResponseDto'];
 
 // ============================================================
+// Balance de Comprobación de Sumas y Saldos — GET /api/eeff/balance-comprobacion
+// ============================================================
+
+export type LineaBalanceComprobacion = Schemas['LineaBalanceComprobacionDto'];
+
+export type CuentaNaturalezaOpuesta = Schemas['CuentaNaturalezaOpuestaDto'];
+
+export type BalanceComprobacionResponse = Schemas['BalanceComprobacionResponseDto'];
+
+// ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
 // ============================================================
 
