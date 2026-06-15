@@ -7,7 +7,10 @@ import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
+import { BalanceComprobacionService } from './balance-comprobacion.service';
 import { BalanceGeneralService } from './balance-general.service';
+import { BalanceComprobacionQueryDto } from './dto/balance-comprobacion-query.dto';
+import { BalanceComprobacionResponseDto } from './dto/balance-comprobacion-response.dto';
 import { BalanceResponseDto } from './dto/balance-response.dto';
 import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
@@ -33,6 +36,7 @@ export class EeffController {
   constructor(
     private readonly balanceGeneralService: BalanceGeneralService,
     private readonly estadoResultadosService: EstadoResultadosService,
+    private readonly balanceComprobacionService: BalanceComprobacionService,
   ) {}
 
   @Get('balance')
@@ -77,6 +81,31 @@ export class EeffController {
       ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       ...(query.gestionId !== undefined ? { gestionId: query.gestionId } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('balance-comprobacion')
+  @RequirePermissions('contabilidad.eeff.read')
+  @ApiOperation({
+    summary:
+      'Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. ' +
+      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y ' +
+      'saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13.',
+  })
+  @ApiOkResponse({ type: BalanceComprobacionResponseDto })
+  obtenerBalanceComprobacion(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: BalanceComprobacionQueryDto,
+  ) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.balanceComprobacionService.consultarBalanceComprobacion(tenantId, {
+      ...(query.desde !== undefined ? { desde: query.desde } : {}),
+      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });
   }

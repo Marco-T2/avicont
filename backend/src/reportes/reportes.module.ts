@@ -9,6 +9,7 @@ import { RbacModule } from '@/rbac/rbac.module';
 import { PrismaEeffSaldosReaderAdapter } from './adapters/prisma-eeff-saldos-reader.adapter';
 import { PrismaComprobantesReaderAdapter } from './adapters/prisma-comprobantes-reader.adapter';
 import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-reader.adapter';
+import { BalanceComprobacionService } from './balance-comprobacion.service';
 import { BalanceGeneralService } from './balance-general.service';
 import { EstadoResultadosService } from './estado-resultados.service';
 import { EeffController } from './eeff.controller';
@@ -20,7 +21,7 @@ import { LIBRO_MAYOR_READER_PORT } from './ports/libro-mayor-reader.port';
 import { ReportesController } from './reportes.controller';
 
 /**
- * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General + Estado de Resultados (EEFF).
+ * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General + Estado de Resultados + Balance de Comprobación (EEFF).
  *
  * DI:
  *   - `ComprobantesReaderPort` → `PrismaComprobantesReaderAdapter` (Diario)
@@ -63,9 +64,12 @@ import { ReportesController } from './reportes.controller';
       useExisting: PrismaLibroMayorReaderAdapter,
     },
 
-    // Service + Adapter EEFF (Balance + Estado Resultados): $queryRaw GROUP BY saldos + findMany estructura.
+    // Service + Adapter EEFF (Balance + Estado Resultados + Balance de Comprobación):
+    // $queryRaw GROUP BY saldos + findMany estructura. El Balance de Comprobación
+    // reusa EEFF_SALDOS_READER_PORT sin adapter nuevo.
     BalanceGeneralService,
     EstadoResultadosService,
+    BalanceComprobacionService,
     PrismaEeffSaldosReaderAdapter,
     {
       provide: EEFF_SALDOS_READER_PORT,

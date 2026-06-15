@@ -1826,6 +1826,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eeff/balance-comprobacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13. */
+        get: operations["EeffController_obtenerBalanceComprobacion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3095,6 +3112,51 @@ export interface components {
             /** @example 0.00 */
             totalEgresoBob: string;
             esGanancia: boolean;
+        };
+        LineaBalanceComprobacionDto: {
+            cuentaId: string;
+            codigoInterno: string;
+            nombre: string;
+            /** @example DEUDORA */
+            naturaleza: string;
+            /** @example 1000.00 */
+            sumasDebito: string;
+            /** @example 300.00 */
+            sumasCredito: string;
+            /** @example 700.00 */
+            saldoDeudor: string;
+            /** @example 0.00 */
+            saldoAcreedor: string;
+        };
+        CuentaNaturalezaOpuestaDto: {
+            cuentaId: string;
+            codigoInterno: string;
+            nombre: string;
+            /** @example DEUDORA */
+            naturaleza: string;
+            /** @example 150.00 */
+            saldoOpuesto: string;
+        };
+        BalanceComprobacionResponseDto: {
+            /** @example 2026-04-01 */
+            fechaDesde: string;
+            /** @example 2026-04-30 */
+            fechaHasta: string;
+            lineas: components["schemas"]["LineaBalanceComprobacionDto"][];
+            /** @example 1000.00 */
+            totalSumasDebito: string;
+            /** @example 1000.00 */
+            totalSumasCredito: string;
+            /** @example 700.00 */
+            totalSaldoDeudor: string;
+            /** @example 700.00 */
+            totalSaldoAcreedor: string;
+            cuadra: boolean;
+            /** @example 0.00 */
+            diferenciaSumas: string;
+            /** @example 0.00 */
+            diferenciaSaldos: string;
+            cuentasNaturalezaOpuesta: components["schemas"]["CuentaNaturalezaOpuestaDto"][];
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -6620,6 +6682,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EstadoResultadosResponseDto"];
+                };
+            };
+        };
+    };
+    EeffController_obtenerBalanceComprobacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceComprobacionResponseDto"];
                 };
             };
         };
