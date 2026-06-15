@@ -2,10 +2,12 @@ import { api } from '@/lib/api';
 
 import type { EmpresaFormValues } from '../schemas/empresa-form-schema';
 
-// PATCH /api/tenants/current — actualiza los 6 campos fiscales.
+// PATCH /api/tenants/current — actualiza los campos fiscales de la organización.
 // Campos string vacío ('') se envían como null para desmapear el valor en BD.
+// tipoEmpresaPrincipal es un enum — nunca se convierte a null.
 export async function updateEmpresa(data: EmpresaFormValues): Promise<void> {
   const payload = {
+    tipoEmpresaPrincipal: data.tipoEmpresaPrincipal,
     razonSocial: data.razonSocial !== '' ? data.razonSocial : null,
     nit: data.nit !== '' ? data.nit : null,
     direccion: data.direccion !== '' ? data.direccion : null,

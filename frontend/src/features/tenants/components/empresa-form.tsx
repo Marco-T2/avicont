@@ -1,33 +1,65 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import {
   empresaFormSchema,
   type EmpresaFormValues,
 } from '../schemas/empresa-form-schema';
 
+// Etiquetas en español para cada tipo de empresa (Ley 843).
+const TIPO_EMPRESA_LABELS: Record<string, string> = {
+  COMERCIAL: 'Comercial',
+  SERVICIOS: 'Servicios',
+  TRANSPORTE: 'Transporte',
+  INDUSTRIAL: 'Industrial',
+  CONSTRUCCION: 'Construcción',
+  PETROLERA: 'Petrolera',
+  AGROPECUARIA: 'Agropecuaria',
+  MINERA: 'Minera',
+};
+
+const TIPOS_EMPRESA = Object.keys(TIPO_EMPRESA_LABELS);
+
 interface EmpresaFormProps {
   defaultValues: Partial<EmpresaFormValues>;
   onSubmit: (values: EmpresaFormValues) => void | Promise<void>;
   isPending: boolean;
+  // false si ya existe una gestión fiscal → el tipo de empresa es inmutable (backend lo enforza).
+  tipoEmpresaEditable: boolean;
 }
 
 // Componente presentacional: recibe props y emite callbacks.
 // Anti-F-07: submit deshabilitado con isPending.
 // Anti-F-10: colores vía tokens del tema.
 // §7: inputs text-base md:text-sm para evitar auto-zoom en iOS.
-export function EmpresaForm({ defaultValues, onSubmit, isPending }: EmpresaFormProps) {
+// §14.7: Select disabled + tooltip cuando !tipoEmpresaEditable (UX honesta, no ocultar).
+export function EmpresaForm({
+  defaultValues,
+  onSubmit,
+  isPending,
+  tipoEmpresaEditable,
+}: EmpresaFormProps) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<EmpresaFormValues>({
     resolver: zodResolver(empresaFormSchema),
     defaultValues: {
+      tipoEmpresaPrincipal: defaultValues.tipoEmpresaPrincipal ?? 'COMERCIAL',
       razonSocial: defaultValues.razonSocial ?? '',
       nit: defaultValues.nit ?? '',
       direccion: defaultValues.direccion ?? '',
@@ -39,6 +71,72 @@ export function EmpresaForm({ defaultValues, onSubmit, isPending }: EmpresaFormP
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Tipo de empresa — Select controlado (shadcn Select requiere Controller) */}
+      <div className="space-y-2">
+        <Label htmlFor="tipoEmpresaPrincipal">Tipo de empresa</Label>
+        <Controller
+          name="tipoEmpresaPrincipal"
+          control={control}
+          render={({ field }) =>
+            tipoEmpresaEditable ? (
+              <Select
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={false}
+              >
+                <SelectTrigger
+                  id="tipoEmpresaPrincipal"
+                  aria-label="Tipo de empresa"
+                  className="w-full text-base md:text-sm"
+                  aria-invalid={errors.tipoEmpresaPrincipal !== undefined}
+                >
+                  <SelectValue placeholder="Seleccioná el tipo de empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS_EMPRESA.map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>
+                      {TIPO_EMPRESA_LABELS[tipo]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              // §14.7: disabled + tooltip — el candado real es el backend.
+              // Un SelectTrigger disabled tiene pointer-events:none, así que el Tooltip
+              // necesita el span wrapper para recibir el hover.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex w-full">
+                    <Select value={field.value} disabled>
+                      <SelectTrigger
+                        id="tipoEmpresaPrincipal"
+                        aria-label="Tipo de empresa"
+                        className="w-full text-base md:text-sm"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_EMPRESA.map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>
+                            {TIPO_EMPRESA_LABELS[tipo]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  El tipo de empresa no se puede cambiar porque ya existe una gestión fiscal.
+                </TooltipContent>
+              </Tooltip>
+            )
+          }
+        />
+        {errors.tipoEmpresaPrincipal !== undefined ? (
+          <p className="text-sm text-destructive">{errors.tipoEmpresaPrincipal.message}</p>
+        ) : null}
+      </div>
+
       {/* Razón social — fullwidth */}
       <div className="space-y-2">
         <Label htmlFor="razonSocial">Razón social</Label>

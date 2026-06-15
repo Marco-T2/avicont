@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { empresaFormSchema } from './empresa-form-schema';
 
-// Helper: base de campos vacíos para evitar errores de campo requerido en tests unitarios
+// Helper: base de campos vacíos para evitar errores de campo requerido en tests unitarios.
+// tipoEmpresaPrincipal incluido con valor válido para que tests de otros campos no fallen.
 const EMPTY_BASE = {
+  tipoEmpresaPrincipal: 'COMERCIAL' as const,
   razonSocial: '',
   nit: '',
   direccion: '',
@@ -130,5 +132,39 @@ describe('empresaFormSchema — defaults vacíos', () => {
       expect(result.data.email).toBe('');
       expect(result.data.razonSocial).toBe('');
     }
+  });
+});
+
+describe('empresaFormSchema — tipoEmpresaPrincipal', () => {
+  const TIPOS_VALIDOS = [
+    'COMERCIAL',
+    'SERVICIOS',
+    'TRANSPORTE',
+    'INDUSTRIAL',
+    'CONSTRUCCION',
+    'PETROLERA',
+    'AGROPECUARIA',
+    'MINERA',
+  ] as const;
+
+  it.each(TIPOS_VALIDOS)('"%s" es un tipo de empresa válido', (tipo) => {
+    const result = empresaFormSchema.safeParse({ ...EMPTY_BASE, tipoEmpresaPrincipal: tipo });
+    expect(result.success).toBe(true);
+  });
+
+  it('"OTRO" no es un tipo de empresa válido', () => {
+    const result = empresaFormSchema.safeParse({
+      ...EMPTY_BASE,
+      tipoEmpresaPrincipal: 'OTRO',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Seleccioná un tipo de empresa válido');
+    }
+  });
+
+  it('tipo de empresa vacío no es válido', () => {
+    const result = empresaFormSchema.safeParse({ ...EMPTY_BASE, tipoEmpresaPrincipal: '' });
+    expect(result.success).toBe(false);
   });
 });
