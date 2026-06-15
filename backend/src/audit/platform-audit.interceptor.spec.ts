@@ -71,6 +71,19 @@ describe('REQ-SA-08/09: PlatformAuditInterceptor', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
 
+  // El write del interceptor es fire-and-forget: un sleep fijo es flaky bajo
+  // carga de CI (la fila puede aterrizar después de la consulta, contaminando
+  // el test siguiente). Polleamos hasta que la escritura aterrice para que cada
+  // test positivo no deje su fila "colgando" hacia el próximo beforeEach.
+  async function waitForAuditRows(actorUserId: string, minCount: number) {
+    for (let intento = 0; intento < 100; intento++) {
+      const filas = await prisma.platformAudit.findMany({ where: { actorUserId } });
+      if (filas.length >= minCount) return filas;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return prisma.platformAudit.findMany({ where: { actorUserId } });
+  }
+
   beforeAll(async () => {
     prisma = new PrismaClient();
     await prisma.$connect();
@@ -138,11 +151,7 @@ describe('REQ-SA-08/09: PlatformAuditInterceptor', () => {
 
     const result$ = interceptor.intercept(ctx, buildCallHandler());
     await new Promise<void>((resolve) => result$.subscribe({ complete: resolve }));
-    await waitForAudit();
-
-    const filas = await prisma.platformAudit.findMany({
-      where: { actorUserId: SUPER_ADMIN_ID },
-    });
+    const filas = await waitForAuditRows(SUPER_ADMIN_ID, 1);
     expect(filas).toHaveLength(1);
     const fila = filas[0]!;
     expect(fila.actorUserId).toBe(SUPER_ADMIN_ID);
@@ -163,11 +172,7 @@ describe('REQ-SA-08/09: PlatformAuditInterceptor', () => {
 
     const result$ = interceptor.intercept(ctx, buildCallHandler());
     await new Promise<void>((resolve) => result$.subscribe({ complete: resolve }));
-    await waitForAudit();
-
-    const filas = await prisma.platformAudit.findMany({
-      where: { actorUserId: SUPER_ADMIN_ID },
-    });
+    const filas = await waitForAuditRows(SUPER_ADMIN_ID, 1);
     expect(filas).toHaveLength(1);
     expect(filas[0]!.targetOrganizationId).toBe(TARGET_ORG_ID);
   });
@@ -228,11 +233,7 @@ describe('REQ-SA-08/09: PlatformAuditInterceptor', () => {
 
     const result$ = interceptor.intercept(ctx, buildCallHandler());
     await new Promise<void>((resolve) => result$.subscribe({ complete: resolve }));
-    await waitForAudit();
-
-    const filas = await prisma.platformAudit.findMany({
-      where: { actorUserId: SUPER_ADMIN_ID },
-    });
+    const filas = await waitForAuditRows(SUPER_ADMIN_ID, 1);
     expect(filas).toHaveLength(1);
     const payload = filas[0]!.payload as Record<string, unknown>;
     expect(payload['name']).toBe('Mi Org');
