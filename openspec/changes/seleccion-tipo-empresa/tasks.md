@@ -31,18 +31,18 @@ Fecha: 2026-06-15
 
 ## Fase C — Frontend: schema + tipos + API
 
-- [ ] C1. [RED] Agregar test en `empresa-form-schema.test.ts`: `z.enum` acepta los 8 valores válidos; rechaza `"OTRO"` con error
-- [ ] C2. [GREEN] Actualizar `frontend/src/features/tenants/schemas/empresa-form-schema.ts`: agregar `tipoEmpresaPrincipal: z.enum(['COMERCIAL','SERVICIOS','TRANSPORTE','INDUSTRIAL','PETROLERA','CONSTRUCCION','AGROPECUARIA','MINERA'])`
-- [ ] C3. Actualizar `frontend/src/features/tenants/api/get-empresa.ts`: `EmpresaPerfil` += `tipoEmpresaPrincipal: TipoEmpresa` + `tipoEmpresaEditable: boolean`; extraerlos del response ⇒ consumes `api.generated.ts`
-- [ ] C4. Actualizar `frontend/src/features/tenants/api/update-empresa.ts`: incluir `tipoEmpresaPrincipal` en el payload del `PATCH`
+- [x] C1. [RED] Agregar test en `empresa-form-schema.test.ts`: `z.enum` acepta los 8 valores válidos; rechaza `"OTRO"` con error
+- [x] C2. [GREEN] Actualizar `frontend/src/features/tenants/schemas/empresa-form-schema.ts`: agregar `tipoEmpresaPrincipal: z.enum(['COMERCIAL','SERVICIOS','TRANSPORTE','INDUSTRIAL','PETROLERA','CONSTRUCCION','AGROPECUARIA','MINERA'])`
+- [x] C3. Actualizar `frontend/src/features/tenants/api/get-empresa.ts`: `EmpresaPerfilCompleto` (extends `EmpresaPerfil`) += `tipoEmpresaPrincipal: TipoEmpresa | null` + `tipoEmpresaEditable: boolean`; extraerlos del response ⇒ consumes `api.generated.ts`. EmpresaPerfil queda intacta para la capa export-excel.
+- [x] C4. Actualizar `frontend/src/features/tenants/api/update-empresa.ts`: incluir `tipoEmpresaPrincipal` en el payload del `PATCH`
 
 ---
 
 ## Fase D — Frontend: componente y página
 
-- [ ] D1. [RED] Agregar tests en `empresa-form.test.tsx`: `<Select>` renderiza 8 opciones; `disabled+tooltip` cuando `tipoEmpresaEditable=false`; botón guardar `disabled` mientras `isPending`; valor seleccionado llega a `onSubmit`
-- [ ] D2. [GREEN] Modificar `frontend/src/features/tenants/components/empresa-form.tsx`: agregar `<Select>` con 8 opciones + constante de etiquetas es-BO + prop `tipoEmpresaEditable: boolean` + `disabled` + tooltip cuando no editable; incluir en `defaultValues`
-- [ ] D3. Modificar `frontend/src/features/tenants/pages/empresa-page.tsx`: pasar `tipoEmpresaPrincipal` a `defaultValues` y `tipoEmpresaEditable` como prop al form; botón submit `disabled={isPending}`
+- [x] D1. [RED] Agregar tests en `empresa-form.test.tsx`: `<Select>` renderiza 8 opciones; `disabled+tooltip` cuando `tipoEmpresaEditable=false`; botón guardar `disabled` mientras `isPending`; valor seleccionado llega a `onSubmit`
+- [x] D2. [GREEN] Modificar `frontend/src/features/tenants/components/empresa-form.tsx`: agregar `<Select>` con 8 opciones + constante de etiquetas es-BO + prop `tipoEmpresaEditable: boolean` + `disabled` + tooltip cuando no editable; incluir en `defaultValues`
+- [x] D3. Modificar `frontend/src/features/tenants/pages/empresa-page.tsx`: pasar `tipoEmpresaPrincipal` a `defaultValues` y `tipoEmpresaEditable` como prop al form; botón submit `disabled={isPending}`
 
 ---
 
@@ -51,6 +51,6 @@ Fecha: 2026-06-15
 - [ ] E1. `cd backend && pnpm exec tsc --noEmit -p tsconfig.json` → 0 errores
 - [ ] E2. `cd backend && pnpm exec jest src/tenants/` → tests A1+A6 verdes
 - [ ] E3. `cd backend && DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit` → e2e A5 verdes + regresión completa verde
-- [ ] E4. `cd frontend && pnpm exec tsc -b` → 0 errores
-- [ ] E5. `cd frontend && pnpm exec vitest run` → tests C1+D1 verdes + regresión completa verde
-- [ ] E6. CI `contract-drift`: `openapi.json` + `api.generated.ts` sin diff (`git diff --exit-code`) — confirmar en PR
+- [x] E4. `cd frontend && pnpm exec tsc -b` → 0 errores ✅
+- [x] E5. `cd frontend && pnpm exec vitest run` → 1357 tests (15 nuevos) todos verdes ✅
+- [x] E6. CI `contract-drift`: `api.generated.ts` sin diff desde nuestros cambios ✅
