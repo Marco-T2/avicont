@@ -67,6 +67,7 @@ const P_ASIENTOS_UPDATE = 'contabilidad.asientos.update';
 const ID_TIPO_EGRESO = '11111111-1111-4111-8111-111111111111';
 const ID_TIPO_INGRESO = '22222222-2222-4222-8222-222222222222';
 const ID_TIPO_NO_TRIB = '33333333-3333-4333-8333-333333333333';
+const ID_TIPO_AUTO = '44444444-4444-4444-8444-444444444444';
 const ID_DOC_EGRESO = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ID_DOC_INGRESO = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
@@ -111,6 +112,21 @@ const tipoNoTributario: TipoDocumentoFisico = {
   updatedAt: '2026-01-01T00:00:00Z',
   numeracionAutomatica: false,
   numeroInicial: null,
+};
+
+// Tipo con numeración automática: el sistema asigna el número (auto ⇒ ¬tributario).
+const tipoAutoNumerico: TipoDocumentoFisico = {
+  id: ID_TIPO_AUTO,
+  nombre: 'Recibo auto-numerado',
+  codigo: 'recibo-auto',
+  esTributario: false,
+  activo: true,
+  tiposComprobanteAplicables: ['EGRESO'],
+  organizationId: 'org-1',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  numeracionAutomatica: true,
+  numeroInicial: 1,
 };
 
 const docEgreso: DocumentoFisico = {
@@ -183,7 +199,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   setPerms('all');
   mockUseTiposDocumentoFisico.mockReturnValue({
-    data: { items: [tipoEgreso, tipoIngreso, tipoNoTributario] },
+    data: { items: [tipoEgreso, tipoIngreso, tipoNoTributario, tipoAutoNumerico] },
   });
   mockUseDocumentosFisicos.mockReturnValue({ data: { items: [] }, isLoading: false });
   mockUseAsociarDocumentos.mockReturnValue(asociarMockBase);
@@ -327,6 +343,54 @@ describe('DocumentoFisicoCombobox — mini-form inline (D2)', () => {
     // Monto y moneda deben aparecer
     expect(screen.getByLabelText(/monto/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/moneda/i)).toBeInTheDocument();
+  });
+
+  it('tipo con numeración automática → oculta el campo Número y muestra la pista de asignación automática', async () => {
+    renderCombobox('EGRESO');
+    await userEvent.click(screen.getByRole('combobox'));
+
+    const searchInput = screen.getByPlaceholderText(/buscar por número/i);
+    await userEvent.type(searchInput, 'REC-TEST');
+
+    const crearItems = screen.getAllByText(/crear nuevo documento/i);
+    await userEvent.click(crearItems[0]);
+
+    // Con tipo manual (default sin seleccionar) el input de Número está presente.
+    expect(screen.getByPlaceholderText(/ej: f-001/i)).toBeInTheDocument();
+
+    // Seleccionar tipo con numeración automática.
+    const select = screen.getByLabelText(/tipo/i);
+    await userEvent.selectOptions(select, ID_TIPO_AUTO);
+
+    // El input editable de Número desaparece y aparece la pista.
+    expect(screen.queryByPlaceholderText(/ej: f-001/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/asignado automáticamente/i)).toBeInTheDocument();
+  });
+
+  it('tipo automático → submit no envía numero al backend (lo asigna el sistema)', async () => {
+    renderCombobox('EGRESO');
+    await userEvent.click(screen.getByRole('combobox'));
+
+    const searchInput = screen.getByPlaceholderText(/buscar por número/i);
+    await userEvent.type(searchInput, 'REC-TEST');
+
+    const crearItems = screen.getAllByText(/crear nuevo documento/i);
+    await userEvent.click(crearItems[0]);
+
+    const select = screen.getByLabelText(/tipo/i);
+    await userEvent.selectOptions(select, ID_TIPO_AUTO);
+
+    const inputFecha = screen.getByLabelText(/fecha de emisión/i);
+    await act(async () => {
+      fireEvent.change(inputFecha, { target: { value: '2026-05-29' } });
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /confirmar/i }));
+
+    expect(mutateCreate).toHaveBeenCalled();
+    const payload = mutateCreate.mock.calls[0]?.[0] as { numero?: unknown };
+    // El backend rechaza con 422 si recibe numero en un tipo auto → no debe enviarse.
+    expect(payload.numero).toBeUndefined();
   });
 
   it('botón Confirmar disabled mientras isPending=true', async () => {

@@ -2178,7 +2178,7 @@ export interface components {
             /** @description Si true, el sistema asigna número correlativo automáticamente. */
             numeracionAutomatica: boolean;
             /** @description Número inicial de la secuencia. Null si numeracionAutomatica=false. */
-            numeroInicial?: Record<string, never> | null;
+            numeroInicial: number | null;
         };
         ListarTiposDocumentoFisicoResponseDto: {
             items: components["schemas"]["TipoDocumentoFisicoResponseDto"][];

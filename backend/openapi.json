@@ -6377,7 +6377,7 @@
             "description": "Si true, el sistema asigna número correlativo automáticamente."
           },
           "numeroInicial": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "description": "Número inicial de la secuencia. Null si numeracionAutomatica=false."
           }
@@ -6392,7 +6392,8 @@
           "organizationId",
           "createdAt",
           "updatedAt",
-          "numeracionAutomatica"
+          "numeracionAutomatica",
+          "numeroInicial"
         ]
       },
       "ListarTiposDocumentoFisicoResponseDto": {
