@@ -2047,6 +2047,57 @@ export interface components {
              */
             modulo: "CONTABILIDAD" | "GRANJA" | "OTROS";
         };
+        /**
+         * @description Tipo de empresa principal según Ley 843 art. 46
+         * @enum {string}
+         */
+        TipoEmpresa: "COMERCIAL" | "SERVICIOS" | "TRANSPORTE" | "INDUSTRIAL" | "PETROLERA" | "CONSTRUCCION" | "AGROPECUARIA" | "MINERA";
+        TenantCurrentResponseDto: {
+            /** @description UUID de la organización */
+            id: string;
+            /** @description Nombre de la organización */
+            name: string;
+            /** @description Slug URL-friendly único de la organización */
+            slug: string;
+            /**
+             * @description Estado de la organización
+             * @example ACTIVE
+             */
+            status: string;
+            /**
+             * @description Plan de suscripción
+             * @example FREE
+             */
+            plan: string;
+            /** @description Módulo de contabilidad activo */
+            contabilidadEnabled: boolean;
+            /** @description Módulo de granja activo */
+            granjaEnabled: boolean;
+            /**
+             * @description Tipo de empresa principal según Ley 843 art. 46
+             * @example COMERCIAL
+             */
+            tipoEmpresaPrincipal: components["schemas"]["TipoEmpresa"];
+            /**
+             * @description Tipos de empresa activos
+             * @example [
+             *       "COMERCIAL"
+             *     ]
+             */
+            tiposEmpresaActivos: string[];
+            /** @description false si ya existe al menos una gestión fiscal — tipoEmpresaPrincipal queda inmutable */
+            tipoEmpresaEditable: boolean;
+            razonSocial?: string | null;
+            nit?: string | null;
+            direccion?: string | null;
+            representanteLegal?: string | null;
+            telefono?: string | null;
+            email?: string | null;
+            /** @description Fecha de creación (ISO 8601) */
+            createdAt: string;
+            /** @description Fecha de última actualización (ISO 8601) */
+            updatedAt: string;
+        };
         UpdateTenantDto: {
             /**
              * @description Organization name
@@ -4247,12 +4298,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tenant details */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TenantCurrentResponseDto"];
+                };
             };
         };
     };
