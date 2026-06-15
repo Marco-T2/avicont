@@ -48,9 +48,9 @@ Fecha: 2026-06-15
 
 ## Fase E — Gates de verificación
 
-- [ ] E1. `cd backend && pnpm exec tsc --noEmit -p tsconfig.json` → 0 errores
-- [ ] E2. `cd backend && pnpm exec jest src/tenants/` → tests A1+A6 verdes
-- [ ] E3. `cd backend && DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit` → e2e A5 verdes + regresión completa verde
+- [x] E1. `cd backend && pnpm exec tsc --noEmit -p tsconfig.json` → 0 errores ✅
+- [x] E2. `cd backend && pnpm exec jest src/tenants/` → tests A1+A6 verdes (161/161) ✅
+- [ ] E3. `cd backend && DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit` → e2e A5 (BLOQUEADO por W3 preexistente: Node v24 + AWS SDK + ts-jest, no es regresión)
 - [x] E4. `cd frontend && pnpm exec tsc -b` → 0 errores ✅
 - [x] E5. `cd frontend && pnpm exec vitest run` → 1357 tests (15 nuevos) todos verdes ✅
 - [x] E6. CI `contract-drift`: `api.generated.ts` sin diff desde nuestros cambios ✅

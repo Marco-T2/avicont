@@ -90,7 +90,7 @@ El formulario de perfil de empresa (`/settings/empresa`) DEBE incluir un `<Selec
 
 ### Requisito: Inmutabilidad de tipoEmpresaPrincipal post-gestión (backend)
 
-`PATCH /tenants/current` DEBE rechazar con HTTP 422 y code `TENANT_TIPO_EMPRESA_INMUTABLE` cualquier intento de cambiar `tipoEmpresaPrincipal` cuando la organización ya tiene al menos una gestión fiscal registrada.
+`PATCH /tenants/current` DEBE rechazar con HTTP 409 y code `TENANT_EMPRESA_INMUTABLE` cualquier intento de cambiar `tipoEmpresaPrincipal` cuando la organización ya tiene al menos una gestión fiscal registrada.
 
 > Nota: este comportamiento ya existe implementado via `TipoEmpresaInmutableError`. Este requisito lo formaliza en la especificación.
 
@@ -99,7 +99,7 @@ El formulario de perfil de empresa (`/settings/empresa`) DEBE incluir un `<Selec
 - DADO un tenant con al menos una gestión fiscal
 - Y un usuario con permiso `organizacion.configuracion.update`
 - CUANDO hace `PATCH /tenants/current` con `{ "tipoEmpresaPrincipal": "SERVICIOS" }`
-- ENTONCES la respuesta es 422 con `error.code === "TENANT_TIPO_EMPRESA_INMUTABLE"`
+- ENTONCES la respuesta es 409 con `error.code === "TENANT_EMPRESA_INMUTABLE"`
 
 #### Escenario: Cambio permitido sin gestiones
 
