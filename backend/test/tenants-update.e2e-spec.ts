@@ -268,6 +268,72 @@ describe('PATCH /api/tenants/current (e2e)', () => {
     });
   });
 
+  describe('tipoEmpresaEditable', () => {
+    it('GET /tenants/current devuelve tipoEmpresaEditable: true cuando no hay gestiones', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId);
+      expect(res.status).toBe(200);
+      expect(res.body.tipoEmpresaEditable).toBe(true);
+      expect(res.body.tipoEmpresaPrincipal).toBe('COMERCIAL');
+    });
+
+    it('GET /tenants/current devuelve tipoEmpresaEditable: false cuando existe al menos una gestión', async () => {
+      // Crear una gestión fiscal para bloquear la edición.
+      // El endpoint /gestiones usa activeTenantId del JWT, no X-Tenant-ID.
+      await request(app.getHttpServer())
+        .post('/api/gestiones')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ year: 2026 })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId);
+      expect(res.status).toBe(200);
+      expect(res.body.tipoEmpresaEditable).toBe(false);
+    });
+
+    it('PATCH con tipoEmpresaPrincipal: "MINERA" → 200 cuando no hay gestiones', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ tipoEmpresaPrincipal: 'MINERA' });
+      expect(res.status).toBe(200);
+      expect(res.body.tipoEmpresaPrincipal).toBe('MINERA');
+    });
+
+    it('PATCH con tipoEmpresaPrincipal cuando ya hay gestión → 409 TENANT_EMPRESA_INMUTABLE', async () => {
+      // Crear una gestión fiscal para bloquear el cambio.
+      // El endpoint /gestiones usa activeTenantId del JWT, no X-Tenant-ID.
+      await request(app.getHttpServer())
+        .post('/api/gestiones')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ year: 2026 })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ tipoEmpresaPrincipal: 'SERVICIOS' });
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('TENANT_EMPRESA_INMUTABLE');
+    });
+
+    it('PATCH con tipoEmpresaPrincipal inválido → 400 (validación enum)', async () => {
+      const res = await request(app.getHttpServer())
+        .patch('/api/tenants/current')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .set('X-Tenant-ID', orgId)
+        .send({ tipoEmpresaPrincipal: 'OTRO' });
+      expect(res.status).toBe(400);
+    });
+  });
+
   it('defecto A: un miembro sin organizacion.configuracion.update → 403', async () => {
     const hashedPassword = await bcrypt.hash('password123', 10);
     const contador = await prisma.user.create({

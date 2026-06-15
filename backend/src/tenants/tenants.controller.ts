@@ -1,9 +1,17 @@
 import { Controller, Post, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
+import { TenantCurrentResponseDto } from './dto/tenant-current-response.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -30,9 +38,9 @@ export class TenantsController {
   @UseGuards(TenantGuard)
   @ApiSecurity('X-Tenant-ID')
   @ApiOperation({ summary: 'Get current tenant details' })
-  @ApiResponse({ status: 200, description: 'Tenant details' })
-  async getCurrent(@CurrentTenant() tenantId: string) {
-    return this.tenantsService.findById(tenantId);
+  @ApiOkResponse({ type: TenantCurrentResponseDto })
+  async getCurrent(@CurrentTenant() tenantId: string): Promise<TenantCurrentResponseDto> {
+    return this.tenantsService.getCurrent(tenantId);
   }
 
   @Patch('current')
