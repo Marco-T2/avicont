@@ -28,7 +28,9 @@ import { isEmail } from 'class-validator';
 import { CreateTenantDto, ModuloOrganizacion } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { UpdateFeaturesDto } from './dto/update-features.dto';
+import { TenantCurrentResponseDto } from './dto/tenant-current-response.dto';
 import { TenantSlug } from './domain/tenant-slug';
+import { toDominioTipoEmpresa } from './adapters/enum-mappers';
 import {
   TenantNoEncontradoError,
   TenantSlugDuplicadoError,
@@ -128,6 +130,47 @@ export class TenantsService {
       throw new TenantNoEncontradoError({ slug });
     }
     return tenant;
+  }
+
+  /**
+   * Devuelve el perfil completo del tenant actual con el flag derivado
+   * `tipoEmpresaEditable`, que indica si `tipoEmpresaPrincipal` aún puede
+   * modificarse (solo cuando no existe ninguna gestión fiscal — Ley 843 art. 46).
+   *
+   * Llama a `findById` y `gestionesReader.existeAlgunaGestion` en paralelo
+   * para minimizar latencia.
+   */
+  async getCurrent(tenantId: string): Promise<TenantCurrentResponseDto> {
+    const [tenant, tieneGestion] = await Promise.all([
+      this.repo.findById(tenantId),
+      this.gestionesReader.existeAlgunaGestion(tenantId),
+    ]);
+
+    if (!tenant) {
+      throw new TenantNoEncontradoError({ id: tenantId });
+    }
+
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+      plan: tenant.plan,
+      contabilidadEnabled: tenant.contabilidadEnabled,
+      granjaEnabled: tenant.granjaEnabled,
+      // El adapter mapea Prisma→dominio en el boundary (enum-mappers.ts).
+      tipoEmpresaPrincipal: toDominioTipoEmpresa(tenant.tipoEmpresaPrincipal),
+      tiposEmpresaActivos: tenant.tiposEmpresaActivos.map(toDominioTipoEmpresa),
+      tipoEmpresaEditable: !tieneGestion,
+      razonSocial: tenant.razonSocial,
+      nit: tenant.nit,
+      direccion: tenant.direccion,
+      representanteLegal: tenant.representanteLegal,
+      telefono: tenant.telefono,
+      email: tenant.email,
+      createdAt: tenant.createdAt.toISOString(),
+      updatedAt: tenant.updatedAt.toISOString(),
+    };
   }
 
   async update(id: string, dto: UpdateTenantDto) {

@@ -9,7 +9,26 @@ import { z } from 'zod';
 // Patrón: todos los campos son z.string() (sin .default() para evitar que zod
 // infiera el tipo de INPUT como `string | undefined`). Los defaultValues del
 // formulario se manejan en useForm() dentro del componente.
+
+// Los 8 tipos de empresa habilitados por la norma boliviana (Ley 843).
+// Espeja el enum TipoEmpresa del backend — cualquier cambio allá requiere actualizar acá.
+const TIPOS_EMPRESA = [
+  'COMERCIAL',
+  'SERVICIOS',
+  'TRANSPORTE',
+  'INDUSTRIAL',
+  'CONSTRUCCION',
+  'PETROLERA',
+  'AGROPECUARIA',
+  'MINERA',
+] as const;
+
 export const empresaFormSchema = z.object({
+  // Zod v4: error callback para mensaje personalizado en español.
+  tipoEmpresaPrincipal: z.enum(TIPOS_EMPRESA, {
+    error: () => 'Seleccioná un tipo de empresa válido',
+  }),
+
   razonSocial: z.string().max(200, 'Máximo 200 caracteres'),
 
   // RND 10-0025-14: el NIT tiene entre 7 y 12 dígitos numéricos.

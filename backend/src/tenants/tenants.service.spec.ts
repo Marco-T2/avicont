@@ -762,4 +762,46 @@ describe('TenantsService (unit)', () => {
       expect(tipoRegistroSeeder.seedDefaultsForTenant).not.toHaveBeenCalled();
     });
   });
+
+  describe('getCurrent', () => {
+    it('devuelve tipoEmpresaEditable: true cuando no hay ninguna gestión', async () => {
+      const org = mkOrg();
+      repo.findById.mockResolvedValue(org);
+      gestiones.existeAlgunaGestion.mockResolvedValue(false);
+
+      const result = await service.getCurrent(TENANT_ID);
+
+      expect(result.tipoEmpresaEditable).toBe(true);
+      expect(repo.findById).toHaveBeenCalledWith(TENANT_ID);
+      expect(gestiones.existeAlgunaGestion).toHaveBeenCalledWith(TENANT_ID);
+    });
+
+    it('devuelve tipoEmpresaEditable: false cuando ya existe al menos una gestión', async () => {
+      const org = mkOrg();
+      repo.findById.mockResolvedValue(org);
+      gestiones.existeAlgunaGestion.mockResolvedValue(true);
+
+      const result = await service.getCurrent(TENANT_ID);
+
+      expect(result.tipoEmpresaEditable).toBe(false);
+    });
+
+    it('incluye los campos de la org en la respuesta', async () => {
+      const org = mkOrg({ name: 'Acme Corp' });
+      repo.findById.mockResolvedValue(org);
+      gestiones.existeAlgunaGestion.mockResolvedValue(false);
+
+      const result = await service.getCurrent(TENANT_ID);
+
+      expect(result.id).toBe(TENANT_ID);
+      expect(result.name).toBe('Acme Corp');
+      expect(result.tipoEmpresaPrincipal).toBe(PrismaTipoEmpresa.COMERCIAL);
+    });
+
+    it('lanza TenantNoEncontradoError si el tenant no existe', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.getCurrent(TENANT_ID)).rejects.toBeInstanceOf(TenantNoEncontradoError);
+    });
+  });
 });

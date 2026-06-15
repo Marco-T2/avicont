@@ -1242,7 +1242,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Tenant details"
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCurrentResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5889,6 +5896,124 @@
         "required": [
           "name",
           "modulo"
+        ]
+      },
+      "TipoEmpresa": {
+        "type": "string",
+        "enum": [
+          "COMERCIAL",
+          "SERVICIOS",
+          "TRANSPORTE",
+          "INDUSTRIAL",
+          "PETROLERA",
+          "CONSTRUCCION",
+          "AGROPECUARIA",
+          "MINERA"
+        ],
+        "description": "Tipo de empresa principal según Ley 843 art. 46"
+      },
+      "TenantCurrentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "UUID de la organización"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nombre de la organización"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Slug URL-friendly único de la organización"
+          },
+          "status": {
+            "type": "string",
+            "description": "Estado de la organización",
+            "example": "ACTIVE"
+          },
+          "plan": {
+            "type": "string",
+            "description": "Plan de suscripción",
+            "example": "FREE"
+          },
+          "contabilidadEnabled": {
+            "type": "boolean",
+            "description": "Módulo de contabilidad activo"
+          },
+          "granjaEnabled": {
+            "type": "boolean",
+            "description": "Módulo de granja activo"
+          },
+          "tipoEmpresaPrincipal": {
+            "description": "Tipo de empresa principal según Ley 843 art. 46",
+            "example": "COMERCIAL",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TipoEmpresa"
+              }
+            ]
+          },
+          "tiposEmpresaActivos": {
+            "description": "Tipos de empresa activos",
+            "example": [
+              "COMERCIAL"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tipoEmpresaEditable": {
+            "type": "boolean",
+            "description": "false si ya existe al menos una gestión fiscal — tipoEmpresaPrincipal queda inmutable"
+          },
+          "razonSocial": {
+            "type": "string",
+            "nullable": true
+          },
+          "nit": {
+            "type": "string",
+            "nullable": true
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "representanteLegal": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Fecha de creación (ISO 8601)"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Fecha de última actualización (ISO 8601)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "status",
+          "plan",
+          "contabilidadEnabled",
+          "granjaEnabled",
+          "tipoEmpresaPrincipal",
+          "tiposEmpresaActivos",
+          "tipoEmpresaEditable",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "UpdateTenantDto": {

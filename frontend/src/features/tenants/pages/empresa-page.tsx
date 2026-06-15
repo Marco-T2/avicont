@@ -23,9 +23,13 @@ export function EmpresaPage(): React.JSX.Element {
   }
 
   // Mapea null del backend a '' para que react-hook-form trabaje solo con strings.
+  // tipoEmpresaPrincipal es un enum: si es null usamos el default del form ('COMERCIAL').
   const defaultValues: Partial<EmpresaFormValues> =
     empresaQuery.data !== undefined
       ? {
+          ...(empresaQuery.data.tipoEmpresaPrincipal !== null
+            ? { tipoEmpresaPrincipal: empresaQuery.data.tipoEmpresaPrincipal }
+            : {}),
           razonSocial: empresaQuery.data.razonSocial ?? '',
           nit: empresaQuery.data.nit ?? '',
           direccion: empresaQuery.data.direccion ?? '',
@@ -92,6 +96,7 @@ export function EmpresaPage(): React.JSX.Element {
           defaultValues={defaultValues}
           onSubmit={handleSubmit}
           isPending={updateMutation.isPending}
+          tipoEmpresaEditable={empresaQuery.data.tipoEmpresaEditable}
         />
       ) : null}
     </div>
