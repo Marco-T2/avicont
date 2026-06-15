@@ -119,6 +119,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/libros/mayor',
       '/eeff/balance',
       '/eeff/balance-comprobacion',
+      '/eeff/hoja-trabajo',
       '/eeff/resultados',
       '/plan-cuentas',
       '/contactos',
