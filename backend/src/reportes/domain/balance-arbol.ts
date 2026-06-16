@@ -29,6 +29,7 @@ import type {
   SubseccionCalculada,
 } from '../dto/balance-response.dto';
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
+import { calcularResultadoEjercicioBob } from './resultado-ejercicio';
 import { calcularSaldoNeto } from './saldo-naturaleza';
 
 // ============================================================
@@ -146,7 +147,7 @@ export function construirBalance(params: ConstruirBalanceParams): BalanceArbolRe
   }
 
   // Calcular Resultado del Ejercicio (REQ-BG-09)
-  const resultadoEjercicio = calcularResultadoEjercicio(estructura, saldosGestion);
+  const resultadoEjercicio = calcularResultadoEjercicioBob(estructura, saldosGestion);
 
   // Ensamblar árbol por claseCuenta → subClaseCuenta
   const activo = ensamblarSeccion(
@@ -188,50 +189,6 @@ export function construirBalance(params: ConstruirBalanceParams): BalanceArbolRe
     cuadra,
     diferenciaBob,
   };
-}
-
-// ============================================================
-// Resultado del Ejercicio (REQ-BG-09)
-// ============================================================
-
-/**
- * Resultado del Ejercicio = Σ saldoNeto(INGRESO) − Σ saldoNeto(EGRESO).
- * Calculado sobre saldosGestion (saldos del rango de gestión, no histórico).
- *
- * NCB: INGRESO es naturaleza ACREEDORA (saldo = haber−debe);
- * EGRESO es DEUDORA (saldo = debe−haber). calcularSaldoNeto da el signo correcto.
- */
-function calcularResultadoEjercicio(
-  estructura: CuentaEstructuraRow[],
-  saldosGestion: SaldoCuentaRow[],
-): Money {
-  const saldosGestionMap = new Map<string, SaldoCuentaRow>(
-    saldosGestion.map((s) => [s.cuentaId, s]),
-  );
-
-  let totalIngreso = Money.ZERO;
-  let totalEgreso = Money.ZERO;
-
-  for (const cuenta of estructura) {
-    if (!cuenta.esDetalle) continue;
-
-    const saldoRow = saldosGestionMap.get(cuenta.id);
-    if (!saldoRow) continue;
-
-    const saldoNeto = calcularSaldoNeto(
-      saldoRow.totalDebitoBob,
-      saldoRow.totalCreditoBob,
-      cuenta.naturaleza,
-    );
-
-    if (cuenta.claseCuenta === ClaseCuenta.INGRESO) {
-      totalIngreso = totalIngreso.plus(saldoNeto);
-    } else if (cuenta.claseCuenta === ClaseCuenta.EGRESO) {
-      totalEgreso = totalEgreso.plus(saldoNeto);
-    }
-  }
-
-  return totalIngreso.minus(totalEgreso);
 }
 
 // ============================================================

@@ -12,6 +12,7 @@ import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-rea
 import { BalanceComprobacionService } from './balance-comprobacion.service';
 import { BalanceGeneralService } from './balance-general.service';
 import { EstadoResultadosService } from './estado-resultados.service';
+import { EvolucionPatrimonioService } from './evolucion-patrimonio.service';
 import { HojaTrabajoService } from './hoja-trabajo.service';
 import { EeffController } from './eeff.controller';
 import { LibroDiarioService } from './libro-diario.service';
@@ -23,7 +24,8 @@ import { ReportesController } from './reportes.controller';
 
 /**
  * Módulo `reportes` — capabilities Libro Diario + Libro Mayor + Balance General +
- * Estado de Resultados + Balance de Comprobación + Hoja de Trabajo de 12 Columnas (EEFF).
+ * Estado de Resultados + Balance de Comprobación + Hoja de Trabajo de 12 Columnas +
+ * Estado de Evolución del Patrimonio Neto (EEFF).
  *
  * DI:
  *   - `ComprobantesReaderPort` → `PrismaComprobantesReaderAdapter` (Diario)
@@ -74,6 +76,7 @@ import { ReportesController } from './reportes.controller';
     EstadoResultadosService,
     BalanceComprobacionService,
     HojaTrabajoService,
+    EvolucionPatrimonioService,
     PrismaEeffSaldosReaderAdapter,
     {
       provide: EEFF_SALDOS_READER_PORT,

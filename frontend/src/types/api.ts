@@ -773,6 +773,16 @@ export type CuadresHojaTrabajo = Schemas['CuadresHojaTrabajoDto'];
 export type HojaTrabajoResponse = Schemas['HojaTrabajoResponseDto'];
 
 // ============================================================
+// Estado de Evolución del Patrimonio Neto — GET /api/eeff/evolucion-patrimonio
+// ============================================================
+
+export type ComponentePatrimonio = Schemas['ComponentePatrimonioDto'];
+
+export type TotalesEvolucionPatrimonio = Schemas['TotalesEvolucionPatrimonioDto'];
+
+export type EvolucionPatrimonioResponse = Schemas['EvolucionPatrimonioResponseDto'];
+
+// ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
 // ============================================================
 
