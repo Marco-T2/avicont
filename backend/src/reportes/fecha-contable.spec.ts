@@ -1,4 +1,4 @@
-import { formatFechaContable, parseFechaContable } from './fecha-contable';
+import { diaAnterior, formatFechaContable, parseFechaContable } from './fecha-contable';
 
 describe('fecha-contable (helpers compartidos de reportes)', () => {
   describe('parseFechaContable', () => {
@@ -53,6 +53,26 @@ describe('fecha-contable (helpers compartidos de reportes)', () => {
     it('es inversa de parseFechaContable para fechas válidas', () => {
       const parsed = parseFechaContable('2026-12-09');
       expect(formatFechaContable(parsed!)).toBe('2026-12-09');
+    });
+  });
+
+  describe('diaAnterior', () => {
+    it('resta un día dentro del mismo mes', () => {
+      expect(formatFechaContable(diaAnterior(parseFechaContable('2026-05-31')!))).toBe(
+        '2026-05-30',
+      );
+    });
+
+    it('cruza el límite de mes', () => {
+      expect(formatFechaContable(diaAnterior(parseFechaContable('2026-03-01')!))).toBe(
+        '2026-02-28',
+      );
+    });
+
+    it('cruza el límite de año (1-ene → 31-dic del año previo)', () => {
+      expect(formatFechaContable(diaAnterior(parseFechaContable('2026-01-01')!))).toBe(
+        '2025-12-31',
+      );
     });
   });
 });

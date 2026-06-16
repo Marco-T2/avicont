@@ -40,6 +40,21 @@ export function parseFechaContable(fecha: string): Date | null {
 }
 
 /**
+ * Día calendario anterior a `date`, en UTC (FechaContable calendario puro, §4.6).
+ *
+ * Usado por el Estado de Evolución del Patrimonio Neto para obtener el saldo
+ * INICIAL del período: los saldos acumulados deben cortar en el día PREVIO al
+ * inicio del rango, para que `saldoInicial + movimiento(rango) = saldoFinal`
+ * sin hueco ni solape.
+ *
+ * `Date.UTC` con día 0 (o negativo) rueda correctamente al mes/año anterior
+ * (ej. 2026-01-01 → 2025-12-31). No usa `new Date()` sin args (§4.6).
+ */
+export function diaAnterior(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - 1));
+}
+
+/**
  * Serializa una Date (UTC) a string "YYYY-MM-DD" para respuestas HTTP.
  */
 export function formatFechaContable(date: Date): string {

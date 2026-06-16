@@ -5446,6 +5446,33 @@
         ]
       }
     },
+    "/api/eeff/evolucion-patrimonio": {
+      "get": {
+        "operationId": "EeffController_obtenerEvolucionPatrimonio",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvolucionPatrimonioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Estado de Evolución del Patrimonio Neto (EEPN) — 4º estado financiero formal. Acepta fechaDesde+fechaHasta, periodoFiscalId o gestionId (forma habitual). Por cada componente del patrimonio muestra saldo inicial, resultado del ejercicio (en curso), otros movimientos y saldo final, con verificación de cuadre.",
+        "tags": [
+          "Estados Financieros"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -9479,6 +9506,128 @@
           "totales",
           "cuadres",
           "cuentasNaturalezaOpuesta"
+        ]
+      },
+      "ComponentePatrimonioDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoInterno": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "esContraria": {
+            "type": "boolean"
+          },
+          "esSintetica": {
+            "type": "boolean"
+          },
+          "saldoInicialBob": {
+            "type": "string",
+            "example": "100000.00"
+          },
+          "resultadoEjercicioBob": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "otrosMovimientosBob": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "saldoFinalBob": {
+            "type": "string",
+            "example": "100000.00"
+          },
+          "cuadra": {
+            "type": "boolean"
+          },
+          "diferenciaBob": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre",
+          "esContraria",
+          "esSintetica",
+          "saldoInicialBob",
+          "resultadoEjercicioBob",
+          "otrosMovimientosBob",
+          "saldoFinalBob",
+          "cuadra",
+          "diferenciaBob"
+        ]
+      },
+      "TotalesEvolucionPatrimonioDto": {
+        "type": "object",
+        "properties": {
+          "saldoInicialBob": {
+            "type": "string",
+            "example": "125000.00"
+          },
+          "resultadoEjercicioBob": {
+            "type": "string",
+            "example": "30000.00"
+          },
+          "otrosMovimientosBob": {
+            "type": "string",
+            "example": "40000.00"
+          },
+          "saldoFinalBob": {
+            "type": "string",
+            "example": "195000.00"
+          }
+        },
+        "required": [
+          "saldoInicialBob",
+          "resultadoEjercicioBob",
+          "otrosMovimientosBob",
+          "saldoFinalBob"
+        ]
+      },
+      "EvolucionPatrimonioResponseDto": {
+        "type": "object",
+        "properties": {
+          "fechaDesde": {
+            "type": "string",
+            "example": "2026-01-01"
+          },
+          "fechaHasta": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "componentes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentePatrimonioDto"
+            }
+          },
+          "totales": {
+            "$ref": "#/components/schemas/TotalesEvolucionPatrimonioDto"
+          },
+          "cuadra": {
+            "type": "boolean"
+          },
+          "diferenciaBob": {
+            "type": "string",
+            "example": "0.00"
+          }
+        },
+        "required": [
+          "fechaDesde",
+          "fechaHasta",
+          "componentes",
+          "totales",
+          "cuadra",
+          "diferenciaBob"
         ]
       },
       "MePermissionsResponseDto": {

@@ -15,9 +15,12 @@ import { BalanceResponseDto } from './dto/balance-response.dto';
 import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
 import { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
+import { EvolucionPatrimonioQueryDto } from './dto/evolucion-patrimonio-query.dto';
+import { EvolucionPatrimonioResponseDto } from './dto/evolucion-patrimonio-response.dto';
 import { HojaTrabajoQueryDto } from './dto/hoja-trabajo-query.dto';
 import { HojaTrabajoResponseDto } from './dto/hoja-trabajo-response.dto';
 import { EstadoResultadosService } from './estado-resultados.service';
+import { EvolucionPatrimonioService } from './evolucion-patrimonio.service';
 import { HojaTrabajoService } from './hoja-trabajo.service';
 import { resolveTenantId } from './tenant-id';
 import type { AuthenticatedRequest } from './tenant-id';
@@ -41,6 +44,7 @@ export class EeffController {
     private readonly estadoResultadosService: EstadoResultadosService,
     private readonly balanceComprobacionService: BalanceComprobacionService,
     private readonly hojaTrabajoService: HojaTrabajoService,
+    private readonly evolucionPatrimonioService: EvolucionPatrimonioService,
   ) {}
 
   @Get('balance')
@@ -132,6 +136,32 @@ export class EeffController {
       ...(query.desde !== undefined ? { desde: query.desde } : {}),
       ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('evolucion-patrimonio')
+  @RequirePermissions('contabilidad.eeff.read')
+  @ApiOperation({
+    summary:
+      'Estado de Evolución del Patrimonio Neto (EEPN) — 4º estado financiero formal. ' +
+      'Acepta fechaDesde+fechaHasta, periodoFiscalId o gestionId (forma habitual). ' +
+      'Por cada componente del patrimonio muestra saldo inicial, resultado del ejercicio ' +
+      '(en curso), otros movimientos y saldo final, con verificación de cuadre.',
+  })
+  @ApiOkResponse({ type: EvolucionPatrimonioResponseDto })
+  obtenerEvolucionPatrimonio(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: EvolucionPatrimonioQueryDto,
+  ) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.evolucionPatrimonioService.consultarEvolucionPatrimonio(tenantId, {
+      ...(query.fechaDesde !== undefined ? { fechaDesde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
+      ...(query.gestionId !== undefined ? { gestionId: query.gestionId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });
   }

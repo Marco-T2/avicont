@@ -1860,6 +1860,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eeff/evolucion-patrimonio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de Evolución del Patrimonio Neto (EEPN) — 4º estado financiero formal. Acepta fechaDesde+fechaHasta, periodoFiscalId o gestionId (forma habitual). Por cada componente del patrimonio muestra saldo inicial, resultado del ejercicio (en curso), otros movimientos y saldo final, con verificación de cuadre. */
+        get: operations["EeffController_obtenerEvolucionPatrimonio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3315,6 +3332,45 @@ export interface components {
             totales: components["schemas"]["TotalesHojaTrabajoDto"];
             cuadres: components["schemas"]["CuadresHojaTrabajoDto"];
             cuentasNaturalezaOpuesta: components["schemas"]["CuentaNaturalezaOpuestaDto"][];
+        };
+        ComponentePatrimonioDto: {
+            cuentaId: string | null;
+            codigoInterno: string | null;
+            nombre: string;
+            esContraria: boolean;
+            esSintetica: boolean;
+            /** @example 100000.00 */
+            saldoInicialBob: string;
+            /** @example 0.00 */
+            resultadoEjercicioBob: string;
+            /** @example 0.00 */
+            otrosMovimientosBob: string;
+            /** @example 100000.00 */
+            saldoFinalBob: string;
+            cuadra: boolean;
+            /** @example 0.00 */
+            diferenciaBob: string;
+        };
+        TotalesEvolucionPatrimonioDto: {
+            /** @example 125000.00 */
+            saldoInicialBob: string;
+            /** @example 30000.00 */
+            resultadoEjercicioBob: string;
+            /** @example 40000.00 */
+            otrosMovimientosBob: string;
+            /** @example 195000.00 */
+            saldoFinalBob: string;
+        };
+        EvolucionPatrimonioResponseDto: {
+            /** @example 2026-01-01 */
+            fechaDesde: string;
+            /** @example 2026-12-31 */
+            fechaHasta: string;
+            componentes: components["schemas"]["ComponentePatrimonioDto"][];
+            totales: components["schemas"]["TotalesEvolucionPatrimonioDto"];
+            cuadra: boolean;
+            /** @example 0.00 */
+            diferenciaBob: string;
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -6879,6 +6935,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HojaTrabajoResponseDto"];
+                };
+            };
+        };
+    };
+    EeffController_obtenerEvolucionPatrimonio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvolucionPatrimonioResponseDto"];
                 };
             };
         };
