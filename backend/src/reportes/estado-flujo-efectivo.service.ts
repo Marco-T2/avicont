@@ -36,7 +36,7 @@ export class EstadoFlujoEfectivoService {
    *  2. Promise.all de 4 lecturas del port (cero método nuevo):
    *     - obtenerSaldosHasta(desde−1)        → saldo INICIAL (incl. efectivo)
    *     - obtenerSaldosHasta(hasta)          → saldo FINAL (incl. efectivo)
-   *     - obtenerSaldosEnRango(desde, hasta) → resultado del ejercicio + flujo
+   *     - obtenerSaldosEnRango(desde, hasta, excluirCierre=true) → resultado operativo + flujo
    *     - obtenerEstructuraCuentas           → clasificación por actividad
    *  3. construirEstadoFlujoEfectivo (función pura).
    *  4. Mapear a EstadoFlujoEfectivoResponseDto.
@@ -99,7 +99,16 @@ export class EstadoFlujoEfectivoService {
         fechaCorte: hasta,
         incluirAnulados: query.incluirAnulados,
       }),
-      this.eeffSaldosReader.obtenerSaldosEnRango(tenantId, desde, hasta, query.incluirAnulados),
+      // excluirCierre=true: el EFE parte del resultado OPERATIVO del período. Sin
+      // esto, consultar una gestión cerrada daría resultado=0 y descuadre = utilidad
+      // (el CIERRE pone ingresos/egresos en cero y traslada el resultado al patrimonio).
+      this.eeffSaldosReader.obtenerSaldosEnRango(
+        tenantId,
+        desde,
+        hasta,
+        query.incluirAnulados,
+        true,
+      ),
       this.eeffSaldosReader.obtenerEstructuraCuentas(tenantId),
     ]);
 

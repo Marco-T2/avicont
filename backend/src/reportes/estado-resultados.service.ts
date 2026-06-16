@@ -94,8 +94,11 @@ export class EstadoResultadosService {
     // ── 2. Consultar saldos de flujo y estructura en paralelo ──────────────────
     // NCB / NIC 1: SOLO obtenerSaldosEnRango — garantía de flujo (REQ-ER-02).
     // Las cuentas de resultado parten de 0 al inicio del rango.
+    // excluirCierre=true (§4.9 CLAUDE.md): el ER muestra el resultado OPERATIVO del
+    // período. Sin esto, consultar una gestión cerrada daría ingresos/egresos en cero
+    // (el asiento de CIERRE los anula) → un Estado de Resultados vacío.
     const [saldosRango, estructura] = await Promise.all([
-      this.eeffSaldosReader.obtenerSaldosEnRango(tenantId, desde, hasta, incluirAnulados),
+      this.eeffSaldosReader.obtenerSaldosEnRango(tenantId, desde, hasta, incluirAnulados, true),
       this.eeffSaldosReader.obtenerEstructuraCuentas(tenantId),
     ]);
 

@@ -198,7 +198,30 @@ describe('EstadoFlujoEfectivoService (unit)', () => {
       });
 
       expect(eeffReader.obtenerSaldosHasta.mock.calls[0][1].incluirAnulados).toBe(true);
-      expect(eeffReader.obtenerSaldosEnRango).toHaveBeenCalledWith(TENANT_ID, DESDE, HASTA, true);
+      // excluirCierre SIEMPRE true: el resultado de operación del EFE debe partir del
+      // resultado OPERATIVO del período, no del residuo post-cierre (ver test del builder
+      // "el resultado del ejercicio trasladado a patrimonio NO se doble-cuenta").
+      expect(eeffReader.obtenerSaldosEnRango).toHaveBeenCalledWith(
+        TENANT_ID,
+        DESDE,
+        HASTA,
+        true,
+        true,
+      );
+    });
+
+    it('SIEMPRE excluye CIERRE del rango (excluirCierre=true), independiente de incluirAnulados', async () => {
+      await service.consultarFlujoEfectivo(TENANT_ID, {
+        desde: '2026-01-01',
+        hasta: '2026-12-31',
+        incluirAnulados: false,
+      });
+
+      // Sin excluir CIERRE, consultar el EFE de una gestión cerrada daría resultado=0
+      // (el cierre pone ingresos/egresos en cero) y descuadre = utilidad del ejercicio.
+      const [, , , incluirAnulados, excluirCierre] = eeffReader.obtenerSaldosEnRango.mock.calls[0];
+      expect(incluirAnulados).toBe(false);
+      expect(excluirCierre).toBe(true);
     });
   });
 

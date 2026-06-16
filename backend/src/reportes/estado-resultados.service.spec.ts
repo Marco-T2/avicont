@@ -123,6 +123,7 @@ describe('EstadoResultadosService (unit)', () => {
         expect.any(Date),
         expect.any(Date),
         false,
+        true, // excluirCierre: el ER muestra el resultado OPERATIVO, no el residuo post-cierre
       );
       // NUNCA debe llamar obtenerSaldosHasta — garantía de flujo (REQ-ER-02)
       expect(eeffReader.obtenerSaldosHasta).not.toHaveBeenCalled();
@@ -210,6 +211,7 @@ describe('EstadoResultadosService (unit)', () => {
         expect.any(Date),
         expect.any(Date),
         false,
+        true, // excluirCierre
       );
     });
 
@@ -225,7 +227,20 @@ describe('EstadoResultadosService (unit)', () => {
         expect.any(Date),
         expect.any(Date),
         true,
+        true, // excluirCierre
       );
+    });
+
+    it('SIEMPRE excluye CIERRE (excluirCierre=true): el ER de una gestión cerrada muestra el resultado operativo, no ceros', async () => {
+      await service.consultarEstadoResultados(TENANT_ID, {
+        fechaDesde: '2026-05-01',
+        fechaHasta: '2026-05-31',
+      });
+
+      // Sin excluir CIERRE, el ER de un período cerrado mostraría ingresos/egresos en
+      // cero (el asiento de cierre los anula) — sería un Estado de Resultados vacío.
+      const excluirCierre = eeffReader.obtenerSaldosEnRango.mock.calls[0][4];
+      expect(excluirCierre).toBe(true);
     });
 
     it('Promise.all: obtenerSaldosEnRango + obtenerEstructuraCuentas corren en paralelo', async () => {

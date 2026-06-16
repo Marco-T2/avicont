@@ -7,7 +7,10 @@
  * Resultado del Ejercicio se NOMBRA (computado del rango); el resto de los
  * movimientos se agrupan en un catch-all honesto ("Otros movimientos") porque
  * un sistema contable genérico no clasifica el motivo (aporte vs distribución).
- * El nivel B (filas por concepto) queda diferido — requiere clasificación.
+ * El nivel B (matriz NIC 1 completa: filas por concepto + fila de "apropiación del
+ * resultado" que reclasifica el resultado del ejercicio dentro del patrimonio
+ * post-cierre) queda DIFERIDO — requiere clasificación de movimientos y el feature
+ * de cierre de ejercicio. Ver builder evolucion-patrimonio.ts (asimetría con EFE/ER).
  *
  * Montos como string decimal (§4.5 CLAUDE.md): evita pérdida IEEE-754 en JSON.
  * Fechas como "YYYY-MM-DD" (§4.6 CLAUDE.md): fecha calendario puro, sin hora ni UTC.
@@ -43,7 +46,11 @@ export interface ComponentePatrimonioCalculado {
   resultadoEjercicioBob: Money;
   otrosMovimientosBob: Money;
   saldoFinalBob: Money;
-  /** true si saldoInicial + resultado + otrosMovimientos ≈ saldoFinal (±Bs 0.01). */
+  /**
+   * true si saldoInicial + resultado + otrosMovimientos ≈ saldoFinal (±Bs 0.01).
+   * Chequeo de CONSISTENCIA de las 3 lecturas + matemática de fechas, NO de validez
+   * contable: en datos íntegros da true por construcción (ver builder).
+   */
   cuadra: boolean;
   /** (saldoInicial + resultado + otrosMovimientos) − saldoFinal. "0.00" si cuadra. */
   diferenciaBob: Money;
@@ -106,7 +113,8 @@ export class EvolucionPatrimonioResponseDto {
   totales!: TotalesEvolucionPatrimonioDto;
   /**
    * true si la evolución cuadra: saldoInicial + resultado + otrosMovimientos ≈ saldoFinal
-   * por componente y en el total (±Bs 0.01).
+   * por componente y en el total (±Bs 0.01). Es un chequeo de CONSISTENCIA entre las
+   * lecturas (inicial/final/rango) y la matemática de fechas, NO de validez contable.
    * HTTP 200 siempre — el descuadre es dato, no error.
    */
   @ApiProperty() cuadra!: boolean;

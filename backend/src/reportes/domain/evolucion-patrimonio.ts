@@ -15,8 +15,26 @@
  *   3. Totalizar las 4 columnas aplicando esContraria (las contrarias restan,
  *      espejo de la propagación del Balance).
  *   4. Cuadre por componente: saldoInicial + resultado + otrosMovimientos ≈ saldoFinal.
- *      Es una identidad aritmética que valida la matemática de fechas (el saldo
- *      inicial corta en desde−1 y el rango en [desde, hasta], sin hueco ni solape).
+ *
+ * QUÉ VALIDA `cuadra` (y qué NO): es un chequeo de CONSISTENCIA entre las 3 lecturas
+ * (inicial=hasta(desde−1), final=hasta(hasta), rango=[desde,hasta]) y de la matemática
+ * de fechas — sin hueco ni solape. NO es una validación de corrección contable: por
+ * construcción `final = inicial + rango` para los mismos filtros, así que en datos
+ * íntegros siempre da true. Se vuelve útil si las 3 lecturas divergen (drift de filtros,
+ * bug de fechas, escritura concurrente entre las queries) o si los datos están corruptos.
+ *
+ * CIERRE — asimetría DELIBERADA con EFE/ER: el EEPN INCLUYE los comprobantes de CIERRE
+ * en saldosRango (el service llama obtenerSaldosEnRango SIN excluirCierre), al revés que
+ * el EFE y el Estado de Resultados. Razón: el traslado del resultado al patrimonio es un
+ * movimiento real del patrimonio y vive en saldoFinal (acumulado); excluir CIERRE de
+ * saldosRango rompería la identidad de la cuenta de resultados acumulados.
+ *
+ * LIMITACIÓN post-cierre (degradación con gracia, NO bug): consultada una gestión cerrada,
+ * el resultado aparece en "otrosMovimientos" de la cuenta que lo recibió, NO en la columna
+ * sintética (que da 0 porque el cierre anuló ingresos/egresos). El TOTAL es correcto y el
+ * estado cuadra. Mostrarlo en su columna propia exige una fila de "apropiación del
+ * resultado" (NIC 1) — DIFERIDO al feature de cierre de ejercicio. Ver test
+ * "gestión cerrada (degradación con gracia)" en evolucion-patrimonio.spec.ts.
  *
  * Control cruzado clave: el total de saldoFinal del EEPN debe coincidir con el
  * Total Patrimonio del Balance General a fecha = hasta (incluido el Resultado del
