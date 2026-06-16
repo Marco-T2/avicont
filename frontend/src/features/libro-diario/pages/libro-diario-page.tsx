@@ -56,10 +56,13 @@ export function LibroDiarioPage(): React.JSX.Element {
     (params.fechaDesde !== undefined && params.fechaHasta !== undefined);
 
   // Rango para el nombre del archivo de export.
+  // Se deriva del response (data.rango) que trae las fechas RESUELTAS por el backend,
+  // no de los params locales. Así, cuando el modo es período, se usan las fechas reales
+  // del período en lugar del UUID del periodoFiscalId (bug R9).
   const rango: string =
-    params.fechaDesde !== undefined && params.fechaHasta !== undefined
-      ? `${params.fechaDesde}_${params.fechaHasta}`
-      : (params.periodoFiscalId ?? 'sin-rango');
+    data !== undefined
+      ? `${data.rango.fechaDesde}_${data.rango.fechaHasta}`
+      : 'sin-rango';
 
   return (
     <div className="space-y-6">
