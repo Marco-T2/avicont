@@ -8,13 +8,20 @@
 // fuerza a actualizar el enum del dominio en el mismo PR.
 
 import {
+  ActividadFlujo as PrismaActividadFlujo,
   ClaseCuenta as PrismaClaseCuenta,
   Moneda as PrismaMoneda,
   NaturalezaCuenta as PrismaNaturalezaCuenta,
   SubClaseCuenta as PrismaSubClaseCuenta,
 } from '@prisma/client';
 
-import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import {
+  ActividadFlujo,
+  ClaseCuenta,
+  Moneda,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 // ------------------------------------------------------------
 // Moneda (cross-module: cuentas es dueño de monedaFuncional)
@@ -130,4 +137,34 @@ export function toDominioSubClaseCuenta(p: PrismaSubClaseCuenta): SubClaseCuenta
 
 export function toPrismaSubClaseCuenta(d: SubClaseCuenta): PrismaSubClaseCuenta {
   return SUBCLASE_DOMINIO_A_PRISMA[d];
+}
+
+// ------------------------------------------------------------
+// ActividadFlujo (NIC 7 — Estado de Flujo de Efectivo)
+// Duplicado deliberado de reportes/adapters/enum-mappers.ts (§3.3: no cruzar
+// fronteras de módulo fuera de un port). cuentas es dueño del campo
+// Cuenta.actividadFlujo; reportes lo consume vía port. Los literales son
+// idénticos en runtime — el mapper solo mantiene el boundary de tipos.
+// ------------------------------------------------------------
+
+const ACTIVIDAD_FLUJO_PRISMA_A_DOMINIO: Record<PrismaActividadFlujo, ActividadFlujo> = {
+  EFECTIVO: ActividadFlujo.EFECTIVO,
+  OPERACION: ActividadFlujo.OPERACION,
+  INVERSION: ActividadFlujo.INVERSION,
+  FINANCIACION: ActividadFlujo.FINANCIACION,
+};
+
+const ACTIVIDAD_FLUJO_DOMINIO_A_PRISMA: Record<ActividadFlujo, PrismaActividadFlujo> = {
+  [ActividadFlujo.EFECTIVO]: PrismaActividadFlujo.EFECTIVO,
+  [ActividadFlujo.OPERACION]: PrismaActividadFlujo.OPERACION,
+  [ActividadFlujo.INVERSION]: PrismaActividadFlujo.INVERSION,
+  [ActividadFlujo.FINANCIACION]: PrismaActividadFlujo.FINANCIACION,
+};
+
+export function toDominioActividadFlujo(p: PrismaActividadFlujo): ActividadFlujo {
+  return ACTIVIDAD_FLUJO_PRISMA_A_DOMINIO[p];
+}
+
+export function toPrismaActividadFlujo(d: ActividadFlujo): PrismaActividadFlujo {
+  return ACTIVIDAD_FLUJO_DOMINIO_A_PRISMA[d];
 }

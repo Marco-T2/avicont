@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString, Length } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, Length, ValidateIf } from 'class-validator';
 
-import { Moneda } from '@/common/domain/enums';
+import { ActividadFlujo, Moneda } from '@/common/domain/enums';
 
 // UpdateCuentaDto SOLO expone campos mutables. Los campos estructurales
 // (codigoInterno, claseCuenta, subClaseCuenta, naturaleza, parentId,
@@ -36,4 +36,12 @@ export class UpdateCuentaDto {
   @IsOptional()
   @IsEnum(Moneda)
   monedaFuncional?: Moneda;
+
+  // actividadFlujo es nullable: null = "sin clasificar" (volver a heurística automática).
+  // El @ValidateIf permite null explícito sin que @IsEnum lo rechace (§D2 design doc).
+  @ApiPropertyOptional({ enum: ActividadFlujo, nullable: true })
+  @IsOptional()
+  @ValidateIf((o: UpdateCuentaDto) => o.actividadFlujo !== null)
+  @IsEnum(ActividadFlujo)
+  actividadFlujo?: ActividadFlujo | null;
 }

@@ -17,6 +17,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
+  ActividadFlujo,
   ClaseCuenta,
   type Cuenta,
   type CuentaTreeNode,
@@ -29,6 +30,7 @@ import { useCuentaTree } from '../hooks/use-cuenta-tree';
 import {
   type CuentaFormValues,
   cuentaFormSchema,
+  LABELS_ACTIVIDAD_FLUJO,
   LABELS_CLASE,
   LABELS_MONEDA,
   LABELS_NATURALEZA,
@@ -89,6 +91,9 @@ function mapCuentaToFormValues(c: Cuenta): CuentaFormValues {
     esContraria: c.esContraria,
     monedaFuncional: c.monedaFuncional,
     permiteMultiMoneda: c.permiteMultiMoneda,
+    // actividadFlujo: null → no incluir en el form (el Select mostrará "Sin clasificar");
+    // valor presente → incluirlo para que el Select lo preseleccione.
+    ...(c.actividadFlujo !== null ? { actividadFlujo: c.actividadFlujo } : {}),
   };
 }
 
@@ -146,6 +151,8 @@ export function CuentaForm({
   const requiereContacto = useWatch({ control, name: 'requiereContacto' });
   const permiteMultiMoneda = useWatch({ control, name: 'permiteMultiMoneda' });
   const monedaFuncional = useWatch({ control, name: 'monedaFuncional' });
+  // actividadFlujo: solo relevante en modo edición (§D1 design); en create no se renderiza.
+  const actividadFlujo = useWatch({ control, name: 'actividadFlujo' });
   const subClasesValidas = SUBCLASES_POR_CLASE[claseCuenta];
 
   // Al cambiar claseCuenta o esContraria (solo en create), auto-setea la
@@ -393,6 +400,41 @@ export function CuentaForm({
           onCheckedChange={(c) => setValue('permiteMultiMoneda', c)}
         />
       </div>
+
+      {/* actividadFlujo: SOLO en modo edición (§D1 design — en create no aplica;
+          el backend no acepta el campo en CreateCuentaDto). Sentinel __none__ =
+          null = "sin clasificar / heurística automática del EFE". */}
+      {mode === 'edit' ? (
+        <Field
+          label="Actividad de flujo de efectivo"
+          error={errors.actividadFlujo?.message}
+          hint="Clasifica la cuenta para el Estado de Flujo de Efectivo (NIC 7). Dejar en blanco para que el reporte use la heurística automática."
+        >
+          <Select
+            value={actividadFlujo ?? '__none__'}
+            onValueChange={(v) =>
+              setValue(
+                'actividadFlujo',
+                v === '__none__' ? undefined : (v as ActividadFlujo),
+              )
+            }
+          >
+            <SelectTrigger className="max-w-md">
+              <SelectValue placeholder="— Sin clasificar (heurística automática) —" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">
+                — Sin clasificar (heurística automática) —
+              </SelectItem>
+              {(Object.keys(LABELS_ACTIVIDAD_FLUJO) as ActividadFlujo[]).map((a) => (
+                <SelectItem key={a} value={a}>
+                  {LABELS_ACTIVIDAD_FLUJO[a]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
 
       <Field label="Moneda funcional" error={errors.monedaFuncional?.message}>
         <Select

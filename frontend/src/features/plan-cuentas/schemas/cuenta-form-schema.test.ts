@@ -14,6 +14,7 @@ const VALID: CuentaFormValues = {
   esContraria: false,
   monedaFuncional: 'BOB',
   permiteMultiMoneda: true,
+  // actividadFlujo es opcional — undefined = sin clasificar
 };
 
 describe('cuentaFormSchema', () => {
@@ -59,6 +60,21 @@ describe('cuentaFormSchema', () => {
 
   it('rechaza parentId que no es UUID', () => {
     const result = cuentaFormSchema.safeParse({ ...VALID, parentId: 'not-a-uuid' });
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta actividadFlujo undefined (campo opcional, sin clasificar)', () => {
+    const result = cuentaFormSchema.safeParse({ ...VALID, actividadFlujo: undefined });
+    expect(result.success).toBe(true);
+  });
+
+  it('acepta actividadFlujo con un valor válido del enum', () => {
+    const result = cuentaFormSchema.safeParse({ ...VALID, actividadFlujo: 'INVERSION' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza actividadFlujo con un valor fuera del enum', () => {
+    const result = cuentaFormSchema.safeParse({ ...VALID, actividadFlujo: 'CAJA' });
     expect(result.success).toBe(false);
   });
 });

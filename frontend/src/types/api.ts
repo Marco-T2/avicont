@@ -99,6 +99,16 @@ export const Moneda = {
 } as const satisfies Record<string, Schemas['CuentaResponseDto']['monedaFuncional']>;
 export type Moneda = (typeof Moneda)[keyof typeof Moneda];
 
+// ActividadFlujo — NIC 7 (Estado de Flujo de Efectivo). Nullable en la cuenta:
+// null = sin clasificar → el reporte EFE aplica la heurística automática.
+export const ActividadFlujo = {
+  EFECTIVO: 'EFECTIVO',
+  OPERACION: 'OPERACION',
+  INVERSION: 'INVERSION',
+  FINANCIACION: 'FINANCIACION',
+} as const satisfies Record<string, NonNullable<Schemas['CuentaResponseDto']['actividadFlujo']>>;
+export type ActividadFlujo = (typeof ActividadFlujo)[keyof typeof ActividadFlujo];
+
 // ============================================================
 // Cuenta (plan de cuentas)
 // ============================================================

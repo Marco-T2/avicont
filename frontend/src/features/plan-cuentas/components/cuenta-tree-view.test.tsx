@@ -44,6 +44,7 @@ function makeNode(overrides: Partial<CuentaTreeNode> = {}): CuentaTreeNode {
     permiteMultiMoneda: true,
     esSystemSeed: true,
     esRequeridaSistema: false,
+    actividadFlujo: null,
     createdAt: '2026-04-23T00:00:00.000Z',
     updatedAt: '2026-04-23T00:00:00.000Z',
     hijas: [],

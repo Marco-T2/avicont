@@ -2199,6 +2199,8 @@ export interface components {
             permiteMultiMoneda: boolean;
             esSystemSeed: boolean;
             esRequeridaSistema: boolean;
+            /** @enum {string|null} */
+            actividadFlujo: "EFECTIVO" | "OPERACION" | "INVERSION" | "FINANCIACION" | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2233,6 +2235,8 @@ export interface components {
             permiteMultiMoneda: boolean;
             esSystemSeed: boolean;
             esRequeridaSistema: boolean;
+            /** @enum {string|null} */
+            actividadFlujo: "EFECTIVO" | "OPERACION" | "INVERSION" | "FINANCIACION" | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2283,6 +2287,8 @@ export interface components {
             permiteMultiMoneda?: boolean;
             /** @enum {string} */
             monedaFuncional?: "BOB" | "USD";
+            /** @enum {string|null} */
+            actividadFlujo?: "EFECTIVO" | "OPERACION" | "INVERSION" | "FINANCIACION" | null;
         };
         TipoDocumentoFisicoResponseDto: {
             id: string;

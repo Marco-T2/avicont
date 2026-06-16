@@ -6263,6 +6263,16 @@
           "esRequeridaSistema": {
             "type": "boolean"
           },
+          "actividadFlujo": {
+            "type": "string",
+            "enum": [
+              "EFECTIVO",
+              "OPERACION",
+              "INVERSION",
+              "FINANCIACION"
+            ],
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -6291,6 +6301,7 @@
           "permiteMultiMoneda",
           "esSystemSeed",
           "esRequeridaSistema",
+          "actividadFlujo",
           "createdAt",
           "updatedAt"
         ]
@@ -6411,6 +6422,16 @@
           "esRequeridaSistema": {
             "type": "boolean"
           },
+          "actividadFlujo": {
+            "type": "string",
+            "enum": [
+              "EFECTIVO",
+              "OPERACION",
+              "INVERSION",
+              "FINANCIACION"
+            ],
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -6445,6 +6466,7 @@
           "permiteMultiMoneda",
           "esSystemSeed",
           "esRequeridaSistema",
+          "actividadFlujo",
           "createdAt",
           "updatedAt",
           "hijas"
@@ -6560,6 +6582,16 @@
               "BOB",
               "USD"
             ]
+          },
+          "actividadFlujo": {
+            "type": "string",
+            "enum": [
+              "EFECTIVO",
+              "OPERACION",
+              "INVERSION",
+              "FINANCIACION"
+            ],
+            "nullable": true
           }
         }
       },
