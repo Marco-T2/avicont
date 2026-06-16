@@ -59,7 +59,7 @@ Se ubica en el módulo `backend/src/reportes/` y reutiliza `EeffSaldosReaderPort
 
 El sistema DEBE exponer `GET /api/eeff/balance-comprobacion` que acepta el rango
 del reporte en exactamente UNO de dos modos:
-- Modo rango: `desde` + `hasta`, ambos `YYYY-MM-DD`.
+- Modo rango: `fechaDesde` + `fechaHasta`, ambos `YYYY-MM-DD`.
 - Modo período: `periodoFiscalId` (UUID v4), del cual deriva `[desde, hasta]`
   como el mes completo del período.
 
@@ -68,7 +68,7 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 #### Escenario: rango directo válido
 
 - DADO un tenant con comprobantes CONTABILIZADO en abril 2026
-- CUANDO consulta `?desde=2026-04-01&hasta=2026-04-30`
+- CUANDO consulta `?fechaDesde=2026-04-01&fechaHasta=2026-04-30`
 - ENTONCES responde 200 con las filas del rango y `fechaDesde="2026-04-01"`,
   `fechaHasta="2026-04-30"`.
 
@@ -81,12 +81,12 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 
 #### Escenario: se pasan ambos modos a la vez
 
-- CUANDO consulta con `desde`/`hasta` Y `periodoFiscalId` simultáneamente
+- CUANDO consulta con `fechaDesde`/`fechaHasta` Y `periodoFiscalId` simultáneamente
 - ENTONCES responde 422 con código `REPORTES_BALANCE_COMPROBACION_RANGO_AMBIGUO`.
 
 #### Escenario: no se pasa ningún modo
 
-- CUANDO consulta sin `desde`/`hasta` ni `periodoFiscalId`
+- CUANDO consulta sin `fechaDesde`/`fechaHasta` ni `periodoFiscalId`
 - ENTONCES responde 422 con código `REPORTES_BALANCE_COMPROBACION_RANGO_REQUERIDO`.
 
 ---
@@ -97,17 +97,17 @@ El sistema DEBE validar el rango antes de leer saldos.
 
 #### Escenario: formato inválido
 
-- CUANDO `desde=2026-13-40` (formato/fecha imposible)
+- CUANDO `fechaDesde=2026-13-40` (formato/fecha imposible)
 - ENTONCES 422 con código `REPORTES_BALANCE_COMPROBACION_RANGO_INVALIDO`.
 
 #### Escenario: desde > hasta
 
-- CUANDO `desde=2026-04-30&hasta=2026-04-01`
+- CUANDO `fechaDesde=2026-04-30&fechaHasta=2026-04-01`
 - ENTONCES 422 con código `REPORTES_BALANCE_COMPROBACION_RANGO_INVALIDO`.
 
 #### Escenario: solo una de las dos fechas del modo rango
 
-- CUANDO `desde=2026-04-01` sin `hasta` (modo rango incompleto)
+- CUANDO `fechaDesde=2026-04-01` sin `fechaHasta` (modo rango incompleto)
 - ENTONCES 422 con código `REPORTES_BALANCE_COMPROBACION_RANGO_INVALIDO`.
 
 #### Escenario: periodoFiscalId inexistente o de otro tenant

@@ -72,9 +72,9 @@ export en sus componentes/páginas).
   - Libro Diario / Libro Mayor: `periodoFiscalId`, `fechaDesde`, `fechaHasta`, `incluirAnulados`, `cuentaId` (+ `soloConMovimiento` en Mayor).
   - Balance General: **`fecha`** (corte único) + `incluirAnulados`. **Sin** `periodoFiscalId`, sin rango.
   - Estado de Resultados: `fechaDesde`, `fechaHasta`, `incluirAnulados`. **Sin** `periodoFiscalId`.
-  - Balance de Comprobación / Hoja de Trabajo: `periodoFiscalId`, **`desde`/`hasta`** (no `fechaDesde`/`fechaHasta`), `incluirAnulados`.
-  - EEPN (Evolución del Patrimonio): `periodoFiscalId`, **`fechaDesde`/`fechaHasta`**, `incluirAnulados`.
-  - EFE (Flujo de Efectivo): `periodoFiscalId`, **`desde`/`hasta`**, `incluirAnulados`. El form mantiene `fechaDesde`/`fechaHasta` (UI) y la capa `api` mapea a `desde`/`hasta` (ver comentario en `flujo-efectivo/api/get-flujo-efectivo.ts`).
+  - Balance de Comprobación / Hoja de Trabajo: `periodoFiscalId`, `fechaDesde`/`fechaHasta`, `incluirAnulados` (canonizados en R8, 2026-06-16).
+  - EEPN (Evolución del Patrimonio): `periodoFiscalId`, `fechaDesde`/`fechaHasta`, `incluirAnulados`.
+  - EFE (Flujo de Efectivo): `periodoFiscalId`, `fechaDesde`/`fechaHasta`, `incluirAnulados` (canonizado en R8, 2026-06-16).
 - **El filtro por cuenta lo tienen los DOS libros**, no solo el Mayor (ambos son detalle por cuenta — ver R3).
 - **`fecha` de formato es-BO**: las fechas se muestran/parsean como `YYYY-MM-DD` sin pasar por `Date`/UTC (§4.6); el período se renderiza con `formatPeriodoCorto` de `@/lib/meses`.
 
@@ -233,42 +233,46 @@ dos primeros de la cadena de clones, antes del molde EEFF. (2) **EFE y EEPN** te
 toggle invertido ("Por rango" primero) y default `'rango'` — nacieron del molde EEPN con
 ese orden y el EFE lo heredó. Ambos drifts quedaron normalizados. Ver matriz §4.
 
-### R8 — Query params canónicos (ENUNCIADA, enforcement DIFERIDO)
+### R8 — Query params canónicos (RESUELTA — 2026-06-16)
 
-**Enunciado.** Los nombres canónicos de query param son
-`desde` / `hasta` / `periodoFiscalId` / `incluirAnulados`. Un reporte nuevo **debe**
-usar `desde`/`hasta`, NO `fechaDesde`/`fechaHasta`.
+**Enunciado.** El nombre canónico de query param de rango es
+`fechaDesde` / `fechaHasta` (+ `periodoFiscalId` / `incluirAnulados`). Un reporte
+nuevo con rango **debe** usar `fechaDesde`/`fechaHasta`, NO `desde`/`hasta`.
 
-**Rationale.** Tener tres convenciones (`desde`/`hasta`, `fechaDesde`/`fechaHasta`,
-`fecha`) para lo mismo obliga a cada dev a abrir la capa `api` para saber qué nombre
-usa cada endpoint. Una sola convención elimina ese costo y los bugs de mapeo.
+**Rationale.** Tener dos convenciones (`desde`/`hasta` y `fechaDesde`/`fechaHasta`)
+para lo mismo obligaba a cada dev a abrir la capa `api` para saber qué nombre usa cada
+endpoint, y forzaba un mapeo manual en el frontend para 3 reportes. Se eligió
+`fechaDesde`/`fechaHasta` como canónico porque (a) era la convención mayoritaria
+(4 de 7 reportes de rango), (b) es la que ya usan los forms del frontend
+(`*FiltroValues`), así que canonizar ahí **elimina** todo el código de mapeo en lugar
+de propagarlo, y (c) es más descriptivo. `fecha` (corte único del Balance General) se
+mantiene aparte — no es un rango (R1: foto, no flujo).
 
-> **NOTA — enforcement diferido.** Esta regla se **enuncia** pero su enforcement está
-> **diferido**: cambiar los nombres de los params es un cambio de **contrato backend +
-> OpenAPI** (regenerar `openapi.json` + `api.generated.ts`, job CI `contract-drift`),
-> y toca varios endpoints ya en producción. No se hace "de paso". Se aplica cuando se
-> abra un change dedicado a normalizar params, o cuando un endpoint se toque por otra
-> razón y convenga arrastrarlo. **Para un reporte NUEVO sí es obligatoria desde el
-> día uno** (no hay contrato previo que romper).
+#### Estado — RESUELTA
 
-#### Drift conocido diferido (R8)
+Change dedicado (2026-06-16): se renombraron los 3 reportes que usaban `desde`/`hasta`
+(Balance de Comprobación, Hoja de Trabajo, EFE) a `fechaDesde`/`fechaHasta`. Tocó el
+DTO de query backend, el mapeo en `eeff.controller.ts`, los e2e (query HTTP) y la capa
+`api` del frontend (se borraron los 3 transforms, incluida la "TRAMPA R2" del EFE).
+El param interno del service quedó como `desde`/`hasta` (detalle de implementación, no
+expuesto). OpenAPI + `api.generated.ts` regenerados; `contract-drift` verde.
 
-Estado real de los params al 2026-06-16:
-
-| Reporte | Param de rango real | ¿Cumple R8? |
-|---------|---------------------|-------------|
-| Balance de Comprobación | `desde` / `hasta` | ✅ |
-| Hoja de Trabajo | `desde` / `hasta` | ✅ |
-| EFE | `desde` / `hasta` (mapeado desde el form `fechaDesde`/`fechaHasta`) | ✅ |
-| Libro Diario | `fechaDesde` / `fechaHasta` | ✗ diferido |
-| Libro Mayor | `fechaDesde` / `fechaHasta` | ✗ diferido |
-| Estado de Resultados | `fechaDesde` / `fechaHasta` | ✗ diferido |
-| EEPN | `fechaDesde` / `fechaHasta` | ✗ diferido |
+| Reporte | Param de rango | ¿Cumple R8? |
+|---------|----------------|-------------|
+| Libro Diario | `fechaDesde` / `fechaHasta` | ✅ |
+| Libro Mayor | `fechaDesde` / `fechaHasta` | ✅ |
+| Estado de Resultados | `fechaDesde` / `fechaHasta` | ✅ |
+| EEPN | `fechaDesde` / `fechaHasta` | ✅ |
+| Balance de Comprobación | `fechaDesde` / `fechaHasta` | ✅ (migrado) |
+| Hoja de Trabajo | `fechaDesde` / `fechaHasta` | ✅ (migrado) |
+| EFE | `fechaDesde` / `fechaHasta` | ✅ (migrado) |
 | Balance General | `fecha` (corte único, no es rango) | N-A (R1: foto) |
 
-Por qué se difirió: los 4 reportes ✗ ya están en producción con su contrato OpenAPI;
-renombrar params rompe el contrato y exige tocar backend + regenerar artefactos + CI.
-El beneficio (consistencia) no justifica el riesgo fuera de un change dedicado.
+> **Nota — params no documentados en OpenAPI.** Ningún reporte declara hoy sus query
+> params en `openapi.json` (los DTOs de query no llevan `@ApiPropertyOptional`), así que
+> `contract-drift` no cubre los nombres de params — el contrato de params vive en el DTO
+> backend + la capa `api` frontend + los e2e. Documentarlos en OpenAPI es una mejora
+> transversal separada (gap preexistente, no de R8).
 
 ### R9 — Export Excel gateado por el permiso de lectura del propio reporte; `rango` derivado del RESPONSE
 
@@ -314,39 +318,38 @@ filtros del usuario.
 
 ---
 
-## 4. Matriz de cumplimiento (drift real al 2026-06-16)
+## 4. Matriz de cumplimiento (estado actual al 2026-06-16, post-normalización)
 
-`✓` cumple · `✗` no cumple (drift) · `N-A` no aplica por dominio.
+`✓` cumple · `✗` no cumple (drift) · `N-A` no aplica por dominio. Todo el drift
+detectado en la auditoría fue normalizado (R7 + R9 en PR #215; R8 en el change del
+2026-06-16). La matriz refleja el estado **resuelto**; el historial vive en git y en
+las notas "RESUELTA" de cada regla (§3).
 
 | Reporte | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 |
 |---------|----|----|----|----|----|----|----|----|----|
-| **Libro Diario** | ✓ | ✓ | ✓ | N-A | N-A | N-A | **✗** | **✗** (dif.) | **✗** (bug) |
-| **Libro Mayor** | ✓ | ✓ | ✓ | N-A | N-A | N-A | **✗** | **✗** (dif.) | **✗** (bug) |
+| **Libro Diario** | ✓ | ✓ | ✓ | N-A | N-A | N-A | ✓ | ✓ | ✓ |
+| **Libro Mayor** | ✓ | ✓ | ✓ | N-A | N-A | N-A | ✓ | ✓ | ✓ |
 | **Balance General** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | N-A | ✓ |
-| **Estado de Resultados** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | **✗** (dif.) | ✓ |
+| **Estado de Resultados** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Balance de Comprobación** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **Hoja de Trabajo** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **EEPN (Evolución Patrimonio)** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | **✗** (dif.) | ✓ |
+| **EEPN (Evolución Patrimonio)** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | ✓ | ✓ |
 | **EFE (Flujo de Efectivo)** | ✓ | ✓ | ✓ | N-A | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-R9: los 6 reportes EEFF derivan el `rango` del `response` (fechas resueltas por el
-backend) — correcto. **Libro Diario y Libro Mayor lo derivaban de los filtros y tenían
-un bug**: con período seleccionado el nombre del archivo salía con el UUID del período
-(ver R9). El backend ya exponía las fechas bajo `data.rango`; fix frontend-puro
-aplicado en este change.
+### Drift detectado y resuelto (resumen)
 
-### Drift accionable (resumen)
-
-1. **R7 — card wrapper** (frontend-puro): Libro Diario y Libro Mayor no envuelven los
-   filtros en `rounded-lg border bg-card p-4`. Arreglo barato.
-2. **R9 — bug del `rango` en los libros** (frontend-puro): Libro Diario y Libro Mayor
-   derivaban el rango de los filtros y, con período seleccionado, ponían el UUID del
-   período en el nombre del archivo. El backend ya exponía las fechas resueltas bajo
-   `data.rango` — el bug era que la página las ignoraba. Fix: derivar el rango de
-   `data.rango.fechaDesde/Hasta`. Sin cambio de contrato.
-3. **R8 — params no canónicos** (backend + frontend): Libro Diario, Libro Mayor, Estado
-   de Resultados y EEPN usan `fechaDesde`/`fechaHasta`. **Enforcement diferido** (cambio
-   de contrato backend+OpenAPI; ver R8).
+1. **R7 — card wrapper** (frontend-puro, PR #215): Libro Diario y Libro Mayor no
+   envolvían los filtros en `rounded-lg border bg-card p-4`. Normalizado. (También R7
+   sub-regla: orden/default del toggle período/rango en EFE/EEPN.)
+2. **R9 — bug del `rango` en los libros** (frontend-puro, PR #215): Libro Diario y Libro
+   Mayor derivaban el rango de los filtros y, con período seleccionado, ponían el UUID
+   del período en el nombre del archivo. El backend ya exponía las fechas resueltas bajo
+   `data.rango`. Fix: derivar el rango de `data.rango.fechaDesde/Hasta`. Sin cambio de
+   contrato.
+3. **R8 — params canónicos** (backend + frontend, change 2026-06-16): Balance de
+   Comprobación, Hoja de Trabajo y EFE usaban `desde`/`hasta`. Migrados a
+   `fechaDesde`/`fechaHasta` (canónico). Cambio de contrato (DTO + e2e + capa `api`);
+   OpenAPI + `api.generated.ts` regenerados, `contract-drift` verde. **RESUELTA**.
 
 ---
 
@@ -368,9 +371,10 @@ ve y las "unifica por consistencia", rompe la semántica. Quedan listadas explí
   los reportes de control** (R6): Comprobación, Hoja de Trabajo, EFE. NO las muevas a
   Balance General / Estado de Resultados / EEPN: son ruido para un estado de
   presentación.
-- **El EFE mapea `fechaDesde`/`fechaHasta` (form) → `desde`/`hasta` (api)** a
-  propósito (el endpoint espera `desde`/`hasta`). NO "arregles" el form para que mande
-  `desde`/`hasta` directo sin entender el mapeo.
+- **Todos los reportes de rango usan `fechaDesde`/`fechaHasta`** (R8, canonizado el
+  2026-06-16). Ya no hay mapeo en la capa `api` (la "TRAMPA R2" del EFE se eliminó). El
+  form y el endpoint hablan el mismo nombre. El param interno del service de algunos
+  reportes sigue siendo `desde`/`hasta` (detalle de implementación, no expuesto).
 
 ---
 
@@ -393,8 +397,8 @@ Cuando clones el próximo reporte, seguí esta lista (derivada de R1–R9):
    (`cuentasNaturalezaOpuesta`/`advertencias`). No (presentación) → sin secciones.
 7. **Layout (R7)**: envolvé los filtros en `rounded-lg border bg-card p-4`, botón de
    export arriba a la derecha, orden filtro temporal → toggles → "Buscar".
-8. **Params (R8)**: usá `desde`/`hasta`/`periodoFiscalId`/`incluirAnulados`. **NADA**
-   de `fechaDesde`/`fechaHasta` en un endpoint nuevo.
+8. **Params (R8)**: usá `fechaDesde`/`fechaHasta`/`periodoFiscalId`/`incluirAnulados`.
+   **NADA** de `desde`/`hasta` en un endpoint nuevo (canónico = `fechaDesde`/`fechaHasta`).
 9. **Export (R9)**:
    - Gateá el botón con el permiso de lectura del **propio reporte**
      (`contabilidad.<x>.read`), vía `<PermissionButton>` / `<Can>` (fail-closed).

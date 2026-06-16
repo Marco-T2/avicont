@@ -186,7 +186,7 @@ describe('Balance de Comprobación (e2e)', () => {
     it('401 sin token', async () => {
       const res = await request(app.getHttpServer())
         .get(URL)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
       expect(res.status).toBe(401);
     });
 
@@ -217,7 +217,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${memberToken}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(403);
     });
@@ -234,7 +234,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(200);
       expect(res.body.fechaDesde).toBe('2026-04-01');
@@ -266,7 +266,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30', periodoFiscalId: periodo.id });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30', periodoFiscalId: periodo.id });
 
       expect(res.status).toBe(422);
       expect(res.body.error?.code).toBe('REPORTES_BALANCE_COMPROBACION_RANGO_AMBIGUO');
@@ -295,7 +295,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '01-04-2026', hasta: '30-04-2026' });
+        .query({ fechaDesde: '01-04-2026', fechaHasta: '30-04-2026' });
 
       expect(res.status).toBe(400);
     });
@@ -306,7 +306,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-02-30', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-02-30', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(422);
       expect(res.body.error?.code).toBe('REPORTES_BALANCE_COMPROBACION_RANGO_INVALIDO');
@@ -318,7 +318,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-30', hasta: '2026-04-01' });
+        .query({ fechaDesde: '2026-04-30', fechaHasta: '2026-04-01' });
 
       expect(res.status).toBe(422);
       expect(res.body.error?.code).toBe('REPORTES_BALANCE_COMPROBACION_RANGO_INVALIDO');
@@ -354,7 +354,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(200);
       expect(res.body.cuadra).toBe(true);
@@ -406,7 +406,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(200);
       const codigos = res.body.lineas.map((l: { codigoInterno: string }) => l.codigoInterno);
@@ -459,7 +459,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(200);
       const opuestas = res.body.cuentasNaturalezaOpuesta;
@@ -487,12 +487,12 @@ describe('Balance de Comprobación (e2e)', () => {
       const sin = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30', incluirAnulados: 'false' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30', incluirAnulados: 'false' });
 
       const con = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30', incluirAnulados: 'true' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30', incluirAnulados: 'true' });
 
       expect(sin.status).toBe(200);
       expect(con.status).toBe(200);
@@ -523,7 +523,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const resA = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${tokenA}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(resA.status).toBe(200);
       expect(parseFloat(resA.body.totalSumasDebito)).toBe(8000);
@@ -541,7 +541,7 @@ describe('Balance de Comprobación (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get(URL)
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-04-01', hasta: '2026-04-30' });
+        .query({ fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' });
 
       expect(res.status).toBe(200);
       expect(res.body.lineas).toEqual([]);

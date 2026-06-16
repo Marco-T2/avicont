@@ -102,7 +102,7 @@ export class EeffController {
   @ApiOperation({
     summary:
       'Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. ' +
-      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). ' +
       'Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y ' +
       'saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13.',
   })
@@ -115,8 +115,8 @@ export class EeffController {
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
     // para campos opcionales del DTO.
     return this.balanceComprobacionService.consultarBalanceComprobacion(tenantId, {
-      ...(query.desde !== undefined ? { desde: query.desde } : {}),
-      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.fechaDesde !== undefined ? { desde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { hasta: query.fechaHasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });
@@ -127,7 +127,7 @@ export class EeffController {
   @ApiOperation({
     summary:
       'Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. ' +
-      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). ' +
       'Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, ' +
       'columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22.',
   })
@@ -137,8 +137,8 @@ export class EeffController {
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
     // para campos opcionales del DTO.
     return this.hojaTrabajoService.consultarHojaTrabajo(tenantId, {
-      ...(query.desde !== undefined ? { desde: query.desde } : {}),
-      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.fechaDesde !== undefined ? { desde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { hasta: query.fechaHasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });
@@ -175,7 +175,7 @@ export class EeffController {
   @ApiOperation({
     summary:
       'Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. ' +
-      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). ' +
       'Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo ' +
       'a través de las actividades de operación, inversión y financiación, con cuadre. ' +
       'REQ-FE-01..17.',
@@ -189,8 +189,8 @@ export class EeffController {
     // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
     // para campos opcionales del DTO.
     return this.estadoFlujoEfectivoService.consultarFlujoEfectivo(tenantId, {
-      ...(query.desde !== undefined ? { desde: query.desde } : {}),
-      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.fechaDesde !== undefined ? { desde: query.fechaDesde } : {}),
+      ...(query.fechaHasta !== undefined ? { hasta: query.fechaHasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });

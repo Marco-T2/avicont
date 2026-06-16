@@ -69,7 +69,7 @@ Expone el endpoint `GET /api/eeff/flujo-efectivo`. Vive en el módulo
 
 El sistema DEBE exponer `GET /api/eeff/flujo-efectivo` que acepta el rango en exactamente
 UNO de dos modos:
-- **Modo rango**: `desde` + `hasta`, ambos `YYYY-MM-DD`.
+- **Modo rango**: `fechaDesde` + `fechaHasta`, ambos `YYYY-MM-DD`.
 - **Modo período**: `periodoFiscalId` (UUID), del cual deriva `[desde, hasta]` vía
   `PeriodosReaderPort.obtenerRangoFechas`.
 
@@ -78,7 +78,7 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 #### Escenario: rango directo válido
 
 - DADO un tenant con comprobantes CONTABILIZADO en 2026
-- CUANDO consulta `GET /api/eeff/flujo-efectivo?desde=2026-01-01&hasta=2026-12-31`
+- CUANDO consulta `GET /api/eeff/flujo-efectivo?fechaDesde=2026-01-01&fechaHasta=2026-12-31`
 - ENTONCES responde 200 con el EFE y `fechaDesde="2026-01-01"`, `fechaHasta="2026-12-31"`.
 
 #### Escenario: por periodoFiscalId
@@ -89,12 +89,12 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 
 #### Escenario: ambos modos a la vez
 
-- CUANDO consulta con `desde`/`hasta` Y `periodoFiscalId` simultáneamente
+- CUANDO consulta con `fechaDesde`/`fechaHasta` Y `periodoFiscalId` simultáneamente
 - ENTONCES responde 422 con código `REPORTES_FLUJO_EFECTIVO_RANGO_AMBIGUO`.
 
 #### Escenario: ningún modo proporcionado
 
-- CUANDO consulta sin `desde`/`hasta` ni `periodoFiscalId`
+- CUANDO consulta sin `fechaDesde`/`fechaHasta` ni `periodoFiscalId`
 - ENTONCES responde 422 con código `REPORTES_FLUJO_EFECTIVO_RANGO_REQUERIDO`.
 
 ---
@@ -105,17 +105,17 @@ El sistema DEBE validar el rango antes de leer saldos.
 
 #### Escenario: formato inválido
 
-- CUANDO `desde=2026-13-40`
+- CUANDO `fechaDesde=2026-13-40`
 - ENTONCES responde 422 con código `REPORTES_FLUJO_EFECTIVO_RANGO_INVALIDO`.
 
 #### Escenario: desde posterior a hasta
 
-- CUANDO `desde=2026-12-31&hasta=2026-01-01`
+- CUANDO `fechaDesde=2026-12-31&fechaHasta=2026-01-01`
 - ENTONCES responde 422 con código `REPORTES_FLUJO_EFECTIVO_RANGO_INVALIDO`.
 
 #### Escenario: modo rango incompleto
 
-- CUANDO `desde=2026-01-01` sin `hasta` (o viceversa)
+- CUANDO `fechaDesde=2026-01-01` sin `fechaHasta` (o viceversa)
 - ENTONCES responde 422 con código `REPORTES_FLUJO_EFECTIVO_RANGO_INVALIDO`.
 
 #### Escenario: periodoFiscalId inexistente o de otro tenant
@@ -139,7 +139,7 @@ ejercicio y las partidas no monetarias. La estructura de cuentas vía
 
 #### Escenario: corte de saldo inicial en día previo
 
-- DADO `desde=2026-04-01`
+- DADO `fechaDesde=2026-04-01`
 - CUANDO el service lee saldos iniciales
 - ENTONCES corta en `2026-03-31` de modo que
   `saldoInicial + movimiento(rango) = saldoFinal` sin hueco ni solape.
@@ -584,7 +584,7 @@ importando de `api.generated.ts` directamente.
 ### REQ-FE-UI-02 — Filtro de rango — período XOR rango + incluir anulados
 
 La pantalla DEBE ofrecer dos modos mutuamente excluyentes para acotar el reporte,
-calzando con la query del endpoint (`desde`+`hasta` XOR `periodoFiscalId`, + `incluirAnulados?`).
+calzando con la query del endpoint (`fechaDesde`+`fechaHasta` XOR `periodoFiscalId`, + `incluirAnulados?`).
 A diferencia del EEPN, el EFE **no tiene modo `gestionId`**.
 
 #### Scenario: Modo rango es el default

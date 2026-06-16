@@ -5,7 +5,7 @@
  * la regla de negocio (exactamente un modo, rango coherente, período existe) vive
  * en el service con DomainError (CLAUDE.md §10.10, regla de oro).
  *
- * REQ-BC-01: dos modos mutuamente excluyentes — desde+hasta O periodoFiscalId.
+ * REQ-BC-01: dos modos mutuamente excluyentes — fechaDesde+fechaHasta O periodoFiscalId.
  * REQ-BC-08: incluirAnulados (default false).
  */
 
@@ -15,19 +15,19 @@ import { IsBoolean, IsOptional, IsUUID, Matches } from 'class-validator';
 export class BalanceComprobacionQueryDto {
   /**
    * Inicio del rango (inclusive). Formato YYYY-MM-DD.
-   * Debe usarse junto con `hasta`. REQ-BC-01 modo rango.
+   * Debe usarse junto con `fechaHasta`. REQ-BC-01 modo rango.
    */
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'desde debe tener formato YYYY-MM-DD' })
-  desde?: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fechaDesde debe tener formato YYYY-MM-DD' })
+  fechaDesde?: string;
 
   /**
    * Fin del rango (inclusive). Formato YYYY-MM-DD.
-   * Debe usarse junto con `desde`. REQ-BC-01 modo rango.
+   * Debe usarse junto con `fechaDesde`. REQ-BC-01 modo rango.
    */
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'hasta debe tener formato YYYY-MM-DD' })
-  hasta?: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fechaHasta debe tener formato YYYY-MM-DD' })
+  fechaHasta?: string;
 
   /**
    * UUID del período fiscal. El rango es el mes completo del período.

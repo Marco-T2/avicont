@@ -7,12 +7,8 @@ import type { FlujoEfectivoFiltroValues } from '../schemas/flujo-efectivo-filtro
  * GET /api/eeff/flujo-efectivo — Estado de Flujo de Efectivo (método indirecto).
  *
  * El rango se envía en exactamente uno de los dos modos (mutuamente excluyentes):
- * `periodoFiscalId` O `desde`+`hasta`. El service del backend resuelve el rango
- * con prioridad fechas > período.
- *
- * TRAMPA R2: el endpoint usa `desde`/`hasta` (no `fechaDesde`/`fechaHasta` como el
- * EEPN). El schema del form mantiene `fechaDesde`/`fechaHasta` (es UI); el mapeo a
- * `desde`/`hasta` ocurre acá en la capa api.
+ * `periodoFiscalId` O `fechaDesde`+`fechaHasta`. El service del backend resuelve
+ * el rango con prioridad fechas > período.
  */
 export async function getFlujoEfectivo(
   filtros: FlujoEfectivoFiltroValues,
@@ -24,9 +20,8 @@ export async function getFlujoEfectivo(
   if (filtros.modo === 'periodo') {
     params.periodoFiscalId = filtros.periodoFiscalId;
   } else {
-    // El endpoint espera `desde`/`hasta`, no `fechaDesde`/`fechaHasta`
-    params.desde = filtros.fechaDesde;
-    params.hasta = filtros.fechaHasta;
+    params.fechaDesde = filtros.fechaDesde;
+    params.fechaHasta = filtros.fechaHasta;
   }
 
   const res = await api.get<EstadoFlujoEfectivoResponse>('/api/eeff/flujo-efectivo', {
