@@ -16,6 +16,7 @@ import type {
 } from '../ports/eeff-saldos-reader.port';
 import { EeffSaldosReaderPort } from '../ports/eeff-saldos-reader.port';
 import {
+  toDominioActividadFlujo,
   toDominioClaseCuenta,
   toDominioNaturalezaCuenta,
   toDominioSubClaseCuenta,
@@ -180,6 +181,7 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
         naturaleza: true,
         codigoInterno: true,
         nombre: true,
+        actividadFlujo: true,
       },
       orderBy: [{ codigoInterno: 'asc' }],
     });
@@ -198,6 +200,7 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
       naturaleza: toDominioNaturalezaCuenta(c.naturaleza),
       codigoInterno: c.codigoInterno,
       nombre: c.nombre,
+      actividadFlujo: c.actividadFlujo !== null ? toDominioActividadFlujo(c.actividadFlujo) : null,
     }));
   }
 

@@ -29,6 +29,7 @@ function cuenta(
     subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
     naturaleza: NaturalezaCuenta.DEUDORA,
     nombre: `Cuenta ${overrides.codigoInterno}`,
+    actividadFlujo: null,
     ...overrides,
   };
 }

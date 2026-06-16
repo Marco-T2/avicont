@@ -1877,6 +1877,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/eeff/flujo-efectivo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo a través de las actividades de operación, inversión y financiación, con cuadre. REQ-FE-01..17. */
+        get: operations["EeffController_obtenerFlujoEfectivo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3371,6 +3388,52 @@ export interface components {
             cuadra: boolean;
             /** @example 0.00 */
             diferenciaBob: string;
+        };
+        LineaFlujoDto: {
+            cuentaId: string | null;
+            codigoInterno: string | null;
+            nombre: string;
+            /** @enum {string} */
+            tipo: "RESULTADO_EJERCICIO" | "PARTIDA_NO_MONETARIA" | "VARIACION_CAPITAL_TRABAJO" | "VARIACION_CUENTA";
+            /** @example -3000.00 */
+            monto: string;
+        };
+        SeccionFlujoDto: {
+            lineas: components["schemas"]["LineaFlujoDto"][];
+            /** @example 5000.00 */
+            subtotal: string;
+        };
+        CuentaEfectivoHeuristicaDto: {
+            cuentaId: string;
+            codigoInterno: string;
+            nombre: string;
+        };
+        EstadoFlujoEfectivoResponseDto: {
+            /** @example 2026-01-01 */
+            fechaDesde: string;
+            /** @example 2026-12-31 */
+            fechaHasta: string;
+            /** @example 5000.00 */
+            resultadoEjercicio: string;
+            operacion: components["schemas"]["SeccionFlujoDto"];
+            inversion: components["schemas"]["SeccionFlujoDto"];
+            financiacion: components["schemas"]["SeccionFlujoDto"];
+            /** @example 5000.00 */
+            efectivoInicial: string;
+            /** @example 45000.00 */
+            variacionNeta: string;
+            /** @example 50000.00 */
+            efectivoFinal: string;
+            cuadra: boolean;
+            /** @example 0.00 */
+            diferencia: string;
+            /**
+             * @example [
+             *       "No se identificó ninguna cuenta de efectivo"
+             *     ]
+             */
+            advertencias: string[];
+            cuentasEfectivoDetectadasPorHeuristica: components["schemas"]["CuentaEfectivoHeuristicaDto"][];
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -6954,6 +7017,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvolucionPatrimonioResponseDto"];
+                };
+            };
+        };
+    };
+    EeffController_obtenerFlujoEfectivo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoFlujoEfectivoResponseDto"];
                 };
             };
         };

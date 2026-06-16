@@ -17,6 +17,7 @@ function makeCuenta(overrides: Partial<CuentaEstructuraRow> = {}): CuentaEstruct
     naturaleza: NaturalezaCuenta.ACREEDORA,
     codigoInterno: '4.1.1.001',
     nombre: 'Ventas',
+    actividadFlujo: null,
     ...overrides,
   };
 }

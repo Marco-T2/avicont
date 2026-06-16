@@ -14,11 +14,14 @@ import { BalanceComprobacionResponseDto } from './dto/balance-comprobacion-respo
 import { BalanceResponseDto } from './dto/balance-response.dto';
 import { EeffResultadosQueryDto } from './dto/eeff-resultados-query.dto';
 import { BalanceQueryDto } from './dto/balance-query.dto';
+import { EstadoFlujoEfectivoQueryDto } from './dto/estado-flujo-efectivo-query.dto';
+import { EstadoFlujoEfectivoResponseDto } from './dto/estado-flujo-efectivo-response.dto';
 import { EstadoResultadosResponseDto } from './dto/eeff-resultados-response.dto';
 import { EvolucionPatrimonioQueryDto } from './dto/evolucion-patrimonio-query.dto';
 import { EvolucionPatrimonioResponseDto } from './dto/evolucion-patrimonio-response.dto';
 import { HojaTrabajoQueryDto } from './dto/hoja-trabajo-query.dto';
 import { HojaTrabajoResponseDto } from './dto/hoja-trabajo-response.dto';
+import { EstadoFlujoEfectivoService } from './estado-flujo-efectivo.service';
 import { EstadoResultadosService } from './estado-resultados.service';
 import { EvolucionPatrimonioService } from './evolucion-patrimonio.service';
 import { HojaTrabajoService } from './hoja-trabajo.service';
@@ -45,6 +48,7 @@ export class EeffController {
     private readonly balanceComprobacionService: BalanceComprobacionService,
     private readonly hojaTrabajoService: HojaTrabajoService,
     private readonly evolucionPatrimonioService: EvolucionPatrimonioService,
+    private readonly estadoFlujoEfectivoService: EstadoFlujoEfectivoService,
   ) {}
 
   @Get('balance')
@@ -162,6 +166,32 @@ export class EeffController {
       ...(query.fechaHasta !== undefined ? { fechaHasta: query.fechaHasta } : {}),
       ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       ...(query.gestionId !== undefined ? { gestionId: query.gestionId } : {}),
+      incluirAnulados: query.incluirAnulados ?? false,
+    });
+  }
+
+  @Get('flujo-efectivo')
+  @RequirePermissions('contabilidad.eeff.read')
+  @ApiOperation({
+    summary:
+      'Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. ' +
+      'Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). ' +
+      'Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo ' +
+      'a través de las actividades de operación, inversión y financiación, con cuadre. ' +
+      'REQ-FE-01..17.',
+  })
+  @ApiOkResponse({ type: EstadoFlujoEfectivoResponseDto })
+  obtenerFlujoEfectivo(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: EstadoFlujoEfectivoQueryDto,
+  ) {
+    const tenantId = resolveTenantId(req);
+    // exactOptionalPropertyTypes activo (CLAUDE.md §2.5.1): spread condicional
+    // para campos opcionales del DTO.
+    return this.estadoFlujoEfectivoService.consultarFlujoEfectivo(tenantId, {
+      ...(query.desde !== undefined ? { desde: query.desde } : {}),
+      ...(query.hasta !== undefined ? { hasta: query.hasta } : {}),
+      ...(query.periodoFiscalId !== undefined ? { periodoFiscalId: query.periodoFiscalId } : {}),
       incluirAnulados: query.incluirAnulados ?? false,
     });
   }

@@ -93,6 +93,17 @@ enum NaturalezaCuenta {
 // El Balance General separa Corriente/No Corriente.
 // El Estado de Resultados separa Operativo/No Operativo.
 // Nullable solo en cuentas raíz (nivel 1) que son agrupadores.
+// Actividad del Estado de Flujo de Efectivo (NIC 7), por cuenta.
+// EFECTIVO marca caja/bancos/equivalentes (ancla de la conciliación, no una
+// sección). El campo Cuenta.actividadFlujo es nullable: si null, el reporte EFE
+// aplica un default heurístico desde subClaseCuenta/código.
+enum ActividadFlujo {
+  EFECTIVO
+  OPERACION
+  INVERSION
+  FINANCIACION
+}
+
 enum SubClaseCuenta {
   // Activo
   ACTIVO_CORRIENTE
@@ -400,6 +411,9 @@ model Cuenta {
   // Nullable solo en cuentas raíz (nivel 1) que son agrupadores puros.
   subClaseCuenta SubClaseCuenta?
   naturaleza     NaturalezaCuenta
+  // Actividad del Estado de Flujo de Efectivo (NIC 7). Nullable: si null, el
+  // reporte EFE aplica un default heurístico desde subClaseCuenta/código.
+  actividadFlujo ActividadFlujo?
 
   // ----- Jerarquía -----
   parentId String?

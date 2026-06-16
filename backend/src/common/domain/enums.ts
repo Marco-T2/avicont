@@ -61,6 +61,18 @@ export enum NaturalezaCuenta {
 // Dueño del dato: módulo `cuentas` (campo `Cuenta.subClaseCuenta`).
 // Consumido por: `cuentas`, `reportes` (armar secciones del Balance y Estado de Resultados).
 // Promovido a `common` porque `reportes` también lo consume (cross-module).
+// Actividad del Estado de Flujo de Efectivo (NIC 7). Dueño del dato: módulo
+// `cuentas` (campo `Cuenta.actividadFlujo`). Consumido por: `reportes` (EFE).
+// EFECTIVO marca caja/bancos/equivalentes — es el ancla de la conciliación,
+// NO una sección de actividad. Nullable en la cuenta: si null, el reporte EFE
+// aplica un default heurístico derivado de subClaseCuenta/código.
+export enum ActividadFlujo {
+  EFECTIVO = 'EFECTIVO',
+  OPERACION = 'OPERACION',
+  INVERSION = 'INVERSION',
+  FINANCIACION = 'FINANCIACION',
+}
+
 export enum SubClaseCuenta {
   ACTIVO_CORRIENTE = 'ACTIVO_CORRIENTE',
   ACTIVO_NO_CORRIENTE = 'ACTIVO_NO_CORRIENTE',

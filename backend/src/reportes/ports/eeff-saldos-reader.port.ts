@@ -1,6 +1,11 @@
 import { Decimal } from '@prisma/client/runtime/library';
 
-import type { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import type {
+  ActividadFlujo,
+  ClaseCuenta,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 // ============================================================
 // Símbolo de inyección
@@ -38,6 +43,8 @@ export interface CuentaEstructuraRow {
   naturaleza: NaturalezaCuenta;
   codigoInterno: string;
   nombre: string;
+  /** Actividad del EFE (NIC 7). Null → el reporte aplica default heurístico. */
+  actividadFlujo: ActividadFlujo | null;
 }
 
 /**
