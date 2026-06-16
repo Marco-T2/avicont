@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  ActividadFlujo,
   ClaseCuenta,
   Moneda,
   NaturalezaCuenta,
@@ -67,6 +68,16 @@ export const cuentaFormSchema = z
     esContraria: z.boolean(),
     monedaFuncional: z.enum([Moneda.BOB, Moneda.USD] as const),
     permiteMultiMoneda: z.boolean(),
+    // actividadFlujo: solo expuesto en edición; en create el campo no se envía.
+    // undefined = campo no incluido (create o no se tocó); null = limpiar clasificación.
+    actividadFlujo: z
+      .enum([
+        ActividadFlujo.EFECTIVO,
+        ActividadFlujo.OPERACION,
+        ActividadFlujo.INVERSION,
+        ActividadFlujo.FINANCIACION,
+      ] as const)
+      .optional(),
   })
   // Cross-field: subClaseCuenta debe corresponder a claseCuenta. El backend
   // valida lo mismo, pero mostrarlo en el form evita roundtrips innecesarios.
@@ -136,4 +147,11 @@ export const LABELS_NATURALEZA: Record<NaturalezaCuenta, string> = {
 export const LABELS_MONEDA: Record<Moneda, string> = {
   BOB: 'BOB — Boliviano',
   USD: 'USD — Dólar',
+};
+
+export const LABELS_ACTIVIDAD_FLUJO: Record<ActividadFlujo, string> = {
+  EFECTIVO: 'Efectivo y equivalentes',
+  OPERACION: 'Actividades de operación',
+  INVERSION: 'Actividades de inversión',
+  FINANCIACION: 'Actividades de financiación',
 };

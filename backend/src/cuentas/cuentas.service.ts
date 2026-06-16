@@ -196,6 +196,7 @@ export class CuentasService {
         ? { permiteMultiMoneda: dto.permiteMultiMoneda }
         : {}),
       ...(dto.monedaFuncional !== undefined ? { monedaFuncional: dto.monedaFuncional } : {}),
+      ...(dto.actividadFlujo !== undefined ? { actividadFlujo: dto.actividadFlujo } : {}),
     });
 
     return toCuentaResponse(actualizada);

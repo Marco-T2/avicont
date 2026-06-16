@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import {
+  ActividadFlujo,
+  ClaseCuenta,
+  Moneda,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 import type { Cuenta } from '../domain/cuenta';
 
@@ -24,6 +30,7 @@ export class CuentaResponseDto {
   @ApiProperty() permiteMultiMoneda!: boolean;
   @ApiProperty() esSystemSeed!: boolean;
   @ApiProperty() esRequeridaSistema!: boolean;
+  @ApiProperty({ enum: ActividadFlujo, nullable: true }) actividadFlujo!: ActividadFlujo | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
@@ -60,6 +67,7 @@ export function toCuentaResponse(c: Cuenta): CuentaResponseDto {
     permiteMultiMoneda: c.permiteMultiMoneda,
     esSystemSeed: c.esSystemSeed,
     esRequeridaSistema: c.esRequeridaSistema,
+    actividadFlujo: c.actividadFlujo,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
   };

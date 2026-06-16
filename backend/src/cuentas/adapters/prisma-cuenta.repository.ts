@@ -13,10 +13,12 @@ import type {
 } from '../ports/cuenta.repository.port';
 
 import {
+  toDominioActividadFlujo,
   toDominioClaseCuenta,
   toDominioMoneda,
   toDominioNaturalezaCuenta,
   toDominioSubClaseCuenta,
+  toPrismaActividadFlujo,
   toPrismaClaseCuenta,
   toPrismaMoneda,
   toPrismaNaturalezaCuenta,
@@ -48,6 +50,8 @@ function toDominio(row: PrismaCuenta): Cuenta {
     naturaleza: toDominioNaturalezaCuenta(row.naturaleza),
     subClaseCuenta:
       row.subClaseCuenta === null ? null : toDominioSubClaseCuenta(row.subClaseCuenta),
+    actividadFlujo:
+      row.actividadFlujo === null ? null : toDominioActividadFlujo(row.actividadFlujo),
   };
 }
 
@@ -133,11 +137,16 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
   }
 
   actualizar(id: string, tenantId: string, data: ActualizarCuentaData): Promise<Cuenta> {
-    const { monedaFuncional, ...rest } = data;
+    const { monedaFuncional, actividadFlujo, ...rest } = data;
     const prismaData: Prisma.CuentaUncheckedUpdateInput = {
       ...rest,
       ...(monedaFuncional !== undefined
         ? { monedaFuncional: toPrismaMoneda(monedaFuncional) }
+        : {}),
+      ...(actividadFlujo !== undefined
+        ? {
+            actividadFlujo: actividadFlujo === null ? null : toPrismaActividadFlujo(actividadFlujo),
+          }
         : {}),
     };
     // updateMany + findUnique para asegurar el filtro tenantId y devolver el registro.

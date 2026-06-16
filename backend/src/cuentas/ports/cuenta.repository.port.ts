@@ -1,4 +1,10 @@
-import type { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import type {
+  ActividadFlujo,
+  ClaseCuenta,
+  Moneda,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 import type { Cuenta } from '../domain/cuenta';
 
@@ -45,6 +51,7 @@ export interface ActualizarCuentaData {
   requiereContacto?: boolean;
   permiteMultiMoneda?: boolean;
   monedaFuncional?: Moneda;
+  actividadFlujo?: ActividadFlujo | null;
 }
 
 export interface CuentaRepositoryPort {

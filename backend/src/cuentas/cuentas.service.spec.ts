@@ -1,5 +1,11 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ClaseCuenta, Moneda, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import {
+  ActividadFlujo,
+  ClaseCuenta,
+  Moneda,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 import { CuentasService } from './cuentas.service';
 import type { CreateCuentaDto } from './dto/create-cuenta.dto';
@@ -61,6 +67,7 @@ function cuentaFactory(overrides: Partial<Cuenta> = {}): Cuenta {
     permiteMultiMoneda: true,
     esSystemSeed: false,
     esRequeridaSistema: false,
+    actividadFlujo: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -268,6 +275,58 @@ describe('CuentasService', () => {
       await expect(
         service.actualizar(TENANT_ID, 'cuenta-1', dtoContaminado),
       ).resolves.toBeDefined();
+    });
+
+    it('clasifica con un valor válido: el port recibe actividadFlujo y el response lo refleja', async () => {
+      repo.findById.mockResolvedValue(cuentaFactory());
+      repo.actualizar.mockImplementation(async (_id, _t, data) =>
+        cuentaFactory({ actividadFlujo: data.actividadFlujo ?? null }),
+      );
+
+      const resp = await service.actualizar(TENANT_ID, 'cuenta-1', {
+        actividadFlujo: ActividadFlujo.INVERSION,
+      });
+
+      expect(repo.actualizar).toHaveBeenCalledWith(
+        'cuenta-1',
+        TENANT_ID,
+        expect.objectContaining({ actividadFlujo: ActividadFlujo.INVERSION }),
+      );
+      expect(resp.actividadFlujo).toBe(ActividadFlujo.INVERSION);
+    });
+
+    it('limpiar la clasificación: enviar null hace que el port reciba actividadFlujo: null', async () => {
+      repo.findById.mockResolvedValue(cuentaFactory({ actividadFlujo: ActividadFlujo.EFECTIVO }));
+      repo.actualizar.mockImplementation(async (_id, _t, data) =>
+        cuentaFactory({
+          actividadFlujo:
+            data.actividadFlujo === undefined ? ActividadFlujo.EFECTIVO : data.actividadFlujo,
+        }),
+      );
+
+      const resp = await service.actualizar(TENANT_ID, 'cuenta-1', {
+        actividadFlujo: null,
+      });
+
+      expect(repo.actualizar).toHaveBeenCalledWith(
+        'cuenta-1',
+        TENANT_ID,
+        expect.objectContaining({ actividadFlujo: null }),
+      );
+      expect(resp.actividadFlujo).toBeNull();
+    });
+
+    it('omitir actividadFlujo no pasa la clave al port (spread condicional)', async () => {
+      repo.findById.mockResolvedValue(cuentaFactory({ actividadFlujo: ActividadFlujo.OPERACION }));
+      repo.actualizar.mockImplementation(async (_id, _t, _data) =>
+        cuentaFactory({ actividadFlujo: ActividadFlujo.OPERACION }),
+      );
+
+      await service.actualizar(TENANT_ID, 'cuenta-1', { nombre: 'CAJA ACTUALIZADA' });
+
+      // La clave actividadFlujo NO debe estar presente en el objeto pasado al port.
+      const callArg = repo.actualizar.mock.calls[0]?.[2] as Record<string, unknown>;
+      expect(Object.prototype.hasOwnProperty.call(callArg, 'actividadFlujo')).toBe(false);
     });
   });
 

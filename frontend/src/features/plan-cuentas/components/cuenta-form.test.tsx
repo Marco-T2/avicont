@@ -42,6 +42,7 @@ const SAMPLE: Cuenta = {
   permiteMultiMoneda: true,
   esSystemSeed: false,
   esRequeridaSistema: false,
+  actividadFlujo: null,
   createdAt: '2026-04-23T00:00:00.000Z',
   updatedAt: '2026-04-23T00:00:00.000Z',
 };
@@ -85,6 +86,38 @@ describe('CuentaForm', () => {
     expect(
       screen.getByText(/inmutable post-creación.*identificador único/i),
     ).toBeInTheDocument();
+  });
+
+  it('en modo edit muestra el selector de actividad de flujo', () => {
+    render(
+      <CuentaForm
+        mode="edit"
+        initialData={SAMPLE}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+      { wrapper: wrapper() },
+    );
+    // El label del campo debe estar visible (señal de que el bloque se renderizó)
+    expect(screen.getByText(/actividad de flujo de efectivo/i)).toBeInTheDocument();
+    // El hint explicativo también debe estar presente
+    expect(
+      screen.getByText(/clasifica la cuenta para el estado de flujo de efectivo/i),
+    ).toBeInTheDocument();
+  });
+
+  it('en modo create NO renderiza el selector de actividad de flujo', () => {
+    render(
+      <CuentaForm
+        mode="create"
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+      { wrapper: wrapper() },
+    );
+    expect(
+      screen.queryByText(/actividad de flujo de efectivo/i),
+    ).not.toBeInTheDocument();
   });
 
   it('el botón de submit muestra "Crear cuenta" en create y "Guardar cambios" en edit', () => {
