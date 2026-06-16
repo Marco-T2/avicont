@@ -76,7 +76,7 @@ export function EvolucionPatrimonioFiltros({
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      modo: 'rango',
+      modo: 'periodo',
       periodoFiscalId: '',
       fechaDesde: '',
       fechaHasta: '',
@@ -137,19 +137,19 @@ export function EvolucionPatrimonioFiltros({
       <div className="flex gap-2">
         <Button
           type="button"
-          variant={modo === 'rango' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleModoChange('rango')}
-        >
-          Por rango de fechas
-        </Button>
-        <Button
-          type="button"
           variant={modo === 'periodo' ? 'default' : 'outline'}
           size="sm"
           onClick={() => handleModoChange('periodo')}
         >
           Por período
+        </Button>
+        <Button
+          type="button"
+          variant={modo === 'rango' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => handleModoChange('rango')}
+        >
+          Por rango de fechas
         </Button>
       </div>
 

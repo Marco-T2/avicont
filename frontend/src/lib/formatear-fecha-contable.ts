@@ -14,12 +14,13 @@ const FECHA_FORMAT = new Intl.DateTimeFormat('es-BO', {
  * Convierte una fecha contable "YYYY-MM-DD" a "dd/MM/yyyy"
  * en la zona horaria de La Paz (America/La_Paz — CLAUDE.md §4.6).
  *
+ * Helper compartido entre features de reportes (Libro Diario, Libro Mayor).
  * Ejemplo: '2026-05-01' → '01/05/2026'.
  *
  * Se agrega "T12:00:00" para fijar medianoche local y evitar que el parser ISO
- * lo interprete como UTC y desplace el día (mismo patrón que el Libro Diario).
+ * lo interprete como UTC y desplace el día.
  */
-export function formatearFechaLibroMayor(fechaIso: string): string {
+export function formatearFechaContable(fechaIso: string): string {
   const date = new Date(`${fechaIso}T12:00:00`);
   return FECHA_FORMAT.format(date);
 }
