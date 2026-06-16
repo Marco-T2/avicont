@@ -1833,7 +1833,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13. */
+        /** Balance de Comprobación de Sumas y Saldos — reporte de control de 4 columnas. Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). Por cada cuenta de detalle con movimiento muestra sumas (débito/crédito) y saldos (deudor/acreedor), con verificación de cuadre. REQ-BC-01..13. */
         get: operations["EeffController_obtenerBalanceComprobacion"];
         put?: never;
         post?: never;
@@ -1850,7 +1850,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22. */
+        /** Hoja de Trabajo de 12 Columnas — instrumento de cierre contable. Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). Presenta sumas ordinarias, saldo de comprobación, ajustes, saldo ajustado, columnas de Estado de Resultados y de Balance General con 6 cuadres. REQ-HT-01..22. */
         get: operations["EeffController_obtenerHojaTrabajo"];
         put?: never;
         post?: never;
@@ -1884,7 +1884,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo a través de las actividades de operación, inversión y financiación, con cuadre. REQ-FE-01..17. */
+        /** Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. Acepta el rango por fechaDesde+fechaHasta O por periodoFiscalId (excluyentes). Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo a través de las actividades de operación, inversión y financiación, con cuadre. REQ-FE-01..17. */
         get: operations["EeffController_obtenerFlujoEfectivo"];
         put?: never;
         post?: never;

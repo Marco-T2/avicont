@@ -88,7 +88,7 @@ En la respuesta final:
 
 El sistema DEBE exponer `GET /api/eeff/hoja-trabajo` que acepta el rango del reporte
 en exactamente UNO de dos modos:
-- **Modo rango**: `desde` + `hasta`, ambos `YYYY-MM-DD`.
+- **Modo rango**: `fechaDesde` + `fechaHasta`, ambos `YYYY-MM-DD`.
 - **Modo período**: `periodoFiscalId` (UUID v4), del cual deriva `[desde, hasta]`
   como el mes completo del período vía `PeriodosReaderPort.obtenerRangoFechas`.
 
@@ -97,7 +97,7 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 #### Escenario: rango directo válido
 
 - DADO un tenant con comprobantes CONTABILIZADO en abril 2026
-- CUANDO consulta `GET /api/eeff/hoja-trabajo?desde=2026-04-01&hasta=2026-04-30`
+- CUANDO consulta `GET /api/eeff/hoja-trabajo?fechaDesde=2026-04-01&fechaHasta=2026-04-30`
 - ENTONCES responde 200 con la hoja de trabajo y `fechaDesde="2026-04-01"`,
   `fechaHasta="2026-04-30"`.
 
@@ -110,12 +110,12 @@ Además acepta `incluirAnulados?` (boolean, default `false`).
 
 #### Escenario: ambos modos a la vez
 
-- CUANDO consulta con `desde`/`hasta` Y `periodoFiscalId` simultáneamente
+- CUANDO consulta con `fechaDesde`/`fechaHasta` Y `periodoFiscalId` simultáneamente
 - ENTONCES responde 422 con código `REPORTES_HOJA_TRABAJO_RANGO_AMBIGUO`.
 
 #### Escenario: ningún modo proporcionado
 
-- CUANDO consulta sin `desde`/`hasta` ni `periodoFiscalId`
+- CUANDO consulta sin `fechaDesde`/`fechaHasta` ni `periodoFiscalId`
 - ENTONCES responde 422 con código `REPORTES_HOJA_TRABAJO_RANGO_REQUERIDO`.
 
 ---
@@ -126,17 +126,17 @@ El sistema DEBE validar el rango antes de leer saldos.
 
 #### Escenario: formato de fecha inválido
 
-- CUANDO `desde=2026-13-40` (fecha imposible o formato erróneo)
+- CUANDO `fechaDesde=2026-13-40` (fecha imposible o formato erróneo)
 - ENTONCES responde 422 con código `REPORTES_HOJA_TRABAJO_RANGO_INVALIDO`.
 
 #### Escenario: desde posterior a hasta
 
-- CUANDO `desde=2026-04-30&hasta=2026-04-01`
+- CUANDO `fechaDesde=2026-04-30&fechaHasta=2026-04-01`
 - ENTONCES responde 422 con código `REPORTES_HOJA_TRABAJO_RANGO_INVALIDO`.
 
 #### Escenario: modo rango incompleto (solo una fecha)
 
-- CUANDO `desde=2026-04-01` sin `hasta` (o `hasta` sin `desde`)
+- CUANDO `fechaDesde=2026-04-01` sin `fechaHasta` (o `fechaHasta` sin `fechaDesde`)
 - ENTONCES responde 422 con código `REPORTES_HOJA_TRABAJO_RANGO_INVALIDO`.
 
 #### Escenario: periodoFiscalId inexistente o de otro tenant
@@ -404,8 +404,8 @@ separa AJUSTE en su propia columna antes de recombinar. CIERRE queda fuera de am
 #### Escenario: cross-check E2E
 
 - DADO los mismos comprobantes (ordinarios + AJUSTE, sin CIERRE), mismo rango, mismo tenant
-- CUANDO se consultan tanto `GET /api/eeff/balance-comprobacion?desde=…&hasta=…`
-  como `GET /api/eeff/hoja-trabajo?desde=…&hasta=…`
+- CUANDO se consultan tanto `GET /api/eeff/balance-comprobacion?fechaDesde=…&fechaHasta=…`
+  como `GET /api/eeff/hoja-trabajo?fechaDesde=…&fechaHasta=…`
 - ENTONCES para cada cuenta que aparece en ambos reportes:
   `hojaLinea.saldoAjustadoDeudor == bcLinea.saldoDeudor` (±0.01)
   `hojaLinea.saldoAjustadoAcreedor == bcLinea.saldoAcreedor` (±0.01)

@@ -266,7 +266,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${memberToken}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(403);
     });
@@ -277,7 +277,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(200);
     });
@@ -303,8 +303,8 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
         .query({
-          desde: '2026-01-01',
-          hasta: '2026-12-31',
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-12-31',
           periodoFiscalId: '11111111-1111-4111-8111-111111111111',
         });
       expect(res.status).toBe(422);
@@ -316,7 +316,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01' });
+        .query({ fechaDesde: '2026-01-01' });
       expect(res.status).toBe(422);
       expect(res.body.error?.code).toBe('REPORTES_FLUJO_EFECTIVO_RANGO_INVALIDO');
     });
@@ -349,7 +349,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(200);
       expect(res.body.fechaDesde).toBe('2026-01-01');
@@ -437,7 +437,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(200);
       // El resultado del ejercicio es el punto de partida de operación.
@@ -479,7 +479,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(200);
       expect(res.body.cuentasEfectivoDetectadasPorHeuristica.length).toBeGreaterThan(0);
@@ -497,13 +497,13 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const sinAnulados = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
       expect(sinAnulados.body.efectivoFinal).toBe('100000.00');
 
       const conAnulados = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31', incluirAnulados: true });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31', incluirAnulados: true });
       expect(conAnulados.body.efectivoFinal).toBe('107000.00');
     });
   });
@@ -523,7 +523,7 @@ describe('Estado de Flujo de Efectivo (e2e)', () => {
       const res = await request(app.getHttpServer())
         .get('/api/eeff/flujo-efectivo')
         .set('Authorization', `Bearer ${b.token}`)
-        .query({ desde: '2026-01-01', hasta: '2026-12-31' });
+        .query({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' });
 
       expect(res.status).toBe(200);
       // La org B no tiene movimientos.
