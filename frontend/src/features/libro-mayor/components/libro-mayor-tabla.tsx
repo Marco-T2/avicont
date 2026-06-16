@@ -11,10 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { cn } from '@/lib/utils';
 import type { CuentaLibroMayor } from '@/types/api';
-
-import { formatearFechaLibroMayor } from '../lib/formatear-fecha-libro-mayor';
 import { formatearMontoBob } from '../lib/formatear-monto-bob';
 
 // ============================================================
@@ -147,7 +146,7 @@ function CuentaBloque({ cuenta }: CuentaBloqueProps): React.JSX.Element {
                   className={cn(m.anulado && 'opacity-60')}
                 >
                   <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                    {formatearFechaLibroMayor(m.fechaContable)}
+                    {formatearFechaContable(m.fechaContable)}
                   </TableCell>
                   <TableCell className="font-mono text-xs whitespace-nowrap">
                     {m.numeroComprobante ?? '—'}

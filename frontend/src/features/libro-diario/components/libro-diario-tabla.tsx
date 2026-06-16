@@ -9,10 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { cn } from '@/lib/utils';
 import type { AsientoLibroDiario } from '@/types/api';
-
-import { formatearFechaLibroDiario } from '../lib/formatear-fecha-libro-diario';
 import { formatearMontoBob } from '../lib/formatear-monto-bob';
 
 // ============================================================
@@ -71,7 +70,7 @@ function AsientoCabecera({ asiento, colSpan }: AsientoCabeceraProps): React.JSX.
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">
-            {formatearFechaLibroDiario(asiento.fechaContable)}
+            {formatearFechaContable(asiento.fechaContable)}
           </span>
           <span className="font-mono text-xs font-medium whitespace-nowrap">
             {asiento.numero ?? '—'}

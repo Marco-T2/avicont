@@ -75,8 +75,10 @@ export function LibroMayorPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Filtros */}
-      <LibroMayorFiltros onBuscar={handleBuscar} isFetching={isFetching} />
+      {/* Filtros — R7: card wrapper igual que los reportes EEFF */}
+      <div className="rounded-lg border bg-card p-4">
+        <LibroMayorFiltros onBuscar={handleBuscar} isFetching={isFetching} />
+      </div>
 
       {/* Tabla — solo se muestra si hay params activos */}
       {tieneParams && (
