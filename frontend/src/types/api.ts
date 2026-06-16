@@ -782,6 +782,8 @@ export type TotalesEvolucionPatrimonio = Schemas['TotalesEvolucionPatrimonioDto'
 
 export type EvolucionPatrimonioResponse = Schemas['EvolucionPatrimonioResponseDto'];
 
+export type EstadoFlujoEfectivoResponse = Schemas['EstadoFlujoEfectivoResponseDto'];
+
 // ============================================================
 // Permisos efectivos del usuario — GET /me/permissions
 // ============================================================
