@@ -122,6 +122,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/eeff/hoja-trabajo',
       '/eeff/resultados',
       '/eeff/evolucion-patrimonio',
+      '/eeff/flujo-efectivo',
       '/plan-cuentas',
       '/contactos',
       '/documentos-fisicos',

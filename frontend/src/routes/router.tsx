@@ -26,6 +26,7 @@ import { BalanceComprobacionPage } from '@/features/balance-comprobacion/pages/b
 import { HojaTrabajoPage } from '@/features/hoja-trabajo/pages/hoja-trabajo-page';
 import { EstadoResultadosPage } from '@/features/estado-resultados/pages/estado-resultados-page';
 import { EvolucionPatrimonioPage } from '@/features/evolucion-patrimonio/pages/evolucion-patrimonio-page';
+import { FlujoEfectivoPage } from '@/features/flujo-efectivo/pages/flujo-efectivo-page';
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
@@ -151,6 +152,14 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
                 <EvolucionPatrimonioPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/eeff/flujo-efectivo',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
+                <FlujoEfectivoPage />
               </RequirePermission>
             ),
           },
