@@ -21,6 +21,7 @@ function makeCuenta(overrides: Partial<CuentaEstructuraRow> = {}): CuentaEstruct
     naturaleza: NaturalezaCuenta.DEUDORA,
     codigoInterno: '1.1.1.001',
     nombre: 'Caja MN',
+    actividadFlujo: null,
     ...overrides,
   };
 }

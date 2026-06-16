@@ -521,6 +521,37 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
       expect(cuentaIds).not.toContain(cajaBId);
       expect(cuentaIds).not.toContain(ventasBId);
     });
+
+    // EFE (NIC 7): la estructura trae actividadFlujo; NULL por default,
+    // el valor explícito cuando se setea (REQ-FE-16).
+    it('actividadFlujo es null por default para cuentas existentes', async () => {
+      const estructura = await adapter.obtenerEstructuraCuentas(tenantA);
+
+      const caja = estructura.find((c) => c.id === cajaAId);
+      expect(caja).toBeDefined();
+      expect(caja!.actividadFlujo).toBeNull();
+    });
+
+    it('actividadFlujo refleja el valor seteado en la cuenta', async () => {
+      const cuentaMarcada = await prisma.cuenta.create({
+        data: {
+          organizationId: tenantA,
+          codigoInterno: '1.1.1.009',
+          nombre: 'Caja marcada efectivo',
+          claseCuenta: ClaseCuenta.ACTIVO,
+          subClaseCuenta: SubClaseCuenta.ACTIVO_CORRIENTE,
+          naturaleza: NaturalezaCuenta.DEUDORA,
+          nivel: 4,
+          esDetalle: true,
+          actividadFlujo: 'EFECTIVO',
+        },
+      });
+
+      const estructura = await adapter.obtenerEstructuraCuentas(tenantA);
+      const marcada = estructura.find((c) => c.id === cuentaMarcada.id);
+      expect(marcada).toBeDefined();
+      expect(marcada!.actividadFlujo).toBe('EFECTIVO');
+    });
   });
 
   // ============================================================

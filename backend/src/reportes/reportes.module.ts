@@ -11,6 +11,7 @@ import { PrismaComprobantesReaderAdapter } from './adapters/prisma-comprobantes-
 import { PrismaLibroMayorReaderAdapter } from './adapters/prisma-libro-mayor-reader.adapter';
 import { BalanceComprobacionService } from './balance-comprobacion.service';
 import { BalanceGeneralService } from './balance-general.service';
+import { EstadoFlujoEfectivoService } from './estado-flujo-efectivo.service';
 import { EstadoResultadosService } from './estado-resultados.service';
 import { EvolucionPatrimonioService } from './evolucion-patrimonio.service';
 import { HojaTrabajoService } from './hoja-trabajo.service';
@@ -77,6 +78,7 @@ import { ReportesController } from './reportes.controller';
     BalanceComprobacionService,
     HojaTrabajoService,
     EvolucionPatrimonioService,
+    EstadoFlujoEfectivoService,
     PrismaEeffSaldosReaderAdapter,
     {
       provide: EEFF_SALDOS_READER_PORT,

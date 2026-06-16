@@ -37,6 +37,7 @@ function estructuraBase(): CuentaEstructuraRow[] {
       naturaleza: NaturalezaCuenta.DEUDORA,
       codigoInterno: '1101',
       nombre: 'Caja MN',
+      actividadFlujo: null,
     },
     {
       id: 'c2',
@@ -49,6 +50,7 @@ function estructuraBase(): CuentaEstructuraRow[] {
       naturaleza: NaturalezaCuenta.ACREEDORA,
       codigoInterno: '4101',
       nombre: 'Ventas',
+      actividadFlujo: null,
     },
   ];
 }

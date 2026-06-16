@@ -5473,6 +5473,33 @@
         ]
       }
     },
+    "/api/eeff/flujo-efectivo": {
+      "get": {
+        "operationId": "EeffController_obtenerFlujoEfectivo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoFlujoEfectivoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Estado de Flujo de Efectivo (EFE) — método indirecto (NIC 7). 5º estado financiero. Acepta el rango por desde+hasta O por periodoFiscalId (excluyentes). Parte del resultado del ejercicio y concilia hasta la variación neta de efectivo a través de las actividades de operación, inversión y financiación, con cuadre. REQ-FE-01..17.",
+        "tags": [
+          "Estados Financieros"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -9628,6 +9655,155 @@
           "totales",
           "cuadra",
           "diferenciaBob"
+        ]
+      },
+      "LineaFlujoDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "nullable": true
+          },
+          "codigoInterno": {
+            "type": "string",
+            "nullable": true
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "RESULTADO_EJERCICIO",
+              "PARTIDA_NO_MONETARIA",
+              "VARIACION_CAPITAL_TRABAJO",
+              "VARIACION_CUENTA"
+            ]
+          },
+          "monto": {
+            "type": "string",
+            "example": "-3000.00"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre",
+          "tipo",
+          "monto"
+        ]
+      },
+      "SeccionFlujoDto": {
+        "type": "object",
+        "properties": {
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineaFlujoDto"
+            }
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "5000.00"
+          }
+        },
+        "required": [
+          "lineas",
+          "subtotal"
+        ]
+      },
+      "CuentaEfectivoHeuristicaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string"
+          },
+          "codigoInterno": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "codigoInterno",
+          "nombre"
+        ]
+      },
+      "EstadoFlujoEfectivoResponseDto": {
+        "type": "object",
+        "properties": {
+          "fechaDesde": {
+            "type": "string",
+            "example": "2026-01-01"
+          },
+          "fechaHasta": {
+            "type": "string",
+            "example": "2026-12-31"
+          },
+          "resultadoEjercicio": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "operacion": {
+            "$ref": "#/components/schemas/SeccionFlujoDto"
+          },
+          "inversion": {
+            "$ref": "#/components/schemas/SeccionFlujoDto"
+          },
+          "financiacion": {
+            "$ref": "#/components/schemas/SeccionFlujoDto"
+          },
+          "efectivoInicial": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "variacionNeta": {
+            "type": "string",
+            "example": "45000.00"
+          },
+          "efectivoFinal": {
+            "type": "string",
+            "example": "50000.00"
+          },
+          "cuadra": {
+            "type": "boolean"
+          },
+          "diferencia": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "advertencias": {
+            "example": [
+              "No se identificó ninguna cuenta de efectivo"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cuentasEfectivoDetectadasPorHeuristica": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CuentaEfectivoHeuristicaDto"
+            }
+          }
+        },
+        "required": [
+          "fechaDesde",
+          "fechaHasta",
+          "resultadoEjercicio",
+          "operacion",
+          "inversion",
+          "financiacion",
+          "efectivoInicial",
+          "variacionNeta",
+          "efectivoFinal",
+          "cuadra",
+          "diferencia",
+          "advertencias",
+          "cuentasEfectivoDetectadasPorHeuristica"
         ]
       },
       "MePermissionsResponseDto": {

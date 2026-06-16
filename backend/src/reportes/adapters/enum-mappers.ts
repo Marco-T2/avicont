@@ -12,12 +12,18 @@
 // del Record es intencional y aceptada por la convención.
 
 import {
+  ActividadFlujo as PrismaActividadFlujo,
   ClaseCuenta as PrismaClaseCuenta,
   NaturalezaCuenta as PrismaNaturalezaCuenta,
   SubClaseCuenta as PrismaSubClaseCuenta,
 } from '@prisma/client';
 
-import { ClaseCuenta, NaturalezaCuenta, SubClaseCuenta } from '@/common/domain/enums';
+import {
+  ActividadFlujo,
+  ClaseCuenta,
+  NaturalezaCuenta,
+  SubClaseCuenta,
+} from '@/common/domain/enums';
 
 // ------------------------------------------------------------
 // ClaseCuenta
@@ -70,4 +76,19 @@ const SUBCLASE_PRISMA_A_DOMINIO: Record<PrismaSubClaseCuenta, SubClaseCuenta> = 
 
 export function toDominioSubClaseCuenta(p: PrismaSubClaseCuenta): SubClaseCuenta {
   return SUBCLASE_PRISMA_A_DOMINIO[p];
+}
+
+// ------------------------------------------------------------
+// ActividadFlujo (NIC 7 — Estado de Flujo de Efectivo)
+// ------------------------------------------------------------
+
+const ACTIVIDAD_FLUJO_PRISMA_A_DOMINIO: Record<PrismaActividadFlujo, ActividadFlujo> = {
+  EFECTIVO: ActividadFlujo.EFECTIVO,
+  OPERACION: ActividadFlujo.OPERACION,
+  INVERSION: ActividadFlujo.INVERSION,
+  FINANCIACION: ActividadFlujo.FINANCIACION,
+};
+
+export function toDominioActividadFlujo(p: PrismaActividadFlujo): ActividadFlujo {
+  return ACTIVIDAD_FLUJO_PRISMA_A_DOMINIO[p];
 }
