@@ -113,6 +113,19 @@ período o un rango.
 > a una fecha (ej. arqueo, antigüedad de saldos), copiá el molde de Balance General,
 > NO el de los flujos.
 
+**Defaults de fecha (PR #218).** Ningún input de fecha nace vacío:
+
+- **Modo rango** → `fechaDesde` = **1 de enero del año en curso**, `fechaHasta` = **hoy**
+  (year-to-date). El modo período (por mes) ya trae su selección, no necesita default.
+- **Fecha de corte única** (Balance General) → **hoy**.
+- El "hoy" y el "año en curso" se calculan en **America/La_Paz**, nunca en UTC (§4.6),
+  vía el helper compartido `@/lib/fecha-actual` (`hoyEnLaPazISO` / `primerDiaDelAnioISO`),
+  que espeja el `ClockPort.hoyEnLaPaz()` del backend. **No** usar `new Date()` con la TZ
+  del navegador ni `toISOString()` (desplaza el día en la madrugada boliviana).
+- `01/01` es el **año calendario**, no el inicio de la gestión activa (coincide para
+  empresas COMERCIAL; para industrial/agro/minera es un default que el usuario ajusta).
+  Default "inicio de gestión" quedó como mejora futura.
+
 ### R2 — Toggle "incluir anulados" en todo reporte que lea comprobantes
 
 **Enunciado.** Cualquier reporte que derive sus números de comprobantes lleva el
@@ -385,6 +398,8 @@ Cuando clones el próximo reporte, seguí esta lista (derivada de R1–R9):
 1. **Naturaleza (R1)**: ¿foto o flujo?
    - Foto → cloná **Balance General** (control `fecha` de corte único).
    - Flujo → cloná un reporte de flujo (control XOR período / rango).
+   - **Defaults de fecha (R1)**: precargá los inputs con `@/lib/fecha-actual` — rango =
+     `primerDiaDelAnioISO()`→`hoyEnLaPazISO()`; corte único = `hoyEnLaPazISO()`. Nunca vacíos.
 2. **Anulados (R2)**: agregá el toggle `incluirAnulados` (default `false`) si el
    reporte lee comprobantes.
 3. **Cuenta (R3)**: ¿es detalle por cuenta? Sí → filtro `cuentaId`. No → sin filtro de
