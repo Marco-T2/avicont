@@ -16,6 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 // Cross-feature: períodos del tenant para el selector de período fiscal.
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
+import { hoyEnLaPazISO, primerDiaDelAnioISO } from '@/lib/fecha-actual';
 import { formatPeriodoCorto } from '@/lib/meses';
 
 import type { EvolucionPatrimonioFiltroValues } from '../schemas/evolucion-patrimonio-filtro-schema';
@@ -78,8 +79,8 @@ export function EvolucionPatrimonioFiltros({
     defaultValues: {
       modo: 'periodo',
       periodoFiscalId: '',
-      fechaDesde: '',
-      fechaHasta: '',
+      fechaDesde: primerDiaDelAnioISO(),
+      fechaHasta: hoyEnLaPazISO(),
       incluirAnulados: false,
     },
   });

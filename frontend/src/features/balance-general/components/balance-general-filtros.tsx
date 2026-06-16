@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { hoyEnLaPazISO } from '@/lib/fecha-actual';
 
 import type { BalanceGeneralFiltroValues } from '../schemas/balance-general-filtro-schema';
 
@@ -22,15 +23,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-/** Fecha de hoy en formato YYYY-MM-DD (TZ local del navegador). */
-function hoyISO(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 // ============================================================
 // Props
@@ -68,7 +60,7 @@ export function BalanceGeneralFiltros({
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fecha: hoyISO(),
+      fecha: hoyEnLaPazISO(),
       incluirAnulados: false,
     },
   });
