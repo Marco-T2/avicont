@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { CuentaAutocomplete } from '@/features/comprobantes/components/cuenta-autocomplete';
 // Cross-feature: períodos del tenant para el selector de período fiscal.
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
+import { hoyEnLaPazISO, primerDiaDelAnioISO } from '@/lib/fecha-actual';
 import { formatPeriodoCorto } from '@/lib/meses';
 
 import type { LibroMayorFiltroValues } from '../schemas/libro-mayor-filtro-schema';
@@ -93,8 +94,8 @@ export function LibroMayorFiltros({
     defaultValues: {
       modo: 'periodo',
       periodoFiscalId: '',
-      fechaDesde: '',
-      fechaHasta: '',
+      fechaDesde: primerDiaDelAnioISO(),
+      fechaHasta: hoyEnLaPazISO(),
       incluirAnulados: false,
       soloConMovimiento: true,
       cuentaId: '',

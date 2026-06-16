@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { hoyEnLaPazISO, primerDiaDelAnioISO } from '@/lib/fecha-actual';
 
 import type { EstadoResultadosFiltroValues } from '../schemas/estado-resultados-filtro-schema';
 
@@ -23,23 +24,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-/** Fecha de hoy en formato YYYY-MM-DD (TZ local del navegador). */
-function hoyISO(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/** Primer día del mes actual en formato YYYY-MM-DD (TZ local del navegador). */
-function primerDiaDelMesISO(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}-01`;
-}
 
 // ============================================================
 // Props
@@ -78,8 +62,8 @@ export function EstadoResultadosFiltros({
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fechaDesde: primerDiaDelMesISO(),
-      fechaHasta: hoyISO(),
+      fechaDesde: primerDiaDelAnioISO(),
+      fechaHasta: hoyEnLaPazISO(),
       incluirAnulados: false,
     },
   });

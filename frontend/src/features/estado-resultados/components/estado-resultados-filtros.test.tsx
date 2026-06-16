@@ -12,6 +12,16 @@ describe('EstadoResultadosFiltros', () => {
     expect(screen.getByRole('button', { name: /consultar/i })).toBeDefined();
   });
 
+  it('precarga el rango con el año en curso (desde 01/01, hasta hoy)', () => {
+    render(<EstadoResultadosFiltros onBuscar={vi.fn()} />);
+    const desde = screen.getByLabelText(/desde/i) as HTMLInputElement;
+    const hasta = screen.getByLabelText(/hasta/i) as HTMLInputElement;
+    // desde = 1 de enero del año en curso; hasta = hoy (formato YYYY-MM-DD).
+    expect(desde.value).toMatch(/^\d{4}-01-01$/);
+    expect(hasta.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(desde.value <= hasta.value).toBe(true);
+  });
+
   it('llama onBuscar con el rango y el flag de anulados al enviar', async () => {
     const user = userEvent.setup();
     const onBuscar = vi.fn();
