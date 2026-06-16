@@ -470,6 +470,38 @@ describe('PrismaEeffSaldosReaderAdapter (integration)', () => {
       const cajaConAnulados = conAnulados.find((s) => s.cuentaId === cajaAId);
       expect(cajaConAnulados!.totalDebitoBob.toNumber()).toBe(1300);
     });
+
+    it('excluirCierre=true excluye comprobantes tipo CIERRE; false (default) los incluye', async () => {
+      // El EFE consume este método con excluirCierre=true: su resultado de operación
+      // debe partir del resultado OPERATIVO del período. Sin excluir CIERRE, consultar
+      // una gestión cerrada daría resultado=0 (el cierre pone ingresos/egresos en cero)
+      // y descuadre = utilidad del ejercicio. §4.9 CLAUDE.md.
+      const fecha = new Date(Date.UTC(2026, 0, 15));
+      const desde = new Date(Date.UTC(2026, 0, 1));
+      const hasta = new Date(Date.UTC(2026, 0, 31));
+
+      // Movimiento operativo (DIARIO) + asiento de CIERRE, ambos en el rango.
+      await crearComprobanteContabilizado(tenantA, periodoAId, cajaAId, ventasAId, fecha, 1000);
+      await crearComprobanteContabilizado(
+        tenantA,
+        periodoAId,
+        cajaAId,
+        ventasAId,
+        fecha,
+        700,
+        false,
+        EstadoComprobante.CONTABILIZADO,
+        TipoComprobante.CIERRE,
+      );
+
+      // Default (excluirCierre omitido) → incluye el CIERRE: 1000 + 700.
+      const conCierre = await adapter.obtenerSaldosEnRango(tenantA, desde, hasta, false);
+      expect(conCierre.find((s) => s.cuentaId === cajaAId)!.totalDebitoBob.toNumber()).toBe(1700);
+
+      // excluirCierre=true → solo el movimiento operativo: 1000.
+      const sinCierre = await adapter.obtenerSaldosEnRango(tenantA, desde, hasta, false, true);
+      expect(sinCierre.find((s) => s.cuentaId === cajaAId)!.totalDebitoBob.toNumber()).toBe(1000);
+    });
   });
 
   // ============================================================

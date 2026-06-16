@@ -90,8 +90,16 @@ export class BalanceComprobacionService {
     // ── 3. Saldos de flujo del rango + estructura, en paralelo ────────────
     // DR-3: SOLO obtenerSaldosEnRango — el Balance de Comprobación es de flujo
     // del rango, sin arrastre histórico (NUNCA obtenerSaldosHasta).
+    // excluirCierre=true (§4.9 CLAUDE.md): balance de comprobación PRE-cierre. Sin esto,
+    // una gestión cerrada mostraría ingresos/egresos en cero (el cierre los anula).
     const [saldosRango, estructura] = await Promise.all([
-      this.eeffSaldosReader.obtenerSaldosEnRango(tenantId, desde, hasta, query.incluirAnulados),
+      this.eeffSaldosReader.obtenerSaldosEnRango(
+        tenantId,
+        desde,
+        hasta,
+        query.incluirAnulados,
+        true,
+      ),
       this.eeffSaldosReader.obtenerEstructuraCuentas(tenantId),
     ]);
 

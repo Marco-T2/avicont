@@ -125,6 +125,14 @@ export abstract class EeffSaldosReaderPort {
    *
    * Misma fuente de verdad que `obtenerSaldosHasta`: GROUP BY cuentaId, mismos
    * estados/filtros, mismo predicado organizationId. Solo cambia el rango de fecha.
+   *
+   * @param excluirCierre - si true, excluye comprobantes tipo CIERRE del rango
+   *   (mismo criterio que `obtenerSaldosEnRangoSeparandoAjustes`, §4.9 CLAUDE.md).
+   *   Lo usa el Estado de Flujo de Efectivo: su resultado de operación debe partir
+   *   del resultado OPERATIVO del período, no del residuo post-cierre (los asientos
+   *   de CIERRE ponen ingresos/egresos en cero y trasladan el resultado al patrimonio,
+   *   lo que doble-contaría / descuadraría el EFE). Default false: BG/ER/Balance de
+   *   Comprobación/EEPN mantienen el comportamiento histórico (incluyen CIERRE).
    * // organizationId SIEMPRE primer predicado (§4.2 Anti-31)
    */
   abstract obtenerSaldosEnRango(
@@ -132,6 +140,7 @@ export abstract class EeffSaldosReaderPort {
     desde: Date,
     hasta: Date,
     incluirAnulados: boolean,
+    excluirCierre?: boolean,
   ): Promise<SaldoCuentaRow[]>;
 
   /**

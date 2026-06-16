@@ -260,6 +260,7 @@ describe('BalanceComprobacionService', () => {
         expect.any(Date),
         expect.any(Date),
         true,
+        true, // excluirCierre: balance de comprobación pre-cierre (resultado operativo)
       );
     });
 
@@ -277,7 +278,23 @@ describe('BalanceComprobacionService', () => {
         expect.any(Date),
         expect.any(Date),
         false,
+        true, // excluirCierre
       );
+    });
+
+    it('SIEMPRE excluye CIERRE (excluirCierre=true): el balance de comprobación es pre-cierre', async () => {
+      const { service, eeff } = setup();
+
+      await service.consultarBalanceComprobacion(TENANT, {
+        desde: '2026-04-01',
+        hasta: '2026-04-30',
+        incluirAnulados: false,
+      });
+
+      // Sin excluir CIERRE, un balance de comprobación de gestión cerrada mostraría
+      // ingresos/egresos en cero (el asiento de cierre los anula).
+      const excluirCierre = eeff.obtenerSaldosEnRango.mock.calls[0]![4];
+      expect(excluirCierre).toBe(true);
     });
   });
 

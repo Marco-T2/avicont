@@ -97,6 +97,10 @@ export class EvolucionPatrimonioService {
         fechaCorte: hasta,
         incluirAnulados,
       }),
+      // NO pasar excluirCierre=true (a diferencia del EFE/ER): el EEPN necesita el
+      // traslado del resultado al patrimonio en otrosMovimientos para cuadrar con
+      // saldoFinal (acumulado). Excluir CIERRE descuadraría resultados acumulados.
+      // Ver builder evolucion-patrimonio.ts (asimetría DELIBERADA).
       this.eeffSaldosReader.obtenerSaldosEnRango(tenantId, desde, hasta, incluirAnulados),
       this.eeffSaldosReader.obtenerEstructuraCuentas(tenantId),
     ]);

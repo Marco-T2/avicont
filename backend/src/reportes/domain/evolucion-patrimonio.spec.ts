@@ -306,3 +306,79 @@ describe('construirEvolucionPatrimonio — totales y cuadre', () => {
     expect(result.cuadra).toBe(true);
   });
 });
+
+// ============================================================
+// Post-cierre: degradación con gracia (limitación documentada)
+// ============================================================
+
+describe('construirEvolucionPatrimonio — gestión cerrada (degradación con gracia)', () => {
+  // A DIFERENCIA del EFE y del Estado de Resultados (que excluyen CIERRE para partir
+  // del resultado operativo), el EEPN DEBE incluir los comprobantes de CIERRE en
+  // saldosRango: el traslado del resultado al patrimonio es un movimiento real del
+  // patrimonio y vive en saldoFinal (acumulado). Excluir CIERRE rompería la identidad
+  // saldoInicial + otrosMovimientos = saldoFinal de la cuenta de resultados acumulados.
+  //
+  // Consecuencia (limitación, NO bug): post-cierre el resultado del ejercicio aparece
+  // en la columna "otrosMovimientos" de la cuenta patrimonial que lo recibió, NO en la
+  // columna sintética "Resultado del Ejercicio" (que da 0 porque el cierre anuló
+  // ingresos/egresos). El TOTAL sigue siendo correcto y el estado CUADRA.
+  //
+  // Mostrar el resultado en su columna propia post-cierre exige una fila explícita de
+  // "apropiación del resultado" (NIC 1) — DIFERIDO al feature de cierre de ejercicio.
+  it('el resultado trasladado al patrimonio cae en otrosMovimientos; el total cuadra', () => {
+    const capital = makeCuenta({ id: 'cap' });
+    const resAcum = makeCuenta({
+      id: 'res-acum',
+      subClaseCuenta: SubClaseCuenta.PATRIMONIO_RESULTADOS,
+      codigoInterno: '3.2.1.001',
+      nombre: 'Resultados Acumulados',
+    });
+    const ventas = makeCuenta({
+      id: 'i1',
+      claseCuenta: ClaseCuenta.INGRESO,
+      subClaseCuenta: SubClaseCuenta.INGRESO_OPERATIVO,
+      naturaleza: NaturalezaCuenta.ACREEDORA,
+      codigoInterno: '4.1.1.001',
+      nombre: 'Ventas',
+    });
+    const costos = makeCuenta({
+      id: 'e1',
+      claseCuenta: ClaseCuenta.EGRESO,
+      subClaseCuenta: SubClaseCuenta.EGRESO_OPERATIVO,
+      naturaleza: NaturalezaCuenta.DEUDORA,
+      codigoInterno: '5.1.1.001',
+      nombre: 'Costos',
+    });
+
+    const result = construirEvolucionPatrimonio({
+      estructura: [capital, resAcum, ventas, costos],
+      saldosInicial: [makeSaldo('cap', '0.00', '100000.00')],
+      // Acumulado incl. cierre: el resultado (8000) ya está trasladado a resAcum.
+      saldosFinal: [
+        makeSaldo('cap', '0.00', '100000.00'),
+        makeSaldo('res-acum', '0.00', '8000.00'),
+      ],
+      // Rango incl. cierre: ventas/costos quedan en CERO (el cierre los anuló) y el
+      // cierre acreditó 8000 a resAcum.
+      saldosRango: [
+        makeSaldo('i1', '20000.00', '20000.00'), // venta 20000 + cierre debita 20000 → neto 0
+        makeSaldo('e1', '12000.00', '12000.00'), // costo 12000 + cierre acredita 12000 → neto 0
+        makeSaldo('res-acum', '0.00', '8000.00'), // cierre traslada el resultado
+      ],
+    });
+
+    // La columna sintética da 0 (no se emite) porque ingresos/egresos se anularon.
+    expect(result.componentes.some((c) => c.esSintetica)).toBe(false);
+
+    // El resultado quedó en otrosMovimientos de Resultados Acumulados (limitación).
+    const acum = comp(result, 'res-acum');
+    expect(acum!.otrosMovimientosBob.toBob()).toBe('8000.00');
+    expect(acum!.resultadoEjercicioBob.toBob()).toBe('0.00');
+    expect(acum!.cuadra).toBe(true);
+
+    // Pese a la atribución imperfecta, el TOTAL es correcto y el estado cuadra.
+    expect(result.totales.saldoFinalBob.toBob()).toBe('108000.00');
+    expect(result.cuadra).toBe(true);
+    expect(result.diferenciaBob.toBob()).toBe('0.00');
+  });
+});

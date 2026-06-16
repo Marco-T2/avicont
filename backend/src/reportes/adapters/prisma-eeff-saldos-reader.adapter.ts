@@ -92,6 +92,7 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
     desde: Date,
     hasta: Date,
     incluirAnulados: boolean,
+    excluirCierre = false,
   ): Promise<SaldoCuentaRow[]> {
     // Defense in depth (CLAUDE.md §4.2): primer predicado siempre.
     // NCB / NIC 1: Estado de Resultados de flujo del período, sin arrastre histórico.
@@ -99,6 +100,9 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
     type RawRow = { cuentaId: string; totalDebitoBob: string; totalCreditoBob: string };
 
     const where = this.whereBaseRango(tenantId, desde, hasta, incluirAnulados);
+    // §4.9 CLAUDE.md: el EFE excluye CIERRE para partir del resultado OPERATIVO del
+    // período (mismo criterio que obtenerSaldosEnRangoSeparandoAjustes).
+    const cierreClause = excluirCierre ? Prisma.sql`AND c.tipo <> 'CIERRE'` : Prisma.empty;
 
     const rows = await this.prisma.$queryRaw<RawRow[]>(Prisma.sql`
       SELECT
@@ -108,6 +112,7 @@ export class PrismaEeffSaldosReaderAdapter extends EeffSaldosReaderPort {
       FROM lineas_comprobante lc
       JOIN comprobantes c ON c.id = lc."comprobanteId"
       WHERE ${where}
+        ${cierreClause}
       GROUP BY lc."cuentaId"
     `);
 

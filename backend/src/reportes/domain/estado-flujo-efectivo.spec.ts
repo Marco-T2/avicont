@@ -322,6 +322,13 @@ describe('construirEstadoFlujoEfectivo', () => {
     // Escenario: venta 20000 cobrada en caja + costos 12000 pagados en caja →
     // resultado +8000. Un asiento de cierre traslada el resultado a la cuenta
     // patrimonial "Resultado del ejercicio" (ACREEDORA, haber 8000).
+    //
+    // PRECONDICIÓN: el builder recibe saldosRango SIN comprobantes CIERRE (el service
+    // llama obtenerSaldosEnRango con excluirCierre=true). Por eso ventas/costos
+    // conservan su saldo OPERATIVO completo en saldosRango (resultado=+8000) mientras
+    // que saldosFinal —acumulado, sí refleja el cierre— muestra res-ej con haber 8000.
+    // Esta combinación es exactamente la que produce el adapter post-cierre.
+    //
     // El resultado YA es el punto de partida de operación (NIC 7 método indirecto);
     // contar la variación de la cuenta patrimonio-resultados como financiación lo
     // contaría dos veces → variacionNeta=16000 ≠ efectivoFinal 8000 → descuadre.
