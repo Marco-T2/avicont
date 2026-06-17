@@ -19,7 +19,7 @@ import { TenantsService } from './tenants.service';
  * (patrón del proyecto: PrismaClient directo, no Test.createTestingModule).
  *
  * Valida las garantías que requieren la base de datos:
- *   - CONTABILIDAD: 111 cuentas + OrgConfiguracionContable + OWNER, flags correctos.
+ *   - CONTABILIDAD: 110 cuentas + OrgConfiguracionContable + OWNER, flags correctos.
  *   - Rollback total: si el seeder lanza, la org NO queda en BD (E-ATOM-01).
  *   - GRANJA: granjaEnabled=true, contabilidadEnabled=false, cero cuentas.
  *   - OTROS: ambos flags false, cero cuentas.
@@ -115,7 +115,7 @@ describe('TenantsService.create (integration)', () => {
   }
 
   describe('alta CONTABILIDAD', () => {
-    it('siembra exactamente 111 cuentas + OrgConfiguracionContable + membership OWNER y flags correctos (E-CONT-01 y E-CONT-02)', async () => {
+    it('siembra exactamente 110 cuentas + OrgConfiguracionContable + membership OWNER y flags correctos (E-CONT-01 y E-CONT-02)', async () => {
       const result = await service.create(
         { name: 'Org Integration Cont A', modulo: ModuloOrganizacion.CONTABILIDAD },
         ownerId,
@@ -131,9 +131,9 @@ describe('TenantsService.create (integration)', () => {
       expect(result.memberships[0]?.userId).toBe(ownerId);
       expect(result.memberships[0]?.systemRole).toBe(SystemRole.OWNER);
 
-      // 111 cuentas sembradas
+      // 110 cuentas sembradas
       const cuentaCount = await prisma.cuenta.count({ where: { organizationId: result.id } });
-      expect(cuentaCount).toBe(111);
+      expect(cuentaCount).toBe(110);
 
       // 8 tipos de documento físico universales sembrados (design §D3)
       const tiposCount = await prisma.tipoDocumentoFisico.count({
@@ -164,7 +164,7 @@ describe('TenantsService.create (integration)', () => {
   });
 
   describe('aislamiento multi-tenant (E-MT-01 / E-MT-02)', () => {
-    it('dos organizaciones CONTABILIDAD tienen exactamente 111 cuentas cada una, aisladas por organizationId', async () => {
+    it('dos organizaciones CONTABILIDAD tienen exactamente 110 cuentas cada una, aisladas por organizationId', async () => {
       const orgA = await service.create(
         { name: 'Org Integration Cont A', modulo: ModuloOrganizacion.CONTABILIDAD },
         ownerId,
@@ -184,8 +184,8 @@ describe('TenantsService.create (integration)', () => {
 
       const cuentasA = await prisma.cuenta.count({ where: { organizationId: orgA.id } });
       const cuentasB = await prisma.cuenta.count({ where: { organizationId: orgB.id } });
-      expect(cuentasA).toBe(111);
-      expect(cuentasB).toBe(111);
+      expect(cuentasA).toBe(110);
+      expect(cuentasB).toBe(110);
 
       // Ninguna cuenta de A tiene el organizationId de B
       const idsA = (

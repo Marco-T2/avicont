@@ -22,6 +22,7 @@ function row(overrides: Partial<ComprobanteListRow> = {}): ComprobanteListRow {
     totalCreditoBob: new Prisma.Decimal('1250.00'),
     origenTipo: null,
     origenId: null,
+    generadoPorSistema: false,
     anulado: false,
     fechaAnulacion: null,
     anuladoPorUserId: null,

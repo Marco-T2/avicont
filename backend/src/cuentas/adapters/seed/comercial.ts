@@ -16,7 +16,7 @@ import {
 // `esRequeridaSistema = true` (8 cuentas que mapea OrgConfiguracionContable).
 //
 // La jerarquía completa (nivel 1, 2, 3) se siembra automáticamente como
-// agrupadores (esDetalle=false). Total resultante: 111 cuentas.
+// agrupadores (esDetalle=false). Total resultante: 110 cuentas.
 //
 // Datos AUTOCONTENIDOS: el seed ya NO consulta `CatalogoPuct`. `nombre` se
 // inlinea por hoja y por ancestro (NOMBRES_ANCESTRO); `nivel` y `claseCuenta`
@@ -91,8 +91,9 @@ export const CUENTAS_HOJA_COMERCIAL: CuentaHoja[] = [
   { codigo: '3.1.1.001', nombre: 'CAPITAL' },
   { codigo: '3.1.2.001', nombre: 'RESERVA LEGAL' },
   { codigo: '3.1.3.001', nombre: 'RESULTADOS ACUMULADOS', esRequeridaSistema: true },
-  { codigo: '3.1.4.001', nombre: 'UTILIDAD DE LA GESTIÓN', esRequeridaSistema: true },
-  { codigo: '3.1.4.002', nombre: 'PÉRDIDA DE LA GESTIÓN' },
+  // Cuenta transitoria DUAL del cierre (REQ-CTA-CIERRE-01, Ley 843 art. 46):
+  // utilidad → saldo acreedor, pérdida → saldo deudor. Mapeada a resultadoEjercicioId.
+  { codigo: '3.1.4.001', nombre: 'RESULTADO DE LA GESTIÓN', esRequeridaSistema: true },
 
   // ===== INGRESO (5) =====
   { codigo: '4.1.1.001', nombre: 'INGRESOS POR VENTAS DE MERCADERÍAS' },

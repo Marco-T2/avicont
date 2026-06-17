@@ -703,6 +703,11 @@ model Comprobante {
   origenTipo      String?           // "VENTA" | "COMPRA" | "PAGO" | NULL
   origenId        String?           // id del documento origen
 
+  // Atributo de ORIGEN, ortogonal al estado (como anulado, §4.7): un comprobante
+  // generado por el sistema (ej: asiento de cierre del ejercicio) NO es editable a
+  // mano vía API. Solo se regenera por el path-sistema (REQ-CMP-SYS-01).
+  generadoPorSistema Boolean        @default(false)
+
   // Anulación por flag (CLAUDE.md §4.7). El comprobante CONTABILIZADO se
   // preserva intacto; se marca con anulado=true. No se generan contra-asientos.
   anulado          Boolean           @default(false)

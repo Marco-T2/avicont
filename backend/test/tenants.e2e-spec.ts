@@ -32,7 +32,7 @@ async function buildApp(
  * E2E spec de `POST /api/tenants`.
  *
  * Cubre validación del DTO (`modulo` requerido y enum), seeding por módulo
- * (flags correctos, 111 cuentas para CONTABILIDAD, cero para GRANJA/OTROS)
+ * (flags correctos, 110 cuentas para CONTABILIDAD, cero para GRANJA/OTROS)
  * y aislamiento multi-tenant.
  */
 describe('POST /api/tenants (e2e)', () => {
@@ -109,14 +109,14 @@ describe('POST /api/tenants (e2e)', () => {
       expect(res.body.granjaEnabled).toBe(false);
     });
 
-    it('E-CONT-01 (siembra): después del POST la BD tiene exactamente 111 cuentas para esa organización', async () => {
+    it('E-CONT-01 (siembra): después del POST la BD tiene exactamente 110 cuentas para esa organización', async () => {
       const name = `Org Cont Siembra ${Date.now()}`;
       const res = await crearTenant({ name, modulo: 'CONTABILIDAD' });
       expect(res.status).toBe(201);
 
       const orgId = res.body.id as string;
       const cuentaCount = await prisma.cuenta.count({ where: { organizationId: orgId } });
-      expect(cuentaCount).toBe(111);
+      expect(cuentaCount).toBe(110);
 
       const config = await prisma.orgConfiguracionContable.findUnique({
         where: { organizationId: orgId },
@@ -240,7 +240,7 @@ describe('POST /api/tenants — atomicidad (E-ATOM-01)', () => {
   beforeAll(async () => {
     // Override del seeder de tipos de documento físico para forzar fallo
     // dentro de la TX. El plan-cuentas seeder se ejecuta primero (siembra
-    // 111 cuentas); este seeder falla justo después: toda la TX debe hacer
+    // 110 cuentas); este seeder falla justo después: toda la TX debe hacer
     // rollback (org + cuentas + OrgConfiguracionContable deben quedar sin
     // persistir).
     const seederFallido: TipoDocumentoFisicoSeederPort = {
