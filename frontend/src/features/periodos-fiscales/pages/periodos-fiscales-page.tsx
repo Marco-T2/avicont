@@ -37,6 +37,10 @@ export function PeriodosFiscalesPage(): React.JSX.Element {
   const tipoEmpresa = detalleQuery.data?.tipoEmpresaPrincipal ?? null;
   const periodos = detalleQuery.data?.periodos ?? [];
 
+  // Período seleccionado para el drawer: el botón "Reabrir" depende de SU estado
+  // (CERRADO + no definitivo), no del de la gestión — espeja al backend.
+  const selectedPeriodo = periodos.find((p) => p.id === selectedPeriodoId) ?? null;
+
   if (gestionesQuery.isError) {
     toast.error('No se pudieron cargar las gestiones');
   }
@@ -102,7 +106,8 @@ export function PeriodosFiscalesPage(): React.JSX.Element {
       <PeriodoDetailDrawer
         periodoId={selectedPeriodoId}
         gestionId={effectiveGestionId}
-        gestionStatus={detalleQuery.data?.status ?? 'ABIERTA'}
+        periodoStatus={selectedPeriodo?.status ?? null}
+        periodoEsDefinitivo={selectedPeriodo?.esDefinitivo ?? false}
         onOpenChange={(open) => {
           if (!open) setSelectedPeriodoId(null);
         }}

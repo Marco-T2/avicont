@@ -18,7 +18,7 @@ import { mensajePeriodosFiscales } from '@/lib/error-messages';
 import { usePuedeReabrir } from '@/lib/use-permissions';
 import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
-import type { BorradorPendiente, GestionFiscalStatus, ResumenPrecierre } from '@/types/api';
+import type { BorradorPendiente, PeriodoFiscalStatus, ResumenPrecierre } from '@/types/api';
 
 import { useCerrarPeriodo } from '../hooks/use-cerrar-periodo';
 import { useResumenPrecierre } from '../hooks/use-resumen-precierre';
@@ -30,7 +30,10 @@ interface PeriodoDetailDrawerProps {
   /** Reservado para uso futuro (CerrarGestionButton en el page). No se consume en el drawer. */
   gestionId: string | null;
   onOpenChange: (open: boolean) => void;
-  gestionStatus: GestionFiscalStatus;
+  /** Estado del período seleccionado (`null` cuando el drawer está cerrado). */
+  periodoStatus: PeriodoFiscalStatus | null;
+  /** Si el período fue marcado definitivo (no reabrible). */
+  periodoEsDefinitivo: boolean;
 }
 
 const NOMBRE_MES: Record<number, string> = {
@@ -42,7 +45,7 @@ const NOMBRE_MES: Record<number, string> = {
 export function PeriodoDetailDrawer(
   props: PeriodoDetailDrawerProps,
 ): React.JSX.Element {
-  const { periodoId, onOpenChange, gestionStatus } = props;
+  const { periodoId, onOpenChange, periodoStatus, periodoEsDefinitivo } = props;
   // props.gestionId reservado para CerrarGestionButton en el page — no se usa en el drawer.
   const [reabrirOpen, setReabrirOpen] = useState(false);
   const puedeReabrir = usePuedeReabrir();
@@ -71,10 +74,12 @@ export function PeriodoDetailDrawer(
       ? `${NOMBRE_MES[resumen.periodo.month] ?? resumen.periodo.month} ${resumen.periodo.year}`
       : '';
 
-  // El botón "Reabrir" se muestra solo si:
-  // 1. El usuario tiene el rol OWNER/ADMIN
-  // 2. La gestión está CERRADA (el período ya fue cerrado)
-  const mostrarReabrir = puedeReabrir && gestionStatus === 'CERRADA';
+  // El botón "Reabrir" espeja al backend (PeriodosFiscalesService.reabrir): se
+  // muestra solo si el usuario es OWNER/ADMIN y el PERÍODO está CERRADO y no es
+  // definitivo. NO depende del estado de la gestión: un período cerrado dentro de
+  // una gestión abierta es reabrible (corrección de un mes cerrado de más).
+  const mostrarReabrir =
+    puedeReabrir && periodoStatus === 'CERRADO' && !periodoEsDefinitivo;
 
   return (
     <>
