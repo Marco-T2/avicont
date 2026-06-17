@@ -42,6 +42,15 @@ vi.mock('../components/boton-exportar-libro-diario', () => ({
   },
 }));
 
+// Botón de PDF: mockeado igual que el de Excel para aislar la página de la query de permisos.
+const mockBotonExportarPdf = vi.fn();
+vi.mock('../components/boton-exportar-libro-diario-pdf', () => ({
+  BotonExportarLibroDiarioPdf: (props: { rango: string }) => {
+    mockBotonExportarPdf(props);
+    return <button>Exportar a PDF</button>;
+  },
+}));
+
 const dataConPeriodo: LibroDiarioResponse = {
   rango: { fechaDesde: '2026-04-01', fechaHasta: '2026-04-30' },
   asientos: [],

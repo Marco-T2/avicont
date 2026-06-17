@@ -8,6 +8,7 @@ import { useLibroDiario } from '../hooks/use-libro-diario';
 import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
 
 import { BotonExportarLibroDiario } from '../components/boton-exportar-libro-diario';
+import { BotonExportarLibroDiarioPdf } from '../components/boton-exportar-libro-diario-pdf';
 import { LibroDiarioFiltros } from '../components/libro-diario-filtros';
 import { LibroDiarioTabla } from '../components/libro-diario-tabla';
 
@@ -74,8 +75,9 @@ export function LibroDiarioPage(): React.JSX.Element {
             Asientos contabilizados y bloqueados en orden cronológico
           </p>
         </div>
-        <div className="self-start">
+        <div className="flex flex-col gap-2 self-start sm:flex-row">
           <BotonExportarLibroDiario data={data} perfil={empresa} rango={rango} />
+          <BotonExportarLibroDiarioPdf data={data} perfil={empresa} rango={rango} />
         </div>
       </div>
 
