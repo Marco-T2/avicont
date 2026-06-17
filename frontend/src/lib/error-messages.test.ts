@@ -2,18 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import { mensajeComprobantes, mensajePeriodosFiscales } from './error-messages';
 
-// Construye un error con shape de axios.
+// Construye un error con la shape REAL de axios: el GlobalExceptionFilter del
+// backend envuelve TODO bajo `error` → { error: { code, message, details, ... } }.
+// (Antes este helper armaba la forma plana y enmascaraba el bug de extractBackendError.)
 function err(
   code: string,
   details?: Record<string, unknown>,
   message?: string,
-): { response: { data: { code: string; message?: string; details?: unknown } } } {
+): { response: { data: { error: { code: string; message?: string; details?: unknown } } } } {
   return {
     response: {
       data: {
-        code,
-        ...(message !== undefined ? { message } : {}),
-        ...(details !== undefined ? { details } : {}),
+        error: {
+          code,
+          ...(message !== undefined ? { message } : {}),
+          ...(details !== undefined ? { details } : {}),
+        },
       },
     },
   };
