@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Cuenta, CuentaListResponse } from '@/types/api';
-import type { Periodo } from '@/types/api';
+import type {
+  Cuenta,
+  CuentaListResponse,
+  Gestion,
+  Periodo,
+} from '@/types/api';
 
 import type { LibroMayorFiltroValues } from '../schemas/libro-mayor-filtro-schema';
 
@@ -16,15 +20,18 @@ function makeOnBuscar() {
   return { fn, calls };
 }
 
-// Mock de hooks cross-feature que requiere el componente.
+// Mock de hooks cross-feature que requiere el componente (directa o indirectamente).
+vi.mock('@/features/periodos-fiscales/hooks/use-gestiones', () => ({
+  useGestiones: vi.fn(),
+}));
 vi.mock('@/features/periodos-fiscales/hooks/use-periodos', () => ({
   usePeriodos: vi.fn(),
 }));
-
 vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
   useCuentas: vi.fn(),
 }));
 
+import { useGestiones } from '@/features/periodos-fiscales/hooks/use-gestiones';
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
@@ -34,10 +41,24 @@ import { LibroMayorFiltros } from './libro-mayor-filtros';
 // Fixtures
 // ============================================================
 
+function buildGestion(overrides: Partial<Gestion> = {}): Gestion {
+  return {
+    id: 'g-2026',
+    year: 2026,
+    mesInicio: 1,
+    status: 'ABIERTA',
+    closedAt: null,
+    closedByUserId: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 function buildPeriodo(overrides: Partial<Periodo> = {}): Periodo {
   return {
     id: 'p-2026-05',
-    gestionId: 'g-1',
+    gestionId: 'g-2026',
     year: 2026,
     month: 5,
     ordenEnGestion: 5,
@@ -80,8 +101,38 @@ function makeCuenta(overrides: Partial<Cuenta>): Cuenta {
   };
 }
 
-const CUENTA_CAJA = makeCuenta({ id: 'cuenta-uuid-1', codigoInterno: '1.1.01', nombre: 'Caja Chica' });
-const CUENTA_BANCO = makeCuenta({ id: 'cuenta-uuid-2', codigoInterno: '1.1.02', nombre: 'Banco BNB' });
+const PERIODO_ENE = buildPeriodo({
+  id: 'p-ene',
+  month: 1,
+  ordenEnGestion: 1,
+  fechaInicio: '2026-01-01',
+  fechaFin: '2026-01-31',
+});
+const PERIODO_MAYO = buildPeriodo({
+  id: 'p-mayo',
+  month: 5,
+  ordenEnGestion: 5,
+  fechaInicio: '2026-05-01',
+  fechaFin: '2026-05-31',
+});
+const PERIODO_DIC = buildPeriodo({
+  id: 'p-dic',
+  month: 12,
+  ordenEnGestion: 12,
+  fechaInicio: '2026-12-01',
+  fechaFin: '2026-12-31',
+});
+
+const CUENTA_CAJA = makeCuenta({
+  id: 'cuenta-uuid-1',
+  codigoInterno: '1.1.01',
+  nombre: 'Caja Chica',
+});
+const CUENTA_BANCO = makeCuenta({
+  id: 'cuenta-uuid-2',
+  codigoInterno: '1.1.02',
+  nombre: 'Banco BNB',
+});
 
 const mockCuentasResponse: CuentaListResponse = {
   items: [CUENTA_CAJA, CUENTA_BANCO],
@@ -90,9 +141,13 @@ const mockCuentasResponse: CuentaListResponse = {
   pageSize: 100,
 };
 
-function setupMocks() {
+function setupMocks(periodos: Periodo[] = [PERIODO_ENE, PERIODO_MAYO, PERIODO_DIC]): void {
+  (useGestiones as ReturnType<typeof vi.fn>).mockReturnValue({
+    data: [buildGestion()],
+    isLoading: false,
+  });
   (usePeriodos as ReturnType<typeof vi.fn>).mockReturnValue({
-    data: [buildPeriodo()],
+    data: periodos,
     isLoading: false,
   });
   (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -106,6 +161,10 @@ function renderFiltros(onBuscar = vi.fn()) {
   setupMocks();
   return render(<LibroMayorFiltros onBuscar={onBuscar} />);
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 // ============================================================
 // CuentaAutocomplete presente en el DOM
@@ -124,66 +183,114 @@ describe('LibroMayorFiltros — campo Cuenta (opcional)', () => {
 });
 
 // ============================================================
-// Comportamiento: sin cuenta seleccionada → onBuscar sin cuentaId
+// Default: Gestión + "Todos" → onBuscar con rango de toda la gestión
 // ============================================================
 
-describe('LibroMayorFiltros — sin cuenta seleccionada', () => {
-  it('en modo periodo: onBuscar no incluye cuentaId cuando no se seleccionó cuenta', async () => {
+describe('LibroMayorFiltros — default Gestión + Todos', () => {
+  it('al consultar con el default (Todos) emite rango de toda la gestión + toggles default', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
-    // Seleccionar período: el SelectTrigger con id="mayor-periodo" tiene role="combobox".
-    // El listbox aparece en un portal; usar findByRole('option') para evitar múltiples matches.
-    const periodoTrigger = screen.getByRole('combobox', { name: /período fiscal/i });
-    await user.click(periodoTrigger);
-    const opcionMayo = await screen.findByRole('option', { name: /mayo 2026/i });
-    await user.click(opcionMayo);
-
-    // Pulsar Consultar sin seleccionar cuenta
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
-    expect(onBuscar).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalledTimes(1);
+    });
     const llamada = calls[0];
-    expect(llamada).toBeDefined();
+    expect(llamada).toEqual({
+      modo: 'rango',
+      fechaDesde: '2026-01-01',
+      fechaHasta: '2026-12-31',
+      incluirAnulados: false,
+      soloConMovimiento: true,
+    });
     expect(llamada?.cuentaId).toBeUndefined();
   });
 });
 
 // ============================================================
-// Comportamiento: con cuenta seleccionada → onBuscar incluye cuentaId
+// Selección de un mes específico → modo periodo
 // ============================================================
 
-describe('LibroMayorFiltros — con cuenta seleccionada', () => {
-  it('en modo periodo: onBuscar incluye cuentaId cuando se seleccionó una cuenta', async () => {
+describe('LibroMayorFiltros — mes específico', () => {
+  it('elegir un mes y consultar emite { modo: "periodo", periodoFiscalId }', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
-    // Seleccionar período primero
-    const periodoTrigger = screen.getByRole('combobox', { name: /período fiscal/i });
-    await user.click(periodoTrigger);
-    const opcionMayo = await screen.findByRole('option', { name: /mayo 2026/i });
-    await user.click(opcionMayo);
+    const mesTrigger = screen.getByRole('combobox', { name: /mes/i });
+    await user.click(mesTrigger);
+    await user.click(await screen.findByRole('option', { name: /mayo/i }));
 
-    // Abrir el autocomplete de cuenta.
-    // CuentaAutocomplete renderiza un botón con role="combobox" y texto "Todas las cuentas".
-    // Hay 2 comboboxes: el de período y el de cuenta. El de período queda cerrado
-    // (aria-expanded="false") tras la selección; el de cuenta tiene aria-expanded="false"
-    // inicialmente. Buscamos por el combobox que contiene el texto del placeholder.
-    const todosComboboxes = screen.getAllByRole('combobox');
-    // El segundo combobox es el de cuenta (el primero es el de período fiscal)
-    const cuentaBtn = todosComboboxes[1]!;
-    await user.click(cuentaBtn);
-    // El popover de cmdk muestra las opciones en una lista — buscar por text
-    await user.click(await screen.findByText('Caja Chica'));
-
-    // Consultar
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
-    expect(onBuscar).toHaveBeenCalledTimes(1);
-    const llamada = calls[0];
-    expect(llamada).toBeDefined();
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    const llamada = calls[calls.length - 1];
+    expect(llamada).toMatchObject({
+      modo: 'periodo',
+      periodoFiscalId: 'p-mayo',
+      incluirAnulados: false,
+      soloConMovimiento: true,
+    });
+  });
+});
+
+// ============================================================
+// Con cuenta seleccionada → onBuscar incluye cuentaId
+// ============================================================
+
+describe('LibroMayorFiltros — con cuenta seleccionada', () => {
+  it('onBuscar incluye cuentaId cuando se seleccionó una cuenta', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar, calls } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    // Hay 3 comboboxes: gestión (0), mes (1) y cuenta (2). El de cuenta es el
+    // botón de CuentaAutocomplete (PopoverTrigger), que va último en el DOM.
+    const comboboxes = screen.getAllByRole('combobox');
+    const cuentaBtn = comboboxes[comboboxes.length - 1]!;
+    await user.click(cuentaBtn);
+    await user.click(await screen.findByText('Caja Chica'));
+
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    const llamada = calls[calls.length - 1];
     expect(llamada?.cuentaId).toBe('cuenta-uuid-1');
+  });
+});
+
+// ============================================================
+// Rango personalizado → modo rango con fechas tipeadas
+// ============================================================
+
+describe('LibroMayorFiltros — rango personalizado', () => {
+  it('toggle rango + fechas → onBuscar { modo: "rango", fechaDesde, fechaHasta }', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar, calls } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    await user.click(screen.getByLabelText(/rango de fechas personalizado/i));
+    await user.type(screen.getByLabelText(/^desde$/i), '2026-03-01');
+    await user.type(screen.getByLabelText(/^hasta$/i), '2026-03-31');
+
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    const llamada = calls[calls.length - 1];
+    expect(llamada).toMatchObject({
+      modo: 'rango',
+      fechaDesde: '2026-03-01',
+      fechaHasta: '2026-03-31',
+      incluirAnulados: false,
+      soloConMovimiento: true,
+    });
   });
 });
