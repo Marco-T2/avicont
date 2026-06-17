@@ -87,7 +87,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -107,7 +108,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -135,7 +137,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -146,10 +149,11 @@ describe('PeriodoDetailDrawer', () => {
     expect(await screen.findByText(/Hay comprobantes en borrador/i)).toBeInTheDocument();
   });
 
-  it('rol CONTADOR (usePuedeReabrir false) → botón Reabrir NO se renderiza', async () => {
+  // ── Botón "Reabrir período": espeja al backend (período CERRADO + no definitivo
+  //    + OWNER/ADMIN), independiente del estado de la GESTIÓN. ────────────────────
+  it('sin rol OWNER/ADMIN (usePuedeReabrir false) → botón Reabrir NO se renderiza', async () => {
     setupDefaults();
     mockedUsePuedeReabrir.mockReturnValue(false);
-    // período cerrado para que el botón reabrir aplique
     mockedUseResumenPrecierre.mockReturnValue({
       data: makeResumen({ puedeCerrar: false }),
       isLoading: false,
@@ -160,7 +164,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="CERRADO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -168,7 +173,7 @@ describe('PeriodoDetailDrawer', () => {
     expect(screen.queryByRole('button', { name: /reabrir/i })).not.toBeInTheDocument();
   });
 
-  it('OWNER (usePuedeReabrir true) con período cerrado → botón Reabrir visible', async () => {
+  it('OWNER + período CERRADO con la GESTIÓN ABIERTA → botón Reabrir visible (espejo del backend)', async () => {
     setupDefaults();
     mockedUsePuedeReabrir.mockReturnValue(true);
     mockedUseResumenPrecierre.mockReturnValue({
@@ -176,19 +181,62 @@ describe('PeriodoDetailDrawer', () => {
       isLoading: false,
       isError: false,
     });
-    // periodoId null — el drawer cierra (sin periodoId no renderiza sheet abierto)
     render(
       <PeriodoDetailDrawer
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="CERRADA"
+        periodoStatus="CERRADO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
-    // Con gestionStatus CERRADA y OWNER, el botón reabrir debe aparecer
     const btn = await screen.findByRole('button', { name: /reabrir/i });
     expect(btn).toBeInTheDocument();
+  });
+
+  it('OWNER pero período ABIERTO → botón Reabrir NO se renderiza', async () => {
+    setupDefaults();
+    mockedUsePuedeReabrir.mockReturnValue(true);
+    mockedUseResumenPrecierre.mockReturnValue({
+      data: makeResumen({ puedeCerrar: true }),
+      isLoading: false,
+      isError: false,
+    });
+    render(
+      <PeriodoDetailDrawer
+        periodoId="p1"
+        gestionId="g1"
+        onOpenChange={vi.fn()}
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
+      />,
+      { wrapper: wrapper() },
+    );
+    await screen.findByRole('button', { name: /cerrar período/i });
+    expect(screen.queryByRole('button', { name: /reabrir/i })).not.toBeInTheDocument();
+  });
+
+  it('OWNER + período CERRADO pero definitivo → botón Reabrir NO se renderiza', async () => {
+    setupDefaults();
+    mockedUsePuedeReabrir.mockReturnValue(true);
+    mockedUseResumenPrecierre.mockReturnValue({
+      data: makeResumen({ puedeCerrar: false }),
+      isLoading: false,
+      isError: false,
+    });
+    render(
+      <PeriodoDetailDrawer
+        periodoId="p1"
+        gestionId="g1"
+        onOpenChange={vi.fn()}
+        periodoStatus="CERRADO"
+        periodoEsDefinitivo={true}
+      />,
+      { wrapper: wrapper() },
+    );
+    await screen.findByRole('button', { name: /cerrar período/i });
+    expect(screen.queryByRole('button', { name: /reabrir/i })).not.toBeInTheDocument();
   });
 
   it('periodoId null → drawer cerrado (sin contenido)', () => {
@@ -199,7 +247,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId={null}
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus={null}
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -223,7 +272,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
@@ -248,7 +298,8 @@ describe('PeriodoDetailDrawer', () => {
         periodoId="p1"
         gestionId="g1"
         onOpenChange={vi.fn()}
-        gestionStatus="ABIERTA"
+        periodoStatus="ABIERTO"
+        periodoEsDefinitivo={false}
       />,
       { wrapper: wrapper() },
     );
