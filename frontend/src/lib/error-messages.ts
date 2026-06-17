@@ -12,6 +12,13 @@ export function extractBackendError(err: unknown): BackendErrorPayload {
   const maybe = err as { response?: { data?: unknown } };
   const data = maybe.response?.data;
   if (typeof data !== 'object' || data === null) return {};
+  // El GlobalExceptionFilter del backend envuelve la carga útil bajo `error`
+  // ({ error: { code, message, details, traceId, timestamp } }, ver CLAUDE.md §6.4).
+  // Desenvolvemos ese nivel; el fallback a `data` plano cubre respuestas legacy.
+  const inner = (data as { error?: unknown }).error;
+  if (typeof inner === 'object' && inner !== null) {
+    return inner as BackendErrorPayload;
+  }
   return data as BackendErrorPayload;
 }
 
