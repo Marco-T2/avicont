@@ -1,49 +1,17 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { z } from 'zod';
+import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  PeriodoGestionFiltro,
+  type PeriodoSeleccion,
+} from '@/components/shared/periodo-gestion-filtro';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 // Cross-feature: reutilizamos CuentaAutocomplete de comprobantes — filtra
 // cuentas de detalle activas con pageSize 100.
 import { CuentaAutocomplete } from '@/features/comprobantes/components/cuenta-autocomplete';
-// Cross-feature: períodos del tenant para el selector de período fiscal.
-import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
-import { hoyEnLaPazISO, primerDiaDelAnioISO } from '@/lib/fecha-actual';
-import { formatPeriodoCorto } from '@/lib/meses';
 
 import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
-
-// ============================================================
-// Schema del formulario (shape plano — RHF no soporta bien discriminatedUnion)
-// La validación de la regla de negocio "modo exclusivo" la hace onBuscar antes
-// de pasar al schema del libro-diario; el formulario plano es solo para captura.
-// ============================================================
-
-const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-// Schema plano para RHF — captura todos los campos posibles.
-// La lógica de qué rama aplica la resuelve handleBuscar según el modo activo.
-const formSchema = z.object({
-  modo: z.enum(['periodo', 'rango']),
-  periodoFiscalId: z.string(),
-  fechaDesde: z.string(),
-  fechaHasta: z.string(),
-  incluirAnulados: z.boolean(),
-  cuentaId: z.string(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 // ============================================================
 // Props
@@ -63,185 +31,79 @@ interface LibroDiarioFiltrosProps {
 /**
  * Panel de filtros del Libro Diario.
  *
- * Modo "período fiscal": selector de período del tenant (default).
- * Modo "rango de fechas": dos inputs YYYY-MM-DD.
- * Toggle "Incluir anulados" disponible en ambos modos.
+ * El período se elige con `<PeriodoGestionFiltro>` (Gestión + Mes, con opción
+ * "Todos" → rango de toda la gestión, y un toggle de rango personalizado). La
+ * selección resuelta (`PeriodoSeleccion`) se mapea al payload XOR período/rango
+ * de `LibroDiarioFiltroValues` SIN cambiar el contrato que recibe la page.
  *
- * REQ-LD-01: la exclusividad de modos se enforza al construir el payload
- * que se pasa a onBuscar. El formulario usa un schema plano para que RHF
- * maneje el estado sin errores de tipos con discriminatedUnion.
+ * Toggles propios que conserva: "Incluir anulados" y la cuenta opcional
+ * (CuentaAutocomplete). Se manejan con `useState` local (no hay validación
+ * cruzada entre ellos).
  */
 export function LibroDiarioFiltros({
   onBuscar,
   isFetching = false,
 }: LibroDiarioFiltrosProps): React.JSX.Element {
-  // Cross-feature: períodos del tenant para el selector.
-  const { data: periodos } = usePeriodos();
-  const periodosOrdenados = useMemo(
-    () => [...(periodos ?? [])].sort((a, b) => b.year - a.year || b.month - a.month),
-    [periodos],
-  );
+  // La selección de período la resuelve PeriodoGestionFiltro y la emite por onChange.
+  const [seleccion, setSeleccion] = useState<PeriodoSeleccion | null>(null);
+  const [incluirAnulados, setIncluirAnulados] = useState(false);
+  const [cuentaId, setCuentaId] = useState('');
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    setError,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      modo: 'periodo',
-      periodoFiscalId: '',
-      fechaDesde: primerDiaDelAnioISO(),
-      fechaHasta: hoyEnLaPazISO(),
-      incluirAnulados: false,
-      cuentaId: '',
-    },
-  });
+  function handleConsultar(): void {
+    if (seleccion === null) {
+      setError('Seleccioná un período o rango de fechas');
+      return;
+    }
 
-  const modo = useWatch({ control, name: 'modo' });
-  const incluirAnulados = useWatch({ control, name: 'incluirAnulados' });
-  const cuentaId = useWatch({ control, name: 'cuentaId' });
+    if (
+      seleccion.modo === 'rango' &&
+      (seleccion.fechaDesde === '' || seleccion.fechaHasta === '')
+    ) {
+      setError('Completá las fechas del rango');
+      return;
+    }
 
-  function handleModoChange(nuevoModo: 'periodo' | 'rango'): void {
-    setValue('modo', nuevoModo);
-  }
+    if (seleccion.modo === 'rango' && seleccion.fechaDesde > seleccion.fechaHasta) {
+      setError('La fecha final no puede ser anterior a la fecha inicial');
+      return;
+    }
 
-  function handleSubmitInternal(raw: FormValues): void {
-    if (raw.modo === 'periodo') {
-      if (raw.periodoFiscalId === '') {
-        setError('periodoFiscalId', { message: 'Seleccioná un período fiscal' });
-        return;
-      }
+    setError(undefined);
+
+    const togglesYCuenta = {
+      incluirAnulados,
+      ...(cuentaId !== '' ? { cuentaId } : {}),
+    };
+
+    if (seleccion.modo === 'periodo') {
       onBuscar({
         modo: 'periodo',
-        periodoFiscalId: raw.periodoFiscalId,
-        incluirAnulados: raw.incluirAnulados,
-        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
+        periodoFiscalId: seleccion.periodoFiscalId,
+        ...togglesYCuenta,
       });
     } else {
-      // Validar formato y orden de fechas
-      if (!FECHA_REGEX.test(raw.fechaDesde)) {
-        setError('fechaDesde', { message: 'Formato de fecha inválido (YYYY-MM-DD)' });
-        return;
-      }
-      if (!FECHA_REGEX.test(raw.fechaHasta)) {
-        setError('fechaHasta', { message: 'Formato de fecha inválido (YYYY-MM-DD)' });
-        return;
-      }
-      if (raw.fechaDesde > raw.fechaHasta) {
-        setError('fechaHasta', {
-          message: 'La fecha final no puede ser anterior a la fecha inicial',
-        });
-        return;
-      }
       onBuscar({
         modo: 'rango',
-        fechaDesde: raw.fechaDesde,
-        fechaHasta: raw.fechaHasta,
-        incluirAnulados: raw.incluirAnulados,
-        ...(raw.cuentaId !== '' ? { cuentaId: raw.cuentaId } : {}),
+        fechaDesde: seleccion.fechaDesde,
+        fechaHasta: seleccion.fechaHasta,
+        ...togglesYCuenta,
       });
     }
   }
 
   return (
-    <form
-      onSubmit={(e) => void handleSubmit(handleSubmitInternal)(e)}
-      className="space-y-4"
-      noValidate
-    >
-      {/* Selector de modo */}
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={modo === 'periodo' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleModoChange('periodo')}
-        >
-          Por período
-        </Button>
-        <Button
-          type="button"
-          variant={modo === 'rango' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleModoChange('rango')}
-        >
-          Por rango de fechas
-        </Button>
-      </div>
+    <div className="space-y-4">
+      <PeriodoGestionFiltro
+        value={seleccion}
+        onChange={(sel) => {
+          setSeleccion(sel);
+          setError(undefined);
+        }}
+        error={error}
+      />
 
       <div className="flex flex-wrap items-end gap-3">
-        {/* Modo período fiscal */}
-        {modo === 'periodo' && (
-          <div className="space-y-1">
-            <Label htmlFor="libro-periodo" className="text-xs text-muted-foreground">
-              Período fiscal
-            </Label>
-            <Select
-              onValueChange={(v) =>
-                setValue('periodoFiscalId', v, { shouldValidate: false })
-              }
-            >
-              <SelectTrigger
-                id="libro-periodo"
-                className="h-8 text-sm w-48"
-                aria-invalid={errors.periodoFiscalId !== undefined}
-              >
-                <SelectValue placeholder="Seleccionar período" />
-              </SelectTrigger>
-              <SelectContent>
-                {periodosOrdenados.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {formatPeriodoCorto(p.year, p.month)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.periodoFiscalId?.message !== undefined && (
-              <p className="text-xs text-destructive">{errors.periodoFiscalId.message}</p>
-            )}
-          </div>
-        )}
-
-        {/* Modo rango de fechas */}
-        {modo === 'rango' && (
-          <>
-            <div className="space-y-1">
-              <Label htmlFor="libro-fecha-desde" className="text-xs text-muted-foreground">
-                Desde
-              </Label>
-              <Input
-                id="libro-fecha-desde"
-                type="date"
-                className="h-8 text-sm w-40 text-base md:text-sm"
-                aria-invalid={errors.fechaDesde !== undefined}
-                {...register('fechaDesde')}
-              />
-              {errors.fechaDesde?.message !== undefined && (
-                <p className="text-xs text-destructive">{errors.fechaDesde.message}</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="libro-fecha-hasta" className="text-xs text-muted-foreground">
-                Hasta
-              </Label>
-              <Input
-                id="libro-fecha-hasta"
-                type="date"
-                className="h-8 text-sm w-40 text-base md:text-sm"
-                aria-invalid={errors.fechaHasta !== undefined}
-                {...register('fechaHasta')}
-              />
-              {errors.fechaHasta?.message !== undefined && (
-                <p className="text-xs text-destructive">{errors.fechaHasta.message}</p>
-              )}
-            </div>
-          </>
-        )}
-
         {/* Filtro por cuenta (opcional) */}
         <div className="space-y-1">
           <Label htmlFor="libro-cuenta" className="text-xs text-muted-foreground">
@@ -252,7 +114,7 @@ export function LibroDiarioFiltros({
           <div className="w-56">
             <CuentaAutocomplete
               value={cuentaId}
-              onChange={(id) => setValue('cuentaId', id)}
+              onChange={setCuentaId}
               placeholder="Todas las cuentas"
             />
           </div>
@@ -263,7 +125,7 @@ export function LibroDiarioFiltros({
           <Switch
             id="libro-anulados"
             checked={incluirAnulados}
-            onCheckedChange={(checked) => setValue('incluirAnulados', checked)}
+            onCheckedChange={setIncluirAnulados}
           />
           <Label htmlFor="libro-anulados" className="text-sm cursor-pointer">
             Incluir anulados
@@ -271,10 +133,16 @@ export function LibroDiarioFiltros({
         </div>
 
         {/* Botón consultar */}
-        <Button type="submit" disabled={isFetching} size="sm" className="self-end">
+        <Button
+          type="button"
+          onClick={handleConsultar}
+          disabled={isFetching}
+          size="sm"
+          className="self-end"
+        >
           {isFetching ? 'Consultando…' : 'Consultar'}
         </Button>
       </div>
-    </form>
+    </div>
   );
 }

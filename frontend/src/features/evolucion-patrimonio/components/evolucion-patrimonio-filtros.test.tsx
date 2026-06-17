@@ -2,40 +2,31 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  Cuenta,
-  CuentaListResponse,
-  Gestion,
-  Periodo,
-} from '@/types/api';
+import type { Gestion, Periodo } from '@/types/api';
 
-import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
+import type { EvolucionPatrimonioFiltroValues } from '../schemas/evolucion-patrimonio-filtro-schema';
 
 // Helper para crear un mock tipado de onBuscar que evita 'never' en los args.
 function makeOnBuscar() {
-  const calls: LibroDiarioFiltroValues[] = [];
-  const fn = vi.fn((v: LibroDiarioFiltroValues) => {
+  const calls: EvolucionPatrimonioFiltroValues[] = [];
+  const fn = vi.fn((v: EvolucionPatrimonioFiltroValues) => {
     calls.push(v);
   });
   return { fn, calls };
 }
 
-// Mock de hooks cross-feature que requiere el componente (directa o indirectamente).
+// Mock de hooks cross-feature que requiere el componente compartido.
 vi.mock('@/features/periodos-fiscales/hooks/use-gestiones', () => ({
   useGestiones: vi.fn(),
 }));
 vi.mock('@/features/periodos-fiscales/hooks/use-periodos', () => ({
   usePeriodos: vi.fn(),
 }));
-vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
-  useCuentas: vi.fn(),
-}));
 
 import { useGestiones } from '@/features/periodos-fiscales/hooks/use-gestiones';
 import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
-import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
-import { LibroDiarioFiltros } from './libro-diario-filtros';
+import { EvolucionPatrimonioFiltros } from './evolucion-patrimonio-filtros';
 
 // ============================================================
 // Fixtures
@@ -74,33 +65,6 @@ function buildPeriodo(overrides: Partial<Periodo> = {}): Periodo {
   };
 }
 
-function makeCuenta(overrides: Partial<Cuenta>): Cuenta {
-  return {
-    id: 'cuenta-uuid-1',
-    organizationId: 'org-1',
-    codigoInterno: '1.1.01',
-    nombre: 'Caja Chica',
-    descripcion: null,
-    claseCuenta: 'ACTIVO',
-    subClaseCuenta: 'ACTIVO_CORRIENTE',
-    naturaleza: 'DEUDORA',
-    parentId: null,
-    nivel: 3,
-    esDetalle: true,
-    requiereContacto: false,
-    esContraria: false,
-    activa: true,
-    monedaFuncional: 'BOB',
-    permiteMultiMoneda: false,
-    esSystemSeed: false,
-    esRequeridaSistema: false,
-    actividadFlujo: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...overrides,
-  };
-}
-
 const PERIODO_ENE = buildPeriodo({
   id: 'p-ene',
   month: 1,
@@ -123,24 +87,6 @@ const PERIODO_DIC = buildPeriodo({
   fechaFin: '2026-12-31',
 });
 
-const CUENTA_CAJA = makeCuenta({
-  id: 'cuenta-uuid-1',
-  codigoInterno: '1.1.01',
-  nombre: 'Caja Chica',
-});
-const CUENTA_BANCO = makeCuenta({
-  id: 'cuenta-uuid-2',
-  codigoInterno: '1.1.02',
-  nombre: 'Banco BNB',
-});
-
-const mockCuentasResponse: CuentaListResponse = {
-  items: [CUENTA_CAJA, CUENTA_BANCO],
-  total: 2,
-  page: 1,
-  pageSize: 100,
-};
-
 function setupMocks(periodos: Periodo[] = [PERIODO_ENE, PERIODO_MAYO, PERIODO_DIC]): void {
   (useGestiones as ReturnType<typeof vi.fn>).mockReturnValue({
     data: [buildGestion()],
@@ -150,16 +96,11 @@ function setupMocks(periodos: Periodo[] = [PERIODO_ENE, PERIODO_MAYO, PERIODO_DI
     data: periodos,
     isLoading: false,
   });
-  (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
-    data: mockCuentasResponse,
-    isLoading: false,
-    isError: false,
-  });
 }
 
 function renderFiltros(onBuscar = vi.fn()) {
   setupMocks();
-  return render(<LibroDiarioFiltros onBuscar={onBuscar} />);
+  return render(<EvolucionPatrimonioFiltros onBuscar={onBuscar} />);
 }
 
 beforeEach(() => {
@@ -167,26 +108,10 @@ beforeEach(() => {
 });
 
 // ============================================================
-// CuentaAutocomplete presente en el DOM
-// ============================================================
-
-describe('LibroDiarioFiltros — campo Cuenta (opcional)', () => {
-  it('renderiza el label "Cuenta (opcional)" visible en el formulario', () => {
-    renderFiltros();
-    expect(screen.getByText('Cuenta (opcional)')).toBeInTheDocument();
-  });
-
-  it('renderiza el placeholder "Todas las cuentas" del autocomplete de cuenta', () => {
-    renderFiltros();
-    expect(screen.getByText('Todas las cuentas')).toBeInTheDocument();
-  });
-});
-
-// ============================================================
 // Default: Gestión + "Todos" → onBuscar con rango de toda la gestión
 // ============================================================
 
-describe('LibroDiarioFiltros — default Gestión + Todos', () => {
+describe('EvolucionPatrimonioFiltros — default Gestión + Todos', () => {
   it('al consultar con el default (Todos) emite rango de toda la gestión + toggle default', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
@@ -197,14 +122,12 @@ describe('LibroDiarioFiltros — default Gestión + Todos', () => {
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalledTimes(1);
     });
-    const llamada = calls[0];
-    expect(llamada).toEqual({
+    expect(calls[0]).toEqual({
       modo: 'rango',
       fechaDesde: '2026-01-01',
       fechaHasta: '2026-12-31',
       incluirAnulados: false,
     });
-    expect(llamada?.cuentaId).toBeUndefined();
   });
 });
 
@@ -212,7 +135,7 @@ describe('LibroDiarioFiltros — default Gestión + Todos', () => {
 // Selección de un mes específico → modo periodo
 // ============================================================
 
-describe('LibroDiarioFiltros — mes específico', () => {
+describe('EvolucionPatrimonioFiltros — mes específico', () => {
   it('elegir un mes y consultar emite { modo: "periodo", periodoFiscalId }', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
@@ -227,40 +150,31 @@ describe('LibroDiarioFiltros — mes específico', () => {
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalled();
     });
-    const llamada = calls[calls.length - 1];
-    expect(llamada).toMatchObject({
+    expect(calls[calls.length - 1]).toMatchObject({
       modo: 'periodo',
       periodoFiscalId: 'p-mayo',
       incluirAnulados: false,
     });
-    expect(llamada?.cuentaId).toBeUndefined();
   });
 });
 
 // ============================================================
-// Con cuenta seleccionada → onBuscar incluye cuentaId
+// Toggle incluir anulados → onBuscar lo refleja
 // ============================================================
 
-describe('LibroDiarioFiltros — con cuenta seleccionada', () => {
-  it('onBuscar incluye cuentaId cuando se seleccionó una cuenta', async () => {
+describe('EvolucionPatrimonioFiltros — incluir anulados', () => {
+  it('activar el toggle propaga incluirAnulados: true', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
-    // Hay 3 comboboxes: gestión (0), mes (1) y cuenta (2). El de cuenta es el
-    // botón de CuentaAutocomplete (PopoverTrigger), que va último en el DOM.
-    const comboboxes = screen.getAllByRole('combobox');
-    const cuentaBtn = comboboxes[comboboxes.length - 1]!;
-    await user.click(cuentaBtn);
-    await user.click(await screen.findByText('Caja Chica'));
-
+    await user.click(screen.getByLabelText(/incluir anulados/i));
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalled();
     });
-    const llamada = calls[calls.length - 1];
-    expect(llamada?.cuentaId).toBe('cuenta-uuid-1');
+    expect(calls[calls.length - 1]?.incluirAnulados).toBe(true);
   });
 });
 
@@ -268,7 +182,7 @@ describe('LibroDiarioFiltros — con cuenta seleccionada', () => {
 // Rango personalizado → modo rango con fechas tipeadas
 // ============================================================
 
-describe('LibroDiarioFiltros — rango personalizado', () => {
+describe('EvolucionPatrimonioFiltros — rango personalizado', () => {
   it('toggle rango + fechas → onBuscar { modo: "rango", fechaDesde, fechaHasta }', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
@@ -283,8 +197,7 @@ describe('LibroDiarioFiltros — rango personalizado', () => {
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalled();
     });
-    const llamada = calls[calls.length - 1];
-    expect(llamada).toMatchObject({
+    expect(calls[calls.length - 1]).toMatchObject({
       modo: 'rango',
       fechaDesde: '2026-03-01',
       fechaHasta: '2026-03-31',

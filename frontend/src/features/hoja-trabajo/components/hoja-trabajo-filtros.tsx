@@ -1,43 +1,14 @@
-import { useMemo } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  PeriodoGestionFiltro,
+  type PeriodoSeleccion,
+} from '@/components/shared/periodo-gestion-filtro';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-// Cross-feature: períodos del tenant para el selector de período fiscal.
-import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
-import { hoyEnLaPazISO, primerDiaDelAnioISO } from '@/lib/fecha-actual';
-import { formatPeriodoCorto } from '@/lib/meses';
 
 import type { HojaTrabajoFiltroValues } from '../schemas/hoja-trabajo-filtro-schema';
-
-// ============================================================
-// Schema del formulario (shape plano — RHF no maneja bien discriminatedUnion).
-// La exclusividad de modos (REQ-HT-01) la enforza handleSubmitInternal antes de
-// construir el payload que se pasa a onBuscar.
-// ============================================================
-
-const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-const formSchema = z.object({
-  modo: z.enum(['periodo', 'rango']),
-  periodoFiscalId: z.string(),
-  fechaDesde: z.string(),
-  fechaHasta: z.string(),
-  incluirAnulados: z.boolean(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 // ============================================================
 // Props
@@ -57,184 +28,77 @@ interface HojaTrabajoFiltrosProps {
 /**
  * Panel de filtros de la Hoja de Trabajo de 12 columnas.
  *
- * Modo "período fiscal": selector de período del tenant (default — es como el
- * contador corre el cierre mes a mes). Modo "rango de fechas": dos inputs.
- * Toggle "Incluir anulados" disponible en ambos modos.
+ * El período se elige con `<PeriodoGestionFiltro>` (Gestión + Mes, con opción
+ * "Todos" → rango de toda la gestión, y un toggle de rango personalizado). La
+ * selección resuelta (`PeriodoSeleccion`) se mapea al payload XOR período/rango
+ * de `HojaTrabajoFiltroValues` SIN cambiar el contrato que recibe la page.
  *
- * REQ-HT-01: los modos son mutuamente excluyentes; el payload que se pasa a
- * onBuscar contiene exactamente uno.
+ * Toggle propio que conserva: "Incluir anulados".
  */
 export function HojaTrabajoFiltros({
   onBuscar,
   isFetching = false,
 }: HojaTrabajoFiltrosProps): React.JSX.Element {
-  // Cross-feature: períodos del tenant para el selector.
-  const { data: periodos } = usePeriodos();
-  const periodosOrdenados = useMemo(
-    () => [...(periodos ?? [])].sort((a, b) => b.year - a.year || b.month - a.month),
-    [periodos],
-  );
+  // La selección de período la resuelve PeriodoGestionFiltro y la emite por onChange.
+  const [seleccion, setSeleccion] = useState<PeriodoSeleccion | null>(null);
+  const [incluirAnulados, setIncluirAnulados] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    setError,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      modo: 'periodo',
-      periodoFiscalId: '',
-      fechaDesde: primerDiaDelAnioISO(),
-      fechaHasta: hoyEnLaPazISO(),
-      incluirAnulados: false,
-    },
-  });
+  function handleConsultar(): void {
+    if (seleccion === null) {
+      setError('Seleccioná un período o rango de fechas');
+      return;
+    }
 
-  const modo = useWatch({ control, name: 'modo' });
-  const incluirAnulados = useWatch({ control, name: 'incluirAnulados' });
+    if (
+      seleccion.modo === 'rango' &&
+      (seleccion.fechaDesde === '' || seleccion.fechaHasta === '')
+    ) {
+      setError('Completá las fechas del rango');
+      return;
+    }
 
-  function handleModoChange(nuevoModo: 'periodo' | 'rango'): void {
-    setValue('modo', nuevoModo);
-  }
+    if (seleccion.modo === 'rango' && seleccion.fechaDesde > seleccion.fechaHasta) {
+      setError('La fecha final no puede ser anterior a la fecha inicial');
+      return;
+    }
 
-  function handleSubmitInternal(raw: FormValues): void {
-    if (raw.modo === 'periodo') {
-      if (raw.periodoFiscalId === '') {
-        setError('periodoFiscalId', { message: 'Seleccioná un período fiscal' });
-        return;
-      }
+    setError(undefined);
+
+    if (seleccion.modo === 'periodo') {
       onBuscar({
         modo: 'periodo',
-        periodoFiscalId: raw.periodoFiscalId,
-        incluirAnulados: raw.incluirAnulados,
+        periodoFiscalId: seleccion.periodoFiscalId,
+        incluirAnulados,
       });
-      return;
-    }
-
-    if (!FECHA_REGEX.test(raw.fechaDesde)) {
-      setError('fechaDesde', { message: 'Formato de fecha inválido (YYYY-MM-DD)' });
-      return;
-    }
-    if (!FECHA_REGEX.test(raw.fechaHasta)) {
-      setError('fechaHasta', { message: 'Formato de fecha inválido (YYYY-MM-DD)' });
-      return;
-    }
-    if (raw.fechaDesde > raw.fechaHasta) {
-      setError('fechaHasta', {
-        message: 'La fecha final no puede ser anterior a la fecha inicial',
+    } else {
+      onBuscar({
+        modo: 'rango',
+        fechaDesde: seleccion.fechaDesde,
+        fechaHasta: seleccion.fechaHasta,
+        incluirAnulados,
       });
-      return;
     }
-    onBuscar({
-      modo: 'rango',
-      fechaDesde: raw.fechaDesde,
-      fechaHasta: raw.fechaHasta,
-      incluirAnulados: raw.incluirAnulados,
-    });
   }
 
   return (
-    <form
-      onSubmit={(e) => void handleSubmit(handleSubmitInternal)(e)}
-      className="space-y-4"
-      noValidate
-    >
-      {/* Selector de modo */}
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={modo === 'periodo' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleModoChange('periodo')}
-        >
-          Por período
-        </Button>
-        <Button
-          type="button"
-          variant={modo === 'rango' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => handleModoChange('rango')}
-        >
-          Por rango de fechas
-        </Button>
-      </div>
+    <div className="space-y-4">
+      <PeriodoGestionFiltro
+        value={seleccion}
+        onChange={(sel) => {
+          setSeleccion(sel);
+          setError(undefined);
+        }}
+        error={error}
+      />
 
       <div className="flex flex-wrap items-end gap-3">
-        {/* Modo período fiscal */}
-        {modo === 'periodo' && (
-          <div className="space-y-1">
-            <Label htmlFor="ht-periodo" className="text-xs text-muted-foreground">
-              Período fiscal
-            </Label>
-            <Select
-              onValueChange={(v) => setValue('periodoFiscalId', v, { shouldValidate: false })}
-            >
-              <SelectTrigger
-                id="ht-periodo"
-                className="h-8 text-sm w-48"
-                aria-invalid={errors.periodoFiscalId !== undefined}
-              >
-                <SelectValue placeholder="Seleccionar período" />
-              </SelectTrigger>
-              <SelectContent>
-                {periodosOrdenados.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {formatPeriodoCorto(p.year, p.month)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.periodoFiscalId?.message !== undefined && (
-              <p className="text-xs text-destructive">{errors.periodoFiscalId.message}</p>
-            )}
-          </div>
-        )}
-
-        {/* Modo rango de fechas */}
-        {modo === 'rango' && (
-          <>
-            <div className="space-y-1">
-              <Label htmlFor="ht-fecha-desde" className="text-xs text-muted-foreground">
-                Desde
-              </Label>
-              <Input
-                id="ht-fecha-desde"
-                type="date"
-                className="h-8 text-sm w-40 text-base md:text-sm"
-                aria-invalid={errors.fechaDesde !== undefined}
-                {...register('fechaDesde')}
-              />
-              {errors.fechaDesde?.message !== undefined && (
-                <p className="text-xs text-destructive">{errors.fechaDesde.message}</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ht-fecha-hasta" className="text-xs text-muted-foreground">
-                Hasta
-              </Label>
-              <Input
-                id="ht-fecha-hasta"
-                type="date"
-                className="h-8 text-sm w-40 text-base md:text-sm"
-                aria-invalid={errors.fechaHasta !== undefined}
-                {...register('fechaHasta')}
-              />
-              {errors.fechaHasta?.message !== undefined && (
-                <p className="text-xs text-destructive">{errors.fechaHasta.message}</p>
-              )}
-            </div>
-          </>
-        )}
-
         {/* Toggle incluir anulados */}
         <div className="flex items-center gap-2 pb-0.5">
           <Switch
             id="ht-anulados"
             checked={incluirAnulados}
-            onCheckedChange={(checked) => setValue('incluirAnulados', checked)}
+            onCheckedChange={setIncluirAnulados}
           />
           <Label htmlFor="ht-anulados" className="text-sm cursor-pointer">
             Incluir anulados
@@ -242,10 +106,16 @@ export function HojaTrabajoFiltros({
         </div>
 
         {/* Botón consultar */}
-        <Button type="submit" disabled={isFetching} size="sm" className="self-end">
+        <Button
+          type="button"
+          onClick={handleConsultar}
+          disabled={isFetching}
+          size="sm"
+          className="self-end"
+        >
           {isFetching ? 'Consultando…' : 'Consultar'}
         </Button>
       </div>
-    </form>
+    </div>
   );
 }
