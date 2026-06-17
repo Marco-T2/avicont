@@ -568,6 +568,14 @@ export interface ResumenPrecierre {
   razonNoPuedeCerrar?: string;
 }
 
+// ============================================================
+// Cierre del ejercicio — POST/GET /api/gestiones/:id/cierre
+// ============================================================
+
+export type CierreComprobanteResponse = Schemas['CierreComprobanteResponseDto'];
+
+export type CierreEjercicioResponse = Schemas['CierreEjercicioResponseDto'];
+
 // Query params de GET /api/gestiones (client-only).
 export interface ListarGestionesParams {
   status?: GestionFiscalStatus;

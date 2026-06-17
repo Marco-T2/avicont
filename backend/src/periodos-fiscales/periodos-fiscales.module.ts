@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { CierreEjercicioModule } from '@/cierre-ejercicio/cierre-ejercicio.module';
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import { ComprobantesLockModule } from '@/comprobantes/comprobantes-lock.module';
@@ -26,8 +27,13 @@ import { PERIODO_FISCAL_REPOSITORY_PORT } from './ports/periodo-fiscal.repositor
 //
 // El binding de `PERIODOS_READER_PORT` (lo que comprobantes consume de acá)
 // vive en `PeriodosReaderModule`, también leaf.
+//
+// `CierreEjercicioModule` se importa para inyectar `CierreEjercicioService` en
+// el controller (endpoint POST/GET /gestiones/:id/cierre) y en el service (gate
+// de `cerrar()`, REQ-GF-CIERRE-01). NO hay ciclo: cierre-ejercicio importa
+// `ComprobantesModule` + `EeffSaldosReaderModule` (leafs), nunca este módulo.
 @Module({
-  imports: [RbacModule, ComprobantesLockModule],
+  imports: [RbacModule, ComprobantesLockModule, CierreEjercicioModule],
   controllers: [GestionesFiscalesController, PeriodosFiscalesController],
   providers: [
     PrismaService,

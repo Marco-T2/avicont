@@ -534,6 +534,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gestiones/{id}/cierre": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consultar el estado de los comprobantes de cierre del ejercicio (preview). */
+        get: operations["GestionesFiscalesController_obtenerCierre"];
+        put?: never;
+        /** Generar (o regenerar) los comprobantes de cierre del ejercicio de la gestión, en BORRADOR no-editable. */
+        post: operations["GestionesFiscalesController_generarCierre"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/periodos": {
         parameters: {
             query?: never;
@@ -636,6 +654,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/comprobantes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar comprobantes del tenant con paginación y filtros (periodoFiscalId, tipo, estado, rango de fechas, texto libre). */
+        get: operations["ComprobantesController_listar"];
+        put?: never;
+        /** Crear un comprobante en BORRADOR con sus líneas. No valida partida doble — ese chequeo corre al contabilizar. */
+        post: operations["ComprobantesController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO. */
+        get: operations["ComprobantesController_exportar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle completo del comprobante con sus líneas. */
+        get: operations["ComprobantesController_obtener"];
+        put?: never;
+        post?: never;
+        /** Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular. */
+        delete: operations["ComprobantesController_eliminar"];
+        options?: never;
+        head?: never;
+        /** Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional `contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. Rechaza BLOQUEADO o anulados. */
+        patch: operations["ComprobantesController_actualizar"];
+        trace?: never;
+    };
+    "/api/comprobantes/{id}/contabilizar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transicionar BORRADOR → CONTABILIZADO. Valida partida doble, asigna número atómico {prefijo}{YY}{MM}-{correlativo:6} y registra auditoría. */
+        post: operations["ComprobantesController_contabilizar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva. */
+        post: operations["ComprobantesController_anular"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{id}/auditoria": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff. */
+        get: operations["ComprobantesController_obtenerAuditoria"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/documentos-fisicos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar los documentos físicos asociados al comprobante (REQ-A-09). */
+        get: operations["ComprobantesController_listarDocumentosFisicos"];
+        put?: never;
+        /** Asociar uno o más documentos físicos a un comprobante. Aditiva e idempotente (REQ-A-01). En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto edita la asociación (§4.3 CLAUDE.md) — requiere permiso adicional `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados. */
+        post: operations["ComprobantesController_asociarDocumentosFisicos"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/documentos-fisicos/{documentoFisicoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Desasociar un documento físico de un comprobante. En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto (§4.3 CLAUDE.md) requiere `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados (REQ-A-02/03). */
+        delete: operations["ComprobantesController_desasociarDocumentoFisico"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/adjuntos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos). */
+        get: operations["ComprobantesController_listarAdjuntos"];
+        put?: never;
+        /** Subir un adjunto al comprobante (Pack contabilidad.adjuntos). */
+        post: operations["ComprobantesController_subirAdjunto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos). */
+        get: operations["ComprobantesController_descargarAdjunto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos). */
+        put: operations["ComprobantesController_reemplazarAdjunto"];
+        post?: never;
+        /** Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos). */
+        delete: operations["ComprobantesController_eliminarAdjunto"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cuentas": {
         parameters: {
             query?: never;
@@ -705,6 +916,114 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/contactos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista contactos del tenant con paginación y filtros (q, documento, esCliente, esProveedor, activo). */
+        get: operations["ContactosController_listar"];
+        put?: never;
+        /** Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa. */
+        post: operations["ContactosController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contactos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle del contacto. */
+        get: operations["ContactosController_obtener"];
+        put?: never;
+        post?: never;
+        /** Elimina un contacto. Falla con 409 si alguna línea de comprobante lo referencia (usar desactivar en ese caso). */
+        delete: operations["ContactosController_eliminar"];
+        options?: never;
+        head?: never;
+        /** PATCH del contacto. Campos opcionales; sólo toca los que vienen. El toggle activo/inactivo vive en endpoints dedicados. */
+        patch: operations["ContactosController_actualizar"];
+        trace?: never;
+    };
+    "/api/contactos/{id}/desactivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marca el contacto como inactivo. Idempotente. Los comprobantes históricos siguen refiriéndolo; los nuevos no pueden usarlo. */
+        post: operations["ContactosController_desactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contactos/{id}/reactivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactiva un contacto inactivo. Idempotente. */
+        post: operations["ContactosController_reactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documentos-fisicos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista documentos físicos del tenant con paginación y filtros (tipo, fechas, contacto, estado de asociación, número). */
+        get: operations["DocumentosFisicosController_listar"];
+        put?: never;
+        /** Crea un documento físico en el tenant activo. */
+        post: operations["DocumentosFisicosController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documentos-fisicos/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle del documento físico con sus comprobantes asociados. */
+        get: operations["DocumentosFisicosController_obtener"];
+        put?: never;
+        post?: never;
+        /** Elimina un documento físico. Falla con 409 si tiene asociaciones activas (usar desasociar primero). */
+        delete: operations["DocumentosFisicosController_eliminar"];
+        options?: never;
+        head?: never;
+        /** PATCH parcial del documento físico. Solo toca los campos presentes. Falla con 409 si hay asociaciones a comprobantes contabilizados. */
+        patch: operations["DocumentosFisicosController_actualizar"];
         trace?: never;
     };
     "/api/tipos-documento-fisico": {
@@ -1457,307 +1776,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/comprobantes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Listar comprobantes del tenant con paginación y filtros (periodoFiscalId, tipo, estado, rango de fechas, texto libre). */
-        get: operations["ComprobantesController_listar"];
-        put?: never;
-        /** Crear un comprobante en BORRADOR con sus líneas. No valida partida doble — ese chequeo corre al contabilizar. */
-        post: operations["ComprobantesController_crear"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO. */
-        get: operations["ComprobantesController_exportar"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detalle completo del comprobante con sus líneas. */
-        get: operations["ComprobantesController_obtener"];
-        put?: never;
-        post?: never;
-        /** Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular. */
-        delete: operations["ComprobantesController_eliminar"];
-        options?: never;
-        head?: never;
-        /** Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional `contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. Rechaza BLOQUEADO o anulados. */
-        patch: operations["ComprobantesController_actualizar"];
-        trace?: never;
-    };
-    "/api/comprobantes/{id}/contabilizar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Transicionar BORRADOR → CONTABILIZADO. Valida partida doble, asigna número atómico {prefijo}{YY}{MM}-{correlativo:6} y registra auditoría. */
-        post: operations["ComprobantesController_contabilizar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{id}/anular": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva. */
-        post: operations["ComprobantesController_anular"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{id}/auditoria": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff. */
-        get: operations["ComprobantesController_obtenerAuditoria"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{comprobanteId}/documentos-fisicos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Listar los documentos físicos asociados al comprobante (REQ-A-09). */
-        get: operations["ComprobantesController_listarDocumentosFisicos"];
-        put?: never;
-        /** Asociar uno o más documentos físicos a un comprobante. Aditiva e idempotente (REQ-A-01). En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto edita la asociación (§4.3 CLAUDE.md) — requiere permiso adicional `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados. */
-        post: operations["ComprobantesController_asociarDocumentosFisicos"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{comprobanteId}/documentos-fisicos/{documentoFisicoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Desasociar un documento físico de un comprobante. En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto (§4.3 CLAUDE.md) requiere `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados (REQ-A-02/03). */
-        delete: operations["ComprobantesController_desasociarDocumentoFisico"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{comprobanteId}/adjuntos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos). */
-        get: operations["ComprobantesController_listarAdjuntos"];
-        put?: never;
-        /** Subir un adjunto al comprobante (Pack contabilidad.adjuntos). */
-        post: operations["ComprobantesController_subirAdjunto"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos). */
-        get: operations["ComprobantesController_descargarAdjunto"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos). */
-        put: operations["ComprobantesController_reemplazarAdjunto"];
-        post?: never;
-        /** Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos). */
-        delete: operations["ComprobantesController_eliminarAdjunto"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/contactos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista contactos del tenant con paginación y filtros (q, documento, esCliente, esProveedor, activo). */
-        get: operations["ContactosController_listar"];
-        put?: never;
-        /** Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa. */
-        post: operations["ContactosController_crear"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/contactos/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detalle del contacto. */
-        get: operations["ContactosController_obtener"];
-        put?: never;
-        post?: never;
-        /** Elimina un contacto. Falla con 409 si alguna línea de comprobante lo referencia (usar desactivar en ese caso). */
-        delete: operations["ContactosController_eliminar"];
-        options?: never;
-        head?: never;
-        /** PATCH del contacto. Campos opcionales; sólo toca los que vienen. El toggle activo/inactivo vive en endpoints dedicados. */
-        patch: operations["ContactosController_actualizar"];
-        trace?: never;
-    };
-    "/api/contactos/{id}/desactivar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Marca el contacto como inactivo. Idempotente. Los comprobantes históricos siguen refiriéndolo; los nuevos no pueden usarlo. */
-        post: operations["ContactosController_desactivar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/contactos/{id}/reactivar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reactiva un contacto inactivo. Idempotente. */
-        post: operations["ContactosController_reactivar"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documentos-fisicos": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista documentos físicos del tenant con paginación y filtros (tipo, fechas, contacto, estado de asociación, número). */
-        get: operations["DocumentosFisicosController_listar"];
-        put?: never;
-        /** Crea un documento físico en el tenant activo. */
-        post: operations["DocumentosFisicosController_crear"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documentos-fisicos/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detalle del documento físico con sus comprobantes asociados. */
-        get: operations["DocumentosFisicosController_obtener"];
-        put?: never;
-        post?: never;
-        /** Elimina un documento físico. Falla con 409 si tiene asociaciones activas (usar desasociar primero). */
-        delete: operations["DocumentosFisicosController_eliminar"];
-        options?: never;
-        head?: never;
-        /** PATCH parcial del documento físico. Solo toca los campos presentes. Falla con 409 si hay asociaciones a comprobantes contabilizados. */
-        patch: operations["DocumentosFisicosController_actualizar"];
-        trace?: never;
-    };
     "/api/libros/diario": {
         parameters: {
             query?: never;
@@ -2169,12 +2187,211 @@ export interface components {
              */
             year: number;
         };
+        CierreComprobanteResponseDto: {
+            /** @example 7c9e6679-7425-40de-944b-e07fc1f90ae7 */
+            id: string;
+            /**
+             * @description Slot del comprobante de cierre: gastos (#1), ingresos (#2) o traslado (#3).
+             * @example CIERRE_RESULTADO
+             * @enum {string}
+             */
+            origenTipo: "CIERRE_GASTOS" | "CIERRE_INGRESOS" | "CIERRE_RESULTADO";
+            /**
+             * @example BORRADOR
+             * @enum {string}
+             */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+        };
+        CierreEjercicioResponseDto: {
+            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
+            gestionId: string;
+            /** @description Comprobantes de cierre de la gestión (≤3). En generación recién creados están en BORRADOR. */
+            cierres: components["schemas"]["CierreComprobanteResponseDto"][];
+        };
         ReabrirPeriodoDto: {
             /**
              * @description Razón documentada de la reapertura. Queda en el log permanente (PeriodoFiscalReopening). Mínimo 20 caracteres.
              * @example Corrección de asiento mal contabilizado detectado en auditoría interna
              */
             motivo: string;
+        };
+        CreateLineaDto: {
+            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
+            cuentaId: string;
+            /**
+             * @description Requerido si cuenta.requiereContacto al contabilizar
+             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
+             */
+            contactoId?: string;
+            /**
+             * @example BOB
+             * @enum {string}
+             */
+            moneda: "BOB" | "USD";
+            /**
+             * @description Monto DEBE en moneda original (string)
+             * @example 1000.00
+             */
+            debito: string;
+            /**
+             * @description Monto HABER en moneda original (string)
+             * @example 0
+             */
+            credito: string;
+            /**
+             * @description Tipo de cambio a BOB (1 si moneda=BOB)
+             * @example 1
+             */
+            tipoCambio: string;
+            /**
+             * @description Monto DEBE convertido a BOB
+             * @example 1000.00
+             */
+            debitoBob: string;
+            /**
+             * @description Monto HABER convertido a BOB
+             * @example 0
+             */
+            creditoBob: string;
+            /** @description Glosa específica de la línea (opcional) */
+            glosaLinea?: string;
+        };
+        CreateComprobanteDto: {
+            /**
+             * @example DIARIO
+             * @enum {string}
+             */
+            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            /**
+             * @description Fecha contable en formato ISO YYYY-MM-DD
+             * @example 2026-04-22
+             */
+            fechaContable: string;
+            /** @example Venta al contado a cliente X */
+            glosa: string;
+            /**
+             * @default BOB
+             * @enum {string}
+             */
+            monedaPrincipal?: "BOB";
+            /**
+             * @description T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1.
+             * @example 6.96
+             */
+            tipoCambioReexpresion?: string;
+            lineas: components["schemas"]["CreateLineaDto"][];
+        };
+        ContactoResumenDto: {
+            id: string;
+            /** @example Avícola Sur S.R.L. */
+            nombre: string;
+        };
+        DocumentoRespaldoResumenDto: {
+            id: string;
+            /** @example Factura */
+            tipoNombre: string;
+            /** @example 0042 */
+            numero: string;
+        };
+        ComprobanteListItemDto: {
+            id: string;
+            /** @enum {string} */
+            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            /** @example I2604-000042 */
+            numero: string | null;
+            /** @enum {string} */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+            /** @example 2026-04-22 */
+            fechaContable: string;
+            periodoFiscalId: string;
+            glosa: string;
+            /** @enum {string} */
+            monedaPrincipal: "BOB" | "USD";
+            /** @example 1.00000000 */
+            tipoCambioReexpresion: string;
+            /** @example 1000.00 */
+            totalDebitoBob: string;
+            /** @example 1000.00 */
+            totalCreditoBob: string;
+            anulado: boolean;
+            fechaAnulacion: string | null;
+            anuladoPorUserId: string | null;
+            motivoAnulacion: string | null;
+            createdByUserId: string;
+            createdAt: string;
+            updatedAt: string;
+            contactos: components["schemas"]["ContactoResumenDto"][];
+            documentosRespaldo: components["schemas"]["DocumentoRespaldoResumenDto"][];
+        };
+        ListarComprobantesResponseDto: {
+            items: components["schemas"]["ComprobanteListItemDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        ExportarComprobantesResponseDto: {
+            items: components["schemas"]["ComprobanteListItemDto"][];
+        };
+        EditarContabilizadoDto: {
+            /**
+             * @example DIARIO
+             * @enum {string}
+             */
+            tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            /**
+             * @description Fecha contable en formato ISO YYYY-MM-DD
+             * @example 2026-04-22
+             */
+            fechaContable?: string;
+            /** @example Venta al contado a cliente X */
+            glosa?: string;
+            /**
+             * @default BOB
+             * @enum {string}
+             */
+            monedaPrincipal?: "BOB";
+            /**
+             * @description T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1.
+             * @example 6.96
+             */
+            tipoCambioReexpresion?: string;
+            lineas?: components["schemas"]["CreateLineaDto"][];
+            /** @description Número correlativo. INMUTABLE — si se envía distinto al actual, la petición será rechazada con 409 (§4.9 CLAUDE.md). Omitir en producción. */
+            numero?: string;
+            /**
+             * @description Motivo del cambio, registrado en comprobantes_audit. Si se omite, el trigger registrará motivo NULL (auditoría silenciosa). Mínimo 3 caracteres si se envía.
+             * @example Corrección de glosa — error tipográfico en el nombre del cliente
+             */
+            motivo?: string;
+        };
+        AnularComprobanteDto: {
+            /**
+             * @description Motivo de la anulación, mínimo 10 caracteres (visible en auditoría)
+             * @example Error en la imputación al cliente
+             */
+            motivo: string;
+        };
+        AsociarDocumentosDto: {
+            /**
+             * @description IDs de los documentos físicos a asociar al comprobante. La operación es aditiva e idempotente.
+             * @example [
+             *       "7c0e5b2a-2f3d-4d6e-9a1b-1c2d3e4f5a6b"
+             *     ]
+             */
+            documentoFisicoIds: string[];
+        };
+        AdjuntoResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            comprobanteId: string;
+            nombreOriginal: string;
+            mimeType: string;
+            tamanoBytes: number;
+            /** Format: uuid */
+            subidoPorUserId: string;
+            createdAt: string;
+            updatedAt: string;
         };
         CuentaResponseDto: {
             id: string;
@@ -2289,6 +2506,156 @@ export interface components {
             monedaFuncional?: "BOB" | "USD";
             /** @enum {string|null} */
             actividadFlujo?: "EFECTIVO" | "OPERACION" | "INVERSION" | "FINANCIACION" | null;
+        };
+        CreateContactoDto: {
+            /** @example Granjas El Sol SRL */
+            razonSocial: string;
+            /** @example El Sol */
+            nombreComercial?: string | null;
+            /**
+             * @description NIT, CI, CEX o pasaporte. Texto libre.
+             * @example 1234567019
+             */
+            documento?: string | null;
+            /** @example true */
+            esCliente: boolean;
+            /** @example false */
+            esProveedor: boolean;
+            /** @example ventas@elsol.bo */
+            email?: string | null;
+            /** @example +591 3 1234567 */
+            telefono?: string | null;
+            direccion?: string | null;
+        };
+        Object: Record<string, never>;
+        ContactoResponseDto: {
+            id: string;
+            razonSocial: string;
+            nombreComercial: string | null;
+            documento: string | null;
+            esCliente: boolean;
+            esProveedor: boolean;
+            email: string | null;
+            telefono: string | null;
+            direccion: string | null;
+            activo: boolean;
+            createdByUserId: string;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ListarContactosResponseDto: {
+            items: components["schemas"]["ContactoResponseDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        UpdateContactoDto: {
+            razonSocial?: string;
+            nombreComercial?: string | null;
+            documento?: string | null;
+            esCliente?: boolean;
+            esProveedor?: boolean;
+            email?: string | null;
+            telefono?: string | null;
+            direccion?: string | null;
+        };
+        CreateDocumentoFisicoDto: {
+            /**
+             * Format: uuid
+             * @description ID del tipo de documento físico (debe pertenecer al tenant y estar activo)
+             */
+            tipoDocumentoFisicoId: string;
+            /**
+             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).
+             * @example FAC-0042
+             */
+            numero?: string | null;
+            /**
+             * @description Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).
+             * @example 2026-03-15
+             */
+            fechaEmision: string;
+            /**
+             * @description Monto del documento como string decimal. Obligatorio para tipos tributarios (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).
+             * @example 1250.50
+             */
+            monto?: string | null;
+            /**
+             * @description Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.
+             * @enum {string|null}
+             */
+            moneda?: "BOB" | "USD" | null;
+            /**
+             * Format: uuid
+             * @description ID del contacto (cliente o proveedor) asociado al documento.
+             */
+            contactoId?: string | null;
+            /** @description Glosa o descripción libre del documento. */
+            glosa?: string | null;
+        };
+        TipoDocumentoFisicoEmbebidoDto: {
+            id: string;
+            nombre: string;
+            codigo: string;
+            esTributario: boolean;
+            /** @description Si true, el sistema asigna número correlativo automáticamente. */
+            numeracionAutomatica: boolean;
+        };
+        ContactoEmbebidoDto: {
+            id: string;
+            razonSocial: string;
+        };
+        DocumentoFisicoDto: {
+            id: string;
+            numero: string;
+            fechaEmision: string;
+            monto: string | null;
+            moneda: string | null;
+            glosa: string | null;
+            tipoDocumentoFisico: components["schemas"]["TipoDocumentoFisicoEmbebidoDto"];
+            contacto: components["schemas"]["ContactoEmbebidoDto"] | null;
+            organizationId: string;
+            createdAt: string;
+        };
+        ListarDocumentosFisicosResponseDto: {
+            items: components["schemas"]["DocumentoFisicoDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        UpdateDocumentoFisicoDto: {
+            /**
+             * Format: uuid
+             * @description ID del tipo de documento físico. Debe pertenecer al tenant y estar activo.
+             */
+            tipoDocumentoFisicoId?: string;
+            /**
+             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.
+             * @example FAC-0042
+             */
+            numero?: string;
+            /**
+             * @description Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).
+             * @example 2026-03-15
+             */
+            fechaEmision?: string;
+            /**
+             * @description Monto del documento como string decimal. Para tipos tributarios no puede ser null (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).
+             * @example 1250.50
+             */
+            monto?: string | null;
+            /**
+             * @description Moneda del documento. BOB o USD.
+             * @enum {string|null}
+             */
+            moneda?: "BOB" | "USD" | null;
+            /**
+             * Format: uuid
+             * @description ID del contacto asociado al documento.
+             */
+            contactoId?: string | null;
+            /** @description Glosa o descripción libre del documento. */
+            glosa?: string | null;
         };
         TipoDocumentoFisicoResponseDto: {
             id: string;
@@ -2736,334 +3103,6 @@ export interface components {
             cajaChicaDefaultId?: string | null;
             /** Format: uuid */
             ajustePorInflacionId?: string | null;
-        };
-        CreateLineaDto: {
-            /** @example 3fa85f64-5717-4562-b3fc-2c963f66afa6 */
-            cuentaId: string;
-            /**
-             * @description Requerido si cuenta.requiereContacto al contabilizar
-             * @example 3fa85f64-5717-4562-b3fc-2c963f66afa6
-             */
-            contactoId?: string;
-            /**
-             * @example BOB
-             * @enum {string}
-             */
-            moneda: "BOB" | "USD";
-            /**
-             * @description Monto DEBE en moneda original (string)
-             * @example 1000.00
-             */
-            debito: string;
-            /**
-             * @description Monto HABER en moneda original (string)
-             * @example 0
-             */
-            credito: string;
-            /**
-             * @description Tipo de cambio a BOB (1 si moneda=BOB)
-             * @example 1
-             */
-            tipoCambio: string;
-            /**
-             * @description Monto DEBE convertido a BOB
-             * @example 1000.00
-             */
-            debitoBob: string;
-            /**
-             * @description Monto HABER convertido a BOB
-             * @example 0
-             */
-            creditoBob: string;
-            /** @description Glosa específica de la línea (opcional) */
-            glosaLinea?: string;
-        };
-        CreateComprobanteDto: {
-            /**
-             * @example DIARIO
-             * @enum {string}
-             */
-            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
-            /**
-             * @description Fecha contable en formato ISO YYYY-MM-DD
-             * @example 2026-04-22
-             */
-            fechaContable: string;
-            /** @example Venta al contado a cliente X */
-            glosa: string;
-            /**
-             * @default BOB
-             * @enum {string}
-             */
-            monedaPrincipal?: "BOB";
-            /**
-             * @description T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1.
-             * @example 6.96
-             */
-            tipoCambioReexpresion?: string;
-            lineas: components["schemas"]["CreateLineaDto"][];
-        };
-        ContactoResumenDto: {
-            id: string;
-            /** @example Avícola Sur S.R.L. */
-            nombre: string;
-        };
-        DocumentoRespaldoResumenDto: {
-            id: string;
-            /** @example Factura */
-            tipoNombre: string;
-            /** @example 0042 */
-            numero: string;
-        };
-        ComprobanteListItemDto: {
-            id: string;
-            /** @enum {string} */
-            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
-            /** @example I2604-000042 */
-            numero: string | null;
-            /** @enum {string} */
-            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
-            /** @example 2026-04-22 */
-            fechaContable: string;
-            periodoFiscalId: string;
-            glosa: string;
-            /** @enum {string} */
-            monedaPrincipal: "BOB" | "USD";
-            /** @example 1.00000000 */
-            tipoCambioReexpresion: string;
-            /** @example 1000.00 */
-            totalDebitoBob: string;
-            /** @example 1000.00 */
-            totalCreditoBob: string;
-            anulado: boolean;
-            fechaAnulacion: string | null;
-            anuladoPorUserId: string | null;
-            motivoAnulacion: string | null;
-            createdByUserId: string;
-            createdAt: string;
-            updatedAt: string;
-            contactos: components["schemas"]["ContactoResumenDto"][];
-            documentosRespaldo: components["schemas"]["DocumentoRespaldoResumenDto"][];
-        };
-        ListarComprobantesResponseDto: {
-            items: components["schemas"]["ComprobanteListItemDto"][];
-            total: number;
-            page: number;
-            limit: number;
-        };
-        ExportarComprobantesResponseDto: {
-            items: components["schemas"]["ComprobanteListItemDto"][];
-        };
-        EditarContabilizadoDto: {
-            /**
-             * @example DIARIO
-             * @enum {string}
-             */
-            tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
-            /**
-             * @description Fecha contable en formato ISO YYYY-MM-DD
-             * @example 2026-04-22
-             */
-            fechaContable?: string;
-            /** @example Venta al contado a cliente X */
-            glosa?: string;
-            /**
-             * @default BOB
-             * @enum {string}
-             */
-            monedaPrincipal?: "BOB";
-            /**
-             * @description T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1.
-             * @example 6.96
-             */
-            tipoCambioReexpresion?: string;
-            lineas?: components["schemas"]["CreateLineaDto"][];
-            /** @description Número correlativo. INMUTABLE — si se envía distinto al actual, la petición será rechazada con 409 (§4.9 CLAUDE.md). Omitir en producción. */
-            numero?: string;
-            /**
-             * @description Motivo del cambio, registrado en comprobantes_audit. Si se omite, el trigger registrará motivo NULL (auditoría silenciosa). Mínimo 3 caracteres si se envía.
-             * @example Corrección de glosa — error tipográfico en el nombre del cliente
-             */
-            motivo?: string;
-        };
-        AnularComprobanteDto: {
-            /**
-             * @description Motivo de la anulación, mínimo 10 caracteres (visible en auditoría)
-             * @example Error en la imputación al cliente
-             */
-            motivo: string;
-        };
-        AsociarDocumentosDto: {
-            /**
-             * @description IDs de los documentos físicos a asociar al comprobante. La operación es aditiva e idempotente.
-             * @example [
-             *       "7c0e5b2a-2f3d-4d6e-9a1b-1c2d3e4f5a6b"
-             *     ]
-             */
-            documentoFisicoIds: string[];
-        };
-        AdjuntoResponseDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            comprobanteId: string;
-            nombreOriginal: string;
-            mimeType: string;
-            tamanoBytes: number;
-            /** Format: uuid */
-            subidoPorUserId: string;
-            createdAt: string;
-            updatedAt: string;
-        };
-        CreateContactoDto: {
-            /** @example Granjas El Sol SRL */
-            razonSocial: string;
-            /** @example El Sol */
-            nombreComercial?: string | null;
-            /**
-             * @description NIT, CI, CEX o pasaporte. Texto libre.
-             * @example 1234567019
-             */
-            documento?: string | null;
-            /** @example true */
-            esCliente: boolean;
-            /** @example false */
-            esProveedor: boolean;
-            /** @example ventas@elsol.bo */
-            email?: string | null;
-            /** @example +591 3 1234567 */
-            telefono?: string | null;
-            direccion?: string | null;
-        };
-        Object: Record<string, never>;
-        ContactoResponseDto: {
-            id: string;
-            razonSocial: string;
-            nombreComercial: string | null;
-            documento: string | null;
-            esCliente: boolean;
-            esProveedor: boolean;
-            email: string | null;
-            telefono: string | null;
-            direccion: string | null;
-            activo: boolean;
-            createdByUserId: string;
-            createdAt: string;
-            updatedAt: string;
-        };
-        ListarContactosResponseDto: {
-            items: components["schemas"]["ContactoResponseDto"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        UpdateContactoDto: {
-            razonSocial?: string;
-            nombreComercial?: string | null;
-            documento?: string | null;
-            esCliente?: boolean;
-            esProveedor?: boolean;
-            email?: string | null;
-            telefono?: string | null;
-            direccion?: string | null;
-        };
-        CreateDocumentoFisicoDto: {
-            /**
-             * Format: uuid
-             * @description ID del tipo de documento físico (debe pertenecer al tenant y estar activo)
-             */
-            tipoDocumentoFisicoId: string;
-            /**
-             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).
-             * @example FAC-0042
-             */
-            numero?: string | null;
-            /**
-             * @description Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).
-             * @example 2026-03-15
-             */
-            fechaEmision: string;
-            /**
-             * @description Monto del documento como string decimal. Obligatorio para tipos tributarios (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).
-             * @example 1250.50
-             */
-            monto?: string | null;
-            /**
-             * @description Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.
-             * @enum {string|null}
-             */
-            moneda?: "BOB" | "USD" | null;
-            /**
-             * Format: uuid
-             * @description ID del contacto (cliente o proveedor) asociado al documento.
-             */
-            contactoId?: string | null;
-            /** @description Glosa o descripción libre del documento. */
-            glosa?: string | null;
-        };
-        TipoDocumentoFisicoEmbebidoDto: {
-            id: string;
-            nombre: string;
-            codigo: string;
-            esTributario: boolean;
-            /** @description Si true, el sistema asigna número correlativo automáticamente. */
-            numeracionAutomatica: boolean;
-        };
-        ContactoEmbebidoDto: {
-            id: string;
-            razonSocial: string;
-        };
-        DocumentoFisicoDto: {
-            id: string;
-            numero: string;
-            fechaEmision: string;
-            monto: string | null;
-            moneda: string | null;
-            glosa: string | null;
-            tipoDocumentoFisico: components["schemas"]["TipoDocumentoFisicoEmbebidoDto"];
-            contacto: components["schemas"]["ContactoEmbebidoDto"] | null;
-            organizationId: string;
-            createdAt: string;
-        };
-        ListarDocumentosFisicosResponseDto: {
-            items: components["schemas"]["DocumentoFisicoDto"][];
-            total: number;
-            page: number;
-            pageSize: number;
-        };
-        UpdateDocumentoFisicoDto: {
-            /**
-             * Format: uuid
-             * @description ID del tipo de documento físico. Debe pertenecer al tenant y estar activo.
-             */
-            tipoDocumentoFisicoId?: string;
-            /**
-             * @description Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.
-             * @example FAC-0042
-             */
-            numero?: string;
-            /**
-             * @description Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).
-             * @example 2026-03-15
-             */
-            fechaEmision?: string;
-            /**
-             * @description Monto del documento como string decimal. Para tipos tributarios no puede ser null (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).
-             * @example 1250.50
-             */
-            monto?: string | null;
-            /**
-             * @description Moneda del documento. BOB o USD.
-             * @enum {string|null}
-             */
-            moneda?: "BOB" | "USD" | null;
-            /**
-             * Format: uuid
-             * @description ID del contacto asociado al documento.
-             */
-            contactoId?: string | null;
-            /** @description Glosa o descripción libre del documento. */
-            glosa?: string | null;
         };
         RangoFechasDto: {
             /** @example 2026-04-01 */
@@ -4643,6 +4682,48 @@ export interface operations {
             };
         };
     };
+    GestionesFiscalesController_obtenerCierre: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CierreEjercicioResponseDto"];
+                };
+            };
+        };
+    };
+    GestionesFiscalesController_generarCierre: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CierreEjercicioResponseDto"];
+                };
+            };
+        };
+    };
     PeriodosFiscalesController_listar: {
         parameters: {
             query: {
@@ -4755,6 +4836,390 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_listar: {
+        parameters: {
+            query?: {
+                periodoFiscalId?: string;
+                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+                estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+                fechaDesde?: string;
+                fechaHasta?: string;
+                /** @description Busca en numero y glosa (case-insensitive) */
+                q?: string;
+                page?: number;
+                limit?: number;
+                /** @description Incluir comprobantes anulados en el listado (default: false) */
+                incluirAnulados?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarComprobantesResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateComprobanteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_exportar: {
+        parameters: {
+            query?: {
+                periodoFiscalId?: string;
+                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+                estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+                fechaDesde?: string;
+                fechaHasta?: string;
+                /** @description Busca en numero y glosa (case-insensitive) */
+                q?: string;
+                /** @description Incluir comprobantes anulados en el export (default: false) */
+                incluirAnulados?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportarComprobantesResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_eliminar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarContabilizadoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_contabilizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_anular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnularComprobanteDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_obtenerAuditoria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_listarDocumentosFisicos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_asociarDocumentosFisicos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsociarDocumentosDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_desasociarDocumentoFisico: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                documentoFisicoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_listarAdjuntos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"][];
+                };
+            };
+        };
+    };
+    ComprobantesController_subirAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_descargarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ComprobantesController_reemplazarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjuntoResponseDto"];
+                };
+            };
+        };
+    };
+    ComprobantesController_eliminarAdjunto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comprobanteId: string;
+                adjuntoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Adjunto eliminado. */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4909,6 +5374,274 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_listar: {
+        parameters: {
+            query?: {
+                /** @description Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram. */
+                q?: string;
+                /** @description Match exacto sobre documento */
+                documento?: string;
+                esCliente?: boolean;
+                esProveedor?: boolean;
+                /** @description true (default) → solo activos; false → solo inactivos; all → activos + inactivos. */
+                activo?: components["schemas"]["Object"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarContactosResponseDto"];
+                };
+            };
+        };
+    };
+    ContactosController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateContactoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_eliminar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateContactoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_desactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ContactosController_reactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentosFisicosController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtrar por tipo de documento físico. */
+                tipoDocumentoFisicoId?: string;
+                /** @description Filtrar desde esta fecha de emisión (inclusive). Formato YYYY-MM-DD. */
+                fechaDesde?: string;
+                /** @description Filtrar hasta esta fecha de emisión (inclusive). Formato YYYY-MM-DD. */
+                fechaHasta?: string;
+                /** @description Filtrar por contacto asociado. */
+                contactoId?: string;
+                /** @description Filtrar por estado de asociación: SUELTO (sin comprobantes), EN_BORRADOR (en borradores), CONTABILIZADO (en contabilizados). */
+                estadoAsociacion?: "SUELTO" | "EN_BORRADOR" | "CONTABILIZADO";
+                /** @description Búsqueda parcial sobre el número del documento (case-insensitive). */
+                numero?: string;
+                /** @description Cuando true, devuelve SOLO documentos que no están consumidos por ningún comprobante CONTABILIZADO. Preserva documentos sueltos y los que están en borradores. */
+                disponibleParaAsociar?: boolean;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarDocumentosFisicosResponseDto"];
+                };
+            };
+        };
+    };
+    DocumentosFisicosController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDocumentoFisicoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentosFisicosController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentosFisicosController_eliminar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DocumentosFisicosController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDocumentoFisicoDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -6239,658 +6972,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConfiguracionContableResponseDto"];
                 };
-            };
-        };
-    };
-    ComprobantesController_listar: {
-        parameters: {
-            query?: {
-                periodoFiscalId?: string;
-                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
-                estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
-                fechaDesde?: string;
-                fechaHasta?: string;
-                /** @description Busca en numero y glosa (case-insensitive) */
-                q?: string;
-                page?: number;
-                limit?: number;
-                /** @description Incluir comprobantes anulados en el listado (default: false) */
-                incluirAnulados?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListarComprobantesResponseDto"];
-                };
-            };
-        };
-    };
-    ComprobantesController_crear: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateComprobanteDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_exportar: {
-        parameters: {
-            query?: {
-                periodoFiscalId?: string;
-                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
-                estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
-                fechaDesde?: string;
-                fechaHasta?: string;
-                /** @description Busca en numero y glosa (case-insensitive) */
-                q?: string;
-                /** @description Incluir comprobantes anulados en el export (default: false) */
-                incluirAnulados?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExportarComprobantesResponseDto"];
-                };
-            };
-        };
-    };
-    ComprobantesController_obtener: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_eliminar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_actualizar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EditarContabilizadoDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_contabilizar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_anular: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AnularComprobanteDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_obtenerAuditoria: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_listarDocumentosFisicos: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_asociarDocumentosFisicos: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AsociarDocumentosDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_desasociarDocumentoFisico: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-                documentoFisicoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_listarAdjuntos: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdjuntoResponseDto"][];
-                };
-            };
-        };
-    };
-    ComprobantesController_subirAdjunto: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file?: string;
-                };
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdjuntoResponseDto"];
-                };
-            };
-        };
-    };
-    ComprobantesController_descargarAdjunto: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-                adjuntoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ComprobantesController_reemplazarAdjunto: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-                adjuntoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file?: string;
-                };
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdjuntoResponseDto"];
-                };
-            };
-        };
-    };
-    ComprobantesController_eliminarAdjunto: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                comprobanteId: string;
-                adjuntoId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Adjunto eliminado. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_listar: {
-        parameters: {
-            query?: {
-                /** @description Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram. */
-                q?: string;
-                /** @description Match exacto sobre documento */
-                documento?: string;
-                esCliente?: boolean;
-                esProveedor?: boolean;
-                /** @description true (default) → solo activos; false → solo inactivos; all → activos + inactivos. */
-                activo?: components["schemas"]["Object"];
-                page?: number;
-                pageSize?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListarContactosResponseDto"];
-                };
-            };
-        };
-    };
-    ContactosController_crear: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateContactoDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_obtener: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_eliminar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_actualizar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateContactoDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_desactivar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    ContactosController_reactivar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    DocumentosFisicosController_listar: {
-        parameters: {
-            query?: {
-                /** @description Filtrar por tipo de documento físico. */
-                tipoDocumentoFisicoId?: string;
-                /** @description Filtrar desde esta fecha de emisión (inclusive). Formato YYYY-MM-DD. */
-                fechaDesde?: string;
-                /** @description Filtrar hasta esta fecha de emisión (inclusive). Formato YYYY-MM-DD. */
-                fechaHasta?: string;
-                /** @description Filtrar por contacto asociado. */
-                contactoId?: string;
-                /** @description Filtrar por estado de asociación: SUELTO (sin comprobantes), EN_BORRADOR (en borradores), CONTABILIZADO (en contabilizados). */
-                estadoAsociacion?: "SUELTO" | "EN_BORRADOR" | "CONTABILIZADO";
-                /** @description Búsqueda parcial sobre el número del documento (case-insensitive). */
-                numero?: string;
-                /** @description Cuando true, devuelve SOLO documentos que no están consumidos por ningún comprobante CONTABILIZADO. Preserva documentos sueltos y los que están en borradores. */
-                disponibleParaAsociar?: boolean;
-                page?: number;
-                pageSize?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListarDocumentosFisicosResponseDto"];
-                };
-            };
-        };
-    };
-    DocumentosFisicosController_crear: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateDocumentoFisicoDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    DocumentosFisicosController_obtener: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    DocumentosFisicosController_eliminar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    DocumentosFisicosController_actualizar: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateDocumentoFisicoDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

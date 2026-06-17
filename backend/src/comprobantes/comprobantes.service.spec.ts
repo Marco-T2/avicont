@@ -20,6 +20,7 @@ import type {
   DocumentoFisicoParaAsociar,
   DocumentosFisicosReaderPort,
 } from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
+import type { GestionStatusReaderPort } from '@/periodos-fiscales/ports/gestion-status-reader.port';
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 import type { RbacService } from '@/rbac/rbac.service';
 
@@ -168,6 +169,13 @@ function makeStoragePortMock(): MockStoragePort {
   };
 }
 
+type MockGestionStatus = { estaGestionCerradaPorPeriodo: jest.Mock };
+
+function makeGestionStatusMock(): MockGestionStatus {
+  // Default: la gestión NO está cerrada (no bloquea anulación de cierre).
+  return { estaGestionCerradaPorPeriodo: jest.fn().mockResolvedValue(false) };
+}
+
 function makeAdjuntoRepoMock(): MockAdjuntoRepo {
   return {
     crear: jest.fn(),
@@ -305,6 +313,7 @@ function buildService(overrides?: {
   exportMax?: number;
   storagePort?: Partial<MockStoragePort>;
   adjuntoRepo?: Partial<MockAdjuntoRepo>;
+  gestionStatus?: Partial<MockGestionStatus>;
 }) {
   const repo = { ...makeRepoMock(), ...(overrides?.repo ?? {}) };
   const periodos = { ...makePeriodosMock(), ...(overrides?.periodos ?? {}) };
@@ -324,6 +333,7 @@ function buildService(overrides?: {
   const config = makeConfigMock(overrides?.exportMax ?? 1000);
   const storagePort = { ...makeStoragePortMock(), ...(overrides?.storagePort ?? {}) };
   const adjuntoRepo = { ...makeAdjuntoRepoMock(), ...(overrides?.adjuntoRepo ?? {}) };
+  const gestionStatus = { ...makeGestionStatusMock(), ...(overrides?.gestionStatus ?? {}) };
 
   const service = new ComprobantesService(
     repo as unknown as ComprobanteRepositoryPort,
@@ -340,11 +350,13 @@ function buildService(overrides?: {
     config as unknown as ConfigService,
     storagePort as unknown as StoragePort,
     adjuntoRepo as unknown as AdjuntoComprobanteRepositoryPort,
+    gestionStatus as unknown as GestionStatusReaderPort,
   );
   return {
     service,
     repo,
     periodos,
+    gestionStatus,
     cuentas,
     contactos,
     clock,
@@ -753,6 +765,30 @@ describe('ComprobantesService', () => {
         code: 'COMPROBANTE_NO_ENCONTRADO',
       });
     });
+
+    // REQ-CMP-SYS-03 — generadoPorSistema no es eliminable por el usuario.
+    it('(−) rechaza eliminar un BORRADOR generado por sistema', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.BORRADOR, generadoPorSistema: true }),
+      );
+
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).rejects.toMatchObject({
+        code: 'COMPROBANTE_GENERADO_SISTEMA_NO_ELIMINABLE',
+      });
+      expect(repo.eliminarBorrador).not.toHaveBeenCalled();
+    });
+
+    it('(+) elimina un BORRADOR normal (generadoPorSistema=false) intacto', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.BORRADOR, generadoPorSistema: false }),
+      );
+      repo.eliminarBorrador.mockResolvedValue(1);
+
+      await expect(service.eliminarBorrador(TENANT_ID, USER_ID, 'comp-1')).resolves.toBeUndefined();
+      expect(repo.eliminarBorrador).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('actualizarBorrador', () => {
@@ -826,6 +862,19 @@ describe('ComprobantesService', () => {
       await expect(
         service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', { glosa: 'x' }),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_ESTADO_INVALIDO' });
+      expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
+    });
+
+    // REQ-CMP-SYS-02 — generadoPorSistema no es editable aunque sea BORRADOR.
+    it('(−) rechaza actualizar un BORRADOR generado por sistema', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({ estado: EstadoComprobante.BORRADOR, generadoPorSistema: true }),
+      );
+
+      await expect(
+        service.actualizarBorrador(TENANT_ID, USER_ID, 'comp-1', { glosa: 'x' }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_GENERADO_SISTEMA_NO_EDITABLE' });
       expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
     });
   });
@@ -920,6 +969,38 @@ describe('ComprobantesService', () => {
       // Auditoría via triggers Postgres — no hay llamada explícita al repo.
       expect(r.numero).toBe('D2604-000042');
       expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
+    });
+
+    // REQ-CMP-SYS-04 — el flag generadoPorSistema NO bloquea contabilizar.
+    it('(+) contabiliza un BORRADOR generado por sistema (el flag no bloquea)', async () => {
+      const ctx = buildService();
+      ctx.repo.findById.mockResolvedValue(
+        comprobanteFactory({
+          ...borradorBalanceadoFactory(),
+          generadoPorSistema: true,
+        }),
+      );
+      ctx.periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      ctx.cuentas.obtenerBatch.mockResolvedValue(makeCuentasMap());
+      ctx.secuencia.siguienteCorrelativo.mockResolvedValue(42);
+      ctx.repo.contabilizar.mockImplementation(async (_t, _id, data) =>
+        comprobanteFactory({
+          id: 'comp-b',
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: data.numero,
+          generadoPorSistema: true,
+          totalDebitoBob: data.totalDebitoBob,
+          totalCreditoBob: data.totalCreditoBob,
+        }),
+      );
+
+      const r = await ctx.service.contabilizar(TENANT_ID, USER_ID, 'comp-b');
+
+      expect(r.estado).toBe(EstadoComprobante.CONTABILIZADO);
+      expect(ctx.repo.contabilizar).toHaveBeenCalledTimes(1);
     });
 
     it('rechaza contabilizar un CONTABILIZADO', async () => {
@@ -1204,8 +1285,16 @@ describe('ComprobantesService', () => {
   describe('anular', () => {
     // Helper: comprobante listo para anular (CONTABILIZADO, anulado=false, período ABIERTO)
     function setupAnularHappyPath() {
-      const { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia } =
-        buildService();
+      const {
+        service,
+        repo,
+        periodos,
+        asociacionRepo,
+        clock,
+        auditedRunner,
+        secuencia,
+        gestionStatus,
+      } = buildService();
 
       const comp = comprobanteFactory({
         id: 'comp-c',
@@ -1232,7 +1321,17 @@ describe('ComprobantesService', () => {
       };
       repo.anular.mockResolvedValue(anulado);
 
-      return { service, repo, periodos, asociacionRepo, clock, auditedRunner, secuencia, anulado };
+      return {
+        service,
+        repo,
+        periodos,
+        asociacionRepo,
+        clock,
+        auditedRunner,
+        secuencia,
+        gestionStatus,
+        anulado,
+      };
     }
 
     it('happy path: marca anulado=true en el propio comprobante (REQ-COMP-ANULAR-01)', async () => {
@@ -1438,6 +1537,78 @@ describe('ComprobantesService', () => {
         service.anular(TENANT_ID, USER_ID, 'comp-x', 'Motivo suficiente largo'),
       ).rejects.toMatchObject({ code: 'COMPROBANTE_NO_ENCONTRADO' });
     });
+
+    // REQ-CMP-SYS-06 — anulación de un cierre condicionada al estado de la gestión.
+    it('(−) rechaza anular un CIERRE generado por sistema cuando la gestión está CERRADA', async () => {
+      const { service, repo, periodos, gestionStatus } = buildService({
+        gestionStatus: { estaGestionCerradaPorPeriodo: jest.fn().mockResolvedValue(true) },
+      });
+      const comp = comprobanteFactory({
+        id: 'comp-cierre',
+        tipo: TipoComprobante.CIERRE,
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+        generadoPorSistema: true,
+        periodoFiscalId: PERIODO_ID,
+      });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-cierre', 'Reverso del cierre por ajuste'),
+      ).rejects.toMatchObject({ code: 'CIERRE_EJERCICIO_GESTION_YA_CERRADA' });
+      expect(gestionStatus.estaGestionCerradaPorPeriodo).toHaveBeenCalledWith(
+        PERIODO_ID,
+        TENANT_ID,
+      );
+      expect(repo.anular).not.toHaveBeenCalled();
+    });
+
+    it('(+) permite anular un CIERRE generado por sistema con la gestión ABIERTA', async () => {
+      const { service, repo, periodos, gestionStatus } = buildService({
+        gestionStatus: { estaGestionCerradaPorPeriodo: jest.fn().mockResolvedValue(false) },
+      });
+      const comp = comprobanteFactory({
+        id: 'comp-cierre',
+        tipo: TipoComprobante.CIERRE,
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+        generadoPorSistema: true,
+        periodoFiscalId: PERIODO_ID,
+      });
+      repo.findById.mockResolvedValue(comp);
+      periodos.obtenerPorFecha.mockResolvedValue({
+        id: PERIODO_ID,
+        status: PeriodoFiscalStatus.ABIERTO,
+      });
+      repo.anular.mockResolvedValue({
+        ...comp,
+        anulado: true,
+        fechaAnulacion: new Date(),
+        motivoAnulacion: 'Reverso del cierre por ajuste',
+        anuladoPorUserId: USER_ID,
+      });
+
+      await expect(
+        service.anular(TENANT_ID, USER_ID, 'comp-cierre', 'Reverso del cierre por ajuste'),
+      ).resolves.toMatchObject({ anulado: true });
+      expect(gestionStatus.estaGestionCerradaPorPeriodo).toHaveBeenCalledWith(
+        PERIODO_ID,
+        TENANT_ID,
+      );
+      expect(repo.anular).toHaveBeenCalledTimes(1);
+    });
+
+    it('(+) un comprobante normal (generadoPorSistema=false) no consulta el estado de la gestión', async () => {
+      const { service, gestionStatus } = setupAnularHappyPath();
+
+      await service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente');
+
+      expect(gestionStatus.estaGestionCerradaPorPeriodo).not.toHaveBeenCalled();
+    });
   });
 
   // ============================================================
@@ -1585,6 +1756,26 @@ describe('ComprobantesService', () => {
       // El numero correlativo es inmutable — debe preservarse
       expect(result.numero).toBe(comp.numero);
       expect(result.glosa).toBe('Glosa corregida post-contabilizado');
+    });
+
+    // REQ-CMP-SYS-05 — un cierre contabilizado es inmutable.
+    it('(−) rechaza editar un CONTABILIZADO generado por sistema', async () => {
+      const { service, repo } = buildService();
+      repo.findById.mockResolvedValue(
+        comprobanteFactory({
+          id: 'comp-cierre',
+          estado: EstadoComprobante.CONTABILIZADO,
+          anulado: false,
+          generadoPorSistema: true,
+        }),
+      );
+
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-cierre', {
+          glosa: 'Intento de editar un cierre',
+        }),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_GENERADO_SISTEMA_NO_EDITABLE' });
+      expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
     });
 
     it('happy path: reemplaza lineas y recalcula totales (REQ-COMP-EDIT-CONTABILIZADO-02)', async () => {

@@ -34,6 +34,10 @@ import {
   DocumentosFisicosReaderPort,
 } from '@/documentos-fisicos/ports/documentos-fisicos-reader.port';
 import {
+  GESTION_STATUS_READER_PORT,
+  GestionStatusReaderPort,
+} from '@/periodos-fiscales/ports/gestion-status-reader.port';
+import {
   PERIODOS_READER_PORT,
   PeriodosReaderPort,
 } from '@/periodos-fiscales/ports/periodos-reader.port';
@@ -89,6 +93,9 @@ import {
   ComprobanteEstadoInvalidoError,
   ComprobanteEstadoNoEditableContabilizadoError,
   ComprobanteNoEncontradoError,
+  CierreComprobanteNoEditableError,
+  CierreComprobanteNoEliminableError,
+  CierreGestionCerradaError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
   ContactoRequeridoError,
@@ -182,6 +189,12 @@ export class ComprobantesService {
     private readonly storage: StoragePort,
     @Inject(ADJUNTO_COMPROBANTE_REPOSITORY_PORT)
     private readonly adjuntoRepo: AdjuntoComprobanteRepositoryPort,
+    // Lectura cross-módulo del estado de la gestión (REQ-CMP-SYS-06): bloquea la
+    // anulación de un comprobante de CIERRE generado por sistema cuando su
+    // gestión ya está CERRADA. Entra por PeriodosReaderModule (leaf) para no
+    // reabrir el ciclo de carga comprobantes↔periodos (ver comprobantes.module).
+    @Inject(GESTION_STATUS_READER_PORT)
+    private readonly gestionStatus: GestionStatusReaderPort,
   ) {
     this.exportMax = this.config.get<number>(
       COMPROBANTES_EXPORT_MAX_ENV,
@@ -314,6 +327,9 @@ export class ComprobantesService {
     return this.auditedTx.run({ userId }, async (tx) => {
       const actual = await this.repo.findById(tenantId, id, tx);
       if (!actual) throw new ComprobanteNoEncontradoError(id);
+      // REQ-CMP-SYS-02: un comprobante generado por sistema (cierre) NO se edita
+      // a mano, aunque esté en BORRADOR. El chequeo va ANTES del de estado.
+      if (actual.generadoPorSistema) throw new CierreComprobanteNoEditableError(id);
       if (actual.estado !== EstadoComprobante.BORRADOR) {
         throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'actualizarBorrador');
       }
@@ -357,6 +373,10 @@ export class ComprobantesService {
     // Pre-check fuera de TX: si el estado ya no es BORRADOR, fail rápido.
     const actual = await this.repo.findById(tenantId, id);
     if (!actual) throw new ComprobanteNoEncontradoError(id);
+    // REQ-CMP-SYS-03: el borrado de un comprobante de sistema solo ocurre por el
+    // path-sistema (writer port de cierre-ejercicio al regenerar), no por el
+    // usuario. El chequeo va ANTES del de estado.
+    if (actual.generadoPorSistema) throw new CierreComprobanteNoEliminableError(id);
     if (actual.estado !== EstadoComprobante.BORRADOR) {
       throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'eliminar');
     }
@@ -568,6 +588,10 @@ export class ComprobantesService {
     // 2) Leer pre-TX para validar estado y obtener periodoFiscalId.
     const comprobantePreTx = await this.repo.findById(tenantId, id);
     if (!comprobantePreTx) throw new ComprobanteNoEncontradoError(id);
+
+    // REQ-CMP-SYS-05: un cierre contabilizado es inmutable salvo reapertura +
+    // anulación. La edición post-CONTABILIZADO no aplica a generadoPorSistema.
+    if (comprobantePreTx.generadoPorSistema) throw new CierreComprobanteNoEditableError(id);
 
     // 3) Validar estado (no necesita lock — CONTABILIZADO no puede retroceder).
     this.validarEstadoParaEditar(
@@ -785,6 +809,17 @@ export class ComprobantesService {
       comprobantePreTx.estado,
       comprobantePreTx.anulado,
     );
+
+    // REQ-CMP-SYS-06: anular un comprobante de CIERRE generado por sistema solo
+    // se permite mientras la gestión NO esté CERRADA. Con gestión cerrada, el
+    // admin debe pasar por el flujo de reapertura (§4.4 — sin bypass).
+    if (comprobantePreTx.generadoPorSistema && comprobantePreTx.tipo === TipoComprobante.CIERRE) {
+      const gestionCerrada = await this.gestionStatus.estaGestionCerradaPorPeriodo(
+        comprobantePreTx.periodoFiscalId,
+        tenantId,
+      );
+      if (gestionCerrada) throw new CierreGestionCerradaError();
+    }
 
     // Resolver reapertura activa del período del comprobante.
     const reapertura = await this.periodos.obtenerReaperturaActiva(

@@ -6,7 +6,7 @@ import { PrismaPlanCuentasSeederAdapter } from './prisma-plan-cuentas-seeder.ada
  * Integration spec del `PrismaPlanCuentasSeederAdapter` contra Postgres real.
  *
  * Valida las garantías que SOLO Postgres puede demostrar:
- *   - Siembra exactamente 111 cuentas + 1 OrgConfiguracionContable por tenant.
+ *   - Siembra exactamente 110 cuentas + 1 OrgConfiguracionContable por tenant.
  *   - Idempotencia: re-ejecutar no duplica registros (upsert).
  *   - Aislamiento multi-tenant: las cuentas de la org A no tienen el
  *     organizationId de la org B.
@@ -56,7 +56,7 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
   }
 
-  it('siembra exactamente 111 cuentas + OrgConfiguracionContable dentro de una TX', async () => {
+  it('siembra exactamente 110 cuentas + OrgConfiguracionContable dentro de una TX', async () => {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await adapter.seedDefaultsForTenant(tenantA, tx);
     });
@@ -64,7 +64,7 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
     const cuentaCount = await prisma.cuenta.count({
       where: { organizationId: tenantA },
     });
-    expect(cuentaCount).toBe(111);
+    expect(cuentaCount).toBe(110);
 
     const config = await prisma.orgConfiguracionContable.findUnique({
       where: { organizationId: tenantA },
@@ -100,7 +100,7 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
     const cuentaCount = await prisma.cuenta.count({
       where: { organizationId: tenantA },
     });
-    expect(cuentaCount).toBe(111);
+    expect(cuentaCount).toBe(110);
 
     const configCount = await prisma.orgConfiguracionContable.count({
       where: { organizationId: tenantA },
@@ -122,22 +122,22 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
     const cuentasB = await prisma.cuenta.count({
       where: { organizationId: tenantB },
     });
-    expect(cuentasA).toBe(111);
-    expect(cuentasB).toBe(111);
+    expect(cuentasA).toBe(110);
+    expect(cuentasB).toBe(110);
 
     // Ninguna cuenta de A tiene el organizationId de B y viceversa
     // Ninguna cuenta de A aparece bajo el organizationId de B
     const cuentasConOrgBId = await prisma.cuenta.count({
       where: { organizationId: tenantB },
     });
-    // tenantB solo tiene sus propias 111 cuentas, no las de A
-    expect(cuentasConOrgBId).toBe(111);
+    // tenantB solo tiene sus propias 110 cuentas, no las de A
+    expect(cuentasConOrgBId).toBe(110);
 
     // Ninguna cuenta de B aparece bajo el organizationId de A
     const cuentasConOrgAId = await prisma.cuenta.count({
       where: { organizationId: tenantA },
     });
-    expect(cuentasConOrgAId).toBe(111);
+    expect(cuentasConOrgAId).toBe(110);
   });
 
   it('rollback: si la TX se revierte, no quedan datos persistidos', async () => {

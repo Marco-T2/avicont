@@ -207,6 +207,71 @@ export class PeriodoNoAbiertoError extends ConflictError {
 }
 
 // ============================================================
+// 409 — comprobantes generados por sistema (cierre, apertura, auto-entries)
+// generadoPorSistema=true: atributo de ORIGEN ortogonal al estado (§4.7).
+// El usuario NO los edita/borra a mano; si los datos están mal, se REGENERAN
+// desde el módulo que los produjo (cierre-ejercicio). Decisión B FIRMADA.
+// ============================================================
+
+/**
+ * Se intenta editar (actualizarBorrador / patch / editarContabilizado) un
+ * comprobante con `generadoPorSistema=true`. El contador NO edita líneas de un
+ * cierre a mano: si los datos están mal, REGENERA el cierre (módulo
+ * `cierre-ejercicio`). Defense in depth (§4.2): el enforcement vive en el
+ * servicio, no en el frontend. REQ-CMP-SYS-02 / REQ-CMP-SYS-05.
+ * Code: COMPROBANTE_GENERADO_SISTEMA_NO_EDITABLE — 409.
+ */
+export class CierreComprobanteNoEditableError extends ConflictError {
+  constructor(id: string) {
+    super(
+      'COMPROBANTE_GENERADO_SISTEMA_NO_EDITABLE',
+      'El comprobante fue generado por el sistema y no puede editarse a mano; regenerá el cierre',
+      { id },
+    );
+  }
+}
+
+/**
+ * Se intenta eliminar (eliminarBorrador, path de usuario) un comprobante con
+ * `generadoPorSistema=true`. El borrado de un comprobante de sistema SOLO ocurre
+ * por el path-sistema (el writer port del módulo `cierre-ejercicio` al
+ * regenerar), no por la operación de usuario. REQ-CMP-SYS-03.
+ * Code: COMPROBANTE_GENERADO_SISTEMA_NO_ELIMINABLE — 409.
+ */
+export class CierreComprobanteNoEliminableError extends ConflictError {
+  constructor(id: string) {
+    super(
+      'COMPROBANTE_GENERADO_SISTEMA_NO_ELIMINABLE',
+      'El comprobante fue generado por el sistema y no puede eliminarse a mano; regenerá el cierre',
+      { id },
+    );
+  }
+}
+
+/**
+ * Se intenta anular un comprobante de CIERRE (`generadoPorSistema=true`) cuya
+ * gestión fiscal ya está `CERRADA`. Para tocarlo, el admin pasa por el flujo de
+ * reapertura de período existente (`PeriodoFiscalReopening`, §4.4) — sin bypass.
+ * REQ-CMP-SYS-06.
+ *
+ * NOTA: este code pertenece al namespace `CIERRE_EJERCICIO_*`. Se define también
+ * aquí (no solo en el futuro módulo `cierre-ejercicio`) para no crear una
+ * dependencia circular comprobantes↔cierre-ejercicio mientras ese módulo aún no
+ * existe (Batch 2 precede al Batch 3). Cuando el módulo de cierre defina el error
+ * canónico, unificar importándolo desde allí (ver tasks.md 2.5 / 3.2).
+ * Code: CIERRE_EJERCICIO_GESTION_YA_CERRADA — 409.
+ */
+export class CierreGestionCerradaError extends ConflictError {
+  constructor(gestionId?: string) {
+    super(
+      'CIERRE_EJERCICIO_GESTION_YA_CERRADA',
+      'La gestión fiscal está cerrada; reabrí el período para anular o regenerar el cierre',
+      gestionId !== undefined ? { gestionId } : undefined,
+    );
+  }
+}
+
+// ============================================================
 // 422 — invariantes de dominio violados
 // ============================================================
 

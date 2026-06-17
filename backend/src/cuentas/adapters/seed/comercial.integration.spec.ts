@@ -55,16 +55,16 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
   }
 
-  it('crea 61 cuentas hoja (esDetalle=true) más su jerarquía de forma autocontenida', async () => {
+  it('crea 60 cuentas hoja (esDetalle=true) más su jerarquía de forma autocontenida', async () => {
     const stats = await sembrarPlanCuentasComercial(prisma, organizationId);
 
     const hojas = await prisma.cuenta.count({
       where: { organizationId, esDetalle: true },
     });
-    expect(hojas).toBe(61);
+    expect(hojas).toBe(60);
 
-    expect(stats.totalCuentas).toBe(111);
-    expect(stats.porNivel).toEqual({ 1: 5, 2: 14, 3: 31, 4: 61 });
+    expect(stats.totalCuentas).toBe(110);
+    expect(stats.porNivel).toEqual({ 1: 5, 2: 14, 3: 31, 4: 60 });
   });
 
   it('mantiene la distribución por nivel idéntica al seed previo basado en PUCT', async () => {
@@ -78,7 +78,34 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
       acc[c.nivel] = (acc[c.nivel] ?? 0) + 1;
       return acc;
     }, {});
-    expect(porNivel).toEqual({ 1: 5, 2: 14, 3: 31, 4: 61 });
+    expect(porNivel).toEqual({ 1: 5, 2: 14, 3: 31, 4: 60 });
+  });
+
+  it('NO contiene la cuenta 3.1.4.002 PÉRDIDA DE LA GESTIÓN (eliminada en cierre-ejercicio)', async () => {
+    await sembrarPlanCuentasComercial(prisma, organizationId);
+
+    const perdida = await prisma.cuenta.findUnique({
+      where: {
+        organizationId_codigoInterno: { organizationId, codigoInterno: '3.1.4.002' },
+      },
+      select: { id: true },
+    });
+    expect(perdida).toBeNull();
+  });
+
+  it('la cuenta 3.1.4.001 se llama RESULTADO DE LA GESTIÓN (transitoria dual)', async () => {
+    await sembrarPlanCuentasComercial(prisma, organizationId);
+
+    const transitoria = await prisma.cuenta.findUnique({
+      where: {
+        organizationId_codigoInterno: { organizationId, codigoInterno: '3.1.4.001' },
+      },
+      select: { nombre: true, esRequeridaSistema: true },
+    });
+    expect(transitoria).toEqual({
+      nombre: 'RESULTADO DE LA GESTIÓN',
+      esRequeridaSistema: true,
+    });
   });
 
   it('preserva las 8 cuentas esRequeridaSistema con los mismos codigoInterno', async () => {
