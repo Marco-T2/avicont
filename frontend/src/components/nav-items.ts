@@ -1,5 +1,6 @@
 import {
   Bird,
+  BookCheck,
   BookMarked,
   BookOpen,
   BookText,
@@ -152,6 +153,13 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Estado de Flujo de Efectivo',
         icon: Droplet,
         requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+        vertical: 'CONTABILIDAD',
+      },
+      {
+        to: '/gestiones/cierre',
+        label: 'Cierre del ejercicio',
+        icon: BookCheck,
+        requiredPermission: PERMISSIONS.contabilidad.gestiones.read,
         vertical: 'CONTABILIDAD',
       },
       {
