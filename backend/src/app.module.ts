@@ -21,6 +21,7 @@ import { ContactosModule } from './contactos/contactos.module';
 import { TiposDocumentoFisicoModule } from './tipos-documento-fisico/tipos-documento-fisico.module';
 import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { CierreEjercicioModule } from './cierre-ejercicio/cierre-ejercicio.module';
 import { GranjaModule } from './granja/granja.module';
 import { PacksModule } from './packs/pack.module';
 import { MeModule } from './me/me.module';
@@ -93,6 +94,7 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     TiposDocumentoFisicoModule,
     DocumentosFisicosModule,
     ReportesModule,
+    CierreEjercicioModule,
     GranjaModule,
     PacksModule,
     MeModule,
