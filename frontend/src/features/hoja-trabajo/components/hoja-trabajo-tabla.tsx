@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 // Cross-feature: reutilizamos el formateador de montos del Libro Mayor
 // (es-BO, separador de miles "." y decimal ","). Ver frontend CLAUDE.md §14.6.
-import { formatearMontoBob } from '@/features/libro-mayor/lib/formatear-monto-bob';
+import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import { cn } from '@/lib/utils';
 import type { HojaTrabajoResponse } from '@/types/api';
 

@@ -20,9 +20,6 @@ import {
   PAGE_SIZE,
 } from '../lib/build-documentos-fisicos-params';
 
-// TODO: ocultar botón si !hasPermission('contabilidad.documentos-fisicos.create')
-// cuando esté disponible el hook useHasPermission en el proyecto.
-
 export function DocumentosFisicosPage(): React.JSX.Element {
   // ─── Filtros ─────────────────────────────────────────────────────────────
   const [numero, setNumero] = useState('');

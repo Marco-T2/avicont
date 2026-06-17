@@ -185,6 +185,7 @@ export function RoleFormDialog({
             <Textarea
               id="description"
               rows={2}
+              className="w-full max-w-full resize-y [field-sizing:fixed] min-h-[80px]"
               placeholder="Para quiénes es este rol y qué pueden hacer."
               aria-invalid={errors.description !== undefined}
               {...register('description')}
