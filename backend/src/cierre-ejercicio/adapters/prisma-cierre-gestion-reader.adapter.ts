@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PeriodoFiscalStatus } from '@prisma/client';
+import { PeriodoFiscalStatus, type Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -36,8 +36,13 @@ export class PrismaCierreGestionReaderAdapter extends CierreGestionReaderPort {
     super();
   }
 
-  async obtenerParaCierre(gestionId: string, tenantId: string): Promise<GestionParaCierre | null> {
-    const gestion = await this.prisma.gestionFiscal.findFirst({
+  async obtenerParaCierre(
+    gestionId: string,
+    tenantId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GestionParaCierre | null> {
+    const client = tx ?? this.prisma;
+    const gestion = await client.gestionFiscal.findFirst({
       where: { id: gestionId, organizationId: tenantId },
       select: {
         id: true,
@@ -91,7 +96,7 @@ export class PrismaCierreGestionReaderAdapter extends CierreGestionReaderPort {
       (p) => p.status === PeriodoFiscalStatus.CERRADO,
     ).length;
 
-    const comprobantesDeCierre = await this.prisma.comprobante.findMany({
+    const comprobantesDeCierre = await client.comprobante.findMany({
       where: {
         organizationId: tenantId,
         origenId: gestionId,

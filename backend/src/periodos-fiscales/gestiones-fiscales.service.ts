@@ -90,7 +90,7 @@ export class GestionesFiscalesService {
 
   async cerrar(id: string, tenantId: string, userId: string): Promise<GestionFiscal> {
     return this.prisma.$transaction(async (tx) => {
-      const gestion = await this.repo.findByIdWithPeriodos(id, tenantId);
+      const gestion = await this.repo.findByIdWithPeriodos(id, tenantId, tx);
       if (!gestion) {
         throw new GestionNoEncontradaError(id);
       }
@@ -115,7 +115,7 @@ export class GestionesFiscalesService {
       // genera los asientos de cierre (eso es POST /gestiones/:id/cierre); solo
       // exige que el cierre que se haya generado esté completamente contabilizado.
       // Si no se generó ningún cierre (ej. gestión sin INGRESO/EGRESO) → no se exige.
-      const { cierres } = await this.cierreEjercicio.obtenerEstadoCierre(id, tenantId);
+      const { cierres } = await this.cierreEjercicio.obtenerEstadoCierre(id, tenantId, tx);
       // Solo BORRADOR cuenta como pendiente: CONTABILIZADO y BLOQUEADO son estados
       // posteados. Al cerrar los 12 períodos (requisito de arriba), el mesCierre que
       // contiene los asientos pasa a BLOQUEADO — exigir CONTABILIZADO estricto haría
