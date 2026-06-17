@@ -113,6 +113,24 @@ describe('GestionesFiscalesService — gate de cerrar() (REQ-GF-CIERRE-01)', () 
     expect(repo.cerrarGestion).toHaveBeenCalledTimes(1);
   });
 
+  // Flujo real: tras contabilizar los cierres, cerrar el período (vía servicio)
+  // los transiciona CONTABILIZADO → BLOQUEADO. Como cerrar() exige los 12 períodos
+  // cerrados, el mesCierre que contiene los asientos SIEMPRE termina BLOQUEADO.
+  // BLOQUEADO es un estado posteado (no pendiente): la gestión debe poder cerrarse.
+  it('(+) con los 3 cierres BLOQUEADO (período ya cerrado) cierra la gestión', async () => {
+    cierreService.obtenerEstadoCierre.mockResolvedValue({
+      gestionId: GESTION,
+      cierres: [
+        { id: 'c1', origenTipo: 'CIERRE_GASTOS', estado: EstadoComprobante.BLOQUEADO },
+        { id: 'c2', origenTipo: 'CIERRE_INGRESOS', estado: EstadoComprobante.BLOQUEADO },
+        { id: 'c3', origenTipo: 'CIERRE_RESULTADO', estado: EstadoComprobante.BLOQUEADO },
+      ],
+    });
+
+    await service.cerrar(GESTION, TENANT, USER);
+    expect(repo.cerrarGestion).toHaveBeenCalledTimes(1);
+  });
+
   it('(+) con SKIP-on-zero (solo #2 y #3 generados, ambos CONTABILIZADO) cierra OK', async () => {
     cierreService.obtenerEstadoCierre.mockResolvedValue({
       gestionId: GESTION,
