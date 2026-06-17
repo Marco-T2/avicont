@@ -1553,6 +1553,76 @@
         ]
       }
     },
+    "/api/gestiones/{id}/cierre": {
+      "post": {
+        "operationId": "GestionesFiscalesController_generarCierre",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CierreEjercicioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Generar (o regenerar) los comprobantes de cierre del ejercicio de la gestión, en BORRADOR no-editable.",
+        "tags": [
+          "Gestiones Fiscales"
+        ]
+      },
+      "get": {
+        "operationId": "GestionesFiscalesController_obtenerCierre",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CierreEjercicioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Consultar el estado de los comprobantes de cierre del ejercicio (preview).",
+        "tags": [
+          "Gestiones Fiscales"
+        ]
+      }
+    },
     "/api/periodos": {
       "get": {
         "operationId": "PeriodosFiscalesController_listar",
@@ -1742,6 +1812,792 @@
         "summary": "Marcar período cerrado como definitivo (solo OWNER, irreversible).",
         "tags": [
           "Periodos Fiscales"
+        ]
+      }
+    },
+    "/api/comprobantes": {
+      "post": {
+        "operationId": "ComprobantesController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComprobanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Crear un comprobante en BORRADOR con sus líneas. No valida partida doble — ese chequeo corre al contabilizar.",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "get": {
+        "operationId": "ComprobantesController_listar",
+        "parameters": [
+          {
+            "name": "periodoFiscalId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APERTURA",
+                "DIARIO",
+                "INGRESO",
+                "EGRESO",
+                "AJUSTE",
+                "TRASPASO",
+                "CIERRE"
+              ]
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BORRADOR",
+                "CONTABILIZADO",
+                "BLOQUEADO"
+              ]
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Busca en numero y glosa (case-insensitive)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "incluirAnulados",
+            "required": false,
+            "in": "query",
+            "description": "Incluir comprobantes anulados en el listado (default: false)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarComprobantesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar comprobantes del tenant con paginación y filtros (periodoFiscalId, tipo, estado, rango de fechas, texto libre).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/export": {
+      "get": {
+        "operationId": "ComprobantesController_exportar",
+        "parameters": [
+          {
+            "name": "periodoFiscalId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "APERTURA",
+                "DIARIO",
+                "INGRESO",
+                "EGRESO",
+                "AJUSTE",
+                "TRASPASO",
+                "CIERRE"
+              ]
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BORRADOR",
+                "CONTABILIZADO",
+                "BLOQUEADO"
+              ]
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Busca en numero y glosa (case-insensitive)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluirAnulados",
+            "required": false,
+            "in": "query",
+            "description": "Incluir comprobantes anulados en el export (default: false)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportarComprobantesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{id}": {
+      "get": {
+        "operationId": "ComprobantesController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Detalle completo del comprobante con sus líneas.",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "patch": {
+        "operationId": "ComprobantesController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarContabilizadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional `contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. Rechaza BLOQUEADO o anulados.",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "delete": {
+        "operationId": "ComprobantesController_eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{id}/contabilizar": {
+      "post": {
+        "operationId": "ComprobantesController_contabilizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Transicionar BORRADOR → CONTABILIZADO. Valida partida doble, asigna número atómico {prefijo}{YY}{MM}-{correlativo:6} y registra auditoría.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{id}/anular": {
+      "post": {
+        "operationId": "ComprobantesController_anular",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularComprobanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{id}/auditoria": {
+      "get": {
+        "operationId": "ComprobantesController_obtenerAuditoria",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/documentos-fisicos": {
+      "get": {
+        "operationId": "ComprobantesController_listarDocumentosFisicos",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar los documentos físicos asociados al comprobante (REQ-A-09).",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "post": {
+        "operationId": "ComprobantesController_asociarDocumentosFisicos",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsociarDocumentosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Asociar uno o más documentos físicos a un comprobante. Aditiva e idempotente (REQ-A-01). En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto edita la asociación (§4.3 CLAUDE.md) — requiere permiso adicional `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados.",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/documentos-fisicos/{documentoFisicoId}": {
+      "delete": {
+        "operationId": "ComprobantesController_desasociarDocumentoFisico",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentoFisicoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Desasociar un documento físico de un comprobante. En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto (§4.3 CLAUDE.md) requiere `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados (REQ-A-02/03).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/adjuntos": {
+      "post": {
+        "operationId": "ComprobantesController_subirAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Subir un adjunto al comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "get": {
+        "operationId": "ComprobantesController_listarAdjuntos",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdjuntoResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
+      "get": {
+        "operationId": "ComprobantesController_descargarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      }
+    },
+    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
+      "put": {
+        "operationId": "ComprobantesController_reemplazarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
+        ]
+      },
+      "delete": {
+        "operationId": "ComprobantesController_eliminarAdjunto",
+        "parameters": [
+          {
+            "name": "comprobanteId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "adjuntoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Adjunto eliminado."
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos).",
+        "tags": [
+          "Asientos contables"
         ]
       }
     },
@@ -2060,6 +2916,525 @@
         "summary": "Lista los conceptos de OrgConfiguracionContable que apuntan a esta cuenta (vacío si no está configurada)",
         "tags": [
           "Cuentas"
+        ]
+      }
+    },
+    "/api/contactos": {
+      "post": {
+        "operationId": "ContactosController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContactoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa.",
+        "tags": [
+          "Contactos"
+        ]
+      },
+      "get": {
+        "operationId": "ContactosController_listar",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documento",
+            "required": false,
+            "in": "query",
+            "description": "Match exacto sobre documento",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "esCliente",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "esProveedor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "activo",
+            "required": false,
+            "in": "query",
+            "description": "true (default) → solo activos; false → solo inactivos; all → activos + inactivos.",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarContactosResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista contactos del tenant con paginación y filtros (q, documento, esCliente, esProveedor, activo).",
+        "tags": [
+          "Contactos"
+        ]
+      }
+    },
+    "/api/contactos/{id}": {
+      "get": {
+        "operationId": "ContactosController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Detalle del contacto.",
+        "tags": [
+          "Contactos"
+        ]
+      },
+      "patch": {
+        "operationId": "ContactosController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContactoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "PATCH del contacto. Campos opcionales; sólo toca los que vienen. El toggle activo/inactivo vive en endpoints dedicados.",
+        "tags": [
+          "Contactos"
+        ]
+      },
+      "delete": {
+        "operationId": "ContactosController_eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Elimina un contacto. Falla con 409 si alguna línea de comprobante lo referencia (usar desactivar en ese caso).",
+        "tags": [
+          "Contactos"
+        ]
+      }
+    },
+    "/api/contactos/{id}/desactivar": {
+      "post": {
+        "operationId": "ContactosController_desactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Marca el contacto como inactivo. Idempotente. Los comprobantes históricos siguen refiriéndolo; los nuevos no pueden usarlo.",
+        "tags": [
+          "Contactos"
+        ]
+      }
+    },
+    "/api/contactos/{id}/reactivar": {
+      "post": {
+        "operationId": "ContactosController_reactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Reactiva un contacto inactivo. Idempotente.",
+        "tags": [
+          "Contactos"
+        ]
+      }
+    },
+    "/api/documentos-fisicos": {
+      "post": {
+        "operationId": "DocumentosFisicosController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentoFisicoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Crea un documento físico en el tenant activo.",
+        "tags": [
+          "Documentos físicos"
+        ]
+      },
+      "get": {
+        "operationId": "DocumentosFisicosController_listar",
+        "parameters": [
+          {
+            "name": "tipoDocumentoFisicoId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por tipo de documento físico.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar desde esta fecha de emisión (inclusive). Formato YYYY-MM-DD.",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar hasta esta fecha de emisión (inclusive). Formato YYYY-MM-DD.",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "contactoId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por contacto asociado.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "estadoAsociacion",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por estado de asociación: SUELTO (sin comprobantes), EN_BORRADOR (en borradores), CONTABILIZADO (en contabilizados).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SUELTO",
+                "EN_BORRADOR",
+                "CONTABILIZADO"
+              ]
+            }
+          },
+          {
+            "name": "numero",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda parcial sobre el número del documento (case-insensitive).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "disponibleParaAsociar",
+            "required": false,
+            "in": "query",
+            "description": "Cuando true, devuelve SOLO documentos que no están consumidos por ningún comprobante CONTABILIZADO. Preserva documentos sueltos y los que están en borradores.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarDocumentosFisicosResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista documentos físicos del tenant con paginación y filtros (tipo, fechas, contacto, estado de asociación, número).",
+        "tags": [
+          "Documentos físicos"
+        ]
+      }
+    },
+    "/api/documentos-fisicos/{id}": {
+      "get": {
+        "operationId": "DocumentosFisicosController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Detalle del documento físico con sus comprobantes asociados.",
+        "tags": [
+          "Documentos físicos"
+        ]
+      },
+      "patch": {
+        "operationId": "DocumentosFisicosController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDocumentoFisicoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "PATCH parcial del documento físico. Solo toca los campos presentes. Falla con 409 si hay asociaciones a comprobantes contabilizados.",
+        "tags": [
+          "Documentos físicos"
+        ]
+      },
+      "delete": {
+        "operationId": "DocumentosFisicosController_eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Elimina un documento físico. Falla con 409 si tiene asociaciones activas (usar desasociar primero).",
+        "tags": [
+          "Documentos físicos"
         ]
       }
     },
@@ -3979,1311 +5354,6 @@
         ]
       }
     },
-    "/api/comprobantes": {
-      "post": {
-        "operationId": "ComprobantesController_crear",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateComprobanteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Crear un comprobante en BORRADOR con sus líneas. No valida partida doble — ese chequeo corre al contabilizar.",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "get": {
-        "operationId": "ComprobantesController_listar",
-        "parameters": [
-          {
-            "name": "periodoFiscalId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tipo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "APERTURA",
-                "DIARIO",
-                "INGRESO",
-                "EGRESO",
-                "AJUSTE",
-                "TRASPASO",
-                "CIERRE"
-              ]
-            }
-          },
-          {
-            "name": "estado",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "BORRADOR",
-                "CONTABILIZADO",
-                "BLOQUEADO"
-              ]
-            }
-          },
-          {
-            "name": "fechaDesde",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-04-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "fechaHasta",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-04-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Busca en numero y glosa (case-insensitive)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 200,
-              "default": 50,
-              "type": "number"
-            }
-          },
-          {
-            "name": "incluirAnulados",
-            "required": false,
-            "in": "query",
-            "description": "Incluir comprobantes anulados en el listado (default: false)",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListarComprobantesResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Listar comprobantes del tenant con paginación y filtros (periodoFiscalId, tipo, estado, rango de fechas, texto libre).",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/export": {
-      "get": {
-        "operationId": "ComprobantesController_exportar",
-        "parameters": [
-          {
-            "name": "periodoFiscalId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tipo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "APERTURA",
-                "DIARIO",
-                "INGRESO",
-                "EGRESO",
-                "AJUSTE",
-                "TRASPASO",
-                "CIERRE"
-              ]
-            }
-          },
-          {
-            "name": "estado",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "BORRADOR",
-                "CONTABILIZADO",
-                "BLOQUEADO"
-              ]
-            }
-          },
-          {
-            "name": "fechaDesde",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-04-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "fechaHasta",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "example": "2026-04-30",
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Busca en numero y glosa (case-insensitive)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "incluirAnulados",
-            "required": false,
-            "in": "query",
-            "description": "Incluir comprobantes anulados en el export (default: false)",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExportarComprobantesResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Exportar todos los comprobantes que coincidan con los filtros, sin paginar. Devuelve hasta COMPROBANTES_EXPORT_MAX (default 1000) comprobantes ordenados ASC. Si el rango supera el límite, devuelve 422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{id}": {
-      "get": {
-        "operationId": "ComprobantesController_obtener",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Detalle completo del comprobante con sus líneas.",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "patch": {
-        "operationId": "ComprobantesController_actualizar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EditarContabilizadoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Actualizar un comprobante. Si está en BORRADOR, actualiza parcialmente (todos los campos opcionales). Si está CONTABILIZADO y el período está abierto, edita cabecera y/o líneas — requiere permiso adicional `contabilidad.asientos.edit-posted` (§4.3 CLAUDE.md). El número correlativo es INMUTABLE. Rechaza BLOQUEADO o anulados.",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "delete": {
-        "operationId": "ComprobantesController_eliminar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Eliminar físicamente un BORRADOR. Un CONTABILIZADO/BLOQUEADO no se borra: se anula con /anular.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{id}/contabilizar": {
-      "post": {
-        "operationId": "ComprobantesController_contabilizar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Transicionar BORRADOR → CONTABILIZADO. Valida partida doble, asigna número atómico {prefijo}{YY}{MM}-{correlativo:6} y registra auditoría.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{id}/anular": {
-      "post": {
-        "operationId": "ComprobantesController_anular",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AnularComprobanteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Anular un CONTABILIZADO con flag anulado=true (CLAUDE.md §4.7). No genera contra-asiento. El número del original se preserva.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{id}/auditoria": {
-      "get": {
-        "operationId": "ComprobantesController_obtenerAuditoria",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Historial de auditoría del comprobante: cada acción con usuario, timestamp y diff.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{comprobanteId}/documentos-fisicos": {
-      "get": {
-        "operationId": "ComprobantesController_listarDocumentosFisicos",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Listar los documentos físicos asociados al comprobante (REQ-A-09).",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "post": {
-        "operationId": "ComprobantesController_asociarDocumentosFisicos",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AsociarDocumentosDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Asociar uno o más documentos físicos a un comprobante. Aditiva e idempotente (REQ-A-01). En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto edita la asociación (§4.3 CLAUDE.md) — requiere permiso adicional `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados.",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{comprobanteId}/documentos-fisicos/{documentoFisicoId}": {
-      "delete": {
-        "operationId": "ComprobantesController_desasociarDocumentoFisico",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "documentoFisicoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Desasociar un documento físico de un comprobante. En BORRADOR no exige permisos extra. En CONTABILIZADO con período abierto (§4.3 CLAUDE.md) requiere `contabilidad.asientos.edit-posted`. Rechaza período cerrado/bloqueado y comprobantes anulados (REQ-A-02/03).",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{comprobanteId}/adjuntos": {
-      "post": {
-        "operationId": "ComprobantesController_subirAdjunto",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdjuntoResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Subir un adjunto al comprobante (Pack contabilidad.adjuntos).",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "get": {
-        "operationId": "ComprobantesController_listarAdjuntos",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AdjuntoResponseDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Listar los adjuntos de un comprobante (Pack contabilidad.adjuntos).",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}/download": {
-      "get": {
-        "operationId": "ComprobantesController_descargarAdjunto",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "adjuntoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Descargar el contenido binario de un adjunto (Pack contabilidad.adjuntos).",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/comprobantes/{comprobanteId}/adjuntos/{adjuntoId}": {
-      "put": {
-        "operationId": "ComprobantesController_reemplazarAdjunto",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "adjuntoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdjuntoResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Reemplazar el archivo de un adjunto existente (Pack contabilidad.adjuntos).",
-        "tags": [
-          "Asientos contables"
-        ]
-      },
-      "delete": {
-        "operationId": "ComprobantesController_eliminarAdjunto",
-        "parameters": [
-          {
-            "name": "comprobanteId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "adjuntoId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Adjunto eliminado."
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Eliminar un adjunto de un comprobante (Pack contabilidad.adjuntos).",
-        "tags": [
-          "Asientos contables"
-        ]
-      }
-    },
-    "/api/contactos": {
-      "post": {
-        "operationId": "ContactosController_crear",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateContactoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Crea un contacto (cliente, proveedor, o ambos) dentro de la organización activa.",
-        "tags": [
-          "Contactos"
-        ]
-      },
-      "get": {
-        "operationId": "ContactosController_listar",
-        "parameters": [
-          {
-            "name": "q",
-            "required": false,
-            "in": "query",
-            "description": "Búsqueda ILIKE parcial sobre razonSocial y nombreComercial (OR). Usa GIN trigram.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "documento",
-            "required": false,
-            "in": "query",
-            "description": "Match exacto sobre documento",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "esCliente",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "esProveedor",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "activo",
-            "required": false,
-            "in": "query",
-            "description": "true (default) → solo activos; false → solo inactivos; all → activos + inactivos.",
-            "schema": {
-              "$ref": "#/components/schemas/Object"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 50,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListarContactosResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Lista contactos del tenant con paginación y filtros (q, documento, esCliente, esProveedor, activo).",
-        "tags": [
-          "Contactos"
-        ]
-      }
-    },
-    "/api/contactos/{id}": {
-      "get": {
-        "operationId": "ContactosController_obtener",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Detalle del contacto.",
-        "tags": [
-          "Contactos"
-        ]
-      },
-      "patch": {
-        "operationId": "ContactosController_actualizar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateContactoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "PATCH del contacto. Campos opcionales; sólo toca los que vienen. El toggle activo/inactivo vive en endpoints dedicados.",
-        "tags": [
-          "Contactos"
-        ]
-      },
-      "delete": {
-        "operationId": "ContactosController_eliminar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Elimina un contacto. Falla con 409 si alguna línea de comprobante lo referencia (usar desactivar en ese caso).",
-        "tags": [
-          "Contactos"
-        ]
-      }
-    },
-    "/api/contactos/{id}/desactivar": {
-      "post": {
-        "operationId": "ContactosController_desactivar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Marca el contacto como inactivo. Idempotente. Los comprobantes históricos siguen refiriéndolo; los nuevos no pueden usarlo.",
-        "tags": [
-          "Contactos"
-        ]
-      }
-    },
-    "/api/contactos/{id}/reactivar": {
-      "post": {
-        "operationId": "ContactosController_reactivar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Reactiva un contacto inactivo. Idempotente.",
-        "tags": [
-          "Contactos"
-        ]
-      }
-    },
-    "/api/documentos-fisicos": {
-      "post": {
-        "operationId": "DocumentosFisicosController_crear",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDocumentoFisicoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Crea un documento físico en el tenant activo.",
-        "tags": [
-          "Documentos físicos"
-        ]
-      },
-      "get": {
-        "operationId": "DocumentosFisicosController_listar",
-        "parameters": [
-          {
-            "name": "tipoDocumentoFisicoId",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por tipo de documento físico.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "fechaDesde",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar desde esta fecha de emisión (inclusive). Formato YYYY-MM-DD.",
-            "schema": {
-              "example": "2026-01-01",
-              "type": "string"
-            }
-          },
-          {
-            "name": "fechaHasta",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar hasta esta fecha de emisión (inclusive). Formato YYYY-MM-DD.",
-            "schema": {
-              "example": "2026-12-31",
-              "type": "string"
-            }
-          },
-          {
-            "name": "contactoId",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por contacto asociado.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "estadoAsociacion",
-            "required": false,
-            "in": "query",
-            "description": "Filtrar por estado de asociación: SUELTO (sin comprobantes), EN_BORRADOR (en borradores), CONTABILIZADO (en contabilizados).",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "SUELTO",
-                "EN_BORRADOR",
-                "CONTABILIZADO"
-              ]
-            }
-          },
-          {
-            "name": "numero",
-            "required": false,
-            "in": "query",
-            "description": "Búsqueda parcial sobre el número del documento (case-insensitive).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "disponibleParaAsociar",
-            "required": false,
-            "in": "query",
-            "description": "Cuando true, devuelve SOLO documentos que no están consumidos por ningún comprobante CONTABILIZADO. Preserva documentos sueltos y los que están en borradores.",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListarDocumentosFisicosResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Lista documentos físicos del tenant con paginación y filtros (tipo, fechas, contacto, estado de asociación, número).",
-        "tags": [
-          "Documentos físicos"
-        ]
-      }
-    },
-    "/api/documentos-fisicos/{id}": {
-      "get": {
-        "operationId": "DocumentosFisicosController_obtener",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Detalle del documento físico con sus comprobantes asociados.",
-        "tags": [
-          "Documentos físicos"
-        ]
-      },
-      "patch": {
-        "operationId": "DocumentosFisicosController_actualizar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDocumentoFisicoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "PATCH parcial del documento físico. Solo toca los campos presentes. Falla con 409 si hay asociaciones a comprobantes contabilizados.",
-        "tags": [
-          "Documentos físicos"
-        ]
-      },
-      "delete": {
-        "operationId": "DocumentosFisicosController_eliminar",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "JWT-auth": []
-          }
-        ],
-        "summary": "Elimina un documento físico. Falla con 409 si tiene asociaciones activas (usar desasociar primero).",
-        "tags": [
-          "Documentos físicos"
-        ]
-      }
-    },
     "/api/libros/diario": {
       "get": {
         "operationId": "ReportesController_obtenerLibroDiario",
@@ -6158,6 +6228,59 @@
           "year"
         ]
       },
+      "CierreComprobanteResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+          },
+          "origenTipo": {
+            "type": "string",
+            "enum": [
+              "CIERRE_GASTOS",
+              "CIERRE_INGRESOS",
+              "CIERRE_RESULTADO"
+            ],
+            "description": "Slot del comprobante de cierre: gastos (#1), ingresos (#2) o traslado (#3).",
+            "example": "CIERRE_RESULTADO"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "BORRADOR",
+              "CONTABILIZADO",
+              "BLOQUEADO"
+            ],
+            "example": "BORRADOR"
+          }
+        },
+        "required": [
+          "id",
+          "origenTipo",
+          "estado"
+        ]
+      },
+      "CierreEjercicioResponseDto": {
+        "type": "object",
+        "properties": {
+          "gestionId": {
+            "type": "string",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "cierres": {
+            "description": "Comprobantes de cierre de la gestión (≤3). En generación recién creados están en BORRADOR.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CierreComprobanteResponseDto"
+            }
+          }
+        },
+        "required": [
+          "gestionId",
+          "cierres"
+        ]
+      },
       "ReabrirPeriodoDto": {
         "type": "object",
         "properties": {
@@ -6171,6 +6294,448 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "CreateLineaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+          },
+          "contactoId": {
+            "type": "string",
+            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "description": "Requerido si cuenta.requiereContacto al contabilizar"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "example": "BOB"
+          },
+          "debito": {
+            "type": "string",
+            "example": "1000.00",
+            "description": "Monto DEBE en moneda original (string)"
+          },
+          "credito": {
+            "type": "string",
+            "example": "0",
+            "description": "Monto HABER en moneda original (string)"
+          },
+          "tipoCambio": {
+            "type": "string",
+            "example": "1",
+            "description": "Tipo de cambio a BOB (1 si moneda=BOB)"
+          },
+          "debitoBob": {
+            "type": "string",
+            "example": "1000.00",
+            "description": "Monto DEBE convertido a BOB"
+          },
+          "creditoBob": {
+            "type": "string",
+            "example": "0",
+            "description": "Monto HABER convertido a BOB"
+          },
+          "glosaLinea": {
+            "type": "string",
+            "description": "Glosa específica de la línea (opcional)"
+          }
+        },
+        "required": [
+          "cuentaId",
+          "moneda",
+          "debito",
+          "credito",
+          "tipoCambio",
+          "debitoBob",
+          "creditoBob"
+        ]
+      },
+      "CreateComprobanteDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "APERTURA",
+              "DIARIO",
+              "INGRESO",
+              "EGRESO",
+              "AJUSTE",
+              "TRASPASO",
+              "CIERRE"
+            ],
+            "example": "DIARIO"
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-04-22",
+            "description": "Fecha contable en formato ISO YYYY-MM-DD"
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Venta al contado a cliente X"
+          },
+          "monedaPrincipal": {
+            "type": "string",
+            "enum": [
+              "BOB"
+            ],
+            "default": "BOB"
+          },
+          "tipoCambioReexpresion": {
+            "type": "string",
+            "example": "6.96",
+            "description": "T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1."
+          },
+          "lineas": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateLineaDto"
+            }
+          }
+        },
+        "required": [
+          "tipo",
+          "fechaContable",
+          "glosa",
+          "lineas"
+        ]
+      },
+      "ContactoResumenDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Avícola Sur S.R.L."
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ]
+      },
+      "DocumentoRespaldoResumenDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tipoNombre": {
+            "type": "string",
+            "example": "Factura"
+          },
+          "numero": {
+            "type": "string",
+            "example": "0042"
+          }
+        },
+        "required": [
+          "id",
+          "tipoNombre",
+          "numero"
+        ]
+      },
+      "ComprobanteListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "APERTURA",
+              "DIARIO",
+              "INGRESO",
+              "EGRESO",
+              "AJUSTE",
+              "TRASPASO",
+              "CIERRE"
+            ]
+          },
+          "numero": {
+            "type": "string",
+            "nullable": true,
+            "example": "I2604-000042"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "BORRADOR",
+              "CONTABILIZADO",
+              "BLOQUEADO"
+            ]
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-04-22"
+          },
+          "periodoFiscalId": {
+            "type": "string"
+          },
+          "glosa": {
+            "type": "string"
+          },
+          "monedaPrincipal": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "tipoCambioReexpresion": {
+            "type": "string",
+            "example": "1.00000000"
+          },
+          "totalDebitoBob": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "totalCreditoBob": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "anulado": {
+            "type": "boolean"
+          },
+          "fechaAnulacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "anuladoPorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "motivoAnulacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "contactos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContactoResumenDto"
+            }
+          },
+          "documentosRespaldo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentoRespaldoResumenDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "numero",
+          "estado",
+          "fechaContable",
+          "periodoFiscalId",
+          "glosa",
+          "monedaPrincipal",
+          "tipoCambioReexpresion",
+          "totalDebitoBob",
+          "totalCreditoBob",
+          "anulado",
+          "fechaAnulacion",
+          "anuladoPorUserId",
+          "motivoAnulacion",
+          "createdByUserId",
+          "createdAt",
+          "updatedAt",
+          "contactos",
+          "documentosRespaldo"
+        ]
+      },
+      "ListarComprobantesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComprobanteListItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "ExportarComprobantesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComprobanteListItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "EditarContabilizadoDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "APERTURA",
+              "DIARIO",
+              "INGRESO",
+              "EGRESO",
+              "AJUSTE",
+              "TRASPASO",
+              "CIERRE"
+            ],
+            "example": "DIARIO"
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-04-22",
+            "description": "Fecha contable en formato ISO YYYY-MM-DD"
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Venta al contado a cliente X"
+          },
+          "monedaPrincipal": {
+            "type": "string",
+            "enum": [
+              "BOB"
+            ],
+            "default": "BOB"
+          },
+          "tipoCambioReexpresion": {
+            "type": "string",
+            "example": "6.96",
+            "description": "T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1."
+          },
+          "lineas": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateLineaDto"
+            }
+          },
+          "numero": {
+            "type": "string",
+            "description": "Número correlativo. INMUTABLE — si se envía distinto al actual, la petición será rechazada con 409 (§4.9 CLAUDE.md). Omitir en producción."
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Motivo del cambio, registrado en comprobantes_audit. Si se omite, el trigger registrará motivo NULL (auditoría silenciosa). Mínimo 3 caracteres si se envía.",
+            "example": "Corrección de glosa — error tipográfico en el nombre del cliente",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        }
+      },
+      "AnularComprobanteDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "example": "Error en la imputación al cliente",
+            "description": "Motivo de la anulación, mínimo 10 caracteres (visible en auditoría)",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "AsociarDocumentosDto": {
+        "type": "object",
+        "properties": {
+          "documentoFisicoIds": {
+            "description": "IDs de los documentos físicos a asociar al comprobante. La operación es aditiva e idempotente.",
+            "example": [
+              "7c0e5b2a-2f3d-4d6e-9a1b-1c2d3e4f5a6b"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "documentoFisicoIds"
+        ]
+      },
+      "AdjuntoResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombreOriginal": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "tamanoBytes": {
+            "type": "number"
+          },
+          "subidoPorUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "comprobanteId",
+          "nombreOriginal",
+          "mimeType",
+          "tamanoBytes",
+          "subidoPorUserId",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CuentaResponseDto": {
@@ -6591,6 +7156,421 @@
               "INVERSION",
               "FINANCIACION"
             ],
+            "nullable": true
+          }
+        }
+      },
+      "CreateContactoDto": {
+        "type": "object",
+        "properties": {
+          "razonSocial": {
+            "type": "string",
+            "example": "Granjas El Sol SRL",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "nombreComercial": {
+            "type": "string",
+            "example": "El Sol",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "documento": {
+            "type": "string",
+            "example": "1234567019",
+            "maxLength": 50,
+            "nullable": true,
+            "description": "NIT, CI, CEX o pasaporte. Texto libre."
+          },
+          "esCliente": {
+            "type": "boolean",
+            "example": true
+          },
+          "esProveedor": {
+            "type": "boolean",
+            "example": false
+          },
+          "email": {
+            "type": "string",
+            "example": "ventas@elsol.bo",
+            "nullable": true
+          },
+          "telefono": {
+            "type": "string",
+            "example": "+591 3 1234567",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          }
+        },
+        "required": [
+          "razonSocial",
+          "esCliente",
+          "esProveedor"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "ContactoResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "razonSocial": {
+            "type": "string"
+          },
+          "nombreComercial": {
+            "type": "string",
+            "nullable": true
+          },
+          "documento": {
+            "type": "string",
+            "nullable": true
+          },
+          "esCliente": {
+            "type": "boolean"
+          },
+          "esProveedor": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefono": {
+            "type": "string",
+            "nullable": true
+          },
+          "direccion": {
+            "type": "string",
+            "nullable": true
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "createdByUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "razonSocial",
+          "nombreComercial",
+          "documento",
+          "esCliente",
+          "esProveedor",
+          "email",
+          "telefono",
+          "direccion",
+          "activo",
+          "createdByUserId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ListarContactosResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContactoResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateContactoDto": {
+        "type": "object",
+        "properties": {
+          "razonSocial": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "nombreComercial": {
+            "type": "string",
+            "maxLength": 200,
+            "nullable": true
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "esCliente": {
+            "type": "boolean"
+          },
+          "esProveedor": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "direccion": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          }
+        }
+      },
+      "CreateDocumentoFisicoDto": {
+        "type": "object",
+        "properties": {
+          "tipoDocumentoFisicoId": {
+            "type": "string",
+            "description": "ID del tipo de documento físico (debe pertenecer al tenant y estar activo)",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "string",
+            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).",
+            "minLength": 1,
+            "maxLength": 50,
+            "nullable": true,
+            "example": "FAC-0042"
+          },
+          "fechaEmision": {
+            "type": "string",
+            "description": "Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).",
+            "example": "2026-03-15"
+          },
+          "monto": {
+            "type": "string",
+            "description": "Monto del documento como string decimal. Obligatorio para tipos tributarios (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).",
+            "example": "1250.50",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "description": "Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "nullable": true
+          },
+          "contactoId": {
+            "type": "string",
+            "description": "ID del contacto (cliente o proveedor) asociado al documento.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "glosa": {
+            "type": "string",
+            "description": "Glosa o descripción libre del documento.",
+            "maxLength": 500,
+            "nullable": true
+          }
+        },
+        "required": [
+          "tipoDocumentoFisicoId",
+          "fechaEmision"
+        ]
+      },
+      "TipoDocumentoFisicoEmbebidoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "esTributario": {
+            "type": "boolean"
+          },
+          "numeracionAutomatica": {
+            "type": "boolean",
+            "description": "Si true, el sistema asigna número correlativo automáticamente."
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "codigo",
+          "esTributario",
+          "numeracionAutomatica"
+        ]
+      },
+      "ContactoEmbebidoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "razonSocial": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "razonSocial"
+        ]
+      },
+      "DocumentoFisicoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "numero": {
+            "type": "string"
+          },
+          "fechaEmision": {
+            "type": "string"
+          },
+          "monto": {
+            "type": "string",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "nullable": true
+          },
+          "glosa": {
+            "type": "string",
+            "nullable": true
+          },
+          "tipoDocumentoFisico": {
+            "$ref": "#/components/schemas/TipoDocumentoFisicoEmbebidoDto"
+          },
+          "contacto": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContactoEmbebidoDto"
+              }
+            ]
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "fechaEmision",
+          "monto",
+          "moneda",
+          "glosa",
+          "tipoDocumentoFisico",
+          "contacto",
+          "organizationId",
+          "createdAt"
+        ]
+      },
+      "ListarDocumentosFisicosResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentoFisicoDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateDocumentoFisicoDto": {
+        "type": "object",
+        "properties": {
+          "tipoDocumentoFisicoId": {
+            "type": "string",
+            "description": "ID del tipo de documento físico. Debe pertenecer al tenant y estar activo.",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "string",
+            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.",
+            "minLength": 1,
+            "maxLength": 50,
+            "example": "FAC-0042"
+          },
+          "fechaEmision": {
+            "type": "string",
+            "description": "Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).",
+            "example": "2026-03-15"
+          },
+          "monto": {
+            "type": "string",
+            "description": "Monto del documento como string decimal. Para tipos tributarios no puede ser null (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).",
+            "example": "1250.50",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "description": "Moneda del documento. BOB o USD.",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "nullable": true
+          },
+          "contactoId": {
+            "type": "string",
+            "description": "ID del contacto asociado al documento.",
+            "format": "uuid",
+            "nullable": true
+          },
+          "glosa": {
+            "type": "string",
+            "description": "Glosa o descripción libre del documento.",
+            "maxLength": 500,
             "nullable": true
           }
         }
@@ -7765,863 +8745,6 @@
             "type": "string",
             "nullable": true,
             "format": "uuid"
-          }
-        }
-      },
-      "CreateLineaDto": {
-        "type": "object",
-        "properties": {
-          "cuentaId": {
-            "type": "string",
-            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
-          },
-          "contactoId": {
-            "type": "string",
-            "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-            "description": "Requerido si cuenta.requiereContacto al contabilizar"
-          },
-          "moneda": {
-            "type": "string",
-            "enum": [
-              "BOB",
-              "USD"
-            ],
-            "example": "BOB"
-          },
-          "debito": {
-            "type": "string",
-            "example": "1000.00",
-            "description": "Monto DEBE en moneda original (string)"
-          },
-          "credito": {
-            "type": "string",
-            "example": "0",
-            "description": "Monto HABER en moneda original (string)"
-          },
-          "tipoCambio": {
-            "type": "string",
-            "example": "1",
-            "description": "Tipo de cambio a BOB (1 si moneda=BOB)"
-          },
-          "debitoBob": {
-            "type": "string",
-            "example": "1000.00",
-            "description": "Monto DEBE convertido a BOB"
-          },
-          "creditoBob": {
-            "type": "string",
-            "example": "0",
-            "description": "Monto HABER convertido a BOB"
-          },
-          "glosaLinea": {
-            "type": "string",
-            "description": "Glosa específica de la línea (opcional)"
-          }
-        },
-        "required": [
-          "cuentaId",
-          "moneda",
-          "debito",
-          "credito",
-          "tipoCambio",
-          "debitoBob",
-          "creditoBob"
-        ]
-      },
-      "CreateComprobanteDto": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "APERTURA",
-              "DIARIO",
-              "INGRESO",
-              "EGRESO",
-              "AJUSTE",
-              "TRASPASO",
-              "CIERRE"
-            ],
-            "example": "DIARIO"
-          },
-          "fechaContable": {
-            "type": "string",
-            "example": "2026-04-22",
-            "description": "Fecha contable en formato ISO YYYY-MM-DD"
-          },
-          "glosa": {
-            "type": "string",
-            "example": "Venta al contado a cliente X"
-          },
-          "monedaPrincipal": {
-            "type": "string",
-            "enum": [
-              "BOB"
-            ],
-            "default": "BOB"
-          },
-          "tipoCambioReexpresion": {
-            "type": "string",
-            "example": "6.96",
-            "description": "T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1."
-          },
-          "lineas": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CreateLineaDto"
-            }
-          }
-        },
-        "required": [
-          "tipo",
-          "fechaContable",
-          "glosa",
-          "lineas"
-        ]
-      },
-      "ContactoResumenDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "nombre": {
-            "type": "string",
-            "example": "Avícola Sur S.R.L."
-          }
-        },
-        "required": [
-          "id",
-          "nombre"
-        ]
-      },
-      "DocumentoRespaldoResumenDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tipoNombre": {
-            "type": "string",
-            "example": "Factura"
-          },
-          "numero": {
-            "type": "string",
-            "example": "0042"
-          }
-        },
-        "required": [
-          "id",
-          "tipoNombre",
-          "numero"
-        ]
-      },
-      "ComprobanteListItemDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "APERTURA",
-              "DIARIO",
-              "INGRESO",
-              "EGRESO",
-              "AJUSTE",
-              "TRASPASO",
-              "CIERRE"
-            ]
-          },
-          "numero": {
-            "type": "string",
-            "nullable": true,
-            "example": "I2604-000042"
-          },
-          "estado": {
-            "type": "string",
-            "enum": [
-              "BORRADOR",
-              "CONTABILIZADO",
-              "BLOQUEADO"
-            ]
-          },
-          "fechaContable": {
-            "type": "string",
-            "example": "2026-04-22"
-          },
-          "periodoFiscalId": {
-            "type": "string"
-          },
-          "glosa": {
-            "type": "string"
-          },
-          "monedaPrincipal": {
-            "type": "string",
-            "enum": [
-              "BOB",
-              "USD"
-            ]
-          },
-          "tipoCambioReexpresion": {
-            "type": "string",
-            "example": "1.00000000"
-          },
-          "totalDebitoBob": {
-            "type": "string",
-            "example": "1000.00"
-          },
-          "totalCreditoBob": {
-            "type": "string",
-            "example": "1000.00"
-          },
-          "anulado": {
-            "type": "boolean"
-          },
-          "fechaAnulacion": {
-            "type": "string",
-            "nullable": true
-          },
-          "anuladoPorUserId": {
-            "type": "string",
-            "nullable": true
-          },
-          "motivoAnulacion": {
-            "type": "string",
-            "nullable": true
-          },
-          "createdByUserId": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "contactos": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContactoResumenDto"
-            }
-          },
-          "documentosRespaldo": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DocumentoRespaldoResumenDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "tipo",
-          "numero",
-          "estado",
-          "fechaContable",
-          "periodoFiscalId",
-          "glosa",
-          "monedaPrincipal",
-          "tipoCambioReexpresion",
-          "totalDebitoBob",
-          "totalCreditoBob",
-          "anulado",
-          "fechaAnulacion",
-          "anuladoPorUserId",
-          "motivoAnulacion",
-          "createdByUserId",
-          "createdAt",
-          "updatedAt",
-          "contactos",
-          "documentosRespaldo"
-        ]
-      },
-      "ListarComprobantesResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ComprobanteListItemDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "limit"
-        ]
-      },
-      "ExportarComprobantesResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ComprobanteListItemDto"
-            }
-          }
-        },
-        "required": [
-          "items"
-        ]
-      },
-      "EditarContabilizadoDto": {
-        "type": "object",
-        "properties": {
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "APERTURA",
-              "DIARIO",
-              "INGRESO",
-              "EGRESO",
-              "AJUSTE",
-              "TRASPASO",
-              "CIERRE"
-            ],
-            "example": "DIARIO"
-          },
-          "fechaContable": {
-            "type": "string",
-            "example": "2026-04-22",
-            "description": "Fecha contable en formato ISO YYYY-MM-DD"
-          },
-          "glosa": {
-            "type": "string",
-            "example": "Venta al contado a cliente X"
-          },
-          "monedaPrincipal": {
-            "type": "string",
-            "enum": [
-              "BOB"
-            ],
-            "default": "BOB"
-          },
-          "tipoCambioReexpresion": {
-            "type": "string",
-            "example": "6.96",
-            "description": "T/C de presentación (re-expresión). Decimal estrictamente positivo. Omitir para usar default 1."
-          },
-          "lineas": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CreateLineaDto"
-            }
-          },
-          "numero": {
-            "type": "string",
-            "description": "Número correlativo. INMUTABLE — si se envía distinto al actual, la petición será rechazada con 409 (§4.9 CLAUDE.md). Omitir en producción."
-          },
-          "motivo": {
-            "type": "string",
-            "description": "Motivo del cambio, registrado en comprobantes_audit. Si se omite, el trigger registrará motivo NULL (auditoría silenciosa). Mínimo 3 caracteres si se envía.",
-            "example": "Corrección de glosa — error tipográfico en el nombre del cliente",
-            "minLength": 3,
-            "maxLength": 500
-          }
-        }
-      },
-      "AnularComprobanteDto": {
-        "type": "object",
-        "properties": {
-          "motivo": {
-            "type": "string",
-            "example": "Error en la imputación al cliente",
-            "description": "Motivo de la anulación, mínimo 10 caracteres (visible en auditoría)",
-            "minLength": 10,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "motivo"
-        ]
-      },
-      "AsociarDocumentosDto": {
-        "type": "object",
-        "properties": {
-          "documentoFisicoIds": {
-            "description": "IDs de los documentos físicos a asociar al comprobante. La operación es aditiva e idempotente.",
-            "example": [
-              "7c0e5b2a-2f3d-4d6e-9a1b-1c2d3e4f5a6b"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        },
-        "required": [
-          "documentoFisicoIds"
-        ]
-      },
-      "AdjuntoResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "comprobanteId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "nombreOriginal": {
-            "type": "string"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "tamanoBytes": {
-            "type": "number"
-          },
-          "subidoPorUserId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "comprobanteId",
-          "nombreOriginal",
-          "mimeType",
-          "tamanoBytes",
-          "subidoPorUserId",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "CreateContactoDto": {
-        "type": "object",
-        "properties": {
-          "razonSocial": {
-            "type": "string",
-            "example": "Granjas El Sol SRL",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "nombreComercial": {
-            "type": "string",
-            "example": "El Sol",
-            "maxLength": 200,
-            "nullable": true
-          },
-          "documento": {
-            "type": "string",
-            "example": "1234567019",
-            "maxLength": 50,
-            "nullable": true,
-            "description": "NIT, CI, CEX o pasaporte. Texto libre."
-          },
-          "esCliente": {
-            "type": "boolean",
-            "example": true
-          },
-          "esProveedor": {
-            "type": "boolean",
-            "example": false
-          },
-          "email": {
-            "type": "string",
-            "example": "ventas@elsol.bo",
-            "nullable": true
-          },
-          "telefono": {
-            "type": "string",
-            "example": "+591 3 1234567",
-            "maxLength": 50,
-            "nullable": true
-          },
-          "direccion": {
-            "type": "string",
-            "maxLength": 500,
-            "nullable": true
-          }
-        },
-        "required": [
-          "razonSocial",
-          "esCliente",
-          "esProveedor"
-        ]
-      },
-      "Object": {
-        "type": "object",
-        "properties": {}
-      },
-      "ContactoResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "razonSocial": {
-            "type": "string"
-          },
-          "nombreComercial": {
-            "type": "string",
-            "nullable": true
-          },
-          "documento": {
-            "type": "string",
-            "nullable": true
-          },
-          "esCliente": {
-            "type": "boolean"
-          },
-          "esProveedor": {
-            "type": "boolean"
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "telefono": {
-            "type": "string",
-            "nullable": true
-          },
-          "direccion": {
-            "type": "string",
-            "nullable": true
-          },
-          "activo": {
-            "type": "boolean"
-          },
-          "createdByUserId": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "razonSocial",
-          "nombreComercial",
-          "documento",
-          "esCliente",
-          "esProveedor",
-          "email",
-          "telefono",
-          "direccion",
-          "activo",
-          "createdByUserId",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "ListarContactosResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ContactoResponseDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "pageSize": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "pageSize"
-        ]
-      },
-      "UpdateContactoDto": {
-        "type": "object",
-        "properties": {
-          "razonSocial": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 200
-          },
-          "nombreComercial": {
-            "type": "string",
-            "maxLength": 200,
-            "nullable": true
-          },
-          "documento": {
-            "type": "string",
-            "maxLength": 50,
-            "nullable": true
-          },
-          "esCliente": {
-            "type": "boolean"
-          },
-          "esProveedor": {
-            "type": "boolean"
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "telefono": {
-            "type": "string",
-            "maxLength": 50,
-            "nullable": true
-          },
-          "direccion": {
-            "type": "string",
-            "maxLength": 500,
-            "nullable": true
-          }
-        }
-      },
-      "CreateDocumentoFisicoDto": {
-        "type": "object",
-        "properties": {
-          "tipoDocumentoFisicoId": {
-            "type": "string",
-            "description": "ID del tipo de documento físico (debe pertenecer al tenant y estar activo)",
-            "format": "uuid"
-          },
-          "numero": {
-            "type": "string",
-            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$. Requerido para tipos manuales; debe OMITIRSE en tipos con numeración automática (el sistema asigna el número — enviarlo produce 422 DOCUMENTO_FISICO_NUMERO_NO_PERMITIDO_EN_TIPO_AUTO).",
-            "minLength": 1,
-            "maxLength": 50,
-            "nullable": true,
-            "example": "FAC-0042"
-          },
-          "fechaEmision": {
-            "type": "string",
-            "description": "Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).",
-            "example": "2026-03-15"
-          },
-          "monto": {
-            "type": "string",
-            "description": "Monto del documento como string decimal. Obligatorio para tipos tributarios (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).",
-            "example": "1250.50",
-            "nullable": true
-          },
-          "moneda": {
-            "type": "string",
-            "description": "Moneda del documento. Obligatoria para tipos tributarios (REQ-D-14). BOB o USD.",
-            "enum": [
-              "BOB",
-              "USD"
-            ],
-            "nullable": true
-          },
-          "contactoId": {
-            "type": "string",
-            "description": "ID del contacto (cliente o proveedor) asociado al documento.",
-            "format": "uuid",
-            "nullable": true
-          },
-          "glosa": {
-            "type": "string",
-            "description": "Glosa o descripción libre del documento.",
-            "maxLength": 500,
-            "nullable": true
-          }
-        },
-        "required": [
-          "tipoDocumentoFisicoId",
-          "fechaEmision"
-        ]
-      },
-      "TipoDocumentoFisicoEmbebidoDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "nombre": {
-            "type": "string"
-          },
-          "codigo": {
-            "type": "string"
-          },
-          "esTributario": {
-            "type": "boolean"
-          },
-          "numeracionAutomatica": {
-            "type": "boolean",
-            "description": "Si true, el sistema asigna número correlativo automáticamente."
-          }
-        },
-        "required": [
-          "id",
-          "nombre",
-          "codigo",
-          "esTributario",
-          "numeracionAutomatica"
-        ]
-      },
-      "ContactoEmbebidoDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "razonSocial": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "razonSocial"
-        ]
-      },
-      "DocumentoFisicoDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "numero": {
-            "type": "string"
-          },
-          "fechaEmision": {
-            "type": "string"
-          },
-          "monto": {
-            "type": "string",
-            "nullable": true
-          },
-          "moneda": {
-            "type": "string",
-            "nullable": true
-          },
-          "glosa": {
-            "type": "string",
-            "nullable": true
-          },
-          "tipoDocumentoFisico": {
-            "$ref": "#/components/schemas/TipoDocumentoFisicoEmbebidoDto"
-          },
-          "contacto": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ContactoEmbebidoDto"
-              }
-            ]
-          },
-          "organizationId": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "numero",
-          "fechaEmision",
-          "monto",
-          "moneda",
-          "glosa",
-          "tipoDocumentoFisico",
-          "contacto",
-          "organizationId",
-          "createdAt"
-        ]
-      },
-      "ListarDocumentosFisicosResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DocumentoFisicoDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "pageSize": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "pageSize"
-        ]
-      },
-      "UpdateDocumentoFisicoDto": {
-        "type": "object",
-        "properties": {
-          "tipoDocumentoFisicoId": {
-            "type": "string",
-            "description": "ID del tipo de documento físico. Debe pertenecer al tenant y estar activo.",
-            "format": "uuid"
-          },
-          "numero": {
-            "type": "string",
-            "description": "Número impreso del documento. Se normaliza (trim + uppercase). Regex: ^[A-Z0-9./-]+$.",
-            "minLength": 1,
-            "maxLength": 50,
-            "example": "FAC-0042"
-          },
-          "fechaEmision": {
-            "type": "string",
-            "description": "Fecha de emisión del documento. Formato ISO 8601 (YYYY-MM-DD).",
-            "example": "2026-03-15"
-          },
-          "monto": {
-            "type": "string",
-            "description": "Monto del documento como string decimal. Para tipos tributarios no puede ser null (REQ-D-13). Se cruza como string para evitar pérdida IEEE-754 (CLAUDE.md §4.5).",
-            "example": "1250.50",
-            "nullable": true
-          },
-          "moneda": {
-            "type": "string",
-            "description": "Moneda del documento. BOB o USD.",
-            "enum": [
-              "BOB",
-              "USD"
-            ],
-            "nullable": true
-          },
-          "contactoId": {
-            "type": "string",
-            "description": "ID del contacto asociado al documento.",
-            "format": "uuid",
-            "nullable": true
-          },
-          "glosa": {
-            "type": "string",
-            "description": "Glosa o descripción libre del documento.",
-            "maxLength": 500,
-            "nullable": true
           }
         }
       },
