@@ -1,8 +1,19 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { GestionFiscalStatus } from '@prisma/client';
 
+import {
+  CierreEjercicioResponseDto,
+  toCierreEjercicioResponse,
+} from '@/cierre-ejercicio/dto/cierre-response.dto';
+import { CierreEjercicioService } from '@/cierre-ejercicio/cierre-ejercicio.service';
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { ForbiddenError } from '@/common/errors';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
@@ -39,7 +50,10 @@ function resolveTenantId(req: AuthenticatedRequest): string {
 @RequireModule('contabilidad')
 @Controller('gestiones')
 export class GestionesFiscalesController {
-  constructor(private readonly service: GestionesFiscalesService) {}
+  constructor(
+    private readonly service: GestionesFiscalesService,
+    private readonly cierreService: CierreEjercicioService,
+  ) {}
 
   @Post()
   @RequirePermissions('contabilidad.gestiones.create')
@@ -93,5 +107,42 @@ export class GestionesFiscalesController {
   ): Promise<GestionResponseDto> {
     const gestion = await this.service.cerrar(id, resolveTenantId(req), req.user.sub);
     return toGestionResponse(gestion);
+  }
+
+  // Cierre del ejercicio (Ley 843 art. 46): genera/consulta los ≤3 comprobantes
+  // tipo CIERRE de la gestión. Reusa el permiso `gestiones.cerrar` (generar el
+  // cierre ES parte de cerrar la gestión); el GET usa `gestiones.read`. El módulo
+  // `contabilidad` ya está exigido a nivel de clase (@RequireModule).
+  @Post(':id/cierre')
+  @RequirePermissions('contabilidad.gestiones.cerrar')
+  @ApiOperation({
+    summary:
+      'Generar (o regenerar) los comprobantes de cierre del ejercicio de la gestión, en BORRADOR no-editable.',
+  })
+  @ApiCreatedResponse({ type: CierreEjercicioResponseDto })
+  async generarCierre(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<CierreEjercicioResponseDto> {
+    const resultado = await this.cierreService.generarCierre(
+      id,
+      resolveTenantId(req),
+      req.user.sub,
+    );
+    return toCierreEjercicioResponse(resultado);
+  }
+
+  @Get(':id/cierre')
+  @RequirePermissions('contabilidad.gestiones.read')
+  @ApiOperation({
+    summary: 'Consultar el estado de los comprobantes de cierre del ejercicio (preview).',
+  })
+  @ApiOkResponse({ type: CierreEjercicioResponseDto })
+  async obtenerCierre(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<CierreEjercicioResponseDto> {
+    const resultado = await this.cierreService.obtenerEstadoCierre(id, resolveTenantId(req));
+    return toCierreEjercicioResponse(resultado);
   }
 }

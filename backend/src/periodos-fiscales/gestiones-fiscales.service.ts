@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { GestionFiscal, GestionFiscalStatus } from '@prisma/client';
+import { EstadoComprobante, GestionFiscal, GestionFiscalStatus } from '@prisma/client';
 
+import { CierreEjercicioService } from '@/cierre-ejercicio/cierre-ejercicio.service';
+import { CierreYaParcialmenteContabilizadoError } from '@/cierre-ejercicio/domain/cierre-errors';
 import { CLOCK_PORT, ClockPort } from '@/common/clock';
 import { calcularMesInicio } from '@/common/domain/cierre-fiscal-por-tipo-empresa';
 import { PrismaService } from '@/common/prisma.service';
@@ -34,6 +36,7 @@ export class GestionesFiscalesService {
     private readonly repo: GestionFiscalRepositoryPort,
     @Inject(CLOCK_PORT) private readonly clock: ClockPort,
     private readonly prisma: PrismaService,
+    private readonly cierreEjercicio: CierreEjercicioService,
   ) {}
 
   async crear(tenantId: string, year: number): Promise<GestionConPeriodos> {
@@ -105,6 +108,17 @@ export class GestionesFiscalesService {
             orden: p.ordenEnGestion,
           })),
         );
+      }
+
+      // REQ-GF-CIERRE-01: si la gestión tiene comprobantes de cierre generados,
+      // todos deben estar CONTABILIZADO antes de cerrar la gestión. `cerrar()` NO
+      // genera los asientos de cierre (eso es POST /gestiones/:id/cierre); solo
+      // exige que el cierre que se haya generado esté completamente contabilizado.
+      // Si no se generó ningún cierre (ej. gestión sin INGRESO/EGRESO) → no se exige.
+      const { cierres } = await this.cierreEjercicio.obtenerEstadoCierre(id, tenantId);
+      const hayPendiente = cierres.some((c) => c.estado !== EstadoComprobante.CONTABILIZADO);
+      if (cierres.length > 0 && hayPendiente) {
+        throw new CierreYaParcialmenteContabilizadoError(id);
       }
 
       return this.repo.cerrarGestion(tx, id, tenantId, userId);
