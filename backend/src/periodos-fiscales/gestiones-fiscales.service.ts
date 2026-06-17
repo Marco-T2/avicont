@@ -116,7 +116,11 @@ export class GestionesFiscalesService {
       // exige que el cierre que se haya generado esté completamente contabilizado.
       // Si no se generó ningún cierre (ej. gestión sin INGRESO/EGRESO) → no se exige.
       const { cierres } = await this.cierreEjercicio.obtenerEstadoCierre(id, tenantId);
-      const hayPendiente = cierres.some((c) => c.estado !== EstadoComprobante.CONTABILIZADO);
+      // Solo BORRADOR cuenta como pendiente: CONTABILIZADO y BLOQUEADO son estados
+      // posteados. Al cerrar los 12 períodos (requisito de arriba), el mesCierre que
+      // contiene los asientos pasa a BLOQUEADO — exigir CONTABILIZADO estricto haría
+      // la gestión incerrable. Misma polaridad que generarCierre (`!== BORRADOR`).
+      const hayPendiente = cierres.some((c) => c.estado === EstadoComprobante.BORRADOR);
       if (cierres.length > 0 && hayPendiente) {
         throw new CierreYaParcialmenteContabilizadoError(id);
       }
