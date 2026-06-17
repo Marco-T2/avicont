@@ -158,8 +158,12 @@ export class CierreEjercicioService {
    * Preview / seguimiento: devuelve los comprobantes de cierre existentes de la
    * gestión sin generarlos. REQ-CE-01 (GET).
    */
-  async obtenerEstadoCierre(gestionId: string, tenantId: string): Promise<ResultadoCierre> {
-    const gestion = await this.gestionReader.obtenerParaCierre(gestionId, tenantId);
+  async obtenerEstadoCierre(
+    gestionId: string,
+    tenantId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ResultadoCierre> {
+    const gestion = await this.gestionReader.obtenerParaCierre(gestionId, tenantId, tx);
     if (gestion === null) {
       throw new CierreGestionNoEncontradaError(gestionId);
     }

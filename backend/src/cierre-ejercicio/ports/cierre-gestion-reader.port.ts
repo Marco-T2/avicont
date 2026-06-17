@@ -4,7 +4,7 @@
 // gate de períodos (REQ-CE-10) y los comprobantes de cierre ya existentes (para
 // la idempotencia REQ-CE-09).
 
-import type { EstadoComprobante, GestionFiscalStatus } from '@prisma/client';
+import type { EstadoComprobante, GestionFiscalStatus, Prisma } from '@prisma/client';
 
 export const CIERRE_GESTION_READER_PORT = Symbol('CIERRE_GESTION_READER_PORT');
 
@@ -57,5 +57,6 @@ export abstract class CierreGestionReaderPort {
   abstract obtenerParaCierre(
     gestionId: string,
     tenantId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<GestionParaCierre | null>;
 }

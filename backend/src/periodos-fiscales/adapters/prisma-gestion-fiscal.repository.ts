@@ -26,8 +26,13 @@ export class PrismaGestionFiscalRepository
     });
   }
 
-  findByIdWithPeriodos(id: string, organizationId: string): Promise<GestionConPeriodos | null> {
-    return this.prisma.gestionFiscal.findFirst({
+  findByIdWithPeriodos(
+    id: string,
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GestionConPeriodos | null> {
+    const client = tx ?? this.prisma;
+    return client.gestionFiscal.findFirst({
       where: { id, organizationId },
       include: { periodos: { orderBy: { ordenEnGestion: 'asc' } } },
     });

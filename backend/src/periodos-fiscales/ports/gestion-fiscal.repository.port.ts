@@ -22,6 +22,7 @@ export abstract class GestionFiscalRepositoryPort {
   abstract findByIdWithPeriodos(
     id: string,
     organizationId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<GestionConPeriodos | null>;
 
   abstract listByOrganization(
