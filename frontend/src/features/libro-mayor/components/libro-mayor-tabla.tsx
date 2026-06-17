@@ -14,7 +14,7 @@ import {
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { cn } from '@/lib/utils';
 import type { CuentaLibroMayor } from '@/types/api';
-import { formatearMontoBob } from '../lib/formatear-monto-bob';
+import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 
 // ============================================================
 // Props

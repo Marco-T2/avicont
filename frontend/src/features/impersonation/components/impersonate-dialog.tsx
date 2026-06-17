@@ -98,6 +98,7 @@ export function ImpersonateDialog({
             <Textarea
               id="reason"
               rows={3}
+              className="w-full max-w-full resize-y [field-sizing:fixed] min-h-[80px]"
               placeholder="Soporte: usuario reporta no ver comprobantes de marzo"
               aria-invalid={errors.reason !== undefined}
               {...register('reason')}
