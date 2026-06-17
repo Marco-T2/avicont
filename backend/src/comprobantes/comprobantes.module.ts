@@ -12,12 +12,14 @@ import { PacksModule } from '@/packs/pack.module';
 
 import { MinioStorageAdapter } from './adapters/minio-storage.adapter';
 import { PrismaAdjuntoComprobanteRepository } from './adapters/prisma-adjunto-comprobante.repository';
+import { PrismaCierreComprobanteWriterAdapter } from './adapters/prisma-cierre-comprobante-writer.adapter';
 import { PrismaComprobanteRepository } from './adapters/prisma-comprobante.repository';
 import { PrismaSecuenciaComprobanteAdapter } from './adapters/prisma-secuencia-comprobante';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
 import { ADJUNTO_COMPROBANTE_REPOSITORY_PORT } from './ports/adjunto-comprobante.repository.port';
+import { CIERRE_COMPROBANTE_WRITER_PORT } from './ports/cierre-comprobante-writer.port';
 import { COMPROBANTE_REPOSITORY_PORT } from './ports/comprobante.repository.port';
 import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
 import { STORAGE_PORT } from './ports/storage.port';
@@ -78,7 +80,16 @@ import { STORAGE_PORT } from './ports/storage.port';
       provide: ADJUNTO_COMPROBANTE_REPOSITORY_PORT,
       useExisting: PrismaAdjuntoComprobanteRepository,
     },
+
+    // Path-sistema de escritura de comprobantes de cierre (REQ-CMP-SYS-03).
+    // Lo consume el módulo `cierre-ejercicio` para crear/regenerar los 3
+    // comprobantes de cierre con `generadoPorSistema=true`.
+    PrismaCierreComprobanteWriterAdapter,
+    {
+      provide: CIERRE_COMPROBANTE_WRITER_PORT,
+      useExisting: PrismaCierreComprobanteWriterAdapter,
+    },
   ],
-  exports: [ComprobantesService],
+  exports: [ComprobantesService, CIERRE_COMPROBANTE_WRITER_PORT],
 })
 export class ComprobantesModule {}

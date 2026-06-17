@@ -836,6 +836,7 @@ describe('tipoCambioReexpresion — PATCH integration (W-1)', () => {
       mockConfig as never,
       null as never, // storagePort — no usado en editarContabilizado
       null as never, // adjuntoRepo — no usado en editarContabilizado
+      { estaGestionCerradaPorPeriodo: jest.fn().mockResolvedValue(false) } as never, // gestionStatus — no alcanzado en editarContabilizado
     );
 
     // Act & Assert: PATCH con TCR en período cerrado → error de period-lock (§4.4).
