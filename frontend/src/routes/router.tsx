@@ -38,6 +38,8 @@ import { PlatformHomePage } from '@/features/platform-admin/pages/platform-home-
 import { OrgsPage } from '@/features/platform-admin/pages/orgs-page';
 import { FeatureFlagsPage } from '@/features/platform-admin/pages/feature-flags-page';
 import { OrgMembersPage } from '@/features/platform-admin/pages/org-members-page';
+import { CierreEjercicioPage } from '@/features/cierre-ejercicio/pages/cierre-ejercicio-page';
+import { CierreGestionActivaRedirect } from '@/features/cierre-ejercicio/components/cierre-gestion-activa-redirect';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -160,6 +162,24 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.eeff.read}>
                 <FlujoEfectivoPage />
+              </RequirePermission>
+            ),
+          },
+          // IMPORTANTE: la ruta estática /gestiones/cierre va ANTES de /gestiones/:id/cierre
+          // (con param) para evitar que React Router interprete 'cierre' como :id.
+          {
+            path: '/gestiones/cierre',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.gestiones.read}>
+                <CierreGestionActivaRedirect />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/gestiones/:id/cierre',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.gestiones.read}>
+                <CierreEjercicioPage />
               </RequirePermission>
             ),
           },

@@ -115,6 +115,10 @@ export function mensajePeriodosFiscales(err: unknown): string {
       return 'El motivo debe tener al menos 20 caracteres.';
     case 'PERIODO_CON_BORRADORES':
       return 'Hay comprobantes en borrador. Contabilizalos o eliminalos antes de cerrar.';
+    // REQ-CEF-11: mismo code que lanza cerrar() de gestión cuando hay cierres pendientes.
+    // El mensaje guía al contador hacia la pantalla de cierre del ejercicio.
+    case 'CIERRE_EJERCICIO_PARCIALMENTE_CONTABILIZADO':
+      return 'Hay asientos de cierre pendientes de contabilizar. Ir a "Cierre del ejercicio" para completarlos.';
     default:
       return p.message ?? FALLBACK_GENERICO;
   }
@@ -276,6 +280,30 @@ export function mensajeDocumentosFisicos(err: unknown): string {
       return 'El tipo de documento seleccionado no existe o fue desactivado.';
     case 'CONTACTO_NO_ENCONTRADO':
       return 'El contacto seleccionado no existe en esta organización.';
+    default:
+      return p.message ?? FALLBACK_GENERICO;
+  }
+}
+
+// ============================================================
+// Cierre del ejercicio — mapping de los 6 códigos CIERRE_EJERCICIO_*.
+// ============================================================
+
+export function mensajeCierreEjercicio(err: unknown): string {
+  const p = extractBackendError(err);
+  switch (p.code) {
+    case 'CIERRE_EJERCICIO_PERIODO_NO_LISTO':
+      return 'No todos los períodos anteriores están cerrados o el período de cierre no está abierto.';
+    case 'CIERRE_EJERCICIO_GESTION_YA_CERRADA':
+      return 'La gestión ya está cerrada.';
+    case 'CIERRE_EJERCICIO_PARCIALMENTE_CONTABILIZADO':
+      return 'No se puede regenerar: al menos un asiento de cierre ya está contabilizado.';
+    case 'CIERRE_EJERCICIO_SIN_MOVIMIENTO':
+      return 'La gestión no tiene cuentas de resultado con movimiento.';
+    case 'CIERRE_EJERCICIO_CUENTA_DESTINO_FALTANTE':
+      return 'Falta configurar la cuenta de resultado del ejercicio en Configuración contable.';
+    case 'CIERRE_EJERCICIO_GESTION_NO_ENCONTRADA':
+      return 'No se encontró la gestión solicitada.';
     default:
       return p.message ?? FALLBACK_GENERICO;
   }
