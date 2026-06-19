@@ -10,34 +10,23 @@ const fechaContableZod = z
 /**
  * Schema del formulario de filtros del Estado de Flujo de Efectivo (EFE).
  *
- * Dos modos mutuamente excluyentes:
- * (a) modo: 'periodo' + periodoFiscalId → el backend deriva el mes completo.
- * (b) modo: 'rango'   + fechaDesde + fechaHasta (fechaDesde ≤ fechaHasta).
+ * Contrato simplificado: siempre rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * (gestión, mes, rango personalizado) a un `RangoFechas { fechaDesde, fechaHasta }`
+ * antes de emitir. Ya no existe el modo 'periodo' con periodoFiscalId.
  *
  * Sin `gestionId` — el endpoint del EFE no lo expone (a diferencia del EEPN).
  * `incluirAnulados` es opcional en el input y resuelve a `false`.
  */
-const togglesShape = {
-  incluirAnulados: z.boolean().optional().default(false),
-};
-
-export const flujoEfectivoFiltroSchema = z.discriminatedUnion('modo', [
-  z.object({
-    modo: z.literal('periodo'),
-    periodoFiscalId: z.string().min(1, 'El período fiscal es obligatorio'),
-    ...togglesShape,
-  }),
-  z
-    .object({
-      modo: z.literal('rango'),
-      fechaDesde: fechaContableZod,
-      fechaHasta: fechaContableZod,
-      ...togglesShape,
-    })
-    .refine((d) => d.fechaDesde <= d.fechaHasta, {
-      message: 'La fecha de inicio no puede ser posterior a la fecha final',
-      path: ['fechaHasta'],
-    }),
-]);
+export const flujoEfectivoFiltroSchema = z
+  .object({
+    fechaDesde: fechaContableZod,
+    fechaHasta: fechaContableZod,
+    incluirAnulados: z.boolean().optional().default(false),
+  })
+  .refine((d) => d.fechaDesde <= d.fechaHasta, {
+    message: 'La fecha de inicio no puede ser posterior a la fecha final',
+    path: ['fechaHasta'],
+  });
 
 export type FlujoEfectivoFiltroValues = z.output<typeof flujoEfectivoFiltroSchema>;

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PeriodoFiscalStatus } from '@prisma/client';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
@@ -45,6 +45,7 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Listar períodos fiscales (filtros: gestionId, status)',
   })
+  @ApiOkResponse({ type: [PeriodoFiscalResponseDto] })
   async listar(
     @Req() req: AuthenticatedRequest,
     @Query('gestionId') gestionId?: string,
@@ -60,6 +61,7 @@ export class PeriodosFiscalesController {
   @Get(':id')
   @RequirePermissions('contabilidad.periodos.read')
   @ApiOperation({ summary: 'Detalle de un período fiscal' })
+  @ApiOkResponse({ type: PeriodoFiscalResponseDto })
   async obtener(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -83,6 +85,7 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Cerrar período fiscal (valida 0 borradores; bloquea los CONTABILIZADO).',
   })
+  @ApiOkResponse({ type: PeriodoFiscalResponseDto })
   async cerrar(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -96,6 +99,7 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Reabrir período cerrado (solo OWNER/ADMIN, motivo ≥20 chars, auditado).',
   })
+  @ApiOkResponse({ type: PeriodoFiscalResponseDto })
   async reabrir(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -111,6 +115,7 @@ export class PeriodosFiscalesController {
   @ApiOperation({
     summary: 'Marcar período cerrado como definitivo (solo OWNER, irreversible).',
   })
+  @ApiOkResponse({ type: PeriodoFiscalResponseDto })
   async marcarDefinitivo(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,

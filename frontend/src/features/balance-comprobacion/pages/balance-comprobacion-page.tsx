@@ -21,11 +21,25 @@ import type { BalanceComprobacionFiltroValues } from '../schemas/balance-comprob
  * `BalanceComprobacionFiltros` lo emite vía onBuscar, la tabla lo consume.
  */
 export function BalanceComprobacionPage(): React.JSX.Element {
-  const [filtros, setFiltros] = useState<BalanceComprobacionFiltroValues | null>(null);
+  const [params, setParams] = useState<BalanceComprobacionFiltroValues>({
+    fechaDesde: '',
+    fechaHasta: '',
+    incluirAnulados: false,
+  });
 
-  const { data, isLoading, isFetching, isError } = useBalanceComprobacion(filtros);
+  const { data, isLoading, isFetching, isError } = useBalanceComprobacion(
+    params.fechaDesde && params.fechaHasta ? params : null,
+  );
   // Cross-feature: perfil fiscal para la cabecera del export a Excel.
   const { data: empresa } = useEmpresa();
+
+  function handleBuscar(values: BalanceComprobacionFiltroValues): void {
+    setParams(values);
+  }
+
+  // tieneParams: truthy check sobre las fechas (string no vacío).
+  // Evita el bug donde undefined !== undefined daba false pero string vacío pasaba.
+  const tieneParams = Boolean(params.fechaDesde && params.fechaHasta);
 
   // Rango para el nombre del archivo: usa las fechas resueltas del response.
   const rango: string =
@@ -47,18 +61,22 @@ export function BalanceComprobacionPage(): React.JSX.Element {
       </div>
 
       <div className="rounded-lg border bg-card p-4">
-        <BalanceComprobacionFiltros onBuscar={setFiltros} isFetching={isFetching} />
+        <BalanceComprobacionFiltros onBuscar={handleBuscar} isFetching={isFetching} />
       </div>
 
-      {filtros === null ? (
+      {/* Tabla — solo se muestra si hay params activos */}
+      {tieneParams && (
+        <BalanceComprobacionTabla data={data} isLoading={isLoading} isError={isError} />
+      )}
+
+      {/* Estado inicial: sin búsqueda activa */}
+      {!tieneParams && (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed">
           <p className="text-sm text-muted-foreground">
             Elegí un período o rango de fechas y presioná{' '}
             <span className="font-medium">Consultar</span> para ver el Balance de Comprobación.
           </p>
         </div>
-      ) : (
-        <BalanceComprobacionTabla data={data} isLoading={isLoading} isError={isError} />
       )}
     </div>
   );

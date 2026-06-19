@@ -249,6 +249,19 @@ describe('PeriodosFiscales (e2e)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(12);
+
+    // Verificar que todos los períodos incluyen fechaInicio y fechaFin en formato YYYY-MM-DD
+    for (const p of res.body as Array<{ fechaInicio: string; fechaFin: string }>) {
+      expect(p.fechaInicio).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(p.fechaFin).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+
+    // Verificar el período de enero (empresa COMERCIAL: mesInicio=1)
+    const enero = (res.body as Array<{ month: number; fechaInicio: string; fechaFin: string }>).find(
+      (p) => p.month === 1,
+    );
+    expect(enero?.fechaInicio).toBe('2026-01-01');
+    expect(enero?.fechaFin).toBe('2026-01-31');
   });
 
   it('GET /periodos/:id/resumen-precierre sobre período vacío devuelve ceros y puedeCerrar=true', async () => {

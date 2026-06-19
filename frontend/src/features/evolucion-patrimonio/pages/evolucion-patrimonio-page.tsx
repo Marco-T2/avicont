@@ -48,7 +48,7 @@ export function EvolucionPatrimonioPage(): React.JSX.Element {
       {filtros === null ? (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed">
           <p className="text-sm text-muted-foreground">
-            Elegí un rango de fechas (o un período) y presioná{' '}
+            Elegí un rango de fechas y presioná{' '}
             <span className="font-medium">Consultar</span> para ver la Evolución del Patrimonio.
           </p>
         </div>

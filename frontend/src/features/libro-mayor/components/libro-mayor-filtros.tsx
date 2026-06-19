@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import {
   PeriodoGestionFiltro,
-  type PeriodoSeleccion,
+  type RangoFechas,
 } from '@/components/shared/periodo-gestion-filtro';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,10 +31,9 @@ interface LibroMayorFiltrosProps {
 /**
  * Panel de filtros del Libro Mayor.
  *
- * El período se elige con `<PeriodoGestionFiltro>` (Gestión + Mes, con opción
- * "Todos" → rango de toda la gestión, y un toggle de rango personalizado). La
- * selección resuelta (`PeriodoSeleccion`) se mapea al payload XOR período/rango
- * de `LibroMayorFiltroValues` SIN cambiar el contrato que recibe la page.
+ * El período se elige con `<PeriodoGestionFiltro>` (presets: esta gestión,
+ * gestión anterior, este mes, mes anterior, personalizado). El componente
+ * compartido siempre emite un `RangoFechas { fechaDesde, fechaHasta }`.
  *
  * Toggles propios que conserva: "Incluir anulados" (REQ-LM-03), "Solo con
  * movimiento" (REQ-LM-08, default activado) y la cuenta opcional
@@ -45,8 +44,8 @@ export function LibroMayorFiltros({
   onBuscar,
   isFetching = false,
 }: LibroMayorFiltrosProps): React.JSX.Element {
-  // La selección de período la resuelve PeriodoGestionFiltro y la emite por onChange.
-  const [seleccion, setSeleccion] = useState<PeriodoSeleccion | null>(null);
+  // El componente compartido emite RangoFechas; lo guardamos en estado local.
+  const [seleccion, setSeleccion] = useState<RangoFechas | null>(null);
   const [incluirAnulados, setIncluirAnulados] = useState(false);
   const [soloConMovimiento, setSoloConMovimiento] = useState(true);
   const [cuentaId, setCuentaId] = useState('');
@@ -58,15 +57,12 @@ export function LibroMayorFiltros({
       return;
     }
 
-    if (seleccion.modo === 'rango' && (seleccion.fechaDesde === '' || seleccion.fechaHasta === '')) {
+    if (seleccion.fechaDesde === '' || seleccion.fechaHasta === '') {
       setError('Completá las fechas del rango');
       return;
     }
 
-    if (
-      seleccion.modo === 'rango' &&
-      seleccion.fechaDesde > seleccion.fechaHasta
-    ) {
+    if (seleccion.fechaDesde > seleccion.fechaHasta) {
       setError('La fecha final no puede ser anterior a la fecha inicial');
       return;
     }
@@ -79,28 +75,18 @@ export function LibroMayorFiltros({
       ...(cuentaId !== '' ? { cuentaId } : {}),
     };
 
-    if (seleccion.modo === 'periodo') {
-      onBuscar({
-        modo: 'periodo',
-        periodoFiscalId: seleccion.periodoFiscalId,
-        ...togglesYCuenta,
-      });
-    } else {
-      onBuscar({
-        modo: 'rango',
-        fechaDesde: seleccion.fechaDesde,
-        fechaHasta: seleccion.fechaHasta,
-        ...togglesYCuenta,
-      });
-    }
+    onBuscar({
+      fechaDesde: seleccion.fechaDesde,
+      fechaHasta: seleccion.fechaHasta,
+      ...togglesYCuenta,
+    });
   }
 
   return (
     <div className="space-y-4">
       <PeriodoGestionFiltro
-        value={seleccion}
-        onChange={(sel) => {
-          setSeleccion(sel);
+        onChange={(r) => {
+          setSeleccion(r);
           setError(undefined);
         }}
         error={error}

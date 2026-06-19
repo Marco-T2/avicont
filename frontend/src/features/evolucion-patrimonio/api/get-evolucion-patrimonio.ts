@@ -6,26 +6,20 @@ import type { EvolucionPatrimonioFiltroValues } from '../schemas/evolucion-patri
 /**
  * GET /api/eeff/evolucion-patrimonio — Estado de Evolución del Patrimonio Neto.
  *
- * El rango se envía en exactamente uno de los dos modos (mutuamente excluyentes):
- * `periodoFiscalId` O `fechaDesde`+`fechaHasta`. El service del backend resuelve
- * el rango con prioridad fechas > período > gestión.
+ * El filtro siempre es un rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * (gestión, mes, rango personalizado) a un rango antes de emitir —
+ * el wire nunca recibe periodoFiscalId.
  */
 export async function getEvolucionPatrimonio(
   filtros: EvolucionPatrimonioFiltroValues,
 ): Promise<EvolucionPatrimonioResponse> {
-  const params: Record<string, string | boolean> = {
-    incluirAnulados: filtros.incluirAnulados,
-  };
-
-  if (filtros.modo === 'periodo') {
-    params.periodoFiscalId = filtros.periodoFiscalId;
-  } else {
-    params.fechaDesde = filtros.fechaDesde;
-    params.fechaHasta = filtros.fechaHasta;
-  }
-
   const res = await api.get<EvolucionPatrimonioResponse>('/api/eeff/evolucion-patrimonio', {
-    params,
+    params: {
+      fechaDesde: filtros.fechaDesde,
+      fechaHasta: filtros.fechaHasta,
+      incluirAnulados: filtros.incluirAnulados,
+    },
   });
   return res.data;
 }

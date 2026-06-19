@@ -45,15 +45,16 @@ export function FlujoEfectivoPage(): React.JSX.Element {
         <FlujoEfectivoFiltros onBuscar={setFiltros} isFetching={isFetching} />
       </div>
 
-      {filtros === null ? (
+      {/* tieneParams: truthy check sobre las fechas (string no vacío). */}
+      {(filtros?.fechaDesde && filtros?.fechaHasta) ? (
+        <FlujoEfectivoTabla data={data} isLoading={isLoading} isError={isError} />
+      ) : (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed">
           <p className="text-sm text-muted-foreground">
             Elegí un rango de fechas (o un período) y presioná{' '}
             <span className="font-medium">Consultar</span> para ver el Flujo de Efectivo.
           </p>
         </div>
-      ) : (
-        <FlujoEfectivoTabla data={data} isLoading={isLoading} isError={isError} />
       )}
     </div>
   );

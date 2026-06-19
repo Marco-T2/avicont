@@ -2208,6 +2208,43 @@ export interface components {
             /** @description Comprobantes de cierre de la gestión (≤3). En generación recién creados están en BORRADOR. */
             cierres: components["schemas"]["CierreComprobanteResponseDto"][];
         };
+        PeriodoFiscalResponseDto: {
+            id: string;
+            gestionId: string;
+            /** @example 2026 */
+            year: number;
+            /**
+             * @description 1-12 (mes calendario real)
+             * @example 4
+             */
+            month: number;
+            /**
+             * @description 1-12 (posición en la gestión)
+             * @example 1
+             */
+            ordenEnGestion: number;
+            /** @enum {string} */
+            status: "ABIERTO" | "CERRADO";
+            /** @description Marcado manualmente; un período definitivo no se puede reabrir. */
+            esDefinitivo: boolean;
+            /** @example 2026-05-03T10:15:00.000Z */
+            closedAt: string | null;
+            closedByUserId: string | null;
+            /**
+             * @description Primer día del mes calendario (YYYY-MM-DD, §4.6)
+             * @example 2026-04-01
+             */
+            fechaInicio: string;
+            /**
+             * @description Último día del mes calendario (YYYY-MM-DD, §4.6)
+             * @example 2026-04-30
+             */
+            fechaFin: string;
+            /** @example 2026-01-01T00:00:00.000Z */
+            createdAt: string;
+            /** @example 2026-01-01T00:00:00.000Z */
+            updatedAt: string;
+        };
         ReabrirPeriodoDto: {
             /**
              * @description Razón documentada de la reapertura. Queda en el log permanente (PeriodoFiscalReopening). Mínimo 20 caracteres.
@@ -4744,7 +4781,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PeriodoFiscalResponseDto"][];
+                };
             };
         };
     };
@@ -4763,7 +4802,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PeriodoFiscalResponseDto"];
+                };
             };
         };
     };
@@ -4797,11 +4838,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PeriodoFiscalResponseDto"];
+                };
             };
         };
     };
@@ -4820,11 +4863,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PeriodoFiscalResponseDto"];
+                };
             };
         };
     };
@@ -4839,11 +4884,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PeriodoFiscalResponseDto"];
+                };
             };
         };
     };

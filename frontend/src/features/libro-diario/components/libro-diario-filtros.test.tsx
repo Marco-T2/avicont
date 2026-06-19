@@ -2,12 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  Cuenta,
-  CuentaListResponse,
-  Gestion,
-  Periodo,
-} from '@/types/api';
+import type { Cuenta, CuentaListResponse } from '@/types/api';
+import type { RangoFechas } from '@/components/shared/periodo-gestion-filtro';
 
 import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
 
@@ -20,19 +16,54 @@ function makeOnBuscar() {
   return { fn, calls };
 }
 
-// Mock de hooks cross-feature que requiere el componente (directa o indirectamente).
-vi.mock('@/features/periodos-fiscales/hooks/use-gestiones', () => ({
-  useGestiones: vi.fn(),
+// ============================================================
+// Mock del componente compartido PeriodoGestionFiltro.
+// Lo reemplazamos con un botón que el test puede usar para emitir
+// un RangoFechas determinista vía el prop onChange.
+// ============================================================
+let capturedOnChange: ((rango: RangoFechas) => void) | null = null;
+
+vi.mock('@/components/shared/periodo-gestion-filtro', () => ({
+  PeriodoGestionFiltro: (props: {
+    onChange: (rango: RangoFechas) => void;
+    error?: string;
+  }) => {
+    capturedOnChange = props.onChange;
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="mock-emitir-rango"
+          onClick={() =>
+            props.onChange({ fechaDesde: '2026-01-01', fechaHasta: '2026-12-31' })
+          }
+        >
+          Emitir rango por defecto
+        </button>
+        {props.error !== undefined && (
+          <p data-testid="periodo-error">{props.error}</p>
+        )}
+      </div>
+    );
+  },
 }));
-vi.mock('@/features/periodos-fiscales/hooks/use-periodos', () => ({
-  usePeriodos: vi.fn(),
-}));
+
+// Mock de CuentaAutocomplete (cross-feature).
 vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
   useCuentas: vi.fn(),
 }));
+vi.mock('@/features/comprobantes/components/cuenta-autocomplete', () => ({
+  CuentaAutocomplete: (props: { onChange: (id: string) => void; placeholder: string }) => (
+    <button
+      type="button"
+      data-testid="mock-cuenta-autocomplete"
+      onClick={() => props.onChange('cuenta-uuid-1')}
+    >
+      {props.placeholder}
+    </button>
+  ),
+}));
 
-import { useGestiones } from '@/features/periodos-fiscales/hooks/use-gestiones';
-import { usePeriodos } from '@/features/periodos-fiscales/hooks/use-periodos';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
 import { LibroDiarioFiltros } from './libro-diario-filtros';
@@ -40,39 +71,6 @@ import { LibroDiarioFiltros } from './libro-diario-filtros';
 // ============================================================
 // Fixtures
 // ============================================================
-
-function buildGestion(overrides: Partial<Gestion> = {}): Gestion {
-  return {
-    id: 'g-2026',
-    year: 2026,
-    mesInicio: 1,
-    status: 'ABIERTA',
-    closedAt: null,
-    closedByUserId: null,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...overrides,
-  };
-}
-
-function buildPeriodo(overrides: Partial<Periodo> = {}): Periodo {
-  return {
-    id: 'p-2026-05',
-    gestionId: 'g-2026',
-    year: 2026,
-    month: 5,
-    ordenEnGestion: 5,
-    status: 'ABIERTO',
-    esDefinitivo: false,
-    closedAt: null,
-    closedByUserId: null,
-    fechaInicio: '2026-05-01',
-    fechaFin: '2026-05-31',
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-    ...overrides,
-  };
-}
 
 function makeCuenta(overrides: Partial<Cuenta>): Cuenta {
   return {
@@ -101,55 +99,14 @@ function makeCuenta(overrides: Partial<Cuenta>): Cuenta {
   };
 }
 
-const PERIODO_ENE = buildPeriodo({
-  id: 'p-ene',
-  month: 1,
-  ordenEnGestion: 1,
-  fechaInicio: '2026-01-01',
-  fechaFin: '2026-01-31',
-});
-const PERIODO_MAYO = buildPeriodo({
-  id: 'p-mayo',
-  month: 5,
-  ordenEnGestion: 5,
-  fechaInicio: '2026-05-01',
-  fechaFin: '2026-05-31',
-});
-const PERIODO_DIC = buildPeriodo({
-  id: 'p-dic',
-  month: 12,
-  ordenEnGestion: 12,
-  fechaInicio: '2026-12-01',
-  fechaFin: '2026-12-31',
-});
-
-const CUENTA_CAJA = makeCuenta({
-  id: 'cuenta-uuid-1',
-  codigoInterno: '1.1.01',
-  nombre: 'Caja Chica',
-});
-const CUENTA_BANCO = makeCuenta({
-  id: 'cuenta-uuid-2',
-  codigoInterno: '1.1.02',
-  nombre: 'Banco BNB',
-});
-
 const mockCuentasResponse: CuentaListResponse = {
-  items: [CUENTA_CAJA, CUENTA_BANCO],
-  total: 2,
+  items: [makeCuenta({ id: 'cuenta-uuid-1', nombre: 'Caja Chica' })],
+  total: 1,
   page: 1,
   pageSize: 100,
 };
 
-function setupMocks(periodos: Periodo[] = [PERIODO_ENE, PERIODO_MAYO, PERIODO_DIC]): void {
-  (useGestiones as ReturnType<typeof vi.fn>).mockReturnValue({
-    data: [buildGestion()],
-    isLoading: false,
-  });
-  (usePeriodos as ReturnType<typeof vi.fn>).mockReturnValue({
-    data: periodos,
-    isLoading: false,
-  });
+function setupMocks(): void {
   (useCuentas as ReturnType<typeof vi.fn>).mockReturnValue({
     data: mockCuentasResponse,
     isLoading: false,
@@ -159,133 +116,174 @@ function setupMocks(periodos: Periodo[] = [PERIODO_ENE, PERIODO_MAYO, PERIODO_DI
 
 function renderFiltros(onBuscar = vi.fn()) {
   setupMocks();
+  capturedOnChange = null;
   return render(<LibroDiarioFiltros onBuscar={onBuscar} />);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  capturedOnChange = null;
 });
 
 // ============================================================
-// CuentaAutocomplete presente en el DOM
+// Renderizado básico
 // ============================================================
 
-describe('LibroDiarioFiltros — campo Cuenta (opcional)', () => {
-  it('renderiza el label "Cuenta (opcional)" visible en el formulario', () => {
+describe('LibroDiarioFiltros — renderizado', () => {
+  it('renderiza el label "Cuenta (opcional)"', () => {
     renderFiltros();
     expect(screen.getByText('Cuenta (opcional)')).toBeInTheDocument();
   });
 
-  it('renderiza el placeholder "Todas las cuentas" del autocomplete de cuenta', () => {
+  it('renderiza el placeholder "Todas las cuentas" del autocomplete', () => {
     renderFiltros();
     expect(screen.getByText('Todas las cuentas')).toBeInTheDocument();
+  });
+
+  it('renderiza el botón Consultar habilitado por defecto', () => {
+    renderFiltros();
+    const btn = screen.getByRole('button', { name: /consultar/i });
+    expect(btn).toBeInTheDocument();
+    expect(btn).not.toBeDisabled();
+  });
+
+  it('botón Consultar muestra "Consultando…" y está deshabilitado cuando isFetching=true', () => {
+    setupMocks();
+    render(<LibroDiarioFiltros onBuscar={vi.fn()} isFetching />);
+    const btn = screen.getByRole('button', { name: /consultando/i });
+    expect(btn).toBeDisabled();
   });
 });
 
 // ============================================================
-// Default: Gestión + "Todos" → onBuscar con rango de toda la gestión
+// Sin selección: error de validación
 // ============================================================
 
-describe('LibroDiarioFiltros — default Gestión + Todos', () => {
-  it('al consultar con el default (Todos) emite rango de toda la gestión + toggle default', async () => {
+describe('LibroDiarioFiltros — validación sin selección', () => {
+  it('consultar sin emitir rango previo muestra error y NO llama onBuscar', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    // NO emitimos rango desde el mock → seleccion === null
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    expect(onBuscar).not.toHaveBeenCalled();
+    expect(screen.getByTestId('periodo-error')).toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// Consultar con rango válido → emite fechaDesde/fechaHasta
+// ============================================================
+
+describe('LibroDiarioFiltros — consultar con rango válido', () => {
+  it('consultar tras emitir rango emite { fechaDesde, fechaHasta, incluirAnulados: false }', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
+    // Simular que PeriodoGestionFiltro emite un rango
+    await user.click(screen.getByTestId('mock-emitir-rango'));
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalledTimes(1);
     });
-    const llamada = calls[0];
-    expect(llamada).toEqual({
-      modo: 'rango',
+    expect(calls[0]).toEqual({
       fechaDesde: '2026-01-01',
       fechaHasta: '2026-12-31',
       incluirAnulados: false,
     });
-    expect(llamada?.cuentaId).toBeUndefined();
+    expect(calls[0]?.cuentaId).toBeUndefined();
   });
-});
 
-// ============================================================
-// Selección de un mes específico → modo periodo
-// ============================================================
-
-describe('LibroDiarioFiltros — mes específico', () => {
-  it('elegir un mes y consultar emite { modo: "periodo", periodoFiscalId }', async () => {
+  it('onBuscar emite cuentaId cuando se selecciona una cuenta', async () => {
     const user = userEvent.setup();
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
-    const mesTrigger = screen.getByRole('combobox', { name: /mes/i });
-    await user.click(mesTrigger);
-    await user.click(await screen.findByRole('option', { name: /mayo/i }));
+    // Emitir rango y seleccionar cuenta
+    await user.click(screen.getByTestId('mock-emitir-rango'));
+    await user.click(screen.getByTestId('mock-cuenta-autocomplete'));
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    expect(calls[calls.length - 1]?.cuentaId).toBe('cuenta-uuid-1');
+  });
+
+  it('onBuscar emite incluirAnulados: true cuando el toggle está activo', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar, calls } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    await user.click(screen.getByTestId('mock-emitir-rango'));
+    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    expect(calls[calls.length - 1]?.incluirAnulados).toBe(true);
+  });
+
+  it('emitir un nuevo rango limpia el error previo', async () => {
+    const user = userEvent.setup();
+    renderFiltros();
+
+    // Primero provocar el error
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+    expect(screen.getByTestId('periodo-error')).toBeInTheDocument();
+
+    // Luego emitir un rango → el error desaparece
+    await user.click(screen.getByTestId('mock-emitir-rango'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('periodo-error')).toBeNull();
+    });
+  });
+
+  it('consultar emite fechaDesde y fechaHasta (no periodoFiscalId)', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar, calls } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    await user.click(screen.getByTestId('mock-emitir-rango'));
+    await user.click(screen.getByRole('button', { name: /consultar/i }));
+
+    await waitFor(() => {
+      expect(onBuscar).toHaveBeenCalled();
+    });
+    const llamada = calls[0];
+    expect(llamada).toHaveProperty('fechaDesde');
+    expect(llamada).toHaveProperty('fechaHasta');
+    expect(llamada).not.toHaveProperty('periodoFiscalId');
+    expect(llamada).not.toHaveProperty('modo');
+  });
+});
+
+// ============================================================
+// Rango personalizado emitido por el mock del componente compartido
+// ============================================================
+
+describe('LibroDiarioFiltros — rango personalizado via capturedOnChange', () => {
+  it('onChange capturado permite emitir cualquier rango personalizado', async () => {
+    const user = userEvent.setup();
+    const { fn: onBuscar, calls } = makeOnBuscar();
+    renderFiltros(onBuscar);
+
+    // Emitir rango personalizado directo vía la referencia capturada
+    expect(capturedOnChange).not.toBeNull();
+    capturedOnChange?.({ fechaDesde: '2026-03-01', fechaHasta: '2026-03-31' });
 
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
     await waitFor(() => {
       expect(onBuscar).toHaveBeenCalled();
     });
-    const llamada = calls[calls.length - 1];
-    expect(llamada).toMatchObject({
-      modo: 'periodo',
-      periodoFiscalId: 'p-mayo',
-      incluirAnulados: false,
-    });
-    expect(llamada?.cuentaId).toBeUndefined();
-  });
-});
-
-// ============================================================
-// Con cuenta seleccionada → onBuscar incluye cuentaId
-// ============================================================
-
-describe('LibroDiarioFiltros — con cuenta seleccionada', () => {
-  it('onBuscar incluye cuentaId cuando se seleccionó una cuenta', async () => {
-    const user = userEvent.setup();
-    const { fn: onBuscar, calls } = makeOnBuscar();
-    renderFiltros(onBuscar);
-
-    // Hay 3 comboboxes: gestión (0), mes (1) y cuenta (2). El de cuenta es el
-    // botón de CuentaAutocomplete (PopoverTrigger), que va último en el DOM.
-    const comboboxes = screen.getAllByRole('combobox');
-    const cuentaBtn = comboboxes[comboboxes.length - 1]!;
-    await user.click(cuentaBtn);
-    await user.click(await screen.findByText('Caja Chica'));
-
-    await user.click(screen.getByRole('button', { name: /consultar/i }));
-
-    await waitFor(() => {
-      expect(onBuscar).toHaveBeenCalled();
-    });
-    const llamada = calls[calls.length - 1];
-    expect(llamada?.cuentaId).toBe('cuenta-uuid-1');
-  });
-});
-
-// ============================================================
-// Rango personalizado → modo rango con fechas tipeadas
-// ============================================================
-
-describe('LibroDiarioFiltros — rango personalizado', () => {
-  it('toggle rango + fechas → onBuscar { modo: "rango", fechaDesde, fechaHasta }', async () => {
-    const user = userEvent.setup();
-    const { fn: onBuscar, calls } = makeOnBuscar();
-    renderFiltros(onBuscar);
-
-    await user.click(screen.getByLabelText(/rango de fechas personalizado/i));
-    await user.type(screen.getByLabelText(/^desde$/i), '2026-03-01');
-    await user.type(screen.getByLabelText(/^hasta$/i), '2026-03-31');
-
-    await user.click(screen.getByRole('button', { name: /consultar/i }));
-
-    await waitFor(() => {
-      expect(onBuscar).toHaveBeenCalled();
-    });
-    const llamada = calls[calls.length - 1];
-    expect(llamada).toMatchObject({
-      modo: 'rango',
+    expect(calls[calls.length - 1]).toMatchObject({
       fechaDesde: '2026-03-01',
       fechaHasta: '2026-03-31',
       incluirAnulados: false,

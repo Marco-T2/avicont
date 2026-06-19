@@ -1646,7 +1646,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PeriodoFiscalResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1675,7 +1685,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodoFiscalResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1732,8 +1749,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodoFiscalResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1771,8 +1795,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodoFiscalResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1800,8 +1831,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeriodoFiscalResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6279,6 +6317,84 @@
         "required": [
           "gestionId",
           "cierres"
+        ]
+      },
+      "PeriodoFiscalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "gestionId": {
+            "type": "string"
+          },
+          "year": {
+            "type": "number",
+            "example": 2026
+          },
+          "month": {
+            "type": "number",
+            "example": 4,
+            "description": "1-12 (mes calendario real)"
+          },
+          "ordenEnGestion": {
+            "type": "number",
+            "example": 1,
+            "description": "1-12 (posición en la gestión)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ABIERTO",
+              "CERRADO"
+            ]
+          },
+          "esDefinitivo": {
+            "type": "boolean",
+            "description": "Marcado manualmente; un período definitivo no se puede reabrir."
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-05-03T10:15:00.000Z"
+          },
+          "closedByUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fechaInicio": {
+            "type": "string",
+            "example": "2026-04-01",
+            "description": "Primer día del mes calendario (YYYY-MM-DD, §4.6)"
+          },
+          "fechaFin": {
+            "type": "string",
+            "example": "2026-04-30",
+            "description": "Último día del mes calendario (YYYY-MM-DD, §4.6)"
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "gestionId",
+          "year",
+          "month",
+          "ordenEnGestion",
+          "status",
+          "esDefinitivo",
+          "closedAt",
+          "closedByUserId",
+          "fechaInicio",
+          "fechaFin",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "ReabrirPeriodoDto": {

@@ -10,35 +10,24 @@ const fechaContableZod = z
 /**
  * Schema del formulario de filtros del Estado de Evolución del Patrimonio Neto.
  *
- * El reporte es anual por naturaleza, pero el endpoint acepta los dos modos
- * mutuamente excluyentes del resto de los EEFF:
- * (a) modo: 'periodo' + periodoFiscalId  → el backend deriva el mes completo.
- * (b) modo: 'rango'   + fechaDesde + fechaHasta (fechaDesde ≤ fechaHasta) →
- *     el modo natural para cubrir una gestión completa (01-ene a 31-dic).
+ * Contrato simplificado: siempre rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * (gestión, mes, rango personalizado) a un `RangoFechas { fechaDesde, fechaHasta }`
+ * antes de emitir. Ya no existe el modo 'periodo' con periodoFiscalId.
  *
- * `incluirAnulados` es opcional en el input y resuelve a `false`.
+ * `incluirAnulados` es opcional en el input (omitir = false). Esto permite
+ * parsear payloads sin el campo (ej. tests, constructores de params) y
+ * siempre devuelve boolean en el output via `.default(false)`.
  */
-const togglesShape = {
-  incluirAnulados: z.boolean().optional().default(false),
-};
-
-export const evolucionPatrimonioFiltroSchema = z.discriminatedUnion('modo', [
-  z.object({
-    modo: z.literal('periodo'),
-    periodoFiscalId: z.string().min(1, 'El período fiscal es obligatorio'),
-    ...togglesShape,
-  }),
-  z
-    .object({
-      modo: z.literal('rango'),
-      fechaDesde: fechaContableZod,
-      fechaHasta: fechaContableZod,
-      ...togglesShape,
-    })
-    .refine((d) => d.fechaDesde <= d.fechaHasta, {
-      message: 'La fecha de inicio no puede ser posterior al rango de fechas final',
-      path: ['fechaHasta'],
-    }),
-]);
+export const evolucionPatrimonioFiltroSchema = z
+  .object({
+    fechaDesde: fechaContableZod,
+    fechaHasta: fechaContableZod,
+    incluirAnulados: z.boolean().optional().default(false),
+  })
+  .refine((d) => d.fechaDesde <= d.fechaHasta, {
+    message: 'La fecha de inicio no puede ser posterior a la fecha final',
+    path: ['fechaHasta'],
+  });
 
 export type EvolucionPatrimonioFiltroValues = z.output<typeof evolucionPatrimonioFiltroSchema>;

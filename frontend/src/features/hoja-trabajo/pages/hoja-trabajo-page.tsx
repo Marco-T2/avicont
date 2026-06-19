@@ -21,11 +21,19 @@ import type { HojaTrabajoFiltroValues } from '../schemas/hoja-trabajo-filtro-sch
  * `HojaTrabajoFiltros` lo emite vía onBuscar, la tabla lo consume.
  */
 export function HojaTrabajoPage(): React.JSX.Element {
-  const [filtros, setFiltros] = useState<HojaTrabajoFiltroValues | null>(null);
+  const [params, setParams] = useState<HojaTrabajoFiltroValues | null>(null);
 
-  const { data, isLoading, isFetching, isError } = useHojaTrabajo(filtros);
+  const { data, isLoading, isFetching, isError } = useHojaTrabajo(params);
   // Cross-feature: perfil fiscal para la cabecera del export a Excel.
   const { data: empresa } = useEmpresa();
+
+  function handleBuscar(values: HojaTrabajoFiltroValues): void {
+    setParams(values);
+  }
+
+  // tieneParams: truthy check sobre las fechas (string no vacío).
+  // Evita el bug donde undefined !== undefined daba false pero string vacío pasaba.
+  const tieneParams = Boolean(params?.fechaDesde && params?.fechaHasta);
 
   // Rango para el nombre del archivo: usa las fechas resueltas del response.
   const rango: string =
@@ -48,18 +56,18 @@ export function HojaTrabajoPage(): React.JSX.Element {
       </div>
 
       <div className="rounded-lg border bg-card p-4">
-        <HojaTrabajoFiltros onBuscar={setFiltros} isFetching={isFetching} />
+        <HojaTrabajoFiltros onBuscar={handleBuscar} isFetching={isFetching} />
       </div>
 
-      {filtros === null ? (
+      {tieneParams ? (
+        <HojaTrabajoTabla data={data} isLoading={isLoading} isError={isError} />
+      ) : (
         <div className="flex h-40 items-center justify-center rounded-md border border-dashed">
           <p className="text-sm text-muted-foreground">
             Elegí un período o rango de fechas y presioná{' '}
             <span className="font-medium">Consultar</span> para ver la Hoja de Trabajo.
           </p>
         </div>
-      ) : (
-        <HojaTrabajoTabla data={data} isLoading={isLoading} isError={isError} />
       )}
     </div>
   );

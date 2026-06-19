@@ -15,7 +15,7 @@ import { LibroMayorTabla } from '../components/libro-mayor-tabla';
  * Página contenedora del Libro Mayor.
  *
  * Orquesta:
- * - LibroMayorFiltros: filtros (período O rango + toggles anulados / solo con movimiento + cuenta opcional)
+ * - LibroMayorFiltros: filtros (rango de fechas + toggles anulados / solo con movimiento + cuenta opcional)
  * - useLibroMayor: hook TanStack Query (solo se activa cuando hay rango válido)
  * - LibroMayorTabla: lista de cuentas expandibles con movimientos y saldo corriente
  *
@@ -32,27 +32,18 @@ export function LibroMayorPage(): React.JSX.Element {
   const { data: empresa } = useEmpresa();
 
   function handleBuscar(values: LibroMayorFiltroValues): void {
-    if (values.modo === 'periodo') {
-      setParams({
-        periodoFiscalId: values.periodoFiscalId,
-        incluirAnulados: values.incluirAnulados,
-        soloConMovimiento: values.soloConMovimiento,
-        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
-      });
-    } else {
-      setParams({
-        fechaDesde: values.fechaDesde,
-        fechaHasta: values.fechaHasta,
-        incluirAnulados: values.incluirAnulados,
-        soloConMovimiento: values.soloConMovimiento,
-        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
-      });
-    }
+    setParams({
+      fechaDesde: values.fechaDesde,
+      fechaHasta: values.fechaHasta,
+      incluirAnulados: values.incluirAnulados,
+      soloConMovimiento: values.soloConMovimiento,
+      ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
+    });
   }
 
-  const tieneParams =
-    params.periodoFiscalId !== undefined ||
-    (params.fechaDesde !== undefined && params.fechaHasta !== undefined);
+  // tieneParams: truthy check sobre las fechas (string no vacío).
+  // Evita el bug donde undefined !== undefined daba false pero string vacío pasaba.
+  const tieneParams = Boolean(params.fechaDesde && params.fechaHasta);
 
   // Rango para el nombre del archivo de export.
   // Se deriva del response (data.rango) que trae las fechas RESUELTAS por el backend,

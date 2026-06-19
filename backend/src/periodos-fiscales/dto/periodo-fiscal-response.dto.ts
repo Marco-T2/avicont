@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PeriodoFiscal, PeriodoFiscalStatus } from '@prisma/client';
 
+import { RangoPeriodoFiscal } from '../domain/rango-periodo-fiscal';
+
 export class PeriodoFiscalResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() gestionId!: string;
@@ -20,11 +22,23 @@ export class PeriodoFiscalResponseDto {
   @ApiProperty({ type: String, nullable: true })
   closedByUserId!: string | null;
 
+  @ApiProperty({
+    example: '2026-04-01',
+    description: 'Primer día del mes calendario (YYYY-MM-DD, §4.6)',
+  })
+  fechaInicio!: string;
+  @ApiProperty({
+    example: '2026-04-30',
+    description: 'Último día del mes calendario (YYYY-MM-DD, §4.6)',
+  })
+  fechaFin!: string;
+
   @ApiProperty({ example: '2026-01-01T00:00:00.000Z' }) createdAt!: string;
   @ApiProperty({ example: '2026-01-01T00:00:00.000Z' }) updatedAt!: string;
 }
 
 export function toPeriodoResponse(p: PeriodoFiscal): PeriodoFiscalResponseDto {
+  const rango = RangoPeriodoFiscal.of(p.year, p.month);
   return {
     id: p.id,
     gestionId: p.gestionId,
@@ -35,6 +49,8 @@ export function toPeriodoResponse(p: PeriodoFiscal): PeriodoFiscalResponseDto {
     esDefinitivo: p.esDefinitivo,
     closedAt: p.closedAt ? p.closedAt.toISOString() : null,
     closedByUserId: p.closedByUserId,
+    fechaInicio: rango.inicio(),
+    fechaFin: rango.fin(),
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };

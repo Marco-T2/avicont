@@ -6,27 +6,24 @@ import type { BalanceComprobacionFiltroValues } from '../schemas/balance-comprob
 /**
  * GET /api/eeff/balance-comprobacion — Balance de Comprobación de Sumas y Saldos.
  *
- * REQ-BC-01: el rango se envía en exactamente uno de los dos modos
- * (mutuamente excluyentes): `periodoFiscalId` O `fechaDesde`+`fechaHasta`. El
- * service del backend rechaza ambos a la vez con 422.
+ * El filtro siempre es un rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * a un rango antes de emitir — el wire nunca recibe periodoFiscalId.
+ *
+ * REQ-BC-01: si no se cumple, el backend responde 422 BALANCE_COMPROBACION_FILTRO_INVALIDO.
  */
 export async function getBalanceComprobacion(
   filtros: BalanceComprobacionFiltroValues,
 ): Promise<BalanceComprobacionResponse> {
-  const params: Record<string, string | boolean> = {
-    incluirAnulados: filtros.incluirAnulados,
-  };
-
-  if (filtros.modo === 'periodo') {
-    params.periodoFiscalId = filtros.periodoFiscalId;
-  } else {
-    params.fechaDesde = filtros.fechaDesde;
-    params.fechaHasta = filtros.fechaHasta;
-  }
-
   const res = await api.get<BalanceComprobacionResponse>(
     '/api/eeff/balance-comprobacion',
-    { params },
+    {
+      params: {
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
+        ...(filtros.incluirAnulados === true ? { incluirAnulados: true } : {}),
+      },
+    },
   );
   return res.data;
 }
