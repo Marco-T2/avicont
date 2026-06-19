@@ -6,7 +6,7 @@ import { descargarBlob, formatearFechaCelda } from '@/lib/export-excel';
 import { PERMISSIONS } from '@/lib/permissions';
 import type { LibroDiarioResponse } from '@/types/api';
 
-import { COLUMNAS_LIBRO_DIARIO_PDF, mapearLibroDiarioACeldasPdf } from '../lib/exportar-libro-diario-pdf';
+import { mapearLibroDiarioADocumentoPdf } from '../lib/exportar-libro-diario-pdf';
 
 interface Props {
   /** Datos del Libro Diario ya cargados en cache (no re-fetchea). */
@@ -42,18 +42,16 @@ export function BotonExportarLibroDiarioPdf({ data, perfil, rango }: Props): Rea
     setGenerando(true);
     try {
       const perfilFiscal: EmpresaPerfil = perfil ?? PERFIL_VACIO;
-      const filas = mapearLibroDiarioACeldasPdf(data);
-      const subtitulo = `${formatearFechaCelda(data.rango.fechaDesde)} — ${formatearFechaCelda(data.rango.fechaHasta)}`;
+      const modelo = mapearLibroDiarioADocumentoPdf(data);
+      const subtitulo = `Del ${formatearFechaCelda(data.rango.fechaDesde)} al ${formatearFechaCelda(data.rango.fechaHasta)}`;
 
       // Dynamic import: @react-pdf/renderer (pesado) solo se carga al exportar.
-      const { construirReportePdf } = await import('@/lib/export-pdf');
-      const blob = await construirReportePdf({
+      const { construirLibroDiarioPdf } = await import('../lib/construir-libro-diario-pdf');
+      const blob = await construirLibroDiarioPdf({
         titulo: 'Libro Diario',
         subtitulo,
         perfil: perfilFiscal,
-        columnas: COLUMNAS_LIBRO_DIARIO_PDF,
-        filas,
-        orientacion: 'landscape',
+        modelo,
       });
       descargarBlob(blob, `libro-diario-${rango}.pdf`);
     } finally {

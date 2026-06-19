@@ -145,6 +145,51 @@ describe('toLibroDiarioResponse (unit)', () => {
     expect(result.asientos[0]!.anulado).toBe(true);
   });
 
+  it('calcula totalDebeBob y totalHaberBob por asiento (subtotal del comprobante)', () => {
+    const rows = [
+      makeAsiento({
+        lineas: [
+          makeLinea(1, '5.7.24', 'Combustible', 12547, 0),
+          makeLinea(2, '1.1.3.2.5', 'IVA Crédito', 1359, 0),
+          makeLinea(3, '5.7.25', 'Mantenimiento', 687, 0),
+          makeLinea(4, '1.1.1.1.2', 'Caja MN', 0, 14593),
+        ],
+      }),
+      makeAsiento({
+        id: 'comp-uuid-2',
+        numero: 'I2601-000001',
+        lineas: [makeLinea(1, '1.1', 'Caja', 500, 0), makeLinea(2, '4.1', 'Ventas', 0, 500)],
+      }),
+    ];
+    const result = toLibroDiarioResponse(rows, rango);
+
+    // Subtotales del primer comprobante (suma de sus 4 líneas)
+    expect(result.asientos[0]!.totalDebeBob).toBe('14593.00');
+    expect(result.asientos[0]!.totalHaberBob).toBe('14593.00');
+    // Subtotales del segundo comprobante, independientes del primero
+    expect(result.asientos[1]!.totalDebeBob).toBe('500.00');
+    expect(result.asientos[1]!.totalHaberBob).toBe('500.00');
+    // El total general sigue siendo la suma de todos los asientos
+    expect(result.totalDebeBob).toBe('15093.00');
+    expect(result.totalHaberBob).toBe('15093.00');
+  });
+
+  it('devuelve subtotales del asiento con decimales fraccionarios', () => {
+    const rows = [
+      makeAsiento({
+        lineas: [
+          makeLinea(1, '5.7.4', 'Alquileres', 43.5, 0),
+          makeLinea(2, '1.1.3.2.5', 'IVA Crédito', 6.5, 0),
+          makeLinea(3, '1.1.1.1.1', 'Caja Chica', 0, 50),
+        ],
+      }),
+    ];
+    const result = toLibroDiarioResponse(rows, rango);
+
+    expect(result.asientos[0]!.totalDebeBob).toBe('50.00');
+    expect(result.asientos[0]!.totalHaberBob).toBe('50.00');
+  });
+
   it('maneja Decimal con decimales fraccionarios correctamente', () => {
     const rows = [
       makeAsiento({

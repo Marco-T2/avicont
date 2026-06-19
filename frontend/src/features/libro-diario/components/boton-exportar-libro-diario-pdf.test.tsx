@@ -5,16 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import * as exportExcelModule from '@/lib/export-excel';
-import type { ConstruirReportePdfParams } from '@/lib/export-pdf';
 import * as usePermissionsModule from '@/lib/use-permissions';
 import type { LibroDiarioResponse } from '@/types/api';
 
 import { BotonExportarLibroDiarioPdf } from './boton-exportar-libro-diario-pdf';
+import type { ConstruirLibroDiarioPdfParams } from '../lib/construir-libro-diario-pdf';
 
-// Mock de la infra react-pdf: evita cargar el motor pesado en jsdom y permite asertar la llamada.
-const construirReportePdfMock = vi.fn<(params: ConstruirReportePdfParams) => Promise<Blob>>();
-vi.mock('@/lib/export-pdf', () => ({
-  construirReportePdf: (params: ConstruirReportePdfParams) => construirReportePdfMock(params),
+// Mock del renderer react-pdf agrupado: evita cargar el motor pesado en jsdom y permite asertar la llamada.
+const construirLibroDiarioPdfMock = vi.fn<(params: ConstruirLibroDiarioPdfParams) => Promise<Blob>>();
+vi.mock('../lib/construir-libro-diario-pdf', () => ({
+  construirLibroDiarioPdf: (params: ConstruirLibroDiarioPdfParams) =>
+    construirLibroDiarioPdfMock(params),
 }));
 
 function mockPermissions(tiene: boolean) {
@@ -48,6 +49,8 @@ const dataValida: LibroDiarioResponse = {
       estado: 'CONTABILIZADO',
       glosa: 'Venta',
       anulado: false,
+      totalDebeBob: '1000.00',
+      totalHaberBob: '1000.00',
       lineas: [
         {
           codigoCuenta: '1101',
@@ -65,7 +68,7 @@ const dataValida: LibroDiarioResponse = {
 
 describe('BotonExportarLibroDiarioPdf', () => {
   beforeEach(() => {
-    construirReportePdfMock.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
+    construirLibroDiarioPdfMock.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:mock'),
       revokeObjectURL: vi.fn(),
@@ -75,7 +78,7 @@ describe('BotonExportarLibroDiarioPdf', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    construirReportePdfMock.mockClear();
+    construirLibroDiarioPdfMock.mockClear();
   });
 
   it('muestra "Exportar a PDF" como texto del botón', () => {
@@ -129,14 +132,15 @@ describe('BotonExportarLibroDiarioPdf', () => {
     await user.click(screen.getByRole('button', { name: /exportar a pdf/i }));
 
     await waitFor(() => {
-      expect(construirReportePdfMock).toHaveBeenCalledOnce();
+      expect(construirLibroDiarioPdfMock).toHaveBeenCalledOnce();
       expect(descargarSpy).toHaveBeenCalledOnce();
     });
 
-    // construirReportePdf recibe el informe en landscape con el título correcto
-    const params = construirReportePdfMock.mock.calls[0]?.[0];
+    // construirLibroDiarioPdf recibe el informe agrupado con el título y subtítulo correctos
+    const params = construirLibroDiarioPdfMock.mock.calls[0]?.[0];
     expect(params?.titulo).toBe('Libro Diario');
-    expect(params?.orientacion).toBe('landscape');
+    expect(params?.subtitulo).toBe('Del 01/06/2026 al 30/06/2026');
+    expect(params?.modelo.asientos).toHaveLength(1);
 
     // descargarBlob recibe el blob y un nombre .pdf con el rango
     const [, nombreArg] = descargarSpy.mock.calls[0] as [Blob, string];

@@ -35,6 +35,8 @@ function crearResponseLibroDiario(overrides?: Partial<LibroDiarioResponse>): Lib
         estado: 'CONTABILIZADO',
         glosa: 'Venta de aves',
         anulado: false,
+        totalDebeBob: '0.00',
+        totalHaberBob: '0.00',
         lineas: [
           {
             codigoCuenta: '1101',
@@ -60,6 +62,8 @@ function crearResponseLibroDiario(overrides?: Partial<LibroDiarioResponse>): Lib
         estado: 'CONTABILIZADO',
         glosa: 'Compra insumos',
         anulado: false,
+        totalDebeBob: '0.00',
+        totalHaberBob: '0.00',
         lineas: [
           {
             codigoCuenta: '5101',
@@ -166,6 +170,8 @@ describe('mapearLibroDiarioAFilas', () => {
           estado: 'CONTABILIZADO',
           glosa: 'Asiento anulado',
           anulado: true,
+          totalDebeBob: '0.00',
+          totalHaberBob: '0.00',
           lineas: [
             {
               codigoCuenta: '1101',
@@ -202,6 +208,8 @@ describe('mapearLibroDiarioAFilas', () => {
           estado: 'CONTABILIZADO',
           glosa: 'Test',
           anulado: false,
+          totalDebeBob: '0.00',
+          totalHaberBob: '0.00',
           lineas: [
             {
               codigoCuenta: '1101',
@@ -239,6 +247,8 @@ describe('mapearLibroDiarioAFilas', () => {
           estado: 'CONTABILIZADO',
           glosa: 'Test',
           anulado: false,
+          totalDebeBob: '0.00',
+          totalHaberBob: '0.00',
           lineas: [
             {
               codigoCuenta: '1101',

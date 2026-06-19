@@ -474,6 +474,9 @@ describe('Libro Diario (e2e)', () => {
       expect(res.status).toBe(200);
       expect(res.body.totalDebeBob).toBe('1000.00');
       expect(res.body.totalHaberBob).toBe('1000.00');
+      // El asiento expone su propio subtotal (subtotal del comprobante)
+      expect(res.body.asientos[0].totalDebeBob).toBe('1000.00');
+      expect(res.body.asientos[0].totalHaberBob).toBe('1000.00');
     });
 
     it('0.00 para período sin asientos', async () => {
