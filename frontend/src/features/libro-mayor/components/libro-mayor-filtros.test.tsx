@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -302,9 +302,12 @@ describe('LibroMayorFiltros — rango personalizado via capturedOnChange', () =>
     const { fn: onBuscar, calls } = makeOnBuscar();
     renderFiltros(onBuscar);
 
-    // Emitir rango personalizado directo vía la referencia capturada
+    // Emitir rango personalizado directo vía la referencia capturada.
+    // act(): la llamada dispara un setState en el componente real.
     expect(capturedOnChange).not.toBeNull();
-    capturedOnChange?.({ fechaDesde: '2026-03-01', fechaHasta: '2026-03-31' });
+    act(() => {
+      capturedOnChange?.({ fechaDesde: '2026-03-01', fechaHasta: '2026-03-31' });
+    });
 
     await user.click(screen.getByRole('button', { name: /consultar/i }));
 
