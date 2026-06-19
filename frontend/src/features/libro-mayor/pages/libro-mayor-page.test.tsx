@@ -41,6 +41,12 @@ vi.mock('../components/boton-exportar-libro-mayor', () => ({
   },
 }));
 
+// El botón PDF comparte data/perfil/rango — se mockea para mantener la página aislada
+// (evita arrastrar @/lib/export-pdf y el motor react-pdf al test de la página).
+vi.mock('../components/boton-exportar-libro-mayor-pdf', () => ({
+  BotonExportarLibroMayorPdf: () => <button>Exportar a PDF</button>,
+}));
+
 const dataConRango: LibroMayorResponse = {
   rango: { fechaDesde: '2026-05-01', fechaHasta: '2026-05-31' },
   cuentas: [],

@@ -8,6 +8,7 @@ import { useLibroMayor } from '../hooks/use-libro-mayor';
 import type { LibroMayorFiltroValues } from '../schemas/libro-mayor-filtro-schema';
 
 import { BotonExportarLibroMayor } from '../components/boton-exportar-libro-mayor';
+import { BotonExportarLibroMayorPdf } from '../components/boton-exportar-libro-mayor-pdf';
 import { LibroMayorFiltros } from '../components/libro-mayor-filtros';
 import { LibroMayorTabla } from '../components/libro-mayor-tabla';
 
@@ -64,8 +65,9 @@ export function LibroMayorPage(): React.JSX.Element {
             Movimientos por cuenta con saldo inicial, corriente y final
           </p>
         </div>
-        <div className="self-start">
+        <div className="flex gap-2 self-start">
           <BotonExportarLibroMayor data={data} perfil={empresa} rango={rango} />
+          <BotonExportarLibroMayorPdf data={data} perfil={empresa} rango={rango} />
         </div>
       </div>
 

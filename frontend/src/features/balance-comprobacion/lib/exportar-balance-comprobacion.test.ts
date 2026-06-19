@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
 import type { BalanceComprobacionResponse } from '@/types/api';
 
-import { mapearBalanceComprobacionAFilas } from './exportar-balance-comprobacion';
+import {
+  mapearBalanceComprobacionAFilas,
+  mapearBalanceComprobacionAFilasDatos,
+} from './exportar-balance-comprobacion';
 
 const perfilCompleto: EmpresaPerfil = {
   razonSocial: 'Avicont S.R.L.',
@@ -162,5 +165,78 @@ describe('mapearBalanceComprobacionAFilas', () => {
     const filas = mapearBalanceComprobacionAFilas(crearResponse(), perfilTodoNull);
     const valores = filas.flatMap((f) => f).map((c) => c.value);
     expect(valores.some((v) => v === 'null')).toBe(false);
+  });
+});
+
+describe('mapearBalanceComprobacionAFilasDatos (sin cabecera fiscal, compartido Excel↔PDF)', () => {
+  it('la primera fila es la de encabezados de columna (no la cabecera fiscal)', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(crearResponse());
+    expect(filas[0]?.[0]).toMatchObject({ type: 'texto', value: 'Código', fontWeight: 'bold' });
+  });
+
+  it('NO contiene la cabecera fiscal', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(crearResponse());
+    const valores = filas.flatMap((f) => f).map((c) => c.value);
+    expect(valores).not.toContain('Avicont S.R.L.');
+  });
+
+  it('incluye la fila TOTALES con los 4 totales del backend (sin recalcular)', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(
+      crearResponse({ totalSumasDebito: '88888.88', totalSaldoAcreedor: '55555.55' }),
+    );
+    const filaTotales = filas.find((f) => f[0]?.value === 'TOTALES');
+    expect(filaTotales?.[3]).toMatchObject({ type: 'numero', value: '88888.88' });
+    expect(filaTotales?.[6]).toMatchObject({ type: 'numero', value: '55555.55' });
+  });
+
+  it('incluye la fila de cuadre con cuadra + diferencias del backend', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(
+      crearResponse({ cuadra: false, diferenciaSumas: '12.34', diferenciaSaldos: '56.78' }),
+    );
+    const filaCuadre = filas.find(
+      (f) => typeof f[0]?.value === 'string' && f[0].value.includes('No cuadra'),
+    );
+    expect(filaCuadre).toBeDefined();
+    const numeros = filaCuadre!.filter((c) => c.type === 'numero').map((c) => c.value);
+    expect(numeros).toContain('12.34');
+    expect(numeros).toContain('56.78');
+  });
+
+  it('NO incluye la sección de naturaleza opuesta cuando la lista está vacía', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(crearResponse());
+    const valores = filas.flatMap((f) => f).map((c) => c.value);
+    expect(valores.some((v) => typeof v === 'string' && v.includes('NATURALEZA OPUESTA'))).toBe(
+      false,
+    );
+  });
+
+  it('incluye la sección de naturaleza opuesta cuando length > 0', () => {
+    const filas = mapearBalanceComprobacionAFilasDatos(
+      crearResponse({
+        cuentasNaturalezaOpuesta: [
+          {
+            cuentaId: 'c9',
+            codigoInterno: '1105',
+            nombre: 'Anticipo a proveedores',
+            naturaleza: 'DEUDORA',
+            saldoOpuesto: '150.00',
+          },
+        ],
+      }),
+    );
+    const valores = filas.flatMap((f) => f).map((c) => c.value);
+    expect(valores.some((v) => typeof v === 'string' && v.includes('NATURALEZA OPUESTA'))).toBe(
+      true,
+    );
+    const filaCuenta = filas.find((f) => f[1]?.value === 'Anticipo a proveedores');
+    expect(filaCuenta?.[3]).toMatchObject({ type: 'numero', value: '150.00' });
+  });
+
+  it('mapearBalanceComprobacionAFilas = cabecera fiscal ++ ...FilasDatos (byte-equivalente)', () => {
+    const response = crearResponse();
+    const completo = mapearBalanceComprobacionAFilas(response, perfilCompleto);
+    const datos = mapearBalanceComprobacionAFilasDatos(response);
+    const cola = completo.slice(completo.length - datos.length);
+    expect(cola).toEqual(datos);
   });
 });
