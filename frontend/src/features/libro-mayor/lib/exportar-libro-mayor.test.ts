@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
 import type { LibroMayorResponse } from '@/types/api';
 
-import { mapearLibroMayorAFilas } from './exportar-libro-mayor';
+import { mapearLibroMayorAFilas, mapearLibroMayorAFilasDatos } from './exportar-libro-mayor';
 
 const perfilCompleto: EmpresaPerfil = {
   razonSocial: 'Avicont S.R.L.',
@@ -370,5 +370,117 @@ describe('mapearLibroMayorAFilas', () => {
     primeraFilaMovimiento!.forEach((celda) => {
       expect('fontWeight' in celda).toBe(false);
     });
+  });
+});
+
+describe('mapearLibroMayorAFilasDatos (sin cabecera fiscal, compartido Excel↔PDF)', () => {
+  it('la primera fila es la de encabezados de columna (no la cabecera fiscal)', () => {
+    const filas = mapearLibroMayorAFilasDatos(crearResponseLibroMayor());
+    const encabezados = filas[0];
+    expect(encabezados).toBeDefined();
+    expect(encabezados![0]).toMatchObject({ type: 'texto', value: 'Fecha', fontWeight: 'bold' });
+    expect(encabezados!).toHaveLength(7);
+  });
+
+  it('NO contiene la cabecera fiscal aunque haya datos', () => {
+    const filas = mapearLibroMayorAFilasDatos(crearResponseLibroMayor());
+    // La razón social del perfil nunca debería aparecer (no se le pasa perfil)
+    const valores = filas.flatMap((f) => f).map((c) => c.value);
+    expect(valores).not.toContain('Avicont S.R.L.');
+  });
+
+  it('mapea montos como string crudo del backend (§4.5), sin recalcular', () => {
+    const filas = mapearLibroMayorAFilasDatos(crearResponseLibroMayor());
+    // fila 0 = encabezados, fila 1 = cabecera cuenta Caja, fila 2 = primer movimiento
+    const filaMovimiento = filas[2];
+    expect(filaMovimiento![3]).toEqual({ type: 'numero', value: '5000.00' });
+    expect(filaMovimiento![5]).toEqual({ type: 'numero', value: '5000.00' });
+  });
+
+  it('formatea la fecha dd/mm/yyyy sin UTC (§4.6): 2026-01-31 → 31/01/2026', () => {
+    const response = crearResponseLibroMayor({
+      cuentas: [
+        {
+          cuentaId: 'c1',
+          codigoInterno: '1101',
+          nombreCuenta: 'Caja',
+          naturaleza: 'DEUDORA',
+          saldoInicialBob: '0.00',
+          saldoFinalBob: '0.00',
+          totalDebeBob: '0.00',
+          totalHaberBob: '0.00',
+          movimientos: [
+            {
+              comprobanteId: 'cp1',
+              numeroComprobante: null,
+              fechaContable: '2026-01-31',
+              glosa: 'Test',
+              glosaLinea: null,
+              estado: 'CONTABILIZADO',
+              anulado: false,
+              orden: 1,
+              debeBob: '100.00',
+              haberBob: '0.00',
+              saldoCorrienteBob: '100.00',
+            },
+          ],
+        },
+      ],
+    });
+    const filas = mapearLibroMayorAFilasDatos(response);
+    expect(filas[2]![0]).toEqual({ type: 'texto', value: '31/01/2026' });
+  });
+
+  it('marca el movimiento anulado con "Anulado" (§4.7)', () => {
+    const response = crearResponseLibroMayor({
+      cuentas: [
+        {
+          cuentaId: 'c1',
+          codigoInterno: '1101',
+          nombreCuenta: 'Caja',
+          naturaleza: 'DEUDORA',
+          saldoInicialBob: '0.00',
+          saldoFinalBob: '0.00',
+          totalDebeBob: '0.00',
+          totalHaberBob: '0.00',
+          movimientos: [
+            {
+              comprobanteId: 'cp1',
+              numeroComprobante: null,
+              fechaContable: '2026-06-10',
+              glosa: 'Asiento anulado',
+              glosaLinea: null,
+              estado: 'CONTABILIZADO',
+              anulado: true,
+              orden: 1,
+              debeBob: '1000.00',
+              haberBob: '0.00',
+              saldoCorrienteBob: '1000.00',
+            },
+          ],
+        },
+      ],
+    });
+    const filas = mapearLibroMayorAFilasDatos(response);
+    const filaMovimiento = filas[2]!;
+    expect(filaMovimiento[filaMovimiento.length - 1]).toEqual({ type: 'texto', value: 'Anulado' });
+  });
+
+  it('incluye la fila de totales del backend al final (sin recalcular)', () => {
+    const filas = mapearLibroMayorAFilasDatos(
+      crearResponseLibroMayor({ totalDebeBob: '77777.77', totalHaberBob: '77777.77' }),
+    );
+    const filaTotal = filas[filas.length - 1]!;
+    expect(filaTotal[0]).toMatchObject({ type: 'texto', value: 'TOTAL', fontWeight: 'bold' });
+    expect(filaTotal.find((c) => c.type === 'numero' && c.value === '77777.77')).toBeDefined();
+  });
+
+  it('mapearLibroMayorAFilas = cabecera fiscal ++ mapearLibroMayorAFilasDatos (byte-equivalente)', () => {
+    const response = crearResponseLibroMayor();
+    const completo = mapearLibroMayorAFilas(response, perfilCompleto);
+    const datos = mapearLibroMayorAFilasDatos(response);
+    // Las últimas filas de `completo` deben ser exactamente las filas de datos
+    const cola = completo.slice(completo.length - datos.length);
+    expect(cola).toEqual(datos);
   });
 });

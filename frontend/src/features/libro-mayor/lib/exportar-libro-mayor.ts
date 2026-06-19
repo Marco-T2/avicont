@@ -1,34 +1,46 @@
 import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
 import { armarCabeceraFiscal, formatearFechaCelda } from '@/lib/export-excel';
 import type { Celda } from '@/lib/export-excel';
+import type { ColumnaPdf } from '@/lib/export-pdf';
 import type { LibroMayorResponse } from '@/types/api';
 
 /**
- * Mapea una respuesta del Libro Mayor a la matriz de celdas para el Excel.
+ * Columnas para el PDF del Libro Mayor (7 columnas: flex proporcional a los
+ * widths del Excel). Portrait.
+ */
+export const COLUMNAS_PDF_LIBRO_MAYOR: ColumnaPdf[] = [
+  { flex: 14 }, // Fecha
+  { flex: 12 }, // Comprobante
+  { flex: 40 }, // Glosa
+  { flex: 16 }, // Debe (BOB)
+  { flex: 16 }, // Haber (BOB)
+  { flex: 16 }, // Saldo (BOB)
+  { flex: 10 }, // Estado
+];
+
+/**
+ * Mapea una respuesta del Libro Mayor a la matriz de filas de DATOS (encabezados
+ * de columna + cuentas/movimientos + total), SIN la cabecera fiscal.
+ *
+ * Es la fuente única compartida por Excel (que le antepone armarCabeceraFiscal)
+ * y PDF (que pasa el perfil al builder, el cual renderiza CabeceraFiscalPdf).
  *
  * Estructura del resultado:
- * 1. Filas de cabecera fiscal (armarCabeceraFiscal — tolera null por campo).
- * 2. Fila de encabezados de columna.
- * 3. Por cada cuenta → fila de cabecera de cuenta (saldos del backend) +
+ * 1. Fila de encabezados de columna (negrita).
+ * 2. Por cada cuenta → fila de cabecera de cuenta (saldos del backend) +
  *    por cada movimiento: fila de detalle con saldoCorrienteBob del backend.
- * 4. Fila de total general con totalDebeBob / totalHaberBob del backend.
+ * 3. Fila de total general con totalDebeBob / totalHaberBob del backend.
  *
  * §4.5: saldoCorrienteBob, totalDebeBob, totalHaberBob se pasan como CeldaNumero
- * con el string del backend. El builder (construir-hoja) hace el único boundary
- * string→Number. NUNCA se acumulan valores en cliente.
+ * con el string del backend. El builder hace el único boundary string→Number.
+ * NUNCA se acumulan valores en cliente.
  *
  * §4.6: fechaContable se convierte vía formatearFechaCelda (sin Date/UTC).
  */
-export function mapearLibroMayorAFilas(
-  response: LibroMayorResponse,
-  perfil: EmpresaPerfil,
-): Celda[][] {
+export function mapearLibroMayorAFilasDatos(response: LibroMayorResponse): Celda[][] {
   const filas: Celda[][] = [];
 
-  // 1. Cabecera fiscal (campos no-null del perfil)
-  filas.push(...armarCabeceraFiscal(perfil));
-
-  // 2. Fila de encabezados de columna — negrita para resaltar la estructura del informe
+  // 1. Fila de encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([
     { type: 'texto', value: 'Fecha', fontWeight: 'bold' },
     { type: 'texto', value: 'Comprobante', fontWeight: 'bold' },
@@ -39,7 +51,7 @@ export function mapearLibroMayorAFilas(
     { type: 'texto', value: 'Estado', fontWeight: 'bold' },
   ]);
 
-  // 3. Por cada cuenta: fila de cabecera + filas de movimientos
+  // 2. Por cada cuenta: fila de cabecera + filas de movimientos
   for (const cuenta of response.cuentas) {
     // Fila de cabecera de cuenta con saldos del backend
     filas.push([
@@ -72,7 +84,7 @@ export function mapearLibroMayorAFilas(
     }
   }
 
-  // 4. Fila de totales — valores del backend, SIN recalcular en cliente; negrita para totales
+  // 3. Fila de totales — valores del backend, SIN recalcular en cliente; negrita para totales
   filas.push([
     { type: 'texto', value: 'TOTAL', fontWeight: 'bold' },
     { type: 'texto', value: '', fontWeight: 'bold' },
@@ -84,4 +96,16 @@ export function mapearLibroMayorAFilas(
   ]);
 
   return filas;
+}
+
+/**
+ * Mapea una respuesta del Libro Mayor a la matriz de celdas para el Excel:
+ * cabecera fiscal ++ filas de datos. Wrapper delgado sobre
+ * mapearLibroMayorAFilasDatos (output byte-equivalente al anterior al refactor).
+ */
+export function mapearLibroMayorAFilas(
+  response: LibroMayorResponse,
+  perfil: EmpresaPerfil,
+): Celda[][] {
+  return [...armarCabeceraFiscal(perfil), ...mapearLibroMayorAFilasDatos(response)];
 }

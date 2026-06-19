@@ -6,6 +6,7 @@ import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
 import { BalanceComprobacionFiltros } from '../components/balance-comprobacion-filtros';
 import { BalanceComprobacionTabla } from '../components/balance-comprobacion-tabla';
 import { BotonExportarBalanceComprobacion } from '../components/boton-exportar-balance-comprobacion';
+import { BotonExportarBalanceComprobacionPdf } from '../components/boton-exportar-balance-comprobacion-pdf';
 import { useBalanceComprobacion } from '../hooks/use-balance-comprobacion';
 import type { BalanceComprobacionFiltroValues } from '../schemas/balance-comprobacion-filtro-schema';
 
@@ -55,8 +56,9 @@ export function BalanceComprobacionPage(): React.JSX.Element {
             partida doble antes de emitir los estados financieros.
           </p>
         </div>
-        <div className="self-start">
+        <div className="flex gap-2 self-start">
           <BotonExportarBalanceComprobacion data={data} perfil={empresa} rango={rango} />
+          <BotonExportarBalanceComprobacionPdf data={data} perfil={empresa} rango={rango} />
         </div>
       </div>
 

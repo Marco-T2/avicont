@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { EmpresaPerfil } from '@/features/tenants/api/get-empresa';
 import type { ComprobanteListItem } from '@/types/api';
 
-import { mapearComprobantesAFilas } from './exportar-comprobantes';
+import { mapearComprobantesAFilas, mapearComprobantesAFilasDatos } from './exportar-comprobantes';
 
 // ============================================================
 // Fixtures
@@ -211,5 +211,57 @@ describe('mapearComprobantesAFilas', () => {
 
   it('(11) cabecera fiscal tolera perfil con todos null (sin crash)', () => {
     expect(() => mapearComprobantesAFilas([], perfilTodoNull)).not.toThrow();
+  });
+});
+
+describe('mapearComprobantesAFilasDatos (sin cabecera fiscal, compartido Excel↔PDF)', () => {
+  it('la primera fila es la de 9 encabezados de columna (no la cabecera fiscal)', () => {
+    const filas = mapearComprobantesAFilasDatos([]);
+    expect(filas[0]).toHaveLength(9);
+    expect(filas[0]?.map((c) => c.value)).toEqual([
+      'Fecha',
+      'Número',
+      'Tipo',
+      'Documento respaldo',
+      'Nro. Ref.',
+      'Contacto',
+      'Glosa',
+      'Estado',
+      'Total BOB',
+    ]);
+  });
+
+  it('NO contiene la cabecera fiscal', () => {
+    const filas = mapearComprobantesAFilasDatos([]);
+    const valores = filas.flatMap((f) => f).map((c) => c.value);
+    expect(valores).not.toContain('Avicont S.R.L.');
+  });
+
+  it('totalDebitoBob como celda numérica con string crudo (§4.5)', () => {
+    const filas = mapearComprobantesAFilasDatos([crearItem({ totalDebitoBob: '1250.50' })]);
+    expect(filas[1]![8]).toEqual({ type: 'numero', value: '1250.50' });
+  });
+
+  it('formatea la fecha sin UTC (§4.6)', () => {
+    const filas = mapearComprobantesAFilasDatos([crearItem({ fechaContable: '2026-01-31' })]);
+    expect(filas[1]![0]).toEqual({ type: 'texto', value: '31/01/2026' });
+  });
+
+  it('BORRADOR (numero===null) → celda Número vacía (§4.7)', () => {
+    const filas = mapearComprobantesAFilasDatos([crearItem({ numero: null, estado: 'BORRADOR' })]);
+    expect(filas[1]![1]).toMatchObject({ type: 'texto', value: '' });
+  });
+
+  it('anulado → "Anulado" en Estado (§4.7)', () => {
+    const filas = mapearComprobantesAFilasDatos([crearItem({ anulado: true })]);
+    expect(filas[1]![7]).toMatchObject({ type: 'texto', value: 'Anulado' });
+  });
+
+  it('mapearComprobantesAFilas = cabecera fiscal ++ ...FilasDatos (byte-equivalente)', () => {
+    const items = [crearItem()];
+    const completo = mapearComprobantesAFilas(items, perfilCompleto);
+    const datos = mapearComprobantesAFilasDatos(items);
+    const cola = completo.slice(completo.length - datos.length);
+    expect(cola).toEqual(datos);
   });
 });

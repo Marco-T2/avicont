@@ -11,6 +11,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { useComprobantes } from '../hooks/use-comprobantes';
 
 import { BotonExportarComprobantes } from './boton-exportar-comprobantes';
+import { BotonExportarComprobantesPdf } from './boton-exportar-comprobantes-pdf';
 import { ComprobantesFilters } from './comprobantes-filters';
 import { ComprobantesTable } from './comprobantes-table';
 
@@ -80,6 +81,11 @@ export function ComprobantesPage(): React.JSX.Element {
         </div>
         <div className="flex gap-2 self-start">
           <BotonExportarComprobantes
+            filtros={filtrosExport}
+            perfil={empresa ?? null}
+            rango={rangoArchivo}
+          />
+          <BotonExportarComprobantesPdf
             filtros={filtrosExport}
             perfil={empresa ?? null}
             rango={rangoArchivo}
