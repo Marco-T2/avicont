@@ -17,16 +17,26 @@ import type { LibroDiarioResponse } from '@/types/api';
  * string→Number. NUNCA se suman columnas en cliente.
  *
  * §4.6: fechaContable se convierte vía formatearFechaCelda (sin Date/UTC).
+ *
+ * `cuentaFiltro` (ej. "1.1.1.001 — Caja"): si el informe está filtrado por una
+ * cuenta, se declara en el encabezado para que el Excel no oculte que es un
+ * subconjunto. Ausente → el informe es completo y no se agrega la fila.
  */
 export function mapearLibroDiarioAFilas(
   response: LibroDiarioResponse,
   perfil: EmpresaPerfil,
+  cuentaFiltro?: string,
 ): Celda[][] {
   const filas: Celda[][] = [];
 
   // 1. Cabecera fiscal (campos no-null del perfil)
   const cabeceraFiscal = armarCabeceraFiscal(perfil);
   filas.push(...cabeceraFiscal);
+
+  // 1.b Declaración del filtro de cuenta (solo si el informe está filtrado)
+  if (cuentaFiltro !== undefined) {
+    filas.push([{ type: 'texto', value: `Filtrado por cuenta: ${cuentaFiltro}`, fontWeight: 'bold' }]);
+  }
 
   // 2. Fila de encabezados de columna — negrita para resaltar la estructura del informe
   filas.push([

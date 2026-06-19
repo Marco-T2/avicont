@@ -18,6 +18,10 @@ vi.mock('@/features/tenants/hooks/use-empresa', () => ({
   useEmpresa: () => ({ data: null }),
 }));
 
+vi.mock('@/features/plan-cuentas/hooks/use-cuentas', () => ({
+  useCuentas: () => ({ data: { items: [] } }),
+}));
+
 const mockUseLibroDiario = vi.fn();
 vi.mock('../hooks/use-libro-diario', () => ({
   useLibroDiario: (...args: unknown[]) => mockUseLibroDiario(...args),

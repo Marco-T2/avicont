@@ -15,6 +15,8 @@ interface Props {
   perfil: EmpresaPerfil | null | undefined;
   /** Rango de fechas/período para el nombre del archivo (ej. "2026-06"). */
   rango: string;
+  /** Etiqueta "código — nombre" de la cuenta filtrada; se declara en el encabezado. */
+  cuentaFiltro?: string;
 }
 
 /**
@@ -26,7 +28,12 @@ interface Props {
  * - Consume la data ya cargada — NO re-fetchea el informe.
  * - Usa el perfil fiscal del hook useEmpresa (pasado por prop desde la página).
  */
-export function BotonExportarLibroDiario({ data, perfil, rango }: Props): React.JSX.Element {
+export function BotonExportarLibroDiario({
+  data,
+  perfil,
+  rango,
+  cuentaFiltro,
+}: Props): React.JSX.Element {
   const [generando, setGenerando] = useState(false);
 
   async function handleExportar(): Promise<void> {
@@ -44,7 +51,7 @@ export function BotonExportarLibroDiario({ data, perfil, rango }: Props): React.
         email: null,
       };
 
-      const filas = mapearLibroDiarioAFilas(data, perfilFiscal);
+      const filas = mapearLibroDiarioAFilas(data, perfilFiscal, cuentaFiltro);
       const blob = await construirHoja(filas);
       descargarBlob(blob, generarNombreArchivo('libro-diario', rango));
     } finally {

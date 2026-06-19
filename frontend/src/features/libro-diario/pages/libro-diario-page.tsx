@@ -1,10 +1,15 @@
 import { useState } from 'react';
 
+// Cross-feature: cuentas de detalle activas para resolver el nombre de la cuenta
+// filtrada. Mismos params que CuentaAutocomplete → reusa el cache de TanStack
+// Query (cero red extra). pageSize 100 = límite del backend (ver §14.6).
+import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 // Cross-feature: perfil fiscal para la cabecera del export a Excel.
 import { useEmpresa } from '@/features/tenants/hooks/use-empresa';
 import type { LibroDiarioParams } from '@/types/api';
 
 import { useLibroDiario } from '../hooks/use-libro-diario';
+import { derivarCuentaFiltroLabel } from '../lib/derivar-cuenta-filtro';
 import type { LibroDiarioFiltroValues } from '../schemas/libro-diario-filtro-schema';
 
 import { BotonExportarLibroDiario } from '../components/boton-exportar-libro-diario';
@@ -34,6 +39,12 @@ export function LibroDiarioPage(): React.JSX.Element {
   const { data, isLoading, isError, isFetching } = useLibroDiario(params);
   // Cross-feature: perfil fiscal para la cabecera del export a Excel.
   const { data: empresa } = useEmpresa();
+  const { data: cuentasData } = useCuentas({ esDetalle: true, activa: true, pageSize: 100 });
+
+  // Se deriva del cuentaId EFECTIVAMENTE consultado (params), no del autocomplete,
+  // para que el export declare lo que el usuario ve en pantalla aunque haya
+  // cambiado el filtro sin volver a consultar.
+  const cuentaFiltro = derivarCuentaFiltroLabel(params.cuentaId, cuentasData?.items ?? []);
 
   function handleBuscar(values: LibroDiarioFiltroValues): void {
     if (values.modo === 'periodo') {
@@ -76,8 +87,18 @@ export function LibroDiarioPage(): React.JSX.Element {
           </p>
         </div>
         <div className="flex flex-col gap-2 self-start sm:flex-row">
-          <BotonExportarLibroDiario data={data} perfil={empresa} rango={rango} />
-          <BotonExportarLibroDiarioPdf data={data} perfil={empresa} rango={rango} />
+          <BotonExportarLibroDiario
+            data={data}
+            perfil={empresa}
+            rango={rango}
+            cuentaFiltro={cuentaFiltro}
+          />
+          <BotonExportarLibroDiarioPdf
+            data={data}
+            perfil={empresa}
+            rango={rango}
+            cuentaFiltro={cuentaFiltro}
+          />
         </div>
       </div>
 

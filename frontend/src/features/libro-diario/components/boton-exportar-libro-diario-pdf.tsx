@@ -15,6 +15,8 @@ interface Props {
   perfil: EmpresaPerfil | null | undefined;
   /** Rango de fechas/período para el nombre del archivo (ej. "2026-06"). */
   rango: string;
+  /** Etiqueta "código — nombre" de la cuenta filtrada; se declara en el encabezado. */
+  cuentaFiltro?: string;
 }
 
 const PERFIL_VACIO: EmpresaPerfil = {
@@ -33,7 +35,12 @@ const PERFIL_VACIO: EmpresaPerfil = {
  * - El motor react-pdf se carga con dynamic import en el click → fuera del chunk de la ruta.
  * - Deshabilitado sin data o sin permiso (§14.7); "Generando…" mientras procesa (Anti-F-07).
  */
-export function BotonExportarLibroDiarioPdf({ data, perfil, rango }: Props): React.JSX.Element {
+export function BotonExportarLibroDiarioPdf({
+  data,
+  perfil,
+  rango,
+  cuentaFiltro,
+}: Props): React.JSX.Element {
   const [generando, setGenerando] = useState(false);
 
   async function handleExportar(): Promise<void> {
@@ -43,7 +50,12 @@ export function BotonExportarLibroDiarioPdf({ data, perfil, rango }: Props): Rea
     try {
       const perfilFiscal: EmpresaPerfil = perfil ?? PERFIL_VACIO;
       const modelo = mapearLibroDiarioADocumentoPdf(data);
-      const subtitulo = `Del ${formatearFechaCelda(data.rango.fechaDesde)} al ${formatearFechaCelda(data.rango.fechaHasta)}`;
+      const rangoTexto = `Del ${formatearFechaCelda(data.rango.fechaDesde)} al ${formatearFechaCelda(data.rango.fechaHasta)}`;
+      // Segunda línea del subtítulo si el informe está filtrado: react-pdf respeta el \n.
+      const subtitulo =
+        cuentaFiltro !== undefined
+          ? `${rangoTexto}\nFiltrado por cuenta: ${cuentaFiltro}`
+          : rangoTexto;
 
       // Dynamic import: @react-pdf/renderer (pesado) solo se carga al exportar.
       const { construirLibroDiarioPdf } = await import('../lib/construir-libro-diario-pdf');
