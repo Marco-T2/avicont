@@ -2,54 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { libroDiarioFiltroSchema } from './libro-diario-filtro-schema';
 
-// REQ-LD-01: exactamente uno de (periodoFiscalId) O (fechaDesde + fechaHasta)
+// Contrato simplificado: siempre rango de fechas (fechaDesde + fechaHasta).
+// No hay más discriminante 'modo' ni periodoFiscalId.
 describe('libroDiarioFiltroSchema', () => {
-  describe('modo períodoFiscalId', () => {
-    it('acepta solo periodoFiscalId', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
-      });
-      expect(r.success).toBe(true);
-    });
-
-    it('rechaza periodoFiscalId vacío', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: '',
-      });
-      expect(r.success).toBe(false);
-    });
-
-    it('acepta toggle incluirAnulados en modo periodo', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
-        incluirAnulados: true,
-      });
-      expect(r.success).toBe(true);
-      if (r.success) {
-        expect(r.data.incluirAnulados).toBe(true);
-      }
-    });
-
-    it('incluirAnulados explícito false es válido', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
-        incluirAnulados: false,
-      });
-      expect(r.success).toBe(true);
-      if (r.success) {
-        expect(r.data.incluirAnulados).toBe(false);
-      }
-    });
-  });
-
-  describe('modo rango de fechas', () => {
+  describe('rango de fechas válido', () => {
     it('acepta fechaDesde + fechaHasta válidas', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-01-01',
         fechaHasta: '2026-03-31',
       });
@@ -58,7 +16,6 @@ describe('libroDiarioFiltroSchema', () => {
 
     it('acepta fechaDesde === fechaHasta (mismo día)', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-05-15',
         fechaHasta: '2026-05-15',
       });
@@ -67,7 +24,6 @@ describe('libroDiarioFiltroSchema', () => {
 
     it('rechaza fechaDesde > fechaHasta', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-05-31',
         fechaHasta: '2026-01-01',
       });
@@ -78,17 +34,15 @@ describe('libroDiarioFiltroSchema', () => {
       }
     });
 
-    it('rechaza modo rango sin fechaDesde', () => {
+    it('rechaza sin fechaDesde', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaHasta: '2026-03-31',
       });
       expect(r.success).toBe(false);
     });
 
-    it('rechaza modo rango sin fechaHasta', () => {
+    it('rechaza sin fechaHasta', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-01-01',
       });
       expect(r.success).toBe(false);
@@ -96,7 +50,6 @@ describe('libroDiarioFiltroSchema', () => {
 
     it('rechaza formato de fecha incorrecto', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '01/01/2026',
         fechaHasta: '31/03/2026',
       });
@@ -104,72 +57,81 @@ describe('libroDiarioFiltroSchema', () => {
     });
   });
 
-  describe('campo cuentaId', () => {
-    it('modo periodo: acepta cuentaId UUID válido y lo preserva en el output', () => {
+  describe('incluirAnulados', () => {
+    it('acepta toggle incluirAnulados: true', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
-        cuentaId: 'f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5',
-      });
-      expect(r.success).toBe(true);
-      if (r.success) {
-        expect(r.data.cuentaId).toBe('f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5');
-      }
-    });
-
-    it('modo rango: acepta cuentaId UUID válido y lo preserva en el output', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-01-01',
         fechaHasta: '2026-03-31',
-        cuentaId: 'f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5',
+        incluirAnulados: true,
       });
       expect(r.success).toBe(true);
       if (r.success) {
-        expect(r.data.cuentaId).toBe('f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5');
+        expect(r.data.incluirAnulados).toBe(true);
       }
     });
 
-    it('modo periodo: sin cuentaId → cuentaId ausente en el output (campo opcional)', () => {
+    it('incluirAnulados omitido → default false en el output', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'periodo',
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
-      });
-      expect(r.success).toBe(true);
-      if (r.success) {
-        expect(r.data.cuentaId).toBeUndefined();
-      }
-    });
-
-    it('modo rango: sin cuentaId → cuentaId ausente en el output (campo opcional)', () => {
-      const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'rango',
         fechaDesde: '2026-01-01',
         fechaHasta: '2026-03-31',
       });
       expect(r.success).toBe(true);
       if (r.success) {
-        expect(r.data.cuentaId).toBeUndefined();
+        expect(r.data.incluirAnulados).toBe(false);
       }
     });
   });
 
-  describe('modo ausente o inválido', () => {
-    it('rechaza sin modo', () => {
+  describe('campo cuentaId', () => {
+    it('acepta cuentaId UUID válido y lo preserva en el output', () => {
       const r = libroDiarioFiltroSchema.safeParse({
-        periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-03-31',
+        cuentaId: 'f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBe('f1e2d3c4-b5a6-4f7e-8d9c-b0a1f2e3d4c5');
+      }
+    });
+
+    it('sin cuentaId → cuentaId ausente en el output (campo opcional)', () => {
+      const r = libroDiarioFiltroSchema.safeParse({
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-03-31',
+      });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.cuentaId).toBeUndefined();
+      }
+    });
+
+    it('rechaza cuentaId con formato inválido (no UUID)', () => {
+      const r = libroDiarioFiltroSchema.safeParse({
+        fechaDesde: '2026-01-01',
+        fechaHasta: '2026-03-31',
+        cuentaId: 'no-es-un-uuid',
       });
       expect(r.success).toBe(false);
     });
+  });
 
-    it('rechaza modo inválido', () => {
+  describe('campos no permitidos del contrato viejo', () => {
+    it('no acepta modo + periodoFiscalId (contrato viejo eliminado)', () => {
+      // El schema plano ignora campos desconocidos (zod strip por defecto),
+      // pero periodoFiscalId no forma parte del output.
       const r = libroDiarioFiltroSchema.safeParse({
-        modo: 'ambos',
+        modo: 'periodo',
         periodoFiscalId: 'a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5',
         fechaDesde: '2026-01-01',
         fechaHasta: '2026-03-31',
       });
-      expect(r.success).toBe(false);
+      // Parsea con éxito (zod strip), pero periodoFiscalId NO está en el output.
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data).not.toHaveProperty('modo');
+        expect(r.data).not.toHaveProperty('periodoFiscalId');
+      }
     });
   });
 });

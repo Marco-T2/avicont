@@ -6,24 +6,19 @@ import type { HojaTrabajoFiltroValues } from '../schemas/hoja-trabajo-filtro-sch
 /**
  * GET /api/eeff/hoja-trabajo — Hoja de Trabajo de 12 columnas.
  *
- * REQ-HT-01: el rango se envía en exactamente uno de los dos modos
- * (mutuamente excluyentes): `periodoFiscalId` O `fechaDesde`+`fechaHasta`. El
- * service del backend rechaza ambos a la vez con 422.
+ * El filtro siempre es un rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * a un rango antes de emitir — el wire nunca recibe periodoFiscalId.
  */
 export async function getHojaTrabajo(
   filtros: HojaTrabajoFiltroValues,
 ): Promise<HojaTrabajoResponse> {
-  const params: Record<string, string | boolean> = {
-    incluirAnulados: filtros.incluirAnulados,
-  };
-
-  if (filtros.modo === 'periodo') {
-    params.periodoFiscalId = filtros.periodoFiscalId;
-  } else {
-    params.fechaDesde = filtros.fechaDesde;
-    params.fechaHasta = filtros.fechaHasta;
-  }
-
-  const res = await api.get<HojaTrabajoResponse>('/api/eeff/hoja-trabajo', { params });
+  const res = await api.get<HojaTrabajoResponse>('/api/eeff/hoja-trabajo', {
+    params: {
+      fechaDesde: filtros.fechaDesde,
+      fechaHasta: filtros.fechaHasta,
+      incluirAnulados: filtros.incluirAnulados,
+    },
+  });
   return res.data;
 }

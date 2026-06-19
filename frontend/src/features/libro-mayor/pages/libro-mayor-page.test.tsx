@@ -3,8 +3,7 @@
  *
  * R7: card wrapper `rounded-lg border bg-card p-4` en el bloque de filtros.
  * R9: el `rango` para el nombre del archivo de export debe provenir de
- *     data.rango (fechas resueltas por el backend), NO de los params locales
- *     (que en modo período solo tienen el UUID del periodoFiscalId).
+ *     data.rango (fechas resueltas por el backend), NO de los params locales.
  */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -42,7 +41,7 @@ vi.mock('../components/boton-exportar-libro-mayor', () => ({
   },
 }));
 
-const dataConPeriodo: LibroMayorResponse = {
+const dataConRango: LibroMayorResponse = {
   rango: { fechaDesde: '2026-05-01', fechaHasta: '2026-05-31' },
   cuentas: [],
   totalDebeBob: '0.00',
@@ -97,7 +96,7 @@ describe('LibroMayorPage — R9: derivación del rango para export', () => {
   it('cuando el hook devuelve data, el rango viene de data.rango.fechaDesde y data.rango.fechaHasta', () => {
     mockBotonExportar.mockClear();
     mockUseLibroMayor.mockReturnValue({
-      data: dataConPeriodo,
+      data: dataConRango,
       isLoading: false,
       isError: false,
       isFetching: false,
@@ -110,7 +109,7 @@ describe('LibroMayorPage — R9: derivación del rango para export', () => {
     );
   });
 
-  it('cuando data es undefined, el rango cae a "sin-rango" (no usa el UUID del período)', () => {
+  it('cuando data es undefined, el rango cae a "sin-rango"', () => {
     mockBotonExportar.mockClear();
     mockSinDatos();
 

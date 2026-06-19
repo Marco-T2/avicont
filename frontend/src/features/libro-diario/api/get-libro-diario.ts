@@ -4,9 +4,9 @@ import type { LibroDiarioParams, LibroDiarioResponse } from '@/types/api';
 /**
  * GET /api/libros/diario — Consulta el Libro Diario del tenant activo.
  *
- * El backend requiere exactamente uno de:
- * (a) periodoFiscalId
- * (b) fechaDesde + fechaHasta
+ * El filtro siempre es un rango de fechas (fechaDesde + fechaHasta).
+ * El componente compartido `PeriodoGestionFiltro` resuelve cualquier preset
+ * a un rango antes de emitir — el wire nunca recibe periodoFiscalId.
  *
  * REQ-LD-01: si no se cumple, el backend responde 400 LIBRO_DIARIO_FILTRO_INVALIDO.
  * REQ-LD-09: requiere permiso contabilidad.libro-diario.read (403 si falta).
@@ -18,9 +18,6 @@ export async function getLibroDiario(
   const res = await api.get<LibroDiarioResponse>('/api/libros/diario', {
     params: {
       ...(params.cuentaId !== undefined ? { cuentaId: params.cuentaId } : {}),
-      ...(params.periodoFiscalId !== undefined
-        ? { periodoFiscalId: params.periodoFiscalId }
-        : {}),
       ...(params.fechaDesde !== undefined ? { fechaDesde: params.fechaDesde } : {}),
       ...(params.fechaHasta !== undefined ? { fechaHasta: params.fechaHasta } : {}),
       ...(params.incluirAnulados === true ? { incluirAnulados: true } : {}),

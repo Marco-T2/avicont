@@ -21,7 +21,7 @@ import { LibroDiarioTabla } from '../components/libro-diario-tabla';
  * Página contenedora del Libro Diario.
  *
  * Orquesta:
- * - LibroDiarioFiltros: formulario de filtros (período O rango + toggle anulados)
+ * - LibroDiarioFiltros: formulario de filtros (rango de fechas + toggle anulados)
  * - useLibroDiario: hook TanStack Query (solo se activa cuando hay filtros válidos)
  * - LibroDiarioTabla: tabla agrupada por asiento con totales al pie
  *
@@ -30,8 +30,6 @@ import { LibroDiarioTabla } from '../components/libro-diario-tabla';
  *
  * Gating: esta página solo es accesible a usuarios con el módulo contabilidad
  * activo — el routing la ubica dentro del DashboardShell (autenticado).
- * Gating granular por permiso contabilidad.libro-diario.read es deuda aceptada
- * (GET /me/permissions no implementado en el frontend aún).
  */
 export function LibroDiarioPage(): React.JSX.Element {
   const [params, setParams] = useState<LibroDiarioParams>({});
@@ -47,30 +45,21 @@ export function LibroDiarioPage(): React.JSX.Element {
   const cuentaFiltro = derivarCuentaFiltroLabel(params.cuentaId, cuentasData?.items ?? []);
 
   function handleBuscar(values: LibroDiarioFiltroValues): void {
-    if (values.modo === 'periodo') {
-      setParams({
-        periodoFiscalId: values.periodoFiscalId,
-        incluirAnulados: values.incluirAnulados,
-        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
-      });
-    } else {
-      setParams({
-        fechaDesde: values.fechaDesde,
-        fechaHasta: values.fechaHasta,
-        incluirAnulados: values.incluirAnulados,
-        ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
-      });
-    }
+    setParams({
+      fechaDesde: values.fechaDesde,
+      fechaHasta: values.fechaHasta,
+      incluirAnulados: values.incluirAnulados,
+      ...(values.cuentaId !== undefined ? { cuentaId: values.cuentaId } : {}),
+    });
   }
 
-  const tieneParams =
-    params.periodoFiscalId !== undefined ||
-    (params.fechaDesde !== undefined && params.fechaHasta !== undefined);
+  // tieneParams: truthy check sobre las fechas (string no vacío).
+  // Evita el bug donde undefined !== undefined daba false pero string vacío pasaba.
+  const tieneParams = Boolean(params.fechaDesde && params.fechaHasta);
 
   // Rango para el nombre del archivo de export.
   // Se deriva del response (data.rango) que trae las fechas RESUELTAS por el backend,
-  // no de los params locales. Así, cuando el modo es período, se usan las fechas reales
-  // del período en lugar del UUID del periodoFiscalId (bug R9).
+  // no de los params locales.
   const rango: string =
     data !== undefined
       ? `${data.rango.fechaDesde}_${data.rango.fechaHasta}`

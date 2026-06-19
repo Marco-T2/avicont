@@ -511,22 +511,8 @@ export interface Gestion {
   updatedAt: string;
 }
 
-export interface Periodo {
-  id: string;
-  gestionId: string;
-  year: number;
-  month: number;
-  ordenEnGestion: number;
-  status: PeriodoFiscalStatus;
-  esDefinitivo: boolean;
-  closedAt: string | null;
-  closedByUserId: string | null;
-  // Derivados puros del (year, month) — el backend los proyecta en la response.
-  fechaInicio: string; // YYYY-MM-DD
-  fechaFin: string; // YYYY-MM-DD
-  createdAt: string;
-  updatedAt: string;
-}
+// Alias del generado — el backend proyecta fechaInicio/fechaFin desde RangoPeriodoFiscal.
+export type Periodo = Schemas['PeriodoFiscalResponseDto'];
 
 // Response de POST /api/gestiones y GET /api/gestiones/:id (incluye los 12).
 export interface GestionConPeriodos extends Gestion {
@@ -710,12 +696,11 @@ export interface AuditoriaEntry {
 // ============================================================
 
 // Query params para GET /api/libros/diario (client-only).
+// El frontend siempre resuelve presets a un rango; el wire nunca recibe periodoFiscalId.
 export interface LibroDiarioParams {
-  /** UUID del período fiscal (exclusivo con fechaDesde/fechaHasta). */
-  periodoFiscalId?: string;
-  /** Inicio del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  /** Inicio del rango YYYY-MM-DD. */
   fechaDesde?: string;
-  /** Fin del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  /** Fin del rango YYYY-MM-DD. */
   fechaHasta?: string;
   /** Si true, incluye asientos anulados (default false — REQ-LD-03). */
   incluirAnulados?: boolean;
@@ -734,14 +719,13 @@ export type LibroDiarioResponse = Schemas['LibroDiarioResponseDto'];
 // ============================================================
 
 // Query params para GET /api/libros/mayor (client-only).
+// El frontend siempre resuelve presets a un rango; el wire nunca recibe periodoFiscalId.
 export interface LibroMayorParams {
   /** UUID de la cuenta. Si se pasa, el Mayor muestra solo esa cuenta de detalle. */
   cuentaId?: string;
-  /** UUID del período fiscal (exclusivo con fechaDesde/fechaHasta). */
-  periodoFiscalId?: string;
-  /** Inicio del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  /** Inicio del rango YYYY-MM-DD. */
   fechaDesde?: string;
-  /** Fin del rango YYYY-MM-DD (exclusivo con periodoFiscalId). */
+  /** Fin del rango YYYY-MM-DD. */
   fechaHasta?: string;
   /** Si true, incluye movimientos de comprobantes anulados (default false — REQ-LM-03). */
   incluirAnulados?: boolean;
