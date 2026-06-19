@@ -39,6 +39,10 @@ export class AsientoLibroDiarioDto {
   /** Flag de anulación ortogonal al estado (§4.7 CLAUDE.md). */
   @ApiProperty() anulado!: boolean;
   @ApiProperty({ type: () => [LineaLibroDiarioDto] }) lineas!: LineaLibroDiarioDto[];
+  /** Suma de los debeBob de las líneas del asiento (subtotal del comprobante). (§4.5) */
+  @ApiProperty({ example: '14593.00' }) totalDebeBob!: string;
+  /** Suma de los haberBob de las líneas del asiento. En un asiento válido: === totalDebeBob. */
+  @ApiProperty({ example: '14593.00' }) totalHaberBob!: string;
 }
 
 export class RangoFechasDto {
@@ -82,8 +86,14 @@ export function toLibroDiarioResponse(
   let totalHaberAcc = new Decimal(0);
 
   const asientos: AsientoLibroDiarioDto[] = rows.map((row) => {
+    let asientoDebeAcc = new Decimal(0);
+    let asientoHaberAcc = new Decimal(0);
+
     const lineas: LineaLibroDiarioDto[] = row.lineas.map((linea) => {
-      // Acumular totales (partida doble §4.1: totalDebe === totalHaber al final)
+      // Subtotal del asiento (partida doble §4.1: debe === haber por comprobante)
+      asientoDebeAcc = asientoDebeAcc.plus(linea.debitoBob);
+      asientoHaberAcc = asientoHaberAcc.plus(linea.creditoBob);
+      // Total general del libro
       totalDebeAcc = totalDebeAcc.plus(linea.debitoBob);
       totalHaberAcc = totalHaberAcc.plus(linea.creditoBob);
 
@@ -105,6 +115,8 @@ export function toLibroDiarioResponse(
       glosa: row.glosa,
       anulado: row.anulado,
       lineas,
+      totalDebeBob: decimalToString(asientoDebeAcc),
+      totalHaberBob: decimalToString(asientoHaberAcc),
     };
   });
 

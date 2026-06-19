@@ -1,86 +1,103 @@
 import { formatearFechaCelda } from '@/lib/export-excel';
-import type { Celda } from '@/lib/export-excel';
-import type { ColumnaPdf } from '@/lib/export-pdf/types';
 import type { LibroDiarioResponse } from '@/types/api';
 
 /**
- * Columnas del Libro Diario en PDF. El `flex` reparte el ancho de la página
- * (espeja proporcionalmente los anchos del Excel: [14,12,35,40,16,16,10]).
+ * Modelo PURO del Libro Diario para el PDF agrupado por comprobante.
+ *
+ * A diferencia del Excel (matriz plana de filas), el Libro Diario en PDF se
+ * presenta como el contador boliviano lo reconoce: agrupado por comprobante
+ * (asiento), con su encabezado (tipo + número + fecha), sus líneas, su subtotal
+ * y UNA glosa por comprobante. Este modelo es serializable y testeable: NO
+ * arrastra @react-pdf/renderer. El renderer (construir-libro-diario-pdf) lo consume.
+ *
+ * §4.5: los montos viajan como string crudo del backend; el formateo de
+ * presentación ocurre en el render, NUNCA se suman ni recalculan en el cliente.
+ * §4.6: la fecha se formatea vía formatearFechaCelda (sin Date/UTC).
  */
-export const COLUMNAS_LIBRO_DIARIO_PDF: ColumnaPdf[] = [
-  { flex: 14 }, // Fecha
-  { flex: 12 }, // Código
-  { flex: 35 }, // Cuenta
-  { flex: 40 }, // Glosa
-  { flex: 16 }, // Debe (BOB)
-  { flex: 16 }, // Haber (BOB)
-  { flex: 10 }, // Estado
-];
+export interface FilaAsientoPdf {
+  codigo: string;
+  nombre: string;
+  /** Monto debe en BOB como string crudo del backend. */
+  debe: string;
+  /** Monto haber en BOB como string crudo del backend. */
+  haber: string;
+}
+
+export interface AsientoPdf {
+  /** Etiqueta user-facing del tipo (ej. "Egreso"). */
+  tipoLabel: string;
+  /** Número correlativo o placeholder si el asiento aún no fue contabilizado. */
+  numero: string;
+  /** Fecha contable formateada dd/mm/yyyy (§4.6). */
+  fecha: string;
+  anulado: boolean;
+  filas: FilaAsientoPdf[];
+  /** Subtotal debe del comprobante (del backend, §4.5). */
+  totalDebe: string;
+  /** Subtotal haber del comprobante (del backend, §4.5). */
+  totalHaber: string;
+  /** Glosa única del comprobante. */
+  glosa: string;
+}
+
+export interface LibroDiarioPdfModelo {
+  asientos: AsientoPdf[];
+  /** Total general debe (del backend, §4.5). */
+  totalDebe: string;
+  /** Total general haber (del backend, §4.5). */
+  totalHaber: string;
+}
 
 /**
- * Mapea una respuesta del Libro Diario a la matriz de celdas del cuerpo del PDF.
- *
- * A diferencia del Excel (`mapearLibroDiarioAFilas`), NO incluye la cabecera
- * fiscal: en el PDF la cabecera se renderiza como bloque full-width aparte,
- * porque en una tabla de columnas fijas las líneas "Etiqueta: valor" quedarían
- * comprimidas. La matriz contiene:
- *
- * 1. Fila de encabezados de columna (negrita).
- * 2. Por cada asiento → por cada línea: fila de detalle.
- * 3. Fila de totales con totalDebeBob / totalHaberBob del backend.
- *
- * §4.5: los montos viajan como CeldaNumero con el string del backend; el formateo
- * de presentación ocurre en el render (tabla-pdf), NUNCA se suman en cliente.
- * §4.6: fechaContable se convierte vía formatearFechaCelda (sin Date/UTC).
+ * Etiquetas user-facing de los tipos de comprobante (§1: "asiento" es vocabulario
+ * de dominio user-facing). Espeja el enum TipoComprobante del backend.
  */
-export function mapearLibroDiarioACeldasPdf(response: LibroDiarioResponse): Celda[][] {
-  const filas: Celda[][] = [];
+const ETIQUETAS_TIPO_COMPROBANTE: Readonly<Record<string, string>> = {
+  APERTURA: 'Apertura',
+  DIARIO: 'Diario',
+  INGRESO: 'Ingreso',
+  EGRESO: 'Egreso',
+  AJUSTE: 'Ajuste',
+  TRASPASO: 'Traspaso',
+  CIERRE: 'Cierre',
+};
 
-  // 1. Encabezados de columna — negrita para resaltar la estructura del informe
-  filas.push([
-    { type: 'texto', value: 'Fecha', fontWeight: 'bold' },
-    { type: 'texto', value: 'Código', fontWeight: 'bold' },
-    { type: 'texto', value: 'Cuenta', fontWeight: 'bold' },
-    { type: 'texto', value: 'Glosa', fontWeight: 'bold' },
-    { type: 'texto', value: 'Debe (BOB)', fontWeight: 'bold' },
-    { type: 'texto', value: 'Haber (BOB)', fontWeight: 'bold' },
-    { type: 'texto', value: 'Estado', fontWeight: 'bold' },
-  ]);
+/** Placeholder para el número de un asiento sin contabilizar (numero === null). */
+const SIN_NUMERO = '—';
 
-  // 2. Filas de detalle: aplanar asientos → líneas
-  for (const asiento of response.asientos) {
-    const fechaCelda = formatearFechaCelda(asiento.fechaContable);
-    const estadoCelda: Celda = {
-      type: 'texto',
-      // §4.7: asientos anulados se marcan visualmente en el informe
-      value: asiento.anulado ? 'Anulado' : '',
-    };
+/** Traduce el tipo del backend a su etiqueta user-facing; ante uno desconocido, lo deja crudo. */
+export function etiquetaTipoComprobante(tipo: string): string {
+  return ETIQUETAS_TIPO_COMPROBANTE[tipo] ?? tipo;
+}
 
-    for (const linea of asiento.lineas) {
-      filas.push([
-        { type: 'texto', value: fechaCelda },
-        { type: 'texto', value: linea.codigoCuenta },
-        { type: 'texto', value: linea.nombreCuenta },
-        // §null-safety: glosa puede ser null — nunca imprimir "null"
-        { type: 'texto', value: linea.glosa ?? '' },
-        // §4.5: monto como string crudo; el render lo formatea para presentación
-        { type: 'numero', value: linea.debeBob },
-        { type: 'numero', value: linea.haberBob },
-        estadoCelda,
-      ]);
-    }
-  }
+/**
+ * Mapea la respuesta del Libro Diario al modelo PDF agrupado por comprobante.
+ *
+ * Los subtotales por asiento y el total general vienen ya computados del backend
+ * (Decimal-safe); el cliente solo maqueta (§4.5).
+ */
+export function mapearLibroDiarioADocumentoPdf(
+  response: LibroDiarioResponse,
+): LibroDiarioPdfModelo {
+  const asientos: AsientoPdf[] = response.asientos.map((asiento) => ({
+    tipoLabel: etiquetaTipoComprobante(asiento.tipo),
+    numero: asiento.numero ?? SIN_NUMERO,
+    fecha: formatearFechaCelda(asiento.fechaContable),
+    anulado: asiento.anulado,
+    filas: asiento.lineas.map((linea) => ({
+      codigo: linea.codigoCuenta,
+      nombre: linea.nombreCuenta,
+      debe: linea.debeBob,
+      haber: linea.haberBob,
+    })),
+    totalDebe: asiento.totalDebeBob,
+    totalHaber: asiento.totalHaberBob,
+    glosa: asiento.glosa,
+  }));
 
-  // 3. Fila de totales — valores del backend, SIN recalcular en cliente; negrita
-  filas.push([
-    { type: 'texto', value: 'TOTAL', fontWeight: 'bold' },
-    { type: 'texto', value: '', fontWeight: 'bold' },
-    { type: 'texto', value: '', fontWeight: 'bold' },
-    { type: 'texto', value: '', fontWeight: 'bold' },
-    { type: 'numero', value: response.totalDebeBob, fontWeight: 'bold' },
-    { type: 'numero', value: response.totalHaberBob, fontWeight: 'bold' },
-    { type: 'texto', value: '', fontWeight: 'bold' },
-  ]);
-
-  return filas;
+  return {
+    asientos,
+    totalDebe: response.totalDebeBob,
+    totalHaber: response.totalHaberBob,
+  };
 }

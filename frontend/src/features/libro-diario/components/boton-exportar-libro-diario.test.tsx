@@ -42,6 +42,8 @@ const dataValida: LibroDiarioResponse = {
       estado: 'CONTABILIZADO',
       glosa: 'Venta',
       anulado: false,
+      totalDebeBob: '0.00',
+      totalHaberBob: '0.00',
       lineas: [
         {
           codigoCuenta: '1101',

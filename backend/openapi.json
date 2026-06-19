@@ -8827,6 +8827,14 @@
             "items": {
               "$ref": "#/components/schemas/LineaLibroDiarioDto"
             }
+          },
+          "totalDebeBob": {
+            "type": "string",
+            "example": "14593.00"
+          },
+          "totalHaberBob": {
+            "type": "string",
+            "example": "14593.00"
           }
         },
         "required": [
@@ -8837,7 +8845,9 @@
           "estado",
           "glosa",
           "anulado",
-          "lineas"
+          "lineas",
+          "totalDebeBob",
+          "totalHaberBob"
         ]
       },
       "LibroDiarioResponseDto": {

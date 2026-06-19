@@ -14,6 +14,8 @@ const asientoContabilizado: AsientoLibroDiario = {
   estado: 'CONTABILIZADO',
   glosa: 'Pago proveedor materiales',
   anulado: false,
+  totalDebeBob: '0.00',
+  totalHaberBob: '0.00',
   lineas: [
     {
       codigoCuenta: '4.1.1',
@@ -40,6 +42,8 @@ const asientoAnulado: AsientoLibroDiario = {
   estado: 'CONTABILIZADO',
   glosa: 'Compra anulada',
   anulado: true,
+  totalDebeBob: '0.00',
+  totalHaberBob: '0.00',
   lineas: [
     {
       codigoCuenta: '4.1.2',
@@ -66,6 +70,8 @@ const asientoBloqueado: AsientoLibroDiario = {
   estado: 'BLOQUEADO',
   glosa: 'Cierre del período',
   anulado: false,
+  totalDebeBob: '0.00',
+  totalHaberBob: '0.00',
   lineas: [
     {
       codigoCuenta: '3.1.1',

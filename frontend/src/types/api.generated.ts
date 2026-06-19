@@ -3130,6 +3130,10 @@ export interface components {
             glosa: string;
             anulado: boolean;
             lineas: components["schemas"]["LineaLibroDiarioDto"][];
+            /** @example 14593.00 */
+            totalDebeBob: string;
+            /** @example 14593.00 */
+            totalHaberBob: string;
         };
         LibroDiarioResponseDto: {
             rango: components["schemas"]["RangoFechasDto"];
