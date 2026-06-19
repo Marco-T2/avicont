@@ -29,6 +29,22 @@ minimumReleaseAgeStrict: true
 # transitivas con advisory HIGH (pnpm audit --audit-level high las bloquea).
 # - form-data <4.0.6 (vía supertest/@types/supertest): GHSA-hmw2-7cc7-3qxx (CRLF injection).
 # - protobufjs <=7.6.0 (vía @nestjs/terminus>@grpc, @opentelemetry): DoS por Any expansion.
+# - multer <2.2.0 (vía @nestjs/platform-express, 8 rutas): GHSA-72gw-mp4g-v24j (DoS por
+#   nombres de campo profundamente anidados). El override cubre las transitivas; la dep
+#   directa (devDependencies) también se subió a ^2.2.0.
 overrides:
   form-data: '>=4.0.6'
   protobufjs: '>=7.6.1'
+  multer: '>=2.2.0'
+
+# Excepciones del audit gate (pnpm audit --audit-level high). Time-boxed: solo
+# para advisories cuyo PARCHE existe pero aún no es instalable por nuestro propio
+# minimumReleaseAge (72h). Remover en cuanto el parche madure y bumpear la dep.
+# - nodemailer GHSA-p6gq-j5cr-w38f (HIGH): la opción `raw` a nivel de mensaje bypassa
+#   disableFileAccess/disableUrlAccess (arbitrary file read / SSRF). NO la usamos
+#   (smtp.adapter solo pasa from/to/subject/text/html/replyTo/attachments). Parche 9.0.1
+#   publicado 2026-06-17, bloqueado por el cooldown hasta ~2026-06-20. ACCIÓN: al madurar,
+#   bumpear nodemailer ^7→^9.0.1 (+ @types/nodemailer) y BORRAR este ignore.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-p6gq-j5cr-w38f
