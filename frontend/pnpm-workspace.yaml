@@ -17,6 +17,11 @@ minimumReleaseAgeStrict: true
 # transitivas con advisory HIGH (pnpm audit --audit-level high las bloquea).
 # - form-data <4.0.6 (vía axios): GHSA-hmw2-7cc7-3qxx (CRLF injection).
 # - vite 8.0.0–8.0.15: GHSA-fx2h-pf6j-xcff (server.fs.deny bypass).
+# - undici 7.0.0–7.27.x (vía jsdom/vitest, solo dev): GHSA-vxpw-j846-p89q /
+#   GHSA-hm92-r4w5-c3mj / TLS cert bypass. Parche 7.28.0 (maduro). Dev-only: no entra
+#   al runtime del bundle. Tope <8: jsdom@29 alcanza internals de undici (wrap-handler)
+#   que cambiaron en 8.x; sin el tope, el override sube a 8.x y rompe jsdom.
 overrides:
   form-data: '>=4.0.6'
   vite: '>=8.0.16'
+  undici: '^7.28.0'
