@@ -148,4 +148,30 @@ describe('BotonExportarLibroDiarioPdf', () => {
     expect(nombreArg).toContain('libro-diario');
     expect(nombreArg).toContain('2026-06');
   });
+
+  it('declara el filtro de cuenta en el subtítulo cuando se pasa cuentaFiltro', async () => {
+    mockPermissions(true);
+    const user = userEvent.setup();
+    vi.spyOn(exportExcelModule, 'descargarBlob').mockImplementation(() => undefined);
+
+    render(
+      <Wrapper>
+        <BotonExportarLibroDiarioPdf
+          data={dataValida}
+          perfil={null}
+          rango="2026-06"
+          cuentaFiltro="1.1.1.001 — Caja"
+        />
+      </Wrapper>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /exportar a pdf/i }));
+
+    await waitFor(() => {
+      expect(construirLibroDiarioPdfMock).toHaveBeenCalledOnce();
+    });
+
+    const params = construirLibroDiarioPdfMock.mock.calls[0]?.[0];
+    expect(params?.subtitulo).toBe('Del 01/06/2026 al 30/06/2026\nFiltrado por cuenta: 1.1.1.001 — Caja');
+  });
 });

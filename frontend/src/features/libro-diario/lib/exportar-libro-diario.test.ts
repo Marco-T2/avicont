@@ -320,4 +320,25 @@ describe('mapearLibroDiarioAFilas', () => {
       expect('fontWeight' in celda).toBe(false);
     });
   });
+
+  it('declara el filtro de cuenta en el encabezado cuando se pasa cuentaFiltro', () => {
+    const response = crearResponseLibroDiario();
+    const filas = mapearLibroDiarioAFilas(response, perfilTodoNull, '1.1.1.001 — Caja');
+
+    // Sin cabecera fiscal (todo null), la fila del filtro queda al inicio.
+    const filaFiltro = filas[0];
+    expect(filaFiltro?.[0]).toEqual({
+      type: 'texto',
+      value: 'Filtrado por cuenta: 1.1.1.001 — Caja',
+      fontWeight: 'bold',
+    });
+  });
+
+  it('NO agrega la fila de filtro cuando cuentaFiltro es undefined (índices intactos)', () => {
+    const response = crearResponseLibroDiario();
+    const filas = mapearLibroDiarioAFilas(response, perfilTodoNull);
+
+    // Fila 0 sigue siendo la de encabezados de columna, no un filtro.
+    expect(filas[0]?.[0]).toMatchObject({ type: 'texto', value: 'Fecha' });
+  });
 });
