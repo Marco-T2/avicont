@@ -6,21 +6,30 @@ import { CuentasModule } from '@/cuentas/cuentas.module';
 import { PacksModule } from '@/packs/pack.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
+import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
+import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
+import { PrismaImportacionExtractoRepository } from './adapters/prisma-importacion-extracto.repository';
+import { PrismaMovimientoBancarioRepository } from './adapters/prisma-movimiento-bancario.repository';
+import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
 import { CuentasBancariasController } from './cuentas-bancarias.controller';
 import { CuentasBancariasService } from './cuentas-bancarias.service';
+import { ExtractoImportadorService } from './extracto-importador.service';
+import { ExtractoParserLookupService } from './extracto-parser-lookup.service';
 import { CUENTA_BANCARIA_REPOSITORY_PORT } from './ports/cuenta-bancaria.repository.port';
+import { EXTRACTO_PARSERS } from './ports/extracto-parser.registry';
+import { IMPORTACION_EXTRACTO_REPOSITORY_PORT } from './ports/importacion-extracto.repository.port';
+import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario.repository.port';
 
-// Slice 1 del change `conciliacion-bancaria`: CRUD de `CuentaBancaria`.
+// Slice 3 del change `conciliacion-bancaria`: adaptador XLSX core-compartido
+// (BancoSol + Económico) + importación end-to-end.
 //
-// `ExtractoParserRegistry`/`EXTRACTO_PARSERS` NO se wirean todavía (ver
-// `ports/extracto-parser.registry.ts`) — los 3 adapters concretos llegan en
-// slices 3-4. El registry valida en su constructor que TODOS los valores de
-// `PerfilExtracto` tengan adapter (fail-fast en bootstrap); wirearlo hoy con
-// una lista vacía/parcial rompería el arranque de TODA la app. Por eso el
-// endpoint `GET /cuentas-bancarias/perfiles` de tasks.md 1.10 también queda
-// diferido a cuando el registry tenga al menos wiring parcial coherente con
-// slice 3 (ver reporte de apply de este slice para el detalle).
+// `EXTRACTO_PARSERS` v1 PARCIAL: solo 2 de los 3 valores de `PerfilExtracto`
+// tienen adapter (`UNION_XLSX` llega en el slice 4). Por eso este módulo NO
+// provee la `ExtractoParserRegistry` fail-fast de `ports/extracto-parser.registry.ts`
+// (slice 1) — su constructor exige los 3 valores o revienta el bootstrap.
+// En su lugar se provee `ExtractoParserLookupService` (lookup LENIENTE, sin
+// fail-fast, ver ese archivo para el detalle y el TODO del slice 4).
 //
 // `CUENTAS_READER_PORT` entra por `CuentasModule` (§3.7 CLAUDE.md — port para
 // lecturas síncronas cross-módulo, ya usado por `ComprobantesModule`).
@@ -32,9 +41,31 @@ import { CUENTA_BANCARIA_REPOSITORY_PORT } from './ports/cuenta-bancaria.reposit
     PrismaService,
     TenantContextService,
     CuentasBancariasService,
+    ExtractoImportadorService,
+    ExtractoParserLookupService,
 
     PrismaCuentaBancariaRepository,
     { provide: CUENTA_BANCARIA_REPOSITORY_PORT, useExisting: PrismaCuentaBancariaRepository },
+
+    PrismaMovimientoBancarioRepository,
+    {
+      provide: MOVIMIENTO_BANCARIO_REPOSITORY_PORT,
+      useExisting: PrismaMovimientoBancarioRepository,
+    },
+
+    PrismaImportacionExtractoRepository,
+    {
+      provide: IMPORTACION_EXTRACTO_REPOSITORY_PORT,
+      useExisting: PrismaImportacionExtractoRepository,
+    },
+
+    {
+      provide: EXTRACTO_PARSERS,
+      useFactory: () => [
+        new XlsxCoreExtractoParser(DIALECTO_BANCOSOL),
+        new XlsxCoreExtractoParser(DIALECTO_ECONOMICO),
+      ],
+    },
   ],
 })
 export class ConciliacionBancariaModule {}

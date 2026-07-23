@@ -5608,6 +5608,36 @@
         ]
       }
     },
+    "/api/cuentas-bancarias/perfiles": {
+      "get": {
+        "operationId": "CuentasBancariasController_listarPerfiles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PerfilExtractoResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Catálogo de perfiles de extracto soportados (banco/formato, instructivo, checksum). Única fuente de verdad para la UI.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
     "/api/cuentas-bancarias": {
       "post": {
         "operationId": "CuentasBancariasController_crear",
@@ -5801,6 +5831,117 @@
           }
         ],
         "summary": "Elimina una cuenta bancaria. Falla con 409 si tiene movimientos o importaciones asociadas.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/cuentas-bancarias/{id}/importaciones": {
+      "post": {
+        "operationId": "CuentasBancariasController_importarExtracto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "confirmarNumeroCuenta": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportarExtractoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Importa un extracto bancario (design §10). Ver REQ-CB-16 para el flujo de confirmación de número de cuenta.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "get": {
+        "operationId": "CuentasBancariasController_listarImportaciones",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarImportacionesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista las importaciones de una cuenta bancaria, más reciente primero.",
         "tags": [
           "Conciliación bancaria — Cuentas bancarias"
         ]
@@ -10285,6 +10426,67 @@
           "cuentasEfectivoDetectadasPorHeuristica"
         ]
       },
+      "PerfilExtractoResponseDto": {
+        "type": "object",
+        "properties": {
+          "perfil": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "banco": {
+            "type": "string"
+          },
+          "formato": {
+            "type": "string"
+          },
+          "extensiones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estrategiaChecksum": {
+            "type": "string"
+          },
+          "soportaContraparte": {
+            "type": "boolean"
+          },
+          "soportaHora": {
+            "type": "boolean"
+          },
+          "exponeNumeroCuenta": {
+            "type": "boolean"
+          },
+          "instruccionesDescarga": {
+            "type": "string"
+          },
+          "advertencia": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "perfil",
+          "banco",
+          "formato",
+          "extensiones",
+          "mimeTypes",
+          "estrategiaChecksum",
+          "soportaContraparte",
+          "soportaHora",
+          "exponeNumeroCuenta",
+          "instruccionesDescarga"
+        ]
+      },
       "CreateCuentaBancariaDto": {
         "type": "object",
         "properties": {
@@ -10441,6 +10643,180 @@
             "description": "Activar o desactivar la cuenta bancaria sin eliminarla."
           }
         }
+      },
+      "AdvertenciaImportacionDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "mensaje"
+        ]
+      },
+      "ImportarExtractoResponseDto": {
+        "type": "object",
+        "properties": {
+          "requiereConfirmacionCuenta": {
+            "type": "boolean"
+          },
+          "numeroDetectado": {
+            "type": "string",
+            "description": "Solo si requiereConfirmacionCuenta=true (REQ-CB-16)."
+          },
+          "importacionId": {
+            "type": "string"
+          },
+          "movimientosNuevos": {
+            "type": "number"
+          },
+          "movimientosDuplicados": {
+            "type": "number"
+          },
+          "filasLeidas": {
+            "type": "number"
+          },
+          "estadoVerificacion": {
+            "type": "string",
+            "enum": [
+              "VERIFICADO",
+              "SIN_VERIFICAR",
+              "DESCUADRE"
+            ]
+          },
+          "diferencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaImportacionDto"
+            }
+          }
+        },
+        "required": [
+          "requiereConfirmacionCuenta"
+        ]
+      },
+      "ImportacionExtractoListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombreArchivo": {
+            "type": "string"
+          },
+          "sha256Archivo": {
+            "type": "string"
+          },
+          "tamanioBytes": {
+            "type": "number"
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "fechaDesde": {
+            "type": "string"
+          },
+          "fechaHasta": {
+            "type": "string"
+          },
+          "coberturaDeclarada": {
+            "type": "boolean"
+          },
+          "saldoInicial": {
+            "type": "string",
+            "nullable": true
+          },
+          "saldoFinal": {
+            "type": "string",
+            "nullable": true
+          },
+          "estadoVerificacion": {
+            "type": "string",
+            "enum": [
+              "VERIFICADO",
+              "SIN_VERIFICAR",
+              "DESCUADRE"
+            ]
+          },
+          "diferencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "filasLeidas": {
+            "type": "number"
+          },
+          "movimientosNuevos": {
+            "type": "number"
+          },
+          "movimientosDuplicados": {
+            "type": "number"
+          },
+          "importadoPorUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombreArchivo",
+          "sha256Archivo",
+          "tamanioBytes",
+          "perfilExtracto",
+          "fechaDesde",
+          "fechaHasta",
+          "coberturaDeclarada",
+          "saldoInicial",
+          "saldoFinal",
+          "estadoVerificacion",
+          "diferencia",
+          "filasLeidas",
+          "movimientosNuevos",
+          "movimientosDuplicados",
+          "importadoPorUserId",
+          "createdAt"
+        ]
+      },
+      "ListarImportacionesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportacionExtractoListItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
       },
       "MePermissionsResponseDto": {
         "type": "object",

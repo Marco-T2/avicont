@@ -1912,6 +1912,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cuentas-bancarias/perfiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo de perfiles de extracto soportados (banco/formato, instructivo, checksum). Única fuente de verdad para la UI. */
+        get: operations["CuentasBancariasController_listarPerfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cuentas-bancarias": {
         parameters: {
             query?: never;
@@ -1947,6 +1964,24 @@ export interface paths {
         head?: never;
         /** PATCH de la cuenta bancaria. cuentaId y perfilExtracto son inmutables — no se exponen acá. */
         patch: operations["CuentasBancariasController_actualizar"];
+        trace?: never;
+    };
+    "/api/cuentas-bancarias/{id}/importaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista las importaciones de una cuenta bancaria, más reciente primero. */
+        get: operations["CuentasBancariasController_listarImportaciones"];
+        put?: never;
+        /** Importa un extracto bancario (design §10). Ver REQ-CB-16 para el flujo de confirmación de número de cuenta. */
+        post: operations["CuentasBancariasController_importarExtracto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/me/permissions": {
@@ -3558,6 +3593,20 @@ export interface components {
             advertencias: string[];
             cuentasEfectivoDetectadasPorHeuristica: components["schemas"]["CuentaEfectivoHeuristicaDto"][];
         };
+        PerfilExtractoResponseDto: {
+            /** @enum {string} */
+            perfil: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            banco: string;
+            formato: string;
+            extensiones: string[];
+            mimeTypes: string[];
+            estrategiaChecksum: string;
+            soportaContraparte: boolean;
+            soportaHora: boolean;
+            exponeNumeroCuenta: boolean;
+            instruccionesDescarga: string;
+            advertencia?: string;
+        };
         CreateCuentaBancariaDto: {
             /**
              * Format: uuid
@@ -3616,6 +3665,50 @@ export interface components {
             moneda?: "BOB" | "USD";
             /** @description Activar o desactivar la cuenta bancaria sin eliminarla. */
             activa?: boolean;
+        };
+        AdvertenciaImportacionDto: {
+            codigo: string;
+            mensaje: string;
+        };
+        ImportarExtractoResponseDto: {
+            requiereConfirmacionCuenta: boolean;
+            /** @description Solo si requiereConfirmacionCuenta=true (REQ-CB-16). */
+            numeroDetectado?: string;
+            importacionId?: string;
+            movimientosNuevos?: number;
+            movimientosDuplicados?: number;
+            filasLeidas?: number;
+            /** @enum {string} */
+            estadoVerificacion?: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
+            diferencia?: string | null;
+            advertencias?: components["schemas"]["AdvertenciaImportacionDto"][];
+        };
+        ImportacionExtractoListItemDto: {
+            id: string;
+            nombreArchivo: string;
+            sha256Archivo: string;
+            tamanioBytes: number;
+            /** @enum {string} */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            fechaDesde: string;
+            fechaHasta: string;
+            coberturaDeclarada: boolean;
+            saldoInicial: string | null;
+            saldoFinal: string | null;
+            /** @enum {string} */
+            estadoVerificacion: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
+            diferencia: string | null;
+            filasLeidas: number;
+            movimientosNuevos: number;
+            movimientosDuplicados: number;
+            importadoPorUserId: string;
+            createdAt: string;
+        };
+        ListarImportacionesResponseDto: {
+            items: components["schemas"]["ImportacionExtractoListItemDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -7274,6 +7367,25 @@ export interface operations {
             };
         };
     };
+    CuentasBancariasController_listarPerfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerfilExtractoResponseDto"][];
+                };
+            };
+        };
+    };
     CuentasBancariasController_listar: {
         parameters: {
             query?: {
@@ -7382,6 +7494,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_listarImportaciones: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarImportacionesResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_importarExtracto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                    /** @enum {string} */
+                    confirmarNumeroCuenta?: "true" | "false";
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportarExtractoResponseDto"];
                 };
             };
         };

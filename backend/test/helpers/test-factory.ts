@@ -105,9 +105,13 @@ export async function cleanupTestData() {
   await prisma.orgConfiguracionContable.deleteMany({});
   // Conciliación bancaria (slice 1): CuentaBancaria tiene FK Restrict hacia
   // Cuenta (onDelete: Restrict) — debe borrarse ANTES de `cuenta.deleteMany`.
-  // MovimientoBancario/ImportacionExtracto/MatchConciliacion llegan en
-  // slices 3/5; cuando existan filas de esas tablas en tests, agregar su
-  // limpieza ACÁ ANTES de esta línea (tienen FK Restrict hacia CuentaBancaria).
+  // Slice 3: MovimientoBancario/ImportacionExtracto tienen FK Restrict hacia
+  // CuentaBancaria — se borran ANTES de `cuentaBancaria.deleteMany`.
+  // MatchConciliacion llega en slice 5: cuando existan filas en tests, agregar
+  // su limpieza ACÁ ANTES de esta línea (FK Cascade hacia MovimientoBancario,
+  // pero mejor explícito).
+  await prisma.movimientoBancario.deleteMany({});
+  await prisma.importacionExtracto.deleteMany({});
   await prisma.cuentaBancaria.deleteMany({});
   await prisma.cuenta.deleteMany({});
   // Gestiones + períodos fiscales (Fase 1.2). Orden importa por las FKs.

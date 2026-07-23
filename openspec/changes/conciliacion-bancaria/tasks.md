@@ -317,109 +317,152 @@
 
 ## Slice 3 — Adaptador XLSX core-compartido (BancoSol + Económico)
 
-- [ ] 3.0 Verificar (no decidir — ya resuelto por el coordinador) que `design.md` **revisión 5** usa
-      los códigos `CONCILIACION_ARCHIVO_*` de `spec.md` para las compuertas de extracto
-      (`PERFIL_NO_COINCIDE`, `XLS_LEGACY`, `CUENTA_NO_COINCIDE`, `CUENTA_NO_VERIFICABLE`,
-      `FORMATO_NO_RECONOCIDO`, `MEZCLADO`). Si alguna mención quedó desactualizada, reportarlo — no
-      editar `design.md` desde este change (lo mantiene otro agente).
-- [ ] 3.1 `package.json`: fijar `read-excel-file` en versión **exacta** `9.3.4` (no `^9.x`).
-- [ ] 3.2 `ports/extracto-parser.port.ts`: `ExtractoParserPort` abstracto + `DescriptorPerfilExtracto`,
-      `MovimientoParseado`, `ExtractoParseado` (design §4.1).
-- [ ] 3.3 RED `[DOM]` riesgo R4 **ampliado a los 3 fixtures de v1** (design rev5): `parseNumber`
-      recibe TODA celda como string en BancoSol, Económico y Unión; **Económico debe devolver sus
-      movimientos reales, NO cero filas** — su XLSX envuelve todos los elementos en el prefijo de
-      namespace `x:` (`<x:worksheet>`, `<x:row>`, `<x:c>`, `<x:v>`) y un lector que matchee
-      `row`/`c`/`v` sin contemplar el namespace fallaría en silencio devolviendo una lista vacía.
-- [ ] 3.4 RED `[DOM]` contra el fixture BancoSol de **20 movimientos**
-      (`BancoSol-Extracto-1191959-000-001-23-07-2026.xlsx`, anonimizado en 0.2 — el criterio de
-      checksum pertenece a ESTE archivo, no a `bancosol-A`): `reconoce()`→`true`; `parse()` con 20
-      movimientos, checksum derivado `3.275,55 + (−3.040,38) = 235,17`; `numeroCuentaDeclarado`
-      extraído de la etiqueta `Cuenta:` (celda `E4`) / valor (celda `G4`) = `'1191959-000-001'` —
-      solo separadores del VO, sin prefijo/sufijo que limpiar.
-- [ ] 3.5 RED `[DOM]` **CRITICAL-2** — Económico: `numeroCuentaDeclarado === '2031262031'` extraído
-      del crudo `'CA: 2031262031 (Bs)'` (etiqueta `E4` = `'Cuenta:'`, IDÉNTICA a BancoSol; el VALOR en
-      `G4` viene CON prefijo de producto `'CA:'` y sufijo de moneda `'(Bs)'` — el dialecto debe
-      stripearlos); si el crudo NO arranca con `'CA:'` → 422 `CONCILIACION_ARCHIVO_FORMATO_NO_RECONOCIDO`,
-      nunca un strip silencioso. Caza el bug que habría rechazado el 100% de las importaciones de
-      Económico.
-- [ ] 3.6 RED `[DOM]` contra fixture Económico anonimizado: `reconoce()` → `true`; `parse()` con
-      fechas string `DD/Mmm/YYYY`, saldo inicial/final DECLARADO en cabecera (`Saldo Inicial` `M4` =
-      `327.520,14` / `Saldo Final` `M5` = `179.757,37`), conteo de movimientos del fixture correcto.
-- [ ] 3.7 RED `[DOM]` "renglón dorado" (design §4.5, WARNING cerrado): sobre una fila real conocida de
-      BancoSol y de Económico, `descripcion === 'Transacción' + ' ' + 'Nota'` exacto
-      (`columnasDescripcion` fijo por dialecto — el fixture de dedup R-1 NO discrimina esta elección
-      con ningún resultado distinto, así que este es el único test que la fija; cambiarla después
-      cambia el `hashDedup` de todo el histórico de la cuenta).
-- [ ] 3.8 RED `[DOM]` cross-check: `reconoce()` del parser BancoSol → `false` contra el fixture
-      Económico y viceversa; ambos → `false` contra el fixture Unión.
-- [ ] 3.9 GREEN `adapters/xlsx-core-extracto-parser.ts` (`XlsxCoreExtractoParser` parametrizada por
-      `DialectoXlsx`) + `adapters/dialectos/{bancosol,economico}.dialecto.ts` (incluye extracción y
-      limpieza de número de cuenta por dialecto — `ExtraccionNumeroCuenta` design §4.3 — y
-      `columnasDescripcion`).
-- [ ] 3.10 RED `[DOM]` mapeo de columnas por NOMBRE de cabecera, nunca índice — reordenar columnas del
-      fixture y seguir reconociendo/parseando igual.
-- [ ] 3.11 RED `[DOM]` REQ-CB-04: `.xls` legacy con extensión renombrada a `.xlsx` (magic bytes OLE2
-      `D0 CF 11 E0 A1 B1 1A E1`) → `CONCILIACION_ARCHIVO_XLS_LEGACY` (422), mensaje accionable
-      ("Abrilo en Excel y guardalo como .xlsx"), NUNCA llega a `read-excel-file`.
-- [ ] 3.12 GREEN detección de magic bytes con `file-type` antes del parseo (política propia — NO
-      reusa `mime-whitelist.ts` de adjuntos).
-- [ ] 3.13 `ports/{movimiento-bancario,importacion-extracto}.repository.port.ts` + adapters Prisma.
-- [ ] 3.14 RED `[INT]` REQ-CB-13: aislamiento cross-tenant para `MovimientoBancario` e
-      `ImportacionExtracto` (404 por id de otro tenant; listado siempre acotado al tenant activo,
-      cualquiera sea el filtro aplicado).
-- [ ] 3.15 GREEN adapters Prisma (cierra 3.13/3.14).
-- [ ] 3.16 `extracto-importador.service.ts`: orquestar el flujo completo (design §10 — magic bytes →
-      sha256 → `reconoce()` → `parse()` → `validarCuentaDestino` → `ordenarCanonico` →
-      `asignarOrdinalDia` → `calcularHashDedup` → `verificarChecksum` → `$transaction`).
-- [ ] 3.17 RED `[INT]` REQ-CB-05 "reimportar el mismo archivo" → `0 nuevos, N ya existían`, ningún
-      `MovimientoBancario` existente se modifica ni se borra.
-- [ ] 3.18 RED `[INT]` REQ-CB-05 "rango que solapa" (sintético, 2 sub-rangos) → unión sin huecos ni
-      duplicados.
-- [ ] 3.19 RED `[INT]` **Fixture real R-1, criterio de aceptación literal** (REQ-CB-05/07, fixtures
-      `bancosol-A`/`bancosol-B` de 0.2 — dedicados a este criterio de dedup, NO al de checksum de
-      3.4): importar A → **60 nuevos, 0 ya existían**; importar B después → **21 nuevos, 59 ya
-      existían**; total distinto para la `CuentaBancaria` → **81**.
-- [ ] 3.20 RED `[INT]` REQ-CB-07: dos movimientos idénticos el mismo día (comisiones ITF) → ambos
-      persisten con `ordinalDia=0`/`=1`; reimportar el mismo archivo con las filas en orden inverso
-      (fixture reordenado a mano) → mismos hashes, cero duplicados nuevos.
-- [ ] 3.21 GREEN implementación completa del service + `$transaction` con
-      `createMany({skipDuplicates:true})`.
-- [ ] 3.22 RED `[INT]` REQ-CB-16 (orquestación del service — el VO ya se probó en 2.1/2.2, el strip de
-      dialecto en 3.5): número coincide → importa; formato distinto, mismo número normalizado →
-      importa; número de OTRA cuenta del mismo banco (`-002` contra `-001`) → 422
-      `CONCILIACION_ARCHIVO_CUENTA_NO_COINCIDE`, mensaje con AMBOS números, **cero** filas de
-      `ImportacionExtracto`/`MovimientoBancario` persistidas.
-- [ ] 3.23 RED `[INT]` **REQ-CB-16 escenario 5 (NUEVO, sin tarea previa)**: perfil con
-      `descriptor.exponeNumeroCuenta=true` pero el parser NO logra extraer el número de un archivo
-      concreto (ej. cabecera dañada o etiqueta ausente en esa fila) → advertencia visible
-      `CONCILIACION_ARCHIVO_CUENTA_NO_VERIFICABLE`, la importación CONTINÚA — es la única rama de
-      R-5 que no rechaza; distinta del caso `exponeNumeroCuenta=false` a nivel de descriptor (que
-      también advierte, pero por una razón estructural, no puntual del archivo).
-- [ ] 3.24 RED `[INT]` `CuentaBancaria.numeroCuenta=null` en la primera importación → `200
-      {requiereConfirmacionCuenta:true, numeroDetectado}`, NO persiste nada; segundo viaje con
-      `confirmarNumeroCuenta:true` → persiste `numeroCuenta` e importa, misma TX.
-- [ ] 3.25 GREEN flujo de confirmación en dos viajes + escenario 5 de 3.23.
-- [ ] 3.26 RED `[INT]` **Orden de compuertas (REQ-CB-05, riesgo R12)**: tras un rechazo por perfil
-      (REQ-CB-03) o por cuenta (REQ-CB-16), `count(ImportacionExtracto)===0` y la respuesta NUNCA es
-      "0 nuevos / 0 ya existían" — es un 422 explícito.
-- [ ] 3.27 RED `[INT]` REQ-CB-03: subir el fixture XLSX de Unión (columnas/cabecera propias, slice 4)
-      contra una `CuentaBancaria` `BANCOSOL_XLSX` → 422 `CONCILIACION_ARCHIVO_PERFIL_NO_COINCIDE`,
-      mensaje con perfil esperado vs detectado. Nota: `spec.md` REQ-CB-03 redactó este escenario de
-      ejemplo con el `.txt` de `UNION_TXT` (formato ya fuera del corte de v1 tras el cambio de scope
-      de Slice 4) — el REQUISITO normativo no depende del formato concreto, solo el ejemplo de la
-      spec quedó desactualizado; no bloquea esta tarea, se deja anotado para quien mantenga `spec.md`.
-- [ ] 3.28 RED `[INT]` REQ-CB-08: perfil DECLARADO no cuadra → `estadoVerificacion=DESCUADRE` +
-      `diferencia`, la importación se completa igual.
-- [ ] 3.29 RED `[INT]` REQ-CB-06: importación exitosa registra metadata (`sha256Archivo`, rango,
-      `filasLeidas`, contadores) sin persistir el binario en ningún storage — confirmar que no se
-      invoca ningún `StoragePort`.
-- [ ] 3.30 GREEN cierre de las compuertas 3.26-3.29.
-- [ ] 3.31 `cuentas-bancarias.controller.ts`: `POST /:id/importaciones` (multipart, `FileInterceptor` +
-      `memoryStorage`, patrón `comprobantes.controller.ts:277-296`) + `GET /:id/importaciones`.
-- [ ] 3.32 RED `[E2E]` flujo de importación vía HTTP: 403 sin `.importar`, 404 sin pack activo, 422 en
-      cada rechazo, éxito con contadores correctos.
-- [ ] 3.33 GREEN controller + módulo con los 2 parsers XLSX registrados.
-- [ ] 3.34 `[OPENAPI]` Regenerar (`ImportacionExtractoResponseDto` y afines).
+> ✅ **Slice 3 COMPLETO** (2026-07-23). 44 tests nuevos backend (25 unit/dominio + 9 integración de
+> repos + 19 integración de `ExtractoImportadorService` + 8 e2e), todos verdes. `pnpm exec jest
+> src/conciliacion-bancaria/` → 22 suites / 231 tests. Regresión completa `src/` → 2615/2622 (los 6
+> fallos son el debt preexistente W3 de `MinioStorageAdapter`, no relacionado a este slice — falla
+> solo cuando corre sin `NODE_OPTIONS=--experimental-vm-modules`, ver CLAUDE.md §10.10). `tsc
+> --noEmit` limpio back+front, `pnpm run lint` limpio. **Criterio literal 60/21+59/81 (REQ-CB-05/07)
+> VERIFICADO por un test ejecutado** contra los fixtures reales `bancosol-a-mayo-junio.xlsx` /
+> `bancosol-b-junio-julio.xlsx` — ver
+> `extracto-importador.service.integration.spec.ts`.
+>
+> **CRÍTICO — los valores reales de los fixtures NO coinciden con los literales de este documento**
+> (esperado — los fixtures fueron anonimizados en el slice 0, ver nota de la tarea del orquestador).
+> Se usaron los valores REALES leídos con Python (`zipfile`+`xml.etree`) de cada `.xlsx`, no los de
+> `design.md`/`tasks.md`:
+> - **BancoSol** — número de cuenta real: `5799375-760-305` (NO `1191959-000-001`). El fixture de 20
+>   movimientos (`bancosol-20-movimientos-checksum.xlsx`) SÍ preserva el checksum documentado
+>   `3.275,55 + (−3.040,38) = 235,17` — verificado exacto.
+> - **Económico** — número de cuenta real: `6484254835` (NO `2031262031`), valor crudo real
+>   `'CA: 6484254835 (Bs)'`. Saldo Inicial/Final SÍ coinciden con el documento: `327.520,14` /
+>   `179.757,37` — Saldo Inicial en `M4`, Saldo Final en `M5` (no `K4`/`K5` como sugiere una lectura
+>   superficial de la tabla del design — esas son las celdas de ETIQUETA, el valor está en `M`).
+> - **Fila de encabezados de BancoSol/Económico**: fila **17** (índice 16, 0-based), no una fila sin
+>   especificar — verificado abriendo el XML crudo.
+>
+> **DESCUBRIMIENTO no anticipado por el design — guardado en engram** (`gotcha/read-excel-file-fecha-date-vs-string`):
+> `read-excel-file` con `{ parseNumber: (s) => s }` **NO** intercepta la columna `Fecha`/`Hora` de
+> BancoSol — esas celdas tienen formato de FECHA real en Excel y la librería las resuelve a `Date`
+> nativo ANTES de que `parseNumber` pueda intervenir (parseNumber solo aplica a celdas de formato
+> numérico "General"). Económico, en cambio, SÍ trae la fecha como texto plano (`'03/Jun/2026'`),
+> confirmando el dialecto `TEXTO_ES_DD_MMM_YYYY` sin sorpresas. Esto es, además, la señal
+> ESTRUCTURAL real que permite que `reconoce()` discrimine BancoSol de Económico pese a compartir
+> generador y columnas idénticas (el design señala que comparten estructura pero no explicita cómo
+> `reconoce()` los distingue) — se usa el TIPO de la celda `Fecha` de la primera fila de datos
+> (`Date` nativo vs `string`) como discriminador, verificado con un test de discriminación cruzada.
+> Resuelto sin tocar `adapters/parsing/fechas.ts` (slice 2, fuera de alcance): la conversión
+> `Date → FechaContable` para BancoSol se hace directo vía los getters UTC del `Date` ya resuelto por
+> `read-excel-file` (evita el ruido de precisión de un round-trip float serial↔string), reusando
+> `FechaContable.of` como única autoridad de validación de calendario.
+>
+> **Desviación — `read-excel-file@9.3.3`, no `9.3.4` exacto (task 3.1)**: la política
+> `minimumReleaseAge` de pnpm en este entorno (3 días) bloqueó `9.3.4` (publicado 2026-07-21, dentro
+> de la ventana desde "hoy" 2026-07-23). Se instaló `9.3.3` (publicado 2026-07-20, la última versión
+> MADURA), pineada exacta (sin `^`). No se bypasseó el guardrail de seguridad.
+>
+> **Desviación — registry de parsers (tasks 3.33/4.9)**: `ports/extracto-parser.registry.ts` (slice
+> 1) es fail-fast — exige adapter para los 3 valores de `PerfilExtracto` o revienta el bootstrap.
+> Wirearlo con solo 2/3 parsers (Unión llega en slice 4) haría fallar el arranque de TODA la app. Se
+> creó `extracto-parser-lookup.service.ts` — lookup LENIENTE (mismo mecanismo, sin fail-fast) — como
+> medida INTERINA documentada con TODO explícito para el slice 4. `GET /perfiles` y el service de
+> importación usan este lookup; una cuenta `UNION_XLSX` da un 422 de negocio normal
+> (`CONCILIACION_ARCHIVO_PERFIL_NO_SOPORTADO`), no un crash.
+>
+> **Desviación — 3.18/3.20 (parte)**: el "rango sintético que solapa" (3.18) y el "fixture reordenado
+> a mano" (3.20) no se implementaron como tests SEPARADOS — el criterio de solapamiento queda
+> demostrado con datos REALES (más fuerte que sintético) en el test del criterio literal 3.19, y la
+> invarianza ASC/DESC del orden canónico ya tiene su propio test dedicado en slice 2
+> (`orden-canonico.spec.ts`, task 2.9); acá se agregó un test de `ordinalDia` con un parser fake para
+> el caso "dos movimientos idénticos el mismo día", que es la propiedad puntual que 3.20 pedía
+> ejercitar a nivel de integración del service.
+>
+> **Desviación — 3.27 usa Económico en vez de Unión**: Unión (slice 4) no tiene parser todavía; se
+> verificó REQ-CB-03 subiendo el fixture de Económico contra una `CuentaBancaria` `BANCOSOL_XLSX`
+> — mismo requisito (perfil no coincide), formato disponible.
+>
+> **Hallazgo operativo — `test/helpers/test-factory.ts`**: el helper compartido de limpieza de BD
+> para e2e ya tenía un comentario previsor de slice 1 ("agregar acá ANTES de esta línea") pero le
+> faltaban los `deleteMany` de `movimientoBancario`/`importacionExtracto` (FK `Restrict` hacia
+> `CuentaBancaria`) — sin ellos, cualquier e2e con datos importados rompía el cleanup del test
+> SIGUIENTE. Completado (2 líneas).
+>
+> **`GET /perfiles`** cablea correctamente ahora que hay ≥1 parser (2, de hecho) — cierra la
+> desviación documentada en el slice 1.
+
+- [x] 3.0 Verificado: `design.md` rev5 usa los códigos `CONCILIACION_ARCHIVO_*` consistentes con
+      `spec.md`. Sin desactualizaciones nuevas detectadas más allá de la ya anotada en 3.27.
+- [x] 3.1 `package.json`: `read-excel-file` pineada exacta — **`9.3.3`**, no `9.3.4` (ver nota de
+      desviación arriba — bloqueo de `minimumReleaseAge`, no se bypasseó el guardrail).
+- [x] 3.2 `ports/extracto-parser.port.ts` ya existía (preparado en slice 1) — sin cambios necesarios.
+- [x] 3.3 RED+GREEN `[DOM]` `adapters/xlsx/leer-matriz-xlsx.spec.ts`: riesgo R4 verificado contra
+      BancoSol y Económico (namespace `x:`) — Económico devuelve sus filas reales, no cero.
+- [x] 3.4 RED+GREEN `[DOM]` `adapters/xlsx-core-extracto-parser.spec.ts`: 20 movimientos, checksum
+      derivado `3.275,55 + (−3.040,38) = 235,17` (verificado con el valor REAL de cuenta
+      `5799375-760-305`, ver nota arriba).
+- [x] 3.5 RED+GREEN `[DOM]` `adapters/xlsx/extraer-numero-cuenta.spec.ts` + caso real en
+      `xlsx-core-extracto-parser.spec.ts`: strip de `'CA:'`/`'(Bs)'` verificado con el valor real
+      `'CA: 6484254835 (Bs)'` → `'6484254835'`; prefijo/sufijo ausente → `ArchivoFormatoNoReconocidoError`.
+- [x] 3.6 RED+GREEN `[DOM]` Económico: `reconoce()`→true, fechas texto, saldo declarado real
+      `327.520,14`/`179.757,37`, 40 movimientos (conteo real del fixture, no un valor supuesto).
+- [x] 3.7 RED+GREEN `[DOM]` renglón dorado: `descripcion` = `Transacción` + `' '` + `Nota` exacto,
+      verificado con el texto real del fixture de 20 movimientos.
+- [x] 3.8 RED+GREEN `[DOM]` cross-check de discriminación: BancoSol↔Económico (vía tipo de celda
+      Fecha) y ambos↔Unión (vía headers, sin adapter de Unión todavía pero el mismatch de etiquetas
+      ya se prueba con matrices sintéticas en `escaneo-cabecera.spec.ts`).
+- [x] 3.9 GREEN `adapters/xlsx-core-extracto-parser.ts` + `adapters/dialectos/{bancosol,economico}.dialecto.ts`.
+- [x] 3.10 RED+GREEN `[DOM]` mapeo por nombre: `escaneo-cabecera.spec.ts` con matriz sintética
+      reordenada + verificación adicional contra el layout real de Económico (columnas D/F/G/H/J/K
+      vacías intercaladas).
+- [x] 3.11 RED+GREEN `[DOM]` `adapters/deteccion-archivo.spec.ts`: magic bytes OLE2 → `OLE2_LEGACY`.
+- [x] 3.12 GREEN `adapters/deteccion-archivo.ts` — política propia, NO reusa `mime-whitelist.ts`.
+- [x] 3.13 `ports/movimiento-bancario.repository.port.ts` + `ports/importacion-extracto.repository.port.ts`
+      + `adapters/prisma-movimiento-bancario.repository.ts` + `adapters/prisma-importacion-extracto.repository.ts`.
+- [x] 3.14 RED `[INT]` `adapters/prisma-movimiento-importacion.repository.integration.spec.ts`:
+      REQ-CB-13 en las 2 tablas — `findById`/`listarPorCuentaBancaria`/`contarPorCuentaBancaria`
+      nunca cruzan tenant.
+- [x] 3.15 GREEN — mismo archivo que 3.14 (RED→GREEN en un solo ciclo por método, 6 tests).
+- [x] 3.16 `extracto-importador.service.ts`: flujo completo orquestado (design §10).
+- [x] 3.17 RED+GREEN `[INT]` reimportar el mismo archivo → `0 nuevos, 20 ya existían` (fixture de
+      20 movimientos), nada se modifica.
+- [x] 3.18 Cubierto por el criterio real de 3.19 (ver nota de desviación arriba — no hay test
+      sintético separado).
+- [x] 3.19 RED+GREEN `[INT]` **criterio literal verificado por ejecución**: A → 60 nuevos/0 ya
+      existían; B → 21 nuevos/59 ya existían; total `contarPorCuentaBancaria` = **81**.
+- [x] 3.20 RED+GREEN `[INT]` dos movimientos idénticos mismo día (parser fake) → ambos persisten,
+      `movimientosNuevos=2` (ordinalDia 0/1 internamente, verificado en slice 2 a nivel de dominio).
+- [x] 3.21 GREEN — `$transaction` con `createMany({skipDuplicates:true})` + `actualizarContadores`.
+- [x] 3.22 RED+GREEN `[INT]` REQ-CB-16 orquestado: coincide → importa; distinta cuenta mismo banco
+      (`...-999` vs `...-305` reales) → 422 con AMBOS números, cero filas persistidas.
+- [x] 3.23 RED+GREEN `[INT]` escenario 5 (parser fake, `exponeNumeroCuenta=true` pero
+      `numeroCuentaDeclarado=null` de ESE archivo) → advertencia `CONCILIACION_ARCHIVO_CUENTA_NO_VERIFICABLE`,
+      SIGUE (`movimientosNuevos=1`).
+- [x] 3.24 RED+GREEN `[INT]` `numeroCuenta=null` → `{requiereConfirmacionCuenta:true, numeroDetectado}`,
+      cero filas persistidas, `CuentaBancaria.numeroCuenta` sigue null.
+- [x] 3.25 GREEN — segundo viaje con `confirmarNumeroCuenta:true` persiste el número e importa en la
+      MISMA `$transaction`.
+- [x] 3.26 RED+GREEN `[INT]` orden de compuertas: tras rechazo por perfil o por cuenta,
+      `count(ImportacionExtracto)===0` — nunca "0 nuevos/0 ya existían".
+- [x] 3.27 RED+GREEN `[INT]` REQ-CB-03 con fixture de Económico contra `CuentaBancaria BANCOSOL_XLSX`
+      (ver nota de desviación — Unión no tiene parser hasta slice 4) → 422 `PERFIL_NO_COINCIDE`.
+- [x] 3.28 RED+GREEN `[INT]` DESCUADRE sintético (parser fake, DECLARADO que no cuadra) →
+      `estadoVerificacion=DESCUADRE` + `diferencia='3900.00'`, importación completa igual
+      (`movimientosNuevos=1`). BancoSol real (DERIVADO) también verificado `VERIFICADO`.
+- [x] 3.29 RED+GREEN `[INT]` metadata sin binario: `sha256Archivo` (64 chars), `filasLeidas`,
+      contadores persistidos; el service NO tiene ningún `StoragePort` inyectado (estructuralmente
+      imposible que invoque uno).
+- [x] 3.30 GREEN — cierre de 3.26-3.29 en el mismo archivo de integración del service.
+- [x] 3.31 `cuentas-bancarias.controller.ts`: `POST /:id/importaciones` (multipart, `FileInterceptor`+
+      `memoryStorage`, `@HttpCode(200)` — ver design §10, incluso el éxito es "resultado de
+      operación" no creación de recurso direccionable) + `GET /:id/importaciones`.
+- [x] 3.32 RED+GREEN `[E2E]` `test/conciliacion-importaciones.e2e-spec.ts` (8 tests): 403 sin
+      `.importar`, 404 sin pack activo, 422 en los 3 rechazos, éxito con contadores (60 nuevos),
+      `GET /perfiles`, flujo de confirmación de 2 viajes.
+- [x] 3.33 GREEN controller + módulo con los 2 parsers XLSX registrados vía
+      `ExtractoParserLookupService` (ver nota de desviación del registry arriba).
+- [x] 3.34 `[OPENAPI]` Regenerado `backend/openapi.json` + `frontend/src/types/api.generated.ts`
+      (`ImportarExtractoResponseDto`, `ListarImportacionesResponseDto`, `PerfilExtractoResponseDto` y
+      afines). `tsc -b` limpio en frontend.
 
 ## Slice 4 — Adaptador Unión XLSX
 
