@@ -151,7 +151,17 @@ export class XlsxCoreExtractoParser extends ExtractoParserPort {
 
     for (const fila of filasDatos) {
       const celdaFecha = valorColumna(fila, encabezados.columnas, d.etiquetaFecha);
-      if (celdaFecha === null) continue; // fila en blanco al pie de la tabla
+      // Fin de la tabla de movimientos: la PRIMERA fila en blanco en la
+      // columna Fecha la marca (bug real hallado en slice 4 — Unión). No
+      // alcanza con `continue`: su bloque de totales al pie reutiliza la
+      // MISMA columna que "Fecha Movimiento" para etiquetas ("Total
+      // Créditos:", "Tránsito", …) — seguir escaneando tras la fila en
+      // blanco intentaría parsear esas etiquetas como fecha y reventaría
+      // (o, peor, las leería como datos si alguna vez calzaran el formato).
+      // BancoSol/Económico no tienen filas en blanco tras el header (data
+      // corrida hasta EOF, verificado en los 4 fixtures reales) — `break`
+      // es equivalente a `continue` para ellos, cero cambio de conducta.
+      if (celdaFecha === null) break;
 
       const { fecha, hora: horaDeCeldaFecha } = leerFechaDeCelda(celdaFecha, d);
       // TEXTO_ES_DD_MMM_YYYY (Económico) no trae hora embebida en la celda

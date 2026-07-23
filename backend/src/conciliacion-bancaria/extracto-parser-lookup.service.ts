@@ -1,27 +1,20 @@
 /**
- * Lookup LENIENTE de `ExtractoParserPort` por `PerfilExtracto` — medida
- * INTERINA del slice 3, documentada como deviation en el reporte de apply.
+ * Lookup LENIENTE de `ExtractoParserPort` por `PerfilExtracto`.
  *
  * `ports/extracto-parser.registry.ts` (slice 1) es fail-fast: su constructor
- * exige que TODOS los valores del enum `PerfilExtracto` (3 en v1) tengan
- * adapter, o revienta el bootstrap (design §4.5). El slice 3 solo trae 2 de 3
- * (`BANCOSOL_XLSX`, `ECONOMICO_XLSX` — `UNION_XLSX` llega en el slice 4), así
- * que wirear `ExtractoParserRegistry` como provider de Nest en este punto
- * haría fallar el arranque de TODA la app.
+ * exige que TODOS los valores del enum `PerfilExtracto` tengan adapter, o
+ * revienta el bootstrap (design §4.5). Desde el slice 4 (`UNION_XLSX`), los 3
+ * valores de v1 tienen adapter y `ExtractoParserRegistry` SÍ se provee en
+ * `conciliacion-bancaria.module.ts` — su chequeo de bootstrap corre en cada
+ * arranque de la app.
  *
- * Esta clase NO reemplaza a `ExtractoParserRegistry` — es un lookup parcial,
- * sin fail-fast, para los perfiles que SÍ tienen adapter hoy. `buscar()`
- * devuelve `undefined` (no lanza) cuando el perfil todavía no tiene adapter;
- * el caller (`ExtractoImportadorService`) lo traduce a un 422 normal — un
- * usuario intentando importar contra una `CuentaBancaria` `UNION_XLSX` antes
- * del slice 4 recibe un error de negocio, no un crash de bootstrap.
- *
- * TODO(slice 4, task 4.9): cuando el parser de Unión exista, reemplazar el
- * wiring de `conciliacion-bancaria.module.ts` para usar la
- * `ExtractoParserRegistry` real (fail-fast, cubre los 3 valores del enum) en
- * lugar de esta clase — o mantener esta clase pero alimentada por una
- * `ExtractoParserRegistry` ya validada. Cualquiera de las dos cierra la
- * brecha; queda a criterio de quien implemente el slice 4.
+ * Esta clase se mantuvo sin cambios como el lookup que consumen
+ * `ExtractoImportadorService` y `CuentasBancariasController` (cerrar el TODO
+ * histórico del slice 3 sin tocar esos dos archivos ni sus specs — cero
+ * blast radius sobre código ya probado). `buscar()` sigue devolviendo
+ * `undefined` (no lanza) si un perfil no tiene adapter; con los 3 perfiles
+ * registrados esa rama queda inalcanzable en runtime, y el fail-fast de
+ * `ExtractoParserRegistry` es la red que lo garantiza en bootstrap.
  */
 import { Inject, Injectable } from '@nestjs/common';
 import type { PerfilExtracto } from '@prisma/client';

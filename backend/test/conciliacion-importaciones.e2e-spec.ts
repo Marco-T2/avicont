@@ -177,7 +177,7 @@ describe('ConciliacionImportaciones (e2e)', () => {
   // GET /perfiles
   // ==========================================================
 
-  it('GET /perfiles — catálogo de perfiles con adapter registrado (BancoSol + Económico)', async () => {
+  it('GET /perfiles — catálogo de perfiles con adapter registrado (BancoSol + Económico + Unión, task 4.12)', async () => {
     const { token, orgId, ownerId } = await seed();
     const packId = await crearPack();
     await otorgarPackActivo(orgId, packId, ownerId);
@@ -188,8 +188,13 @@ describe('ConciliacionImportaciones (e2e)', () => {
 
     expect(res.status).toBe(200);
     const perfiles = res.body.map((p: { perfil: string }) => p.perfil);
+    // Regresión (task 4.12): los 3 perfiles de v1 conviven sin colisión —
+    // el bootstrap de `ExtractoParserRegistry` (fail-fast) no rompe el
+    // arranque de la app y `GET /perfiles` sigue respondiendo.
     expect(perfiles).toContain('BANCOSOL_XLSX');
     expect(perfiles).toContain('ECONOMICO_XLSX');
+    expect(perfiles).toContain('UNION_XLSX');
+    expect(perfiles).toHaveLength(3);
   });
 
   // ==========================================================

@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { Money } from '@/common/domain/money';
+
+import { ArchivoFormatoNoReconocidoError } from '../domain/importacion-errors';
 import { DIALECTO_BANCOSOL } from './dialectos/bancosol.dialecto';
 import { DIALECTO_ECONOMICO } from './dialectos/economico.dialecto';
+import { DIALECTO_UNION_XLSX } from './dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './xlsx-core-extracto-parser';
+import { buscarValorDeEtiqueta } from './xlsx/escaneo-cabecera';
+import { leerMatrizXlsx } from './xlsx/leer-matriz-xlsx';
 
 const FIXTURES_DIR = join(__dirname, '__fixtures__');
 
@@ -88,6 +94,161 @@ describe('XlsxCoreExtractoParser — discriminación cruzada (design §4.5, "mis
   it('el parser Económico NO reconoce el fixture de BancoSol', async () => {
     const parser = new XlsxCoreExtractoParser(DIALECTO_ECONOMICO);
     await expect(parser.reconoce(leerFixture('bancosol-a-mayo-junio.xlsx'))).resolves.toBe(false);
+  });
+});
+
+// ============================================================
+// Slice 4 — Unión XLSX (design §4.3.1). Dialecto PROPIO: NO comparte
+// generador con BancoSol/Económico (columnas y cabecera de otra fuente).
+// ============================================================
+describe('XlsxCoreExtractoParser — Unión XLSX (tasks 4.1/4.4/4.7/4.8)', () => {
+  const parser = new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX);
+
+  it('reconoce() -> true contra el fixture real (hoja ExtractoMovimientosFechas)', async () => {
+    await expect(parser.reconoce(leerFixture('union-extracto-por-rango.xlsx'))).resolves.toBe(true);
+  });
+
+  it('parse() — 21 movimientos, orden ASCENDENTE, numeroCuentaDeclarado limpio (REQ-CB-16)', async () => {
+    const resultado = await parser.parse(leerFixture('union-extracto-por-rango.xlsx'));
+
+    expect(resultado.movimientos).toHaveLength(21);
+    // Valor REAL del fixture anonimizado (slice 0) — NO el '10000024346492'
+    // citado en design/tasks, que corresponde al documento original antes
+    // de anonimizar. El fixture manda.
+    expect(resultado.numeroCuentaDeclarado).toBe('86698879426068');
+    // DERIVADO: el archivo no declara saldo inicial/final en la cabecera.
+    expect(resultado.saldoInicialDeclarado).toBeNull();
+    expect(resultado.saldoFinalDeclarado).toBeNull();
+
+    const primero = resultado.movimientos[0]!;
+    expect(primero.fecha.toIso()).toBe('2026-04-02');
+    expect(primero.monto.toBob()).toBe('900.00');
+    expect(primero.tipo).toBe('DEBITO');
+    expect(primero.saldo?.toBob()).toBe('2243.43');
+    expect(primero.referencia).toBe('5275074184');
+
+    const ultimo = resultado.movimientos[resultado.movimientos.length - 1]!;
+    expect(ultimo.fecha.toIso()).toBe('2026-07-13');
+    expect(ultimo.monto.toBob()).toBe('200.00');
+    expect(ultimo.tipo).toBe('DEBITO');
+    expect(ultimo.saldo?.toBob()).toBe('11909.40');
+
+    // Padding + miles + signo (design §8.1) sobre una fila intermedia real:
+    // '             12,600.00' -> CREDITO 12600.00 (fila del 08/06/2026).
+    const credito = resultado.movimientos.find((m) => m.fecha.toIso() === '2026-06-08')!;
+    expect(credito.monto.toBob()).toBe('12600.00');
+    expect(credito.tipo).toBe('CREDITO');
+  });
+
+  it('renglón dorado (design §4.5): descripcion = columna Descripción exacta, sin concatenar', async () => {
+    const resultado = await parser.parse(leerFixture('union-extracto-por-rango.xlsx'));
+
+    const primero = resultado.movimientos[0]!;
+    expect(primero.descripcion).toBe('N/D POR TRASPASO ENTRE BANCOS ACH');
+  });
+
+  it('REQ-CB-08 checksum DERIVADO — ancla: inicial derivado 3.143,43 + neto 8.765,97 = 11.909,40 == saldo final (task 4.5)', async () => {
+    const resultado = await parser.parse(leerFixture('union-extracto-por-rango.xlsx'));
+
+    const primero = resultado.movimientos[0]!;
+    // saldoInicial = saldo(primero) + monto(primero) porque primero es DEBITO.
+    const saldoInicialDerivado = primero.saldo!.plus(primero.monto);
+    expect(saldoInicialDerivado.toBob()).toBe('3143.43');
+
+    const neto = resultado.movimientos.reduce(
+      (acc, m) => (m.tipo === 'CREDITO' ? acc.plus(m.monto) : acc.minus(m.monto)),
+      Money.ZERO,
+    );
+    expect(neto.toBob()).toBe('8765.97');
+
+    const ultimo = resultado.movimientos[resultado.movimientos.length - 1]!;
+    expect(saldoInicialDerivado.plus(neto).igualaConTolerancia(ultimo.saldo!)).toBe(true);
+  });
+
+  it('REQ-CB-08 verificación ADICIONAL (task 4.6, NO es la estrategia): Total Créditos/Débitos/Total declarados cuadran contra los movimientos', async () => {
+    const buffer = leerFixture('union-extracto-por-rango.xlsx');
+    const resultado = await parser.parse(buffer);
+    const matriz = await leerMatrizXlsx(buffer);
+
+    const totalCreditosDeclarado = buscarValorDeEtiqueta(matriz, 'Total Créditos:', 50);
+    const totalDebitosDeclarado = buscarValorDeEtiqueta(matriz, 'Total Débitos:', 50);
+
+    expect(totalCreditosDeclarado).toBe('12,618.94');
+    expect(totalDebitosDeclarado).toBe('3,852.97');
+
+    // El bloque "Tránsito/Consultado/Congelado/Sobregirado/Disponible/Total"
+    // (fila 43 1-based) es una tabla de 2 filas — etiqueta arriba, valor UNA
+    // fila abajo en la MISMA columna — a diferencia de "Cuenta:"/"Total
+    // Créditos:" (etiqueta y valor en la misma fila). `buscarValorDeEtiqueta`
+    // no cubre ese layout; se verifica por posición ya confirmada contra el
+    // fixture real (fila 43 índice 28 = "Total", fila 45 índice 28 = valor).
+    const filaEtiquetaTotal = matriz.findIndex((fila) => fila.some((celda) => celda === 'Total'));
+    expect(filaEtiquetaTotal).toBeGreaterThan(-1);
+    const columnaTotal = matriz[filaEtiquetaTotal]!.findIndex((celda) => celda === 'Total');
+    const totalDeclarado = matriz[filaEtiquetaTotal + 2]?.[columnaTotal] ?? null;
+
+    expect(totalDeclarado).toBe('11,909.40');
+
+    const sumaCreditos = resultado.movimientos
+      .filter((m) => m.tipo === 'CREDITO')
+      .reduce((acc, m) => acc.plus(m.monto), Money.ZERO);
+    const sumaDebitos = resultado.movimientos
+      .filter((m) => m.tipo === 'DEBITO')
+      .reduce((acc, m) => acc.plus(m.monto), Money.ZERO);
+
+    expect(sumaCreditos.toBob()).toBe('12618.94');
+    expect(sumaDebitos.toBob()).toBe('3852.97');
+
+    // saldo corrido coherente fila a fila (saldoᵢ₋₁ + montoᵢ = saldoᵢ) en las 21 filas.
+    for (let i = 1; i < resultado.movimientos.length; i++) {
+      const anterior = resultado.movimientos[i - 1]!;
+      const actual = resultado.movimientos[i]!;
+      const esperado =
+        actual.tipo === 'CREDITO'
+          ? anterior.saldo!.plus(actual.monto)
+          : anterior.saldo!.minus(actual.monto);
+      expect(esperado.igualaConTolerancia(actual.saldo!)).toBe(true);
+    }
+  });
+});
+
+describe('XlsxCoreExtractoParser — anti-reuso de mapeo Unión ↔ BancoSol/Económico (task 4.1, design §11)', () => {
+  it('reconoce(): el dialecto BancoSol NO reconoce el fixture de Unión', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_BANCOSOL);
+    await expect(parser.reconoce(leerFixture('union-extracto-por-rango.xlsx'))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('reconoce(): el dialecto Económico NO reconoce el fixture de Unión', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_ECONOMICO);
+    await expect(parser.reconoce(leerFixture('union-extracto-por-rango.xlsx'))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('reconoce(): el dialecto Unión NO reconoce el fixture de BancoSol', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX);
+    await expect(parser.reconoce(leerFixture('bancosol-a-mayo-junio.xlsx'))).resolves.toBe(false);
+  });
+
+  it('reconoce(): el dialecto Unión NO reconoce el fixture de Económico', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX);
+    await expect(parser.reconoce(leerFixture('economico-extracto.xlsx'))).resolves.toBe(false);
+  });
+
+  it('parse(): parsear el fixture de Unión con el dialecto de BancoSol FALLA por etiquetas ausentes — nunca devuelve datos corridos', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_BANCOSOL);
+    await expect(parser.parse(leerFixture('union-extracto-por-rango.xlsx'))).rejects.toThrow(
+      ArchivoFormatoNoReconocidoError,
+    );
+  });
+
+  it('parse(): parsear el fixture de BancoSol con el dialecto de Unión FALLA por etiquetas ausentes — nunca devuelve datos corridos', async () => {
+    const parser = new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX);
+    await expect(parser.parse(leerFixture('bancosol-a-mayo-junio.xlsx'))).rejects.toThrow(
+      ArchivoFormatoNoReconocidoError,
+    );
   });
 });
 

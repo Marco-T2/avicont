@@ -487,45 +487,69 @@
 > como parser propio (`UnionXlsxExtractoParser implements ExtractoParserPort`) si no — a decidir en
 > implementación, no es una decisión de esta lista de tareas.
 
-- [ ] 4.1 RED `[DOM]` `reconoce()` del dialecto/parser Unión-XLSX (test "anti-reuso de mapeo", design
+- [x] 4.1 RED `[DOM]` `reconoce()` del dialecto/parser Unión-XLSX (test "anti-reuso de mapeo", design
       §11): `true` solo para el fixture Unión-XLSX anonimizado (hoja `ExtractoMovimientosFechas`,
       cabecera `Cuenta:` sin prefijo, columnas propias); `false` contra los fixtures
       BancoSol/Económico y viceversa — parsear el fixture de Unión con el dialecto de BancoSol debe
       FALLAR por etiquetas ausentes, nunca devolver datos corridos.
-- [ ] 4.2 RED `[DOM]` la etiqueta de la columna de monto es literalmente `'Monto\n'` — **con salto de
+- [x] 4.2 RED `[DOM]` la etiqueta de la columna de monto es literalmente `'Monto\n'` — **con salto de
       línea** — en el fixture real; el mapeo por nombre de cabecera (reusa `normalizarDescripcion` de
       2.7/2.8 para normalizar etiquetas, que colapsa saltos/espacios y hace `trim`) debe matchearla;
       un mapeo por índice o un `===` sobre la etiqueta cruda fallaría acá.
-- [ ] 4.3 GREEN dialecto/parser Unión-XLSX — mapeo de columnas por NOMBRE de cabecera (`Fecha
+      **Nota de apply (slice 4)**: leído a través de `read-excel-file` (`trim` por defecto), la celda
+      de este fixture ya llega SIN el salto de línea final (`'Monto'`) — la librería lo recorta antes
+      de que nuestro código la vea. El test se escribió a nivel de `normalizarDescripcion('Monto\n')`
+      (defensivo, no depende de la librería) porque es la garantía que el design pide: matchea igual
+      si algún re-export futuro sí conserva el salto.
+- [x] 4.3 GREEN dialecto/parser Unión-XLSX — mapeo de columnas por NOMBRE de cabecera (`Fecha
       Movimiento`, `AG`, `Descripción`, `Nro Documento`, `Monto`, `Saldo`), `columnasDescripcion:
       ['Descripción']`, sin reusar índices ni etiquetas de los otros 2 perfiles.
-- [ ] 4.4 RED `[DOM]` `parse()` contra el fixture Unión-XLSX anonimizado: 21 movimientos, orden
+- [x] 4.4 RED `[DOM]` `parse()` contra el fixture Unión-XLSX anonimizado: 21 movimientos, orden
       ASCENDENTE (02/04–13/07), primer/último movimiento correctos; monto con decimales explícitos
       vía `leerMontoCelda` de slice 2 (padding+miles+signo: `'             12,600.00'`→`12600.00`
       CREDITO, `'               -900.00'`→`900.00` DEBITO) — sin cirugía de centavos implícitos (esa
       es del TXT descartado, fuera de v1).
-- [ ] 4.5 RED `[DOM]` REQ-CB-08 checksum — **ANCLA** (define la estrategia `DERIVADO`): saldo inicial
+      **Bug real encontrado y arreglado (slice 4)**: el motor compartido `xlsx-core-extracto-parser.ts`
+      leía TODAS las filas tras el header hasta EOF, saltando (`continue`) las filas en blanco de la
+      columna Fecha. El bloque de totales de Unión reutiliza esa misma columna para sus etiquetas
+      ("Total Créditos:", "Tránsito", …) — el parser intentaba leerlas como fecha y reventaba. Fix:
+      `continue` → `break` en la primera fila en blanco (fin real de la tabla). Verificado sin impacto
+      en BancoSol/Económico: sus 4 fixtures reales NO tienen filas en blanco tras el header (datos
+      corridos hasta EOF) — el codepath nunca se ejercitaba para ellos, cero cambio de conducta
+      (231→247 tests del módulo, mismo verde).
+- [x] 4.5 RED `[DOM]` REQ-CB-08 checksum — **ANCLA** (define la estrategia `DERIVADO`): saldo inicial
       derivado = `saldo(primer movimiento) − monto(primer movimiento)` = `3.143,43`; neto de los 21
       montos = `8.765,97`; `3.143,43 + 8.765,97 = 11.909,40` == saldo de la última fila.
-- [ ] 4.6 RED `[DOM]` REQ-CB-08 **verificación ADICIONAL** del adaptador (no es la estrategia, no
+- [x] 4.6 RED `[DOM]` REQ-CB-08 **verificación ADICIONAL** del adaptador (no es la estrategia, no
       cambia la clasificación `DERIVADO`): Total Créditos declarado fila **39** = `12.618,94` ==
       Σ montos > 0; Total Débitos declarado fila **41** = `3.852,97` == Σ|montos < 0|; Total/
       Disponible declarado fila **45** = `11.909,40` == saldo final; saldo corrido coherente fila a
       fila (`saldoᵢ₋₁ + montoᵢ = saldoᵢ`) en las 21 filas.
-- [ ] 4.7 RED `[DOM]` extracción de `numeroCuentaDeclarado`: etiqueta `'Cuenta:'` en **B8**, valor en
-      **E8** = `'10000024346492'` — limpio, sin prefijo `BUNCA` (a diferencia del TXT descartado);
-      solo separadores del VO; `descriptor.exponeNumeroCuenta = true` confirmado con evidencia real.
-- [ ] 4.8 GREEN wiring completo del parser/dialecto Unión-XLSX + `descriptor`
+- [x] 4.7 RED `[DOM]` extracción de `numeroCuentaDeclarado`: etiqueta `'Cuenta:'` en **B8**, valor en
+      **E8** — limpio, sin prefijo `BUNCA` (a diferencia del TXT descartado); solo separadores del VO;
+      `descriptor.exponeNumeroCuenta = true` confirmado con evidencia real.
+      **Corrección de apply (slice 4, fixture manda)**: el valor REAL del fixture anonimizado (slice 0)
+      es `'86698879426068'`, NO `'10000024346492'` como citan design/esta lista — ese último
+      corresponde al documento original antes de anonimizar. Verificado abriendo el `.xlsx` real;
+      checksums y fechas SÍ coinciden con lo documentado.
+- [x] 4.8 GREEN wiring completo del parser/dialecto Unión-XLSX + `descriptor`
       (`estrategiaChecksum:'DERIVADO'`, `exponeNumeroCuenta:true`).
-- [ ] 4.9 `conciliacion-bancaria.module.ts`: registrar el parser Unión-XLSX en `EXTRACTO_PARSERS` bajo
+- [x] 4.9 `conciliacion-bancaria.module.ts`: registrar el parser Unión-XLSX en `EXTRACTO_PARSERS` bajo
       `PerfilExtracto.UNION_XLSX` — el chequeo de bootstrap del registry cubre los 3 valores del enum.
-- [ ] 4.10 RED `[INT]` REQ-CB-16 aplicado a Unión-XLSX: mismo contrato que BancoSol/Económico — número
+      **Decisión de apply**: se agregó `ExtractoParserRegistry` como provider (Nest lo instancia eager
+      → su fail-fast corre en cada boot) SIN reemplazar `ExtractoParserLookupService` en los call sites
+      (`ExtractoImportadorService`, `CuentasBancariasController`) — cierra el TODO del slice 3 con cero
+      blast radius sobre código/specs ya probados. Verificado con e2e real: bootstrap no crashea y
+      `GET /perfiles` devuelve los 3 perfiles.
+- [x] 4.10 RED `[INT]` REQ-CB-16 aplicado a Unión-XLSX: mismo contrato que BancoSol/Económico — número
       coincide (con o sin formateo distinto) → pasa; número de otra cuenta → 422
       `CONCILIACION_ARCHIVO_CUENTA_NO_COINCIDE` con ambos números, cero filas persistidas.
-- [ ] 4.11 GREEN ajustes finales del service de importación para el 3er perfil.
-- [ ] 4.12 RED `[E2E]` regresión: los 3 perfiles (`BANCOSOL_XLSX`, `ECONOMICO_XLSX`, `UNION_XLSX`)
+- [x] 4.11 GREEN ajustes finales del service de importación para el 3er perfil.
+- [x] 4.12 RED `[E2E]` regresión: los 3 perfiles (`BANCOSOL_XLSX`, `ECONOMICO_XLSX`, `UNION_XLSX`)
       conviven sin colisión en `GET /api/cuentas-bancarias/perfiles`.
-- [ ] 4.13 `[OPENAPI]` Regenerar si `descriptor` agregó campos al DTO de perfiles.
+- [x] 4.13 `[OPENAPI]` Regenerar si `descriptor` agregó campos al DTO de perfiles. **No aplica**: el
+      descriptor de Unión no agregó campos nuevos al DTO; `git diff` de `openapi.json` tras
+      `openapi:dump` es vacío (`UNION_XLSX` ya estaba en el enum Prisma regenerado en slice 0/3).
 
 > ⚠️ **Riesgo del change (R14, confirmado en design rev5 §13 — registrar en `proposal.md` por quien
 > lo mantiene)**: v1 queda con **tres adaptadores XLSX y ningún formato no-Excel** (Unión pasó de TXT

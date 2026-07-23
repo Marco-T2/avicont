@@ -12,6 +12,7 @@ import { PrismaImportacionExtractoRepository } from './adapters/prisma-importaci
 import { PrismaMovimientoBancarioRepository } from './adapters/prisma-movimiento-bancario.repository';
 import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
+import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
 import type { ExtractoParseado, MovimientoParseado } from './ports/extracto-parser.port';
 import type { DescriptorPerfilExtracto, ExtractoParserPort } from './ports/extracto-parser.port';
@@ -159,6 +160,7 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
     servicioConParsers([
       new XlsxCoreExtractoParser(DIALECTO_BANCOSOL),
       new XlsxCoreExtractoParser(DIALECTO_ECONOMICO),
+      new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX),
     ]);
 
   async function crearCuentaBancaria(numeroCuenta: string | null) {
@@ -166,6 +168,16 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
       cuentaId: cuentaIdA,
       alias: 'Cuenta corriente BancoSol',
       perfilExtracto: PerfilExtracto.BANCOSOL_XLSX,
+      numeroCuenta,
+      moneda: 'BOB',
+    });
+  }
+
+  async function crearCuentaBancariaUnion(numeroCuenta: string | null) {
+    return cuentaBancariaRepo.create(tenantA, {
+      cuentaId: cuentaIdA,
+      alias: 'Cuenta Unión',
+      perfilExtracto: PerfilExtracto.UNION_XLSX,
       numeroCuenta,
       moneda: 'BOB',
     });
@@ -545,15 +557,14 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
     ).rejects.toMatchObject({ code: 'CONCILIACION_CUENTA_BANCARIA_NO_ENCONTRADA' });
   });
 
-  it('perfil sin parser registrado todavía (UNION_XLSX, slice 4 pendiente) -> error de negocio, NO crash', async () => {
-    const cb = await cuentaBancariaRepo.create(tenantA, {
-      cuentaId: cuentaIdA,
-      alias: 'Cuenta Unión',
-      perfilExtracto: PerfilExtracto.UNION_XLSX,
-      numeroCuenta: null,
-      moneda: 'BOB',
-    });
-    const service = servicioReal(); // solo 2 parsers: BancoSol + Económico
+  it('perfil sin parser registrado -> error de negocio, NO crash (regresión de la rama "sin adapter" de ExtractoParserLookupService)', async () => {
+    // Desde el slice 4 los 3 perfiles de v1 tienen adapter en producción
+    // (`servicioReal()`) — este test fuerza la rama deliberadamente con una
+    // lista de parsers INCOMPLETA (solo BancoSol) para seguir cubriendo el
+    // código de "perfil sin adapter" de `ExtractoParserLookupService`, sin
+    // afirmar que Unión carece de adapter (ya no es cierto).
+    const cb = await crearCuentaBancariaUnion(null);
+    const service = servicioConParsers([new XlsxCoreExtractoParser(DIALECTO_BANCOSOL)]);
 
     await expect(
       service.importar(
@@ -564,6 +575,86 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
         { confirmarNumeroCuenta: false },
       ),
     ).rejects.toMatchObject({ code: 'CONCILIACION_ARCHIVO_PERFIL_NO_SOPORTADO' });
+  });
+
+  // ============================================================
+  // Slice 4 — Unión XLSX (REQ-CB-16, task 4.10)
+  // ============================================================
+
+  it('Unión XLSX: número de cuenta coincide -> importa normal, 21 movimientos, checksum VERIFICADO (DERIVADO, task 4.10)', async () => {
+    const cb = await crearCuentaBancariaUnion('86698879426068');
+    const service = servicioReal();
+
+    const res = await service.importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(leerFixture('union-extracto-por-rango.xlsx')),
+      { confirmarNumeroCuenta: false },
+    );
+
+    if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+    expect(res.movimientosNuevos).toBe(21);
+    expect(res.movimientosDuplicados).toBe(0);
+    expect(res.estadoVerificacion).toBe('VERIFICADO');
+  });
+
+  it('Unión XLSX: número de OTRA cuenta -> 422 CUENTA_NO_COINCIDE con ambos números, cero filas persistidas (task 4.10)', async () => {
+    const cb = await crearCuentaBancariaUnion('86698879426068-999'); // distinta a la del fixture real
+    const service = servicioReal();
+
+    await expect(
+      service.importar(
+        tenantA,
+        cb.id,
+        'user-1',
+        archivoDe(leerFixture('union-extracto-por-rango.xlsx')),
+        { confirmarNumeroCuenta: false },
+      ),
+    ).rejects.toMatchObject({
+      code: 'CONCILIACION_ARCHIVO_CUENTA_NO_COINCIDE',
+      details: { numeroArchivo: '86698879426068', numeroCuentaDestino: '86698879426068-999' },
+    });
+
+    expect(
+      (await importacionRepo.listarPorCuentaBancaria(tenantA, cb.id, { page: 1, limit: 10 })).total,
+    ).toBe(0);
+    expect(await movimientoRepo.contarPorCuentaBancaria(tenantA, cb.id)).toBe(0);
+  });
+
+  it('Unión XLSX: CuentaBancaria.numeroCuenta=null en la 1ra importación -> requiereConfirmacionCuenta, NO persiste nada (task 4.10)', async () => {
+    const cb = await crearCuentaBancariaUnion(null);
+    const service = servicioReal();
+
+    const res = await service.importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(leerFixture('union-extracto-por-rango.xlsx')),
+      { confirmarNumeroCuenta: false },
+    );
+
+    expect(res).toEqual({ requiereConfirmacionCuenta: true, numeroDetectado: '86698879426068' });
+    expect(
+      (await importacionRepo.listarPorCuentaBancaria(tenantA, cb.id, { page: 1, limit: 10 })).total,
+    ).toBe(0);
+  });
+
+  it('Unión XLSX: archivo de OTRO perfil (BancoSol) contra una CuentaBancaria UNION_XLSX -> 422 PERFIL_NO_COINCIDE, cero filas (task 4.10)', async () => {
+    const cb = await crearCuentaBancariaUnion('86698879426068');
+    const service = servicioReal();
+
+    await expect(
+      service.importar(
+        tenantA,
+        cb.id,
+        'user-1',
+        archivoDe(leerFixture('bancosol-a-mayo-junio.xlsx')),
+        { confirmarNumeroCuenta: false },
+      ),
+    ).rejects.toMatchObject({ code: 'CONCILIACION_ARCHIVO_PERFIL_NO_COINCIDE' });
+
+    expect(await movimientoRepo.contarPorCuentaBancaria(tenantA, cb.id)).toBe(0);
   });
 
   // ============================================================

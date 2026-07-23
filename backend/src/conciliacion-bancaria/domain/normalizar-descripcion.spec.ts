@@ -63,4 +63,9 @@ describe('normalizarDescripcion (REQ-CB-07, design §6.2)', () => {
     const una = normalizarDescripcion('Depósito Múltiple');
     expect(normalizarDescripcion(una)).toBe(una);
   });
+
+  it('caso real Unión XLSX (design §4.3.1): la etiqueta "Monto" con salto de línea al final matchea a "Monto" sin salto tras normalizar — un mapeo por índice o un === sobre la etiqueta cruda fallaría acá (task 4.2)', () => {
+    expect(normalizarDescripcion('Monto\n')).toBe(normalizarDescripcion('Monto'));
+    expect(normalizarDescripcion('Monto\n')).toBe('MONTO');
+  });
 });
