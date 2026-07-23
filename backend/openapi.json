@@ -5608,6 +5608,204 @@
         ]
       }
     },
+    "/api/cuentas-bancarias": {
+      "post": {
+        "operationId": "CuentasBancariasController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Vincula una cuenta del plan (elegida por el usuario) a una cuenta bancaria (REQ-CB-01).",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "get": {
+        "operationId": "CuentasBancariasController_listar",
+        "parameters": [
+          {
+            "name": "activa",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por estado activo. Omitir para listar solo activas.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarCuentasBancariasResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista las cuentas bancarias del tenant activo.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/cuentas-bancarias/{id}": {
+      "get": {
+        "operationId": "CuentasBancariasController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Obtiene una cuenta bancaria por id.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "patch": {
+        "operationId": "CuentasBancariasController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "PATCH de la cuenta bancaria. cuentaId y perfilExtracto son inmutables — no se exponen acá.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "delete": {
+        "operationId": "CuentasBancariasController_eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Elimina una cuenta bancaria. Falla con 409 si tiene movimientos o importaciones asociadas.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -10086,6 +10284,163 @@
           "advertencias",
           "cuentasEfectivoDetectadasPorHeuristica"
         ]
+      },
+      "CreateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta del plan de cuentas ELEGIDA por el usuario (esDetalle=true, activa=true). No se adivina."
+          },
+          "alias": {
+            "type": "string",
+            "example": "Cuenta corriente BancoSol",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ],
+            "description": "Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación."
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "example": "1191959-000-001",
+            "maxLength": 50,
+            "description": "Puede quedar vacío al crear — se captura y confirma en la primera importación (REQ-CB-16)."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "description": "Un extracto tiene una única moneda por definición. Validada contra la cuenta del plan (REQ-CB-02)."
+          }
+        },
+        "required": [
+          "cuentaId",
+          "alias",
+          "perfilExtracto",
+          "moneda"
+        ]
+      },
+      "CuentaBancariaResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "cuentaId": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "activa": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "cuentaId",
+          "alias",
+          "perfilExtracto",
+          "numeroCuenta",
+          "moneda",
+          "activa",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ListarCuentasBancariasResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "numeroCuenta": {
+            "type": "object",
+            "example": "1191959-000-001",
+            "maxLength": 50,
+            "nullable": true,
+            "description": "null limpia el número capturado; se vuelve a capturar en la próxima importación."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "description": "Re-valida REQ-CB-02 contra la cuenta del plan ya vinculada."
+          },
+          "activa": {
+            "type": "boolean",
+            "description": "Activar o desactivar la cuenta bancaria sin eliminarla."
+          }
+        }
       },
       "MePermissionsResponseDto": {
         "type": "object",

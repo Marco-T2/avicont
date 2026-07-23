@@ -353,6 +353,31 @@ export interface ListarTiposDocumentoFisicoParams {
 }
 
 // ============================================================
+// Conciliación bancaria — Cuentas bancarias (slice 1, pack contabilidad.conciliacion)
+// ============================================================
+
+export const PerfilExtracto = {
+  BANCOSOL_XLSX: 'BANCOSOL_XLSX',
+  ECONOMICO_XLSX: 'ECONOMICO_XLSX',
+  UNION_XLSX: 'UNION_XLSX',
+} as const satisfies Record<string, Schemas['CuentaBancariaResponseDto']['perfilExtracto']>;
+export type PerfilExtracto = (typeof PerfilExtracto)[keyof typeof PerfilExtracto];
+
+export type CuentaBancaria = Schemas['CuentaBancariaResponseDto'];
+
+export type ListarCuentasBancariasResponse = Schemas['ListarCuentasBancariasResponseDto'];
+
+export type CreateCuentaBancariaRequest = Schemas['CreateCuentaBancariaDto'];
+
+export type UpdateCuentaBancariaRequest = Schemas['UpdateCuentaBancariaDto'];
+
+export interface ListarCuentasBancariasParams {
+  activa?: boolean | 'all';
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

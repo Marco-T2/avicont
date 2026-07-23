@@ -25,6 +25,7 @@ import {
   ToggleRight,
   TrendingUp,
   Users,
+  Wallet,
 } from 'lucide-react';
 
 import { PERMISSIONS } from '@/lib/permissions';
@@ -288,6 +289,14 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FileBadge,
         requiredPermission: PERMISSIONS.contabilidad.tiposDocumento.read,
         vertical: 'CONTABILIDAD',
+      },
+      {
+        to: '/settings/cuentas-bancarias',
+        label: 'Cuentas bancarias',
+        icon: Wallet,
+        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+        vertical: 'CONTABILIDAD',
+        pack: 'contabilidad.conciliacion',
       },
       // Configuración contable: ítem deshabilitado, pertenece a CONTABILIDAD.
       // Lleva vertical: 'CONTABILIDAD' para que el granjero no lo vea aunque esté disabled.

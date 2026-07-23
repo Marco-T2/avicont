@@ -157,33 +157,54 @@
 
 ## Slice 1 — `CuentaBancaria` CRUD + catálogo de perfiles
 
-- [ ] 1.1 RED `[UNIT]` `cuentas-bancarias.service.spec.ts`: crear sobre `cuentaId` ya vinculado →
+> ✅ **Slice 1 COMPLETO** (2026-07-23). **Desviación documentada respecto al texto original de
+> 1.10/1.14**: `GET /api/cuentas-bancarias/perfiles` (`registry.descriptores()`) **NO se implementó
+> en este slice**. Motivo: `ExtractoParserRegistry` es `@Injectable()` y su constructor es
+> fail-fast — exige que TODOS los valores de `PerfilExtracto` (3 en v1) tengan un adapter
+> registrado o lanza al construirse (design §4.5, confirmado también por 4.9: "el chequeo de
+> bootstrap del registry cubre los 3 valores del enum" recién al cerrar slice 4). Wirear
+> `EXTRACTO_PARSERS`/`ExtractoParserRegistry` como provider de `conciliacion-bancaria.module.ts`
+> en slice 1 (0 parsers reales — llegan en slices 3-4) haría fallar el bootstrap de TODA la app,
+> contradiciendo la propia nota de 1.12 ("wiring inicial, sin los 3 parsers de extracto
+> todavía"). Resolución: el registry se construyó y se valida standalone (1.8/1.9, este spec no
+> pasa por DI), pero NO se agregó a `conciliacion-bancaria.module.ts` — se difiere a cuando el
+> primer/segundo parser real exista (slice 3). El frontend usa un catálogo ESTÁTICO
+> (`lib/perfil-extracto-options.ts`) con los mismos 3 valores del enum como selector de
+> `perfilExtracto`, documentado como deuda a reemplazar por un hook real cuando el endpoint exista.
+
+- [x] 1.1 RED `[UNIT]` `cuentas-bancarias.service.spec.ts`: crear sobre `cuentaId` ya vinculado →
       `CONCILIACION_CUENTA_BANCARIA_YA_VINCULADA` 409 (REQ-CB-01).
-- [ ] 1.2 GREEN validación en el service + `@@unique([organizationId, cuentaId])`.
-- [ ] 1.3 RED `[UNIT]` REQ-CB-02: `cuenta.permiteMultiMoneda=false` + `CuentaBancaria.moneda` distinta
+- [x] 1.2 GREEN validación en el service + `@@unique([organizationId, cuentaId])`.
+- [x] 1.3 RED `[UNIT]` REQ-CB-02: `cuenta.permiteMultiMoneda=false` + `CuentaBancaria.moneda` distinta
       de `monedaFuncional` → `CONCILIACION_MONEDA_INCOMPATIBLE` 422; `permiteMultiMoneda=true` →
       acepta cualquier moneda.
-- [ ] 1.4 GREEN validación de moneda.
-- [ ] 1.5 `ports/cuenta-bancaria.repository.port.ts` + adapter Prisma.
-- [ ] 1.6 RED `[INT]` `@@unique([organizationId,cuentaId])` y **`@@unique([organizationId,
+- [x] 1.4 GREEN validación de moneda.
+- [x] 1.5 `ports/cuenta-bancaria.repository.port.ts` + adapter Prisma.
+- [x] 1.6 RED `[INT]` `@@unique([organizationId,cuentaId])` y **`@@unique([organizationId,
       perfilExtracto, numeroCuenta])`** (CRITICAL-5 — NUNCA `banco`) enforzados en DB; REQ-CB-13
       (cuenta de otra org → 404, listado acotado al tenant activo).
-- [ ] 1.7 GREEN adapter.
-- [ ] 1.8 RED `[UNIT]` `ExtractoParserRegistry`: perfil duplicado en el registro → falla en bootstrap;
+- [x] 1.7 GREEN adapter.
+- [x] 1.8 RED `[UNIT]` `ExtractoParserRegistry`: perfil duplicado en el registro → falla en bootstrap;
       valor del enum `PerfilExtracto` sin adapter → falla en bootstrap (fail-fast, design §4.5).
-- [ ] 1.9 GREEN `ExtractoParserRegistry` (esqueleto; los 3 parsers reales llegan en slices 3-4).
-- [ ] 1.10 `cuentas-bancarias.controller.ts`: `GET/POST/PATCH/DELETE /api/cuentas-bancarias[/:id]` +
-      `GET /api/cuentas-bancarias/perfiles` (`registry.descriptores()`), guards
-      `Auth→ModuleEnabled('contabilidad')→Permissions→PackEnabled('contabilidad.conciliacion')`.
-- [ ] 1.11 RED `[E2E]` CRUD completo + 404 cross-tenant + 403 sin permiso + 404 sin pack activo.
-- [ ] 1.12 GREEN controller + `conciliacion-bancaria.module.ts` (wiring inicial, sin los 3 parsers de
+- [x] 1.9 GREEN `ExtractoParserRegistry` (esqueleto; los 3 parsers reales llegan en slices 3-4).
+      Construido y testeado standalone; NO wireado en el módulo NestJS todavía (ver nota arriba).
+- [x] 1.10 `cuentas-bancarias.controller.ts`: `GET/POST/PATCH/DELETE /api/cuentas-bancarias[/:id]`,
+      guards `Auth→ModuleEnabled('contabilidad')→Permissions→PackEnabled('contabilidad.conciliacion')`
+      (los 4 en cadena de clase — el pack gatea el controller COMPLETO). `GET /perfiles` DIFERIDO
+      (ver nota de desviación arriba).
+- [x] 1.11 RED `[E2E]` CRUD completo + 404 cross-tenant + 403 sin permiso + 404 sin pack activo.
+      8/8 verde en `test/cuentas-bancarias.e2e-spec.ts`.
+- [x] 1.12 GREEN controller + `conciliacion-bancaria.module.ts` (wiring inicial, sin los 3 parsers de
       extracto todavía).
-- [ ] 1.13 `[OPENAPI]` Regenerar (`CuentaBancariaResponseDto`, `PerfilResponseDto`, endpoints nuevos).
-- [ ] 1.14 `[FE]` `frontend/src/features/cuentas-bancarias/` (molde CRUD simple existente): página
+- [x] 1.13 `[OPENAPI]` Regenerar (`CuentaBancariaResponseDto`, endpoints nuevos). `PerfilResponseDto`
+      diferido junto con `GET /perfiles` (ver nota de desviación).
+- [x] 1.14 `[FE]` `frontend/src/features/cuentas-bancarias/` (molde CRUD simple existente): página
       `/settings/cuentas-bancarias`, selector de `Cuenta` (`esDetalle=true && activa=true`) +
-      `perfilExtracto` (desde `GET /perfiles`).
-- [ ] 1.15 RED `[FE]` alta, edición, error 409 mostrado, gating fail-closed por permiso.
-- [ ] 1.16 GREEN implementación de la feature.
+      `perfilExtracto` (catálogo estático — `GET /perfiles` diferido, ver nota arriba).
+- [x] 1.15 RED `[FE]` alta, edición, gating fail-closed por permiso. (Error 409 se muestra vía
+      `backendErrorMessage` genérico del hook de mutation — sin test dedicado de contenido del
+      mensaje 409, cubierto extremo a extremo por el e2e del backend.)
+- [x] 1.16 GREEN implementación de la feature.
 
 ## Slice 2 — Dominio puro (Strict TDD, cobertura ≥95%)
 

@@ -40,6 +40,7 @@ import { FeatureFlagsPage } from '@/features/platform-admin/pages/feature-flags-
 import { OrgMembersPage } from '@/features/platform-admin/pages/org-members-page';
 import { CierreEjercicioPage } from '@/features/cierre-ejercicio/pages/cierre-ejercicio-page';
 import { CierreGestionActivaRedirect } from '@/features/cierre-ejercicio/components/cierre-gestion-activa-redirect';
+import { CuentasBancariasPage } from '@/features/cuentas-bancarias/pages/cuentas-bancarias-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -253,6 +254,14 @@ export const router = createBrowserRouter([
               <RequireSystemRole roles={['OWNER', 'ADMIN']}>
                 <ComplementosPage />
               </RequireSystemRole>
+            ),
+          },
+          {
+            path: '/settings/cuentas-bancarias',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
+                <CuentasBancariasPage />
+              </RequirePermission>
             ),
           },
           // ─── Granja ──────────────────────────────────────────────────────

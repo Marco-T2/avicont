@@ -1912,6 +1912,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cuentas-bancarias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista las cuentas bancarias del tenant activo. */
+        get: operations["CuentasBancariasController_listar"];
+        put?: never;
+        /** Vincula una cuenta del plan (elegida por el usuario) a una cuenta bancaria (REQ-CB-01). */
+        post: operations["CuentasBancariasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuentas-bancarias/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtiene una cuenta bancaria por id. */
+        get: operations["CuentasBancariasController_obtener"];
+        put?: never;
+        post?: never;
+        /** Elimina una cuenta bancaria. Falla con 409 si tiene movimientos o importaciones asociadas. */
+        delete: operations["CuentasBancariasController_eliminar"];
+        options?: never;
+        head?: never;
+        /** PATCH de la cuenta bancaria. cuentaId y perfilExtracto son inmutables — no se exponen acá. */
+        patch: operations["CuentasBancariasController_actualizar"];
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3520,6 +3557,65 @@ export interface components {
              */
             advertencias: string[];
             cuentasEfectivoDetectadasPorHeuristica: components["schemas"]["CuentaEfectivoHeuristicaDto"][];
+        };
+        CreateCuentaBancariaDto: {
+            /**
+             * Format: uuid
+             * @description Cuenta del plan de cuentas ELEGIDA por el usuario (esDetalle=true, activa=true). No se adivina.
+             */
+            cuentaId: string;
+            /** @example Cuenta corriente BancoSol */
+            alias: string;
+            /**
+             * @description Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación.
+             * @enum {string}
+             */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            /**
+             * @description Puede quedar vacío al crear — se captura y confirma en la primera importación (REQ-CB-16).
+             * @example 1191959-000-001
+             */
+            numeroCuenta?: string;
+            /**
+             * @description Un extracto tiene una única moneda por definición. Validada contra la cuenta del plan (REQ-CB-02).
+             * @enum {string}
+             */
+            moneda: "BOB" | "USD";
+        };
+        CuentaBancariaResponseDto: {
+            id: string;
+            organizationId: string;
+            cuentaId: string;
+            alias: string;
+            /** @enum {string} */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            numeroCuenta: string | null;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            activa: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ListarCuentasBancariasResponseDto: {
+            items: components["schemas"]["CuentaBancariaResponseDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        UpdateCuentaBancariaDto: {
+            alias?: string;
+            /**
+             * @description null limpia el número capturado; se vuelve a capturar en la próxima importación.
+             * @example 1191959-000-001
+             */
+            numeroCuenta?: Record<string, never> | null;
+            /**
+             * @description Re-valida REQ-CB-02 contra la cuenta del plan ya vinculada.
+             * @enum {string}
+             */
+            moneda?: "BOB" | "USD";
+            /** @description Activar o desactivar la cuenta bancaria sin eliminarla. */
+            activa?: boolean;
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -7174,6 +7270,118 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EstadoFlujoEfectivoResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtrar por estado activo. Omitir para listar solo activas. */
+                activa?: boolean;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarCuentasBancariasResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCuentaBancariaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_eliminar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CuentasBancariasController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCuentaBancariaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
                 };
             };
         };
