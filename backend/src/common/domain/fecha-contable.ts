@@ -115,6 +115,37 @@ export class FechaContable {
     if (this.day !== other.day) return this.day < other.day ? -1 : 1;
     return 0;
   }
+
+  /**
+   * Nueva fecha desplazada `n` días (`n` puede ser negativo). Usa `Date.UTC`
+   * explícitamente — JS normaliza desbordes de día/mes automáticamente sin
+   * pasar nunca por la zona local (§4.6 core). Motor de sugerencias
+   * (conciliación bancaria, design §5.4): ventana ±3 días.
+   */
+  sumarDias(n: number): FechaContable {
+    const desplazado = new Date(Date.UTC(this.year, this.month - 1, this.day + n));
+    return FechaContable.of(
+      desplazado.getUTCFullYear(),
+      desplazado.getUTCMonth() + 1,
+      desplazado.getUTCDate(),
+    );
+  }
+
+  /** Atajo de `sumarDias(-n)`. */
+  restarDias(n: number): FechaContable {
+    return this.sumarDias(-n);
+  }
+
+  /**
+   * Días calendario entre ambas fechas (`this - other`). Positivo si `this`
+   * es posterior a `other`, negativo si es anterior, cero si son iguales.
+   */
+  diferenciaEnDias(other: FechaContable): number {
+    const msPorDia = 24 * 60 * 60 * 1000;
+    const thisUtc = Date.UTC(this.year, this.month - 1, this.day);
+    const otherUtc = Date.UTC(other.year, other.month - 1, other.day);
+    return Math.round((thisUtc - otherUtc) / msPorDia);
+  }
 }
 
 function daysInMonth(year: number, month: number): number {

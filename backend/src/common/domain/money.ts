@@ -125,6 +125,22 @@ export class Money {
     return this.minus(other).abs().lessThanOrEqualTo(Money.TOLERANCIA_BOB);
   }
 
+  /**
+   * true si |this - other| <= tolerancia. **Currency-neutral**: a diferencia
+   * de `balanceadoEnBobCon`/`TOLERANCIA_BOB` (semántica BOB del invariante de
+   * partida doble, CLAUDE.md §4.1 — no tocar), este método no asume moneda.
+   *
+   * PRECONDICIÓN: el caller garantiza que `this` y `other` están en la MISMA
+   * moneda — este método no la conoce ni la valida. Usado por conciliación
+   * bancaria (design conciliacion-bancaria §8.0) para comparar montos en
+   * moneda original (BOB o USD) en el ancla (§2), el motor de sugerencias
+   * (§5.2) y el checksum de extracto (§4.2), siempre después de filtrar por
+   * igualdad de moneda en el caller.
+   */
+  igualaConTolerancia(other: DecimalInput, tolerancia: Money = Money.of('0.01')): boolean {
+    return this.minus(other).abs().lessThanOrEqualTo(tolerancia);
+  }
+
   // ------------------------------------------------------------
   // Formato
   // ------------------------------------------------------------

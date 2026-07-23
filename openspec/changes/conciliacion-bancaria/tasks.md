@@ -208,89 +208,112 @@
 
 ## Slice 2 — Dominio puro (Strict TDD, cobertura ≥95%)
 
+> ✅ **Slice 2 COMPLETO** (2026-07-23). 233 tests nuevos/extendidos, todos verdes.
+> Cobertura real (`--collectCoverageFrom` sobre los 10 archivos nuevos de `domain/`, los 2 nuevos
+> de `adapters/parsing/`, y `money.ts`/`fecha-contable.ts` — excluyendo `cuenta-bancaria-errors.ts`
+> del slice 1): **99.66% statements · 96.87% branch · 100% funcs · 100% lines** — todos los 10
+> archivos de dominio puro en 100/100/100/100. `tsc --noEmit` limpio. `pnpm run lint` limpio (0
+> errores tras `--fix` de formato prettier).
+>
+> **Desviación documentada — `20260701 slice 4/2/2` (2.27) NO implementada**: ese caso pertenece al
+> formato BCP, que NO es uno de los 3 perfiles de v1 (`BANCOSOL_XLSX`/`ECONOMICO_XLSX`/`UNION_XLSX`
+> — ver Slice 4). La nota en el texto original de la tarea referenciaba dónde vivirá ese caso en un
+> slice futuro, no algo a construir ahora. `leerFechaCelda` implementa únicamente los 3 dialectos de
+> v1 (`SERIAL_EXCEL`, `TEXTO_ES_DD_MMM_YYYY`, `DD_MM_YYYY`).
+>
+> **Hallazgo cerrado en el propio slice — `FechaContable` rechaza año < 1900**: la época de Excel
+> (1899-12-30) no se puede construir vía `FechaContable.of(1899, 12, 30)` (CLAUDE.md §4.6 fija el
+> rango 1900-2999). `leerSerialExcel` resuelve la aritmética de la época en UTC crudo
+> (`Date.UTC(1899, 11, 30) + ent * 86400000`) y solo el resultado FINAL (siempre ≥ 1900 para
+> cualquier serial real de un extracto boliviano) pasa por `FechaContable.of`, que sigue siendo la
+> única validación de calendario. `serial=1` (→ 1899-12-31) sigue rechazado como defensa en
+> profundidad — nunca ocurre con datos reales.
+
 > Orden fijado por el design: el VO adversarial de cuenta bancaria **primero** — es la regla más
 > fácil de romper y la única cuyo fallo es silencioso.
 
-- [ ] 2.1 RED `[DOM]` `domain/numero-cuenta-bancaria.spec.ts` — **TEST ADVERSARIAL PRIMERO**: los 3
+- [x] 2.1 RED `[DOM]` `domain/numero-cuenta-bancaria.spec.ts` — **TEST ADVERSARIAL PRIMERO**: los 3
       números reales (`1191959-000-001`, `-002`, `-003`) comparados de a pares dan `false` en los
       **6 pares cruzados**, `true` solo consigo mismos; equivalencias de normalización (guiones,
       espacios, NBSP, puntos); chequeo de superficie de tipo — el VO no expone getter del normalizado
       (un `startsWith` externo no debe compilar contra el tipo).
-- [ ] 2.2 GREEN `domain/numero-cuenta-bancaria.ts`: `NumeroCuentaBancaria` (`private constructor` +
+- [x] 2.2 GREEN `domain/numero-cuenta-bancaria.ts`: `NumeroCuentaBancaria` (`private constructor` +
       `static of(raw)` + único método `equals()`, sin getter del normalizado — design §4.4, REQ-CB-16).
-- [ ] 2.3 RED `[DOM]` `common/domain/fecha-contable.spec.ts`: `sumarDias`/`restarDias`/
+- [x] 2.3 RED `[DOM]` `common/domain/fecha-contable.spec.ts`: `sumarDias`/`restarDias`/
       `diferenciaEnDias` — cruce de mes, cruce de año, bisiesto (28→29 feb 2028), negativos.
-- [ ] 2.4 GREEN extender `common/domain/fecha-contable.ts` (design §5.4).
-- [ ] 2.5 RED `[DOM]` `common/domain/money.spec.ts` (**CRITICAL-3**, NUEVO): `igualaConTolerancia`
+- [x] 2.4 GREEN extender `common/domain/fecha-contable.ts` (design §5.4).
+- [x] 2.5 RED `[DOM]` `common/domain/money.spec.ts` (**CRITICAL-3**, NUEVO): `igualaConTolerancia`
       — dentro de tolerancia `±0.01` → `true`; borde exacto `0.01` → `true`; fuera → `false`;
       simétrico `a.iguala(b) === b.iguala(a)`; USD y BOB con el mismo `0.01`; caso real BCP
       `4.6500000000000004` vs `4.65` → `true`. NO tocar `balanceadoEnBobCon`/`TOLERANCIA_BOB` (son
       del core contable, semántica BOB).
-- [ ] 2.6 GREEN `common/domain/money.ts`: agregar `igualaConTolerancia(other, tolerancia =
+- [x] 2.6 GREEN `common/domain/money.ts`: agregar `igualaConTolerancia(other, tolerancia =
       Money.of('0.01'))`, currency-neutral (design §8.0). `equalsConTolerancia`/`redondear`/`toFixed`
       NO EXISTEN — no inventarlos.
-- [ ] 2.7 RED `[DOM]` `domain/normalizar-descripcion.spec.ts`: NFKC, diacríticos, uppercase,
+- [x] 2.7 RED `[DOM]` `domain/normalizar-descripcion.spec.ts`: NFKC, diacríticos, uppercase,
       NBSP/tabs/saltos, truncado a 200 (casos reales #953: `DEPÓSITO`/`DEPOSITO`, NBSP de XLSX).
-- [ ] 2.8 GREEN `domain/normalizar-descripcion.ts`.
-- [ ] 2.9 RED `[DOM]` `domain/orden-canonico.spec.ts`: clave total fecha→monto(centavos string,
+- [x] 2.8 GREEN `domain/normalizar-descripcion.ts`.
+- [x] 2.9 RED `[DOM]` `domain/orden-canonico.spec.ts`: clave total fecha→monto(centavos string,
       zero-padded)→tipo→descripcionNormalizada→referencia(null último); el mismo conjunto en ASC y
       DESC produce igual secuencia (caso real Fortaleza #953: 30 movs DESC vs 73 movs ASC, mismo
       período → mismo orden tras `ordenarCanonico`).
-- [ ] 2.10 GREEN `domain/orden-canonico.ts` — `ordenarCanonico`.
-- [ ] 2.11 RED `[DOM]` `domain/ordinal-dia.spec.ts` (REQ-CB-07): dos movimientos idénticos mismo día →
+- [x] 2.10 GREEN `domain/orden-canonico.ts` — `ordenarCanonico`.
+- [x] 2.11 RED `[DOM]` `domain/ordinal-dia.spec.ts` (REQ-CB-07): dos movimientos idénticos mismo día →
       `ordinalDia=0` y `=1`, ninguno se descarta; grupo recompuesto en distinto orden de entrada da
       mismos ordinales; contar **por grupo de tupla**, no por día completo (un import parcial no debe
       correr los ordinales de otros grupos).
-- [ ] 2.12 GREEN `domain/ordinal-dia.ts` — `asignarOrdinalDia`.
-- [ ] 2.13 RED `[DOM]` `domain/hash-dedup.spec.ts`: separador Unit Separator `` evita colisión
+- [x] 2.12 GREEN `domain/ordinal-dia.ts` — `asignarOrdinalDia`.
+- [x] 2.13 RED `[DOM]` `domain/hash-dedup.spec.ts`: separador Unit Separator `` evita colisión
       `('AB','C')` vs `('A','BC')`; `montoCentavos = money.toBob()` como string (`"12600.00"`), nunca
       `number`; prefijo de versión `v1`.
-- [ ] 2.14 GREEN `domain/hash-dedup.ts` — `calcularHashDedup`.
-- [ ] 2.15 RED `[DOM]` `domain/lado-contable.spec.ts`: `ladoContableEsperado('CREDITO')==='DEBITO'` y
+- [x] 2.14 GREEN `domain/hash-dedup.ts` — `calcularHashDedup`.
+- [x] 2.15 RED `[DOM]` `domain/lado-contable.spec.ts`: `ladoContableEsperado('CREDITO')==='DEBITO'` y
       viceversa (§5.1 — la inversión banco↔empresa, la pieza más fácil de invertir por error;
       `LadoBancario` entra, `LadoContable` sale — son DOS tipos, no el mismo reusado).
-- [ ] 2.16 GREEN `domain/lado-contable.ts`.
-- [ ] 2.17 RED `[DOM]` `domain/checksum-extracto.spec.ts`: `DECLARADO` cuadra / no cuadra
+- [x] 2.16 GREEN `domain/lado-contable.ts`.
+- [x] 2.17 RED `[DOM]` `domain/checksum-extracto.spec.ts`: `DECLARADO` cuadra / no cuadra
       (`DESCUADRE`+`diferencia`, nunca rechaza, vía `Money.igualaConTolerancia`); `DERIVADO` parte de
       la fila más antigua tras `ordenarCanonico`; `IMPOSIBLE`→`SIN_VERIFICAR`. Checksums reales:
       BancoSol XLSX derivado `3.275,55 + (−3.040,38) = 235,17`; Económico XLSX declarado
       `327.520,14 + (−147.762,77) = 179.757,37`.
-- [ ] 2.18 GREEN `domain/checksum-extracto.ts` — `verificarChecksum`.
-- [ ] 2.19 RED `[DOM]` `domain/verificar-anclas.spec.ts` (REQ-CB-10, corrección C-1): línea intacta →
+- [x] 2.18 GREEN `domain/checksum-extracto.ts` — `verificarChecksum`.
+- [x] 2.19 RED `[DOM]` `domain/verificar-anclas.spec.ts` (REQ-CB-10, corrección C-1): línea intacta →
       válido; `orden` corrido pero snapshot coincide en los 5 campos (caso benigno) → válido; línea
       inexistente → `LINEA_INEXISTENTE`; comprobante anulado → `COMPROBANTE_ANULADO`; monto distinto
       (vía `Money.igualaConTolerancia`) → `MONTO_CAMBIADO`; `snapshotTipo` (`LadoContable`) invertido
       → `LADO_CAMBIADO`; moneda distinta → `MONEDA_CAMBIADA`; fecha distinta → `FECHA_CAMBIADA`.
       Función pura — no ejecuta ninguna escritura.
-- [ ] 2.20 GREEN `domain/verificar-anclas.ts`.
-- [ ] 2.21 RED `[DOM]` `domain/motor-sugerencias.spec.ts` (REQ-CB-12, §5.2): `ALTA` (fecha exacta +
+- [x] 2.20 GREEN `domain/verificar-anclas.ts`.
+- [x] 2.21 RED `[DOM]` `domain/motor-sugerencias.spec.ts` (REQ-CB-12, §5.2): `ALTA` (fecha exacta +
       candidato único en ambas direcciones); `MEDIA` (fecha ±3 días, candidato único); `BAJA`
       (múltiples candidatos de cualquier lado); `l.monto.igualaConTolerancia(p.monto)` para el match
       de monto; orden total de salida (confianza DESC → |diffDias| ASC → comprobanteId ASC → orden
       ASC) determinístico e independiente del orden de entrada; nunca produce un `MatchConciliacion`
       — solo la lista ranqueada.
-- [ ] 2.22 GREEN `domain/motor-sugerencias.ts` — `sugerir`.
-- [ ] 2.23 RED `[DOM]` `domain/cobertura-extracto.spec.ts` (REQ-CB-09): dos rangos con hueco entre
+- [x] 2.22 GREEN `domain/motor-sugerencias.ts` — `sugerir`.
+- [x] 2.23 RED `[DOM]` `domain/cobertura-extracto.spec.ts` (REQ-CB-09): dos rangos con hueco entre
       ellos → reporta el tramo no cubierto; rangos contiguos/solapados → sin huecos.
-- [ ] 2.24 GREEN `domain/cobertura-extracto.ts` — `detectarHuecos` (lógica lista; NO se expone por
+- [x] 2.24 GREEN `domain/cobertura-extracto.ts` — `detectarHuecos` (lógica lista; NO se expone por
       endpoint en v1, proposal "cae de regalo"; confirmar en el cierre transversal que ningún
       controller la cablea).
-- [ ] 2.25 RED `[DOM]` `adapters/parsing/dinero.spec.ts` (boundary, testeable sin DB): `leerMontoCelda`
+- [x] 2.25 RED `[DOM]` `adapters/parsing/dinero.spec.ts` (boundary, testeable sin DB): `leerMontoCelda`
       con casos reales #953/design§8.1 — BCP `4.6500000000000004`→`4.65` exacto (nunca `Number()`);
       Fortaleza `Bs.  16,000.00`; **Unión XLSX** `'             12,600.00'`→`12600.00` CREDITO y
       `'               -900.00'`→`900.00` DEBITO (trim + quitar miles, signo determina `tipo`); FIE
       `+50,450.00`/`-31,000.00` (signo determina `tipo`). El caso "Unión TXT centavos implícitos"
       (`1260000`→`12600.00`) NO se implementa — es perfil futuro (design §4.3.2), el XLSX de v1 trae
       decimales explícitos.
-- [ ] 2.26 GREEN `adapters/parsing/dinero.ts` — `leerMontoCelda` ÚNICAMENTE. `insertarPuntoDecimal`
+- [x] 2.26 GREEN `adapters/parsing/dinero.ts` — `leerMontoCelda` ÚNICAMENTE. `insertarPuntoDecimal`
       NO se implementa en v1 (queda documentado como necesidad de un futuro perfil ancho-fijo).
-- [ ] 2.27 RED `[DOM]` `adapters/parsing/fechas.spec.ts`: serial Excel BancoSol
+- [x] 2.27 RED `[DOM]` `adapters/parsing/fechas.spec.ts`: serial Excel BancoSol
       `46224.6478587963` (época 1899-12-30, hora=fracción redondeada, guarda `1≤ent≤60000`);
       Económico `03/Jun/2026` con mapa español sin diacríticos (`SET` alias `SEP`), `new Date(string)`
       PROHIBIDO; Unión XLSX `02/04/2026` (`DD/MM/YYYY` string, split por espacio si trae hora);
-      `20260701` slice 4/2/2.
-- [ ] 2.28 GREEN `adapters/parsing/fechas.ts`.
-- [ ] 2.29 `pnpm exec jest src/conciliacion-bancaria/domain --coverage` — cerrar huecos hasta ≥95%.
+      `20260701` slice 4/2/2 — **NO implementado en este slice, ver nota de desviación arriba (BCP
+      es slice futuro)**.
+- [x] 2.28 GREEN `adapters/parsing/fechas.ts`.
+- [x] 2.29 `pnpm exec jest src/conciliacion-bancaria/domain --coverage` — cerrar huecos hasta ≥95%.
+      **99.66% stmts / 96.87% branch / 100% funcs / 100% lines** — objetivo superado.
 
 ## Slice 3 — Adaptador XLSX core-compartido (BancoSol + Económico)
 
