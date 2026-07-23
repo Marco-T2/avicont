@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { OrgPackEntitlement, Pack as PrismaPack } from '@prisma/client';
+import type { OrgPackEntitlement, Pack as PrismaPack, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -28,9 +28,16 @@ export class PrismaOrgPackRepository extends OrgPackRepositoryPort implements Or
     organizationId: string,
     packId: string,
     habilitadoPorUserId: string,
+    opts?: { activo?: boolean; tx?: Prisma.TransactionClient },
   ): Promise<OrgPackEntitlementRow> {
-    const fila = await this.prisma.orgPackEntitlement.create({
-      data: { organizationId, packId, habilitadoPorUserId },
+    const client = opts?.tx ?? this.prisma;
+    const fila = await client.orgPackEntitlement.create({
+      data: {
+        organizationId,
+        packId,
+        habilitadoPorUserId,
+        ...(opts?.activo !== undefined ? { activo: opts.activo } : {}),
+      },
     });
     return toRow(fila);
   }

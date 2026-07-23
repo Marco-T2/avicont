@@ -6,3 +6,8 @@ coverage
 .DS_Store
 .claude/
 package-lock.json
+
+# Extractos bancarios reales sin anonimizar (insumo de análisis del módulo de
+# conciliación). Contienen números de cuenta, nombres y montos reales.
+# Los fixtures anonimizados viven junto a los adaptadores que los usan.
+docs/extractosBancos/

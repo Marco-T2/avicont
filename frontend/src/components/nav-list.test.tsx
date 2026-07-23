@@ -127,6 +127,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/plan-cuentas',
       '/contactos',
       '/documentos-fisicos',
+      '/conciliacion',
     ]);
   });
 
@@ -761,16 +762,53 @@ describe('NavList — filtrado por requiredSystemRole', () => {
   });
 });
 
-// Guard anti-drift: ningún NAV_ITEM de producción declara `pack` todavía. El riel
-// queda listo para enchufar; cuando se construya el primer pack, este test obliga a
-// revisar conscientemente la decisión (y a actualizar la cascada de filtros si cambia).
-describe('NAV_ITEMS — riel de pack sin enchufar aún', () => {
-  it('ningún ítem de producción declara `pack` (riel listo, sin pack concreto)', () => {
-    for (const item of NAV_ITEMS) {
-      expect(
-        item.pack,
-        `"${item.label}" (${item.to}) declara pack sin que exista un pack concreto construido`,
-      ).toBeUndefined();
-    }
+// REQ-SB-10 (tarea 0.20-0.21, change conciliacion-bancaria): "Conciliación
+// bancaria" es el primer NAV_ITEM de producción con `pack` seteado
+// (`contabilidad.conciliacion`). Misma cascada AND fail-closed de REQ-SB-05,
+// sin código nuevo en NavList ni en el filtrado por pack (0.21 — el mecanismo
+// genérico ya alcanza).
+describe('NAV_ITEMS — primer ítem de pack de dominio (REQ-SB-10, conciliación bancaria)', () => {
+  it('el ítem "Conciliación bancaria" declara pack, requiredPermission y vertical', () => {
+    const item = NAV_ITEMS.find((i) => i.to === '/conciliacion');
+    expect(item).toBeDefined();
+    expect(item?.pack).toBe('contabilidad.conciliacion');
+    expect(item?.requiredPermission).toBe('contabilidad.conciliacion.read');
+    expect(item?.vertical).toBe('CONTABILIDAD');
+  });
+
+  it('Escenario 1 — pack activo + permiso + vertical CONTABILIDAD: el ítem está visible', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Conciliación bancaria').length).toBeGreaterThan(0);
+  });
+
+  it('Escenario 2 — pack NO activo (org que lo desactivó): el ítem está oculto', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks([]); // pack otorgado por defecto pero apagado por la org
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
+  });
+
+  it('Escenario 3 — permiso ausente con pack activo: el ítem está oculto (cascada AND)', () => {
+    mockPermissions({ allowedPermissions: [] }); // sin contabilidad.conciliacion.read
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
   });
 });

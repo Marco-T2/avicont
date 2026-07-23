@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { TipoPack, VerticalPack } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 
@@ -11,6 +12,21 @@ import {
   createTestUser,
   prisma,
 } from './helpers/test-factory';
+
+const PACK_CONCILIACION_CLAVE = 'contabilidad.conciliacion';
+
+/** Siembra el pack `contabilidad.conciliacion` (otorgadoPorDefecto=true). */
+async function crearPackConciliacion(): Promise<void> {
+  await prisma.pack.create({
+    data: {
+      clave: PACK_CONCILIACION_CLAVE,
+      nombre: 'Conciliación bancaria',
+      verticalAplicable: VerticalPack.CONTABILIDAD,
+      tipo: TipoPack.DOMINIO,
+      otorgadoPorDefecto: true,
+    },
+  });
+}
 
 /**
  * Levanta la app con la config estándar del proyecto.
@@ -198,6 +214,75 @@ describe('Platform Admin — acceso super-admin (REQ-SA-12, REQ-SA-13)', () => {
       });
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('PLATFORM_ORG_OWNER_NOT_FOUND');
+  });
+
+  // Auto-otorgamiento de packs (design conciliacion-bancaria §7, tarea 0.14
+  // — entry point `PlatformAdminService.crearOrgConOwner`).
+  describe('auto-otorgamiento de packs otorgadoPorDefecto', () => {
+    it('org nueva CONTABILIDAD creada por super-admin nace con OrgPackEntitlement.activo=true', async () => {
+      await crearPackConciliacion();
+      const orgName = `Org SA Conciliacion ${Date.now()}`;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/platform/orgs')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ name: orgName, modulo: 'CONTABILIDAD', ownerEmail });
+
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const pack = await prisma.pack.findUniqueOrThrow({
+        where: { clave: PACK_CONCILIACION_CLAVE },
+      });
+      const entitlement = await prisma.orgPackEntitlement.findUnique({
+        where: { organizationId_packId: { organizationId: orgId, packId: pack.id } },
+      });
+
+      expect(entitlement).not.toBeNull();
+      expect(entitlement?.activo).toBe(true);
+      // El actor auditado es el OWNER designado (owner.id), no el super-admin.
+      expect(entitlement?.habilitadoPorUserId).toBe(ownerUserId);
+    });
+
+    it('org nueva GRANJA creada por super-admin NO recibe contabilidad.conciliacion', async () => {
+      await crearPackConciliacion();
+      const orgName = `Org SA Granja Sin Pack ${Date.now()}`;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/platform/orgs')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ name: orgName, modulo: 'GRANJA', ownerEmail });
+
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const pack = await prisma.pack.findUniqueOrThrow({
+        where: { clave: PACK_CONCILIACION_CLAVE },
+      });
+      const entitlement = await prisma.orgPackEntitlement.findUnique({
+        where: { organizationId_packId: { organizationId: orgId, packId: pack.id } },
+      });
+
+      expect(entitlement).toBeNull();
+    });
+
+    it('org nueva OTROS creada por super-admin NO recibe ningún pack otorgadoPorDefecto', async () => {
+      await crearPackConciliacion();
+      const orgName = `Org SA Otros Sin Pack ${Date.now()}`;
+
+      const res = await request(app.getHttpServer())
+        .post('/api/admin/platform/orgs')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ name: orgName, modulo: 'OTROS', ownerEmail });
+
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const entitlements = await prisma.orgPackEntitlement.findMany({
+        where: { organizationId: orgId },
+      });
+      expect(entitlements).toEqual([]);
+    });
   });
 });
 

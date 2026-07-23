@@ -1,3 +1,5 @@
+import type { VerticalPack } from '@prisma/client';
+
 import type { Pack } from '../domain/pack';
 
 export const PACK_CATALOG_READER_PORT = Symbol('PACK_CATALOG_READER_PORT');
@@ -16,4 +18,11 @@ export abstract class PackCatalogReaderPort {
 
   /** Devuelve un pack por su id, o null si no existe en el catálogo. */
   abstract findById(id: string): Promise<Pack | null>;
+
+  /**
+   * Packs `otorgadoPorDefecto = true` (y `activo = true`) del vertical dado.
+   * Alimenta el auto-otorgamiento al provisionar una org (design
+   * conciliacion-bancaria §7.2).
+   */
+  abstract listarOtorgadosPorDefecto(vertical: VerticalPack): Promise<Pack[]>;
 }

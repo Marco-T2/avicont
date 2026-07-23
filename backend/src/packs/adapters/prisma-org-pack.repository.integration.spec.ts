@@ -73,6 +73,35 @@ describe('PrismaOrgPackRepository (integration)', () => {
       await repo.habilitar(orgAId, packId, USER_ID);
       await expect(repo.habilitar(orgAId, packId, USER_ID)).rejects.toThrow();
     });
+
+    // Auto-otorgamiento (design conciliacion-bancaria §7.2): opts.activo permite
+    // nacer YA activo; opts.tx permite ejecutar dentro de una TX externa.
+    it('opts.activo=true crea la fila YA activa (auto-otorgamiento, no el default false)', async () => {
+      const fila = await repo.habilitar(orgAId, packId, USER_ID, { activo: true });
+
+      expect(fila.activo).toBe(true);
+    });
+
+    it('opts.tx: dentro de una TX real que hace rollback → NO persiste el entitlement', async () => {
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await repo.habilitar(orgAId, packId, USER_ID, { activo: true, tx });
+          throw new Error('rollback deliberado del test');
+        }),
+      ).rejects.toThrow('rollback deliberado del test');
+
+      expect(await repo.findByOrgYPack(orgAId, packId)).toBeNull();
+    });
+
+    it('opts.tx: dentro de una TX real que hace commit → persiste con activo=true', async () => {
+      await prisma.$transaction(async (tx) => {
+        await repo.habilitar(orgAId, packId, USER_ID, { activo: true, tx });
+      });
+
+      const fila = await repo.findByOrgYPack(orgAId, packId);
+      expect(fila).not.toBeNull();
+      expect(fila?.activo).toBe(true);
+    });
   });
 
   describe('findByOrgYPack', () => {

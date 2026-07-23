@@ -55,6 +55,13 @@ describe('TenantsService.create (integration)', () => {
     const mockGestiones = { existeAlgunaGestion: jest.fn() };
     const mockMemberships = { findAllByTenant: jest.fn() };
     const mockRedis = { del: jest.fn().mockResolvedValue(0) };
+    // Este spec cubre seeders + rollback de la creación de org; el
+    // auto-otorgamiento de packs (design conciliacion-bancaria §7.2/§7.3) se
+    // cubre end-to-end vía HTTP en test/tenants.e2e-spec.ts (fuera de scope acá).
+    const mockPacks = {
+      otorgarPacksPorDefecto: jest.fn().mockResolvedValue([]),
+      invalidarCacheDeOrg: jest.fn().mockResolvedValue(undefined),
+    };
 
     return new TenantsService(
       /* TENANT_REPOSITORY_PORT */ repo,
@@ -65,6 +72,7 @@ describe('TenantsService.create (integration)', () => {
       /* TIPO_DOCUMENTO_FISICO_SEEDER_PORT */ tiposDocSeeder,
       /* TIPO_REGISTRO_SEEDER_PORT */ tipoRegistroSeeder,
       /* PrismaService */ prisma as unknown as PrismaService,
+      /* PackService */ mockPacks as never,
     );
   }
 

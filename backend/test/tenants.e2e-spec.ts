@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { TipoPack, VerticalPack } from '@prisma/client';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
@@ -8,6 +9,35 @@ import {
   TipoDocumentoFisicoSeederPort,
 } from '../src/tipos-documento-fisico/ports/tipos-documento-fisico-seeder.port';
 import { cleanupTestData, createTestUser, prisma } from './helpers/test-factory';
+
+const PACK_CONCILIACION_CLAVE = 'contabilidad.conciliacion';
+const PACK_OTORGADO_GRANJA_CLAVE = 'granja.pack-otorgado-e2e';
+
+/** Siembra el pack `contabilidad.conciliacion` (otorgadoPorDefecto=true). */
+async function crearPackConciliacion(): Promise<void> {
+  await prisma.pack.create({
+    data: {
+      clave: PACK_CONCILIACION_CLAVE,
+      nombre: 'Conciliación bancaria',
+      verticalAplicable: VerticalPack.CONTABILIDAD,
+      tipo: TipoPack.DOMINIO,
+      otorgadoPorDefecto: true,
+    },
+  });
+}
+
+/** Siembra un pack de GRANJA otorgadoPorDefecto=true — cruce de vertical. */
+async function crearPackOtorgadoGranja(): Promise<void> {
+  await prisma.pack.create({
+    data: {
+      clave: PACK_OTORGADO_GRANJA_CLAVE,
+      nombre: 'Pack otorgado de Granja (test)',
+      verticalAplicable: VerticalPack.GRANJA,
+      tipo: TipoPack.DOMINIO,
+      otorgadoPorDefecto: true,
+    },
+  });
+}
 
 /**
  * Configura y levanta una INestApplication desde AppModule con los pipes y
@@ -220,6 +250,77 @@ describe('POST /api/tenants (e2e)', () => {
   });
 
   // ---------------------------------------------------------------
+  // Auto-otorgamiento de packs (design conciliacion-bancaria §7, tareas 0.14/0.16)
+  // ---------------------------------------------------------------
+  describe('auto-otorgamiento de packs otorgadoPorDefecto', () => {
+    beforeEach(async () => {
+      await crearPackConciliacion();
+      await crearPackOtorgadoGranja();
+    });
+
+    it('org nueva CONTABILIDAD nace con OrgPackEntitlement.activo=true para contabilidad.conciliacion', async () => {
+      const res = await crearTenant({
+        name: `Org Conciliacion ${Date.now()}`,
+        modulo: 'CONTABILIDAD',
+      });
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const pack = await prisma.pack.findUniqueOrThrow({
+        where: { clave: PACK_CONCILIACION_CLAVE },
+      });
+      const entitlement = await prisma.orgPackEntitlement.findUnique({
+        where: { organizationId_packId: { organizationId: orgId, packId: pack.id } },
+      });
+
+      expect(entitlement).not.toBeNull();
+      expect(entitlement?.activo).toBe(true);
+    });
+
+    it('org nueva GRANJA NO recibe contabilidad.conciliacion (otro vertical)', async () => {
+      const res = await crearTenant({ name: `Org Granja Sin Pack ${Date.now()}`, modulo: 'GRANJA' });
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const pack = await prisma.pack.findUniqueOrThrow({
+        where: { clave: PACK_CONCILIACION_CLAVE },
+      });
+      const entitlement = await prisma.orgPackEntitlement.findUnique({
+        where: { organizationId_packId: { organizationId: orgId, packId: pack.id } },
+      });
+
+      expect(entitlement).toBeNull();
+    });
+
+    it('org nueva GRANJA SÍ recibe el pack otorgadoPorDefecto propio de su vertical', async () => {
+      const res = await crearTenant({ name: `Org Granja Con Pack ${Date.now()}`, modulo: 'GRANJA' });
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const pack = await prisma.pack.findUniqueOrThrow({
+        where: { clave: PACK_OTORGADO_GRANJA_CLAVE },
+      });
+      const entitlement = await prisma.orgPackEntitlement.findUnique({
+        where: { organizationId_packId: { organizationId: orgId, packId: pack.id } },
+      });
+
+      expect(entitlement).not.toBeNull();
+      expect(entitlement?.activo).toBe(true);
+    });
+
+    it('org nueva OTROS NO recibe ningún pack otorgadoPorDefecto (sin vertical)', async () => {
+      const res = await crearTenant({ name: `Org Otros Sin Pack ${Date.now()}`, modulo: 'OTROS' });
+      expect(res.status).toBe(201);
+
+      const orgId = res.body.id as string;
+      const entitlements = await prisma.orgPackEntitlement.findMany({
+        where: { organizationId: orgId },
+      });
+      expect(entitlements).toEqual([]);
+    });
+  });
+
+  // ---------------------------------------------------------------
   // Sin autenticación
   // ---------------------------------------------------------------
   it('rechaza POST sin token → 401', async () => {
@@ -267,6 +368,7 @@ describe('POST /api/tenants — atomicidad (E-ATOM-01)', () => {
   beforeEach(async () => {
     await cleanupTestData();
     await createTestUser({ email: 'atom-e2e@test.com', password: 'pass12345' });
+    await crearPackConciliacion();
     const loginRes = await request(appAtom.getHttpServer())
       .post('/api/auth/login')
       .send({ email: 'atom-e2e@test.com', password: 'pass12345' });
@@ -296,5 +398,24 @@ describe('POST /api/tenants — atomicidad (E-ATOM-01)', () => {
     // Sin OrgConfiguracionContable huérfana
     const configCount = await prisma.orgConfiguracionContable.count();
     expect(configCount).toBe(0);
+  });
+
+  // Tarea 0.16: rollback de la TX de provisión no deja OrgPackEntitlement
+  // huérfano — el auto-otorgamiento de packs vive DENTRO de la misma TX que
+  // el resto del seeding (design conciliacion-bancaria §7.2), así que el
+  // rollback del seeder de tipos de documento también deshace cualquier
+  // entitlement que se hubiera creado.
+  it('E-ATOM-02: rollback de la TX no deja OrgPackEntitlement huérfano', async () => {
+    const entitlementCount = await prisma.orgPackEntitlement.count();
+
+    const res = await request(appAtom.getHttpServer())
+      .post('/api/tenants')
+      .set('Authorization', `Bearer ${tokenAtom}`)
+      .send({ name: `Org Atom Pack Rollback ${Date.now()}`, modulo: 'CONTABILIDAD' });
+
+    expect(res.status).toBeGreaterThanOrEqual(500);
+
+    const entitlementCountAfter = await prisma.orgPackEntitlement.count();
+    expect(entitlementCountAfter).toBe(entitlementCount);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  Banknote,
   Bird,
   BookCheck,
   BookMarked,
@@ -182,6 +183,16 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FileStack,
         requiredPermission: PERMISSIONS.contabilidad.documentosFisicos.read,
         vertical: 'CONTABILIDAD',
+      },
+      // Primer NAV_ITEM con `pack` (riel eje 2, REQ-SB-10). La página se
+      // construye en slice 5 del change conciliacion-bancaria.
+      {
+        to: '/conciliacion',
+        label: 'Conciliación bancaria',
+        icon: Banknote,
+        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+        vertical: 'CONTABILIDAD',
+        pack: 'contabilidad.conciliacion',
       },
     ],
   },
