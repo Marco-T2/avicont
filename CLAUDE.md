@@ -1021,9 +1021,19 @@ preexistente (Node v24 + AWS SDK + ts-jest)". No requería cambiar configuració
 con el flag de arriba**. Cualquier doc o comentario que siga afirmando que esos tests están
 bloqueados está desactualizado.
 
-**Falla preexistente NO relacionada:** `test/auth-logout-all.e2e-spec.ts` falla ~5 tests
-cuando corre dentro de la suite E2E completa, pero pasa 5/5 en aislamiento. Es un problema
-de aislamiento cross-file, no una regresión de lo que estés tocando. Issue separado.
+**Flake histórico de `auth-logout-all` — NO reproducido desde 2026-07-24.** Esta nota decía
+que `test/auth-logout-all.e2e-spec.ts` caía ~5 tests dentro de la suite E2E completa pero
+pasaba 5/5 en aislamiento. **Medido el 2026-07-24 sobre `main`: 45/45 suites y 592/592 tests
+en verde**, con datos de granja y conciliación presentes en la BD. El síntoma no apareció.
+
+Se descartó también la hipótesis de que el cascade de `Organization` rompiera por el
+`onDelete: Restrict` de los movimientos de granja hacia `TipoRegistro`: Postgres resuelve
+ese cascade correctamente (verificado, no supuesto).
+
+La nota se conserva porque **una corrida verde no prueba que un flake intermitente no
+exista** — `--runInBand` fija un único orden de ejecución. Si lo ves fallar, es aislamiento
+cross-file, no una regresión de lo que estés tocando. Desde el PR #241 las 43 suites
+comparten `cleanupTestData()`, así que el orden de borrado por FK vive en un solo lugar.
 
 ### 11.4 Lint y typecheck
 
@@ -1032,10 +1042,14 @@ Correr **desde `backend/`**:
 ```bash
 cd backend
 pnpm exec tsc --noEmit -p tsconfig.json    # typecheck
-pnpm run lint                              # eslint src/
+pnpm run lint                              # eslint sobre src/ y test/
 pnpm exec eslint <path> --fix              # auto-fix
 pnpm run format                            # prettier sobre src/ y test/
 ```
+
+> Hasta el PR #242 el script era `eslint src` y **no cubría `test/`**, que había acumulado
+> 43 errores sin que el CI los reportara (limpiados en el PR #241). Si agregás un directorio
+> de tests nuevo, sumalo al script — un lint que no corre es un lint que no existe.
 
 ### 11.5 Checklist antes de arrancar a codear desde cero
 
