@@ -360,8 +360,16 @@ export const PerfilExtracto = {
   BANCOSOL_XLSX: 'BANCOSOL_XLSX',
   ECONOMICO_XLSX: 'ECONOMICO_XLSX',
   UNION_XLSX: 'UNION_XLSX',
+  BCP_XLSX: 'BCP_XLSX',
 } as const satisfies Record<string, Schemas['CuentaBancariaResponseDto']['perfilExtracto']>;
 export type PerfilExtracto = (typeof PerfilExtracto)[keyof typeof PerfilExtracto];
+
+/**
+ * Metadata de un perfil soportado, servida por `GET /api/cuentas-bancarias/perfiles`
+ * desde el registro de parsers del backend — única fuente de verdad de qué
+ * bancos hay y cómo se llaman de cara al usuario.
+ */
+export type PerfilExtractoDescriptor = Schemas['PerfilExtractoResponseDto'];
 
 export type CuentaBancaria = Schemas['CuentaBancariaResponseDto'];
 

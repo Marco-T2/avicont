@@ -17,7 +17,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { CuentaBancaria, Moneda } from '@/types/api';
 
-import { PERFIL_EXTRACTO_OPTIONS } from '../lib/perfil-extracto-options';
+import { usePerfilesExtracto } from '../hooks/use-perfiles-extracto';
+import { etiquetaPerfilExtracto } from '../lib/etiqueta-perfil-extracto';
 import {
   cuentaBancariaFormSchema,
   DEFAULT_CREATE_VALUES,
@@ -57,6 +58,12 @@ export function CuentaBancariaForm({
     setValue,
     formState: { errors },
   } = form;
+
+  // Catálogo de bancos soportados servido por el backend (fuente de verdad:
+  // el registro de parsers). En modo edición el select está deshabilitado —
+  // `perfilExtracto` es inmutable post-creación — así que no importa si el
+  // catálogo todavía no llegó.
+  const { data: perfiles } = usePerfilesExtracto();
 
   const cuentaId = useWatch({ control, name: 'cuentaId' });
   const perfilExtracto = useWatch({ control, name: 'perfilExtracto' });
@@ -125,9 +132,9 @@ export function CuentaBancariaForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {PERFIL_EXTRACTO_OPTIONS.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                {p.label}
+            {(perfiles ?? []).map((p) => (
+              <SelectItem key={p.perfil} value={p.perfil}>
+                {etiquetaPerfilExtracto(p)}
               </SelectItem>
             ))}
           </SelectContent>

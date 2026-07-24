@@ -4,6 +4,7 @@ import type { DialectoFecha } from './fechas';
 const SERIAL_EXCEL: DialectoFecha = { tipo: 'SERIAL_EXCEL' };
 const TEXTO_ES: DialectoFecha = { tipo: 'TEXTO_ES_DD_MMM_YYYY' };
 const DD_MM_YYYY: DialectoFecha = { tipo: 'DD_MM_YYYY' };
+const YYYYMMDD: DialectoFecha = { tipo: 'YYYYMMDD' };
 
 // Boundary de parsing — testeable sin DB (design §8.2). `new Date(string)`
 // PROHIBIDO en todo este archivo: depende del locale del proceso.
@@ -107,6 +108,39 @@ describe('leerFechaCelda (design §8.2, caso #953)', () => {
 
     it('rechaza formato sin las 3 partes', () => {
       expect(() => leerFechaCelda('07/2026', DD_MM_YYYY)).toThrow();
+    });
+  });
+
+  describe('YYYYMMDD — BCP XLSX', () => {
+    it('caso real del fixture: 20260701 → 2026-07-01, sin hora (BCP la trae en columna aparte)', () => {
+      const resultado = leerFechaCelda('20260701', YYYYMMDD);
+      expect(resultado.fecha.toIso()).toBe('2026-07-01');
+      expect(resultado.hora).toBeNull();
+    });
+
+    it('tolera padding — la celda llega como string crudo del XLSX', () => {
+      expect(leerFechaCelda('  20260715  ', YYYYMMDD).fecha.toIso()).toBe('2026-07-15');
+    });
+
+    // El riesgo real de este dialecto es el `slice` ciego: cortar posiciones
+    // fijas sobre una cadena que NO es YYYYMMDD produce una fecha plausible
+    // pero equivocada, y una fecha mal leída se propaga hasta el hash de
+    // dedup sin que nada la detecte. Por eso se exige la forma exacta.
+    it('rechaza una fecha con separadores en vez de cortarla a ciegas', () => {
+      expect(() => leerFechaCelda('2026-07-01', YYYYMMDD)).toThrow(RangeError);
+    });
+
+    it('rechaza cadenas de largo distinto de 8', () => {
+      expect(() => leerFechaCelda('2026071', YYYYMMDD)).toThrow(RangeError);
+      expect(() => leerFechaCelda('202607011', YYYYMMDD)).toThrow(RangeError);
+    });
+
+    it('rechaza una cadena de 8 caracteres que no sean todos dígitos', () => {
+      expect(() => leerFechaCelda('2026JUL1', YYYYMMDD)).toThrow(RangeError);
+    });
+
+    it('rechaza una fecha de calendario imposible (delega en FechaContable)', () => {
+      expect(() => leerFechaCelda('20260231', YYYYMMDD)).toThrow();
     });
   });
 
