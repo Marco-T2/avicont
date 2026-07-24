@@ -266,6 +266,48 @@ que no aplique al perfil.
 > ancho-fijo futuro (ej. el TXT de Unión, documentado pero diferido) sí
 > caería en `IMPOSIBLE`.
 
+**El checksum `DERIVADO` DEBE anclar el saldo en el orden CRONOLÓGICO de los
+movimientos, NUNCA en el orden canónico de deduplicación.** Son dos órdenes
+con propósitos distintos y no son intercambiables: el canónico ordena por
+atributos intrínsecos (`fecha → monto → tipo → …`) e ignora la hora a
+propósito, porque es lo que hace que un mismo movimiento produzca el mismo
+hash venga el archivo en ASC o en DESC. Pero eso significa que su primer
+elemento es el de MENOR MONTO del día más antiguo, no el que ocurrió primero
+— y el saldo corrido de ese movimiento no sirve como ancla.
+
+El orden cronológico se deriva del **orden físico de las filas**: los bancos
+emiten el extracto ordenado por tiempo real, incluso dentro de un mismo día y
+aunque el formato no publique la hora. Solo varía la dirección, que se detecta
+comparando fechas. Si la secuencia física NO es monótona por fecha, el sistema
+NO DEBE adivinar el ancla: el checksum queda `SIN_VERIFICAR`. Un "no pude
+verificar" honesto es preferible a un descuadre inventado — la señal de
+descuadre solo sirve si el contador puede confiar en ella.
+
+#### Scenario: Día más antiguo con varios movimientos — el ancla es el cronológicamente primero
+
+- GIVEN un extracto `DERIVADO` cuyo día más antiguo trae tres movimientos, y
+  el de menor monto NO es el que ocurrió primero
+- WHEN se verifica el checksum
+- THEN el saldo inicial se deriva del movimiento que ocurrió PRIMERO según el
+  orden físico del archivo
+- AND el resultado es `VERIFICADO`, no un descuadre por la diferencia entre
+  los montos del día
+
+#### Scenario: El mismo período exportado en ASC y en DESC da el mismo veredicto
+
+- GIVEN dos exports del mismo banco que cubren días en común, uno en orden
+  ascendente y otro descendente
+- WHEN se verifica el checksum de cada uno
+- THEN ambos dan el mismo `estadoVerificacion`
+
+#### Scenario: Archivo no ordenado por fecha — SIN_VERIFICAR, nunca un descuadre inventado
+
+- GIVEN un extracto cuyas filas no vienen ordenadas por fecha en ninguna
+  dirección
+- WHEN se verifica el checksum con estrategia `DERIVADO`
+- THEN el resultado es `SIN_VERIFICAR`
+- AND el sistema NO reporta `DESCUADRE`
+
 **Un perfil PUEDE declarar verificaciones adicionales más allá de su
 estrategia primaria**, sin que eso cambie su clasificación DECLARADO /
 DERIVADO / IMPOSIBLE. Ej.: Unión (`DERIVADO`) además reconcilia los totales

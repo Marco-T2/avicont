@@ -1,13 +1,21 @@
 /**
  * Verifica el saldo de un extracto según su `EstrategiaChecksum` (REQ-CB-08,
- * design §4.2). Consume la lista de movimientos YA ORDENADA por
- * `ordenarCanonico` — no reordena. Informativo, NUNCA rechaza la importación
- * (decisión 3): el resultado es `VERIFICADO | SIN_VERIFICAR | DESCUADRE`.
+ * design §4.2). Informativo, NUNCA rechaza la importación (decisión 3): el
+ * resultado es `VERIFICADO | SIN_VERIFICAR | DESCUADRE`.
+ *
+ * **La lista que consume DEBE venir en orden CRONOLÓGICO** (`ordenarCronologico`,
+ * derivado del orden físico del archivo), NO en orden canónico. El orden
+ * canónico ordena por `fecha → monto → …` e ignora la hora a propósito, así
+ * que su primer elemento es el de menor monto del día más antiguo y no el que
+ * ocurrió primero. Anclar el saldo ahí produce descuadres FANTASMA sobre datos
+ * correctos — ver el caso Fortaleza documentado en `orden-cronologico.ts`.
+ * `DECLARADO` es inmune (lee los saldos de la cabecera), pero recibe la misma
+ * lista para no tener dos contratos distintos.
  *
  * - **DECLARADO**: el archivo trae saldo inicial/final en la cabecera.
  *   `saldoInicialDeclarado + Σ(±montos) ≟ saldoFinalDeclarado`.
  * - **DERIVADO**: se deriva el saldo inicial de la fila más antigua (primer
- *   elemento del array, que YA está en orden canónico):
+ *   elemento del array, que YA está en orden cronológico):
  *   `saldoInicial = saldo(primero) ∓ monto(primero)` según su lado — un
  *   CREDITO sumó al saldo corrido, así que antes de él el saldo era menor
  *   (se resta); un DEBITO restó, así que antes era mayor (se suma). Luego

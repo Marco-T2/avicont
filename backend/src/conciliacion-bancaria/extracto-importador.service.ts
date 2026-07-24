@@ -25,6 +25,7 @@ import { NumeroCuentaBancaria } from './domain/numero-cuenta-bancaria';
 import type { MovimientoConOrdinalDia } from './domain/ordinal-dia';
 import { asignarOrdinalDia } from './domain/ordinal-dia';
 import { ordenarCanonico } from './domain/orden-canonico';
+import { ordenarCronologico } from './domain/orden-cronologico';
 import { ExtractoParserLookupService } from './extracto-parser-lookup.service';
 import {
   CUENTA_BANCARIA_REPOSITORY_PORT,
@@ -156,10 +157,19 @@ export class ExtractoImportadorService {
       construirMovimientoCreateData(item, cuentaBancariaId, cuentaBancaria.moneda),
     );
 
-    const checksum = verificarChecksum(descriptor.estrategiaChecksum, canonico, {
-      saldoInicialDeclarado: parseado.saldoInicialDeclarado,
-      saldoFinalDeclarado: parseado.saldoFinalDeclarado,
-    });
+    // El checksum NO consume el orden canónico: necesita saber qué movimiento
+    // ocurrió primero, y el canónico desempata por monto (ver
+    // `domain/orden-cronologico.ts`). Si el archivo no viene ordenado por
+    // fecha, `ordenarCronologico` devuelve null y el checksum queda
+    // SIN_VERIFICAR en vez de inventar un descuadre.
+    const cronologico = ordenarCronologico(parseado.movimientos);
+    const checksum =
+      cronologico === null
+        ? { estadoVerificacion: 'SIN_VERIFICAR' as const, diferencia: null }
+        : verificarChecksum(descriptor.estrategiaChecksum, cronologico, {
+            saldoInicialDeclarado: parseado.saldoInicialDeclarado,
+            saldoFinalDeclarado: parseado.saldoFinalDeclarado,
+          });
 
     const sha256Archivo = createHash('sha256').update(archivo.buffer).digest('hex');
     if (await this.importacionRepo.existePorSha256(tenantId, cuentaBancariaId, sha256Archivo)) {
