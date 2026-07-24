@@ -127,7 +127,20 @@ export function ImportacionesDrawer({
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="text-base md:text-sm"
-                onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+                // Cambiar el archivo mientras sube dejaría el resultado hablando
+                // de un archivo que ya no es el seleccionado.
+                disabled={importar.isPending}
+                onChange={(e) => {
+                  setArchivo(e.target.files?.[0] ?? null);
+                  // El resultado que quedó en pantalla es de OTRO archivo. Dejarlo
+                  // visible hizo que se importara dos veces el mismo extracto, y en
+                  // el flujo de confirmación (REQ-CB-16) era peor: el cartel seguía
+                  // preguntando por el número detectado en el archivo anterior, así
+                  // que "Sí, es esta cuenta" mandaba el archivo NUEVO con
+                  // confirmarNumeroCuenta y el backend guardaba en la cuenta el
+                  // número declarado por ese otro archivo, sin que nadie lo viera.
+                  importar.reset();
+                }}
               />
             </div>
 

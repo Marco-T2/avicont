@@ -275,6 +275,44 @@ describe('ImportacionesDrawer — confirmación del número de cuenta (REQ-CB-16
     expect(screen.getByText(/3 ya existían/i)).toBeInTheDocument();
   });
 
+  it('cambiar el archivo invalida el pedido de confirmación del archivo anterior', async () => {
+    // El caso peligroso: el cartel pregunta por el número detectado en el archivo
+    // A y el usuario cambia a B. Si el resultado sobrevive, "Sí, es esta cuenta"
+    // manda B con confirmarNumeroCuenta y el backend graba en la cuenta el número
+    // declarado por B, cuando en pantalla se confirmó el de A.
+    const user = userEvent.setup();
+    const reset = vi.fn();
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      data: { requiereConfirmacionCuenta: true, numeroDetectado: '1191959-000-007' },
+      reset,
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    const input = screen.getByLabelText(/archivo del extracto/i);
+    await user.upload(input, new File(['a'], 'extracto-A.xlsx'));
+    expect(reset).toHaveBeenCalledTimes(1);
+
+    await user.upload(input, new File(['b'], 'extracto-B.xlsx'));
+
+    expect(reset).toHaveBeenCalledTimes(2);
+  });
+
+  it('mientras importa, el input de archivo queda bloqueado', () => {
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: true,
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    expect(screen.getByLabelText(/archivo del extracto/i)).toBeDisabled();
+  });
+
   it('las advertencias de la importación se muestran, no se tragan', () => {
     vi.mocked(useImportarExtracto).mockReturnValue({
       mutate: vi.fn(),
