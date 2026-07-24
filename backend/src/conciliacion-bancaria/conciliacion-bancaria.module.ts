@@ -9,7 +9,9 @@ import { RbacModule } from '@/rbac/rbac.module';
 
 import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
 import { DIALECTO_BCP } from './adapters/dialectos/bcp.dialecto';
+import { DIALECTO_BMSC } from './adapters/dialectos/bmsc.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
+import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
 import { PrismaImportacionExtractoRepository } from './adapters/prisma-importacion-extracto.repository';
@@ -32,8 +34,9 @@ import { MATCH_CONCILIACION_REPOSITORY_PORT } from './ports/match-conciliacion.r
 import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario.repository.port';
 
 // `EXTRACTO_PARSERS` cubre TODOS los valores de `PerfilExtracto`: los 3 que
-// cerró el slice 4 del change `conciliacion-bancaria` (task 4.9) más
-// `BCP_XLSX`, agregado después sobre el mismo motor.
+// cerró el slice 4 del change `conciliacion-bancaria` (task 4.9), más
+// `BCP_XLSX` y más `FORTALEZA_XLSX`/`BMSC_XLSX` (primeros dos perfiles con
+// columnas Débito/Crédito separadas), todos sobre el mismo motor.
 //
 // `ExtractoParserRegistry` (fail-fast de `ports/extracto-parser.registry.ts`,
 // slice 1) SÍ se provee: con todos los dialectos presentes, su constructor
@@ -101,6 +104,8 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
         new XlsxCoreExtractoParser(DIALECTO_ECONOMICO),
         new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX),
         new XlsxCoreExtractoParser(DIALECTO_BCP),
+        new XlsxCoreExtractoParser(DIALECTO_FORTALEZA),
+        new XlsxCoreExtractoParser(DIALECTO_BMSC),
       ],
     },
   ],

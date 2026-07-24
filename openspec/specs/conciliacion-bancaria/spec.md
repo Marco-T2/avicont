@@ -654,8 +654,9 @@ por su cuenta.
 ### REQ-CB-16: Validación del número de cuenta del extracto contra la `CuentaBancaria` destino
 
 Cuando el perfil expone el número de cuenta en la cabecera del archivo
-(confirmado para los 4 perfiles soportados: BancoSol, Económico y Unión bajo
-la misma etiqueta `Cuenta:`, BCP bajo `Nro. Cuenta:` — si un perfil futuro no
+(confirmado para los 6 perfiles soportados: BancoSol, Económico y Unión bajo
+la misma etiqueta `Cuenta:`, BCP bajo `Nro. Cuenta:`, Fortaleza bajo `NÚMERO
+DE CUENTA:` y BMSC bajo `Nro de Cuenta:` — si un perfil futuro no
 lo expusiera, aplica el fallback de advertencia sin rechazo descrito más
 abajo), el servicio de importación DEBE extraerlo y
 compararlo contra `CuentaBancaria.numeroCuenta` **antes de persistir
@@ -900,3 +901,53 @@ un movimiento simultáneamente "conciliado" e "ignorado".
 - WHEN el usuario intenta marcarlo como ignorado directamente
 - THEN el sistema rechaza con `CONCILIACION_MOVIMIENTO_YA_CONCILIADO` (422)
   y exige deshacer el match primero (REQ-CB-17)
+
+### REQ-CB-19: El lado del movimiento sale de la columna, nunca se adivina
+
+Los extractos soportados publican el monto de dos formas distintas, y el
+adaptador DEBE declarar explícitamente cuál usa su perfil:
+
+- **Columna única con signo** (BancoSol, Económico, Unión, BCP): una sola
+  columna de monto; el `LadoBancario` se deriva del SIGNO (`-` → `DEBITO`).
+- **Débito y Crédito separados** (Fortaleza, BMSC): dos columnas; el
+  `LadoBancario` lo determina **cuál de las dos trae valor**, y el signo de la
+  celda se ignora — en estos formatos los montos vienen positivos en ambas
+  columnas, de modo que deducir el lado del signo clasificaría TODO como
+  crédito.
+
+En el modo de columnas separadas, una fila de movimiento DEBE traer valor en
+**exactamente una** de las dos columnas. Con las dos llenas el archivo es
+ambiguo; con ninguna no hay movimiento. En ambos casos el sistema DEBE
+rechazar el archivo con un error de formato y NUNCA elegir un lado por
+default: un movimiento importado con el lado invertido es un error contable
+que no se manifiesta hasta la conciliación, y para entonces ya contaminó el
+hash de dedup y las sugerencias.
+
+Esta elección es **dato declarativo del dialecto**, no una rama por banco en
+el motor de parsing.
+
+#### Scenario: Columna única con signo negativo — débito
+
+- GIVEN un perfil cuyo mapeo de monto es de columna única con signo
+- WHEN la celda de monto del movimiento es `-1.43`
+- THEN el movimiento se importa con `tipo=DEBITO` y monto `1.43` (positivo)
+
+#### Scenario: Columnas separadas — el lado sale de la columna, no del signo
+
+- GIVEN un perfil cuyo mapeo de monto declara columnas `Débito` y `Crédito`
+- WHEN la fila trae valor POSITIVO únicamente en la columna `Débito`
+- THEN el movimiento se importa con `tipo=DEBITO`
+
+#### Scenario: Columnas separadas — ambas con valor, rechazo
+
+- GIVEN un perfil cuyo mapeo de monto declara columnas `Débito` y `Crédito`
+- WHEN una fila de movimiento trae valor en las DOS columnas
+- THEN el sistema rechaza el archivo por formato no reconocido, sin importar
+  ningún movimiento
+
+#### Scenario: Columnas separadas — ninguna con valor, rechazo
+
+- GIVEN un perfil cuyo mapeo de monto declara columnas `Débito` y `Crédito`
+- WHEN una fila de movimiento no trae valor en ninguna de las dos
+- THEN el sistema rechaza el archivo por formato no reconocido, sin asumir
+  un monto en cero

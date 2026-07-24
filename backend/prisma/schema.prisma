@@ -1298,6 +1298,8 @@ enum PerfilExtracto {
   ECONOMICO_XLSX
   UNION_XLSX
   BCP_XLSX
+  FORTALEZA_XLSX
+  BMSC_XLSX
 }
 
 // Perspectiva del BANCO (extracto): lo que el banco declara en cada fila.

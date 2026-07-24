@@ -49,7 +49,7 @@ export const DIALECTO_BCP: DialectoXlsx = {
 
   etiquetaFecha: 'Fecha',
   etiquetaHora: 'Hora',
-  etiquetaMonto: 'Monto',
+  mapeoMonto: { modo: 'COLUMNA_UNICA_CON_SIGNO', etiqueta: 'Monto' },
   etiquetaSaldo: 'Saldo',
   columnasDescripcion: ['Descripción', 'Medio de Atención'],
 

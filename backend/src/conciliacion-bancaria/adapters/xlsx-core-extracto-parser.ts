@@ -24,7 +24,8 @@ import type {
   MovimientoParseado,
 } from '../ports/extracto-parser.port';
 import { ExtractoParserPort } from '../ports/extracto-parser.port';
-import type { DialectoXlsx } from './dialectos/dialecto-xlsx';
+import type { DialectoXlsx, MapeoMonto } from './dialectos/dialecto-xlsx';
+import type { MontoLeido } from './parsing/dinero';
 import { leerMontoCelda } from './parsing/dinero';
 import type { FechaLeida } from './parsing/fechas';
 import { leerFechaCelda } from './parsing/fechas';
@@ -66,11 +67,84 @@ function celdaAString(cruda: CeldaCruda): string | null {
   return cruda;
 }
 
+function etiquetasMonto(mapeo: MapeoMonto): string[] {
+  return mapeo.modo === 'COLUMNA_UNICA_CON_SIGNO'
+    ? [mapeo.etiqueta]
+    : [mapeo.etiquetaDebito, mapeo.etiquetaCredito];
+}
+
 function etiquetasRequeridas(dialecto: DialectoXlsx): string[] {
-  const base = [dialecto.etiquetaFecha, dialecto.etiquetaMonto, dialecto.etiquetaSaldo];
+  const base = [
+    dialecto.etiquetaFecha,
+    ...etiquetasMonto(dialecto.mapeoMonto),
+    dialecto.etiquetaSaldo,
+  ];
   if (dialecto.etiquetaHora !== undefined) base.push(dialecto.etiquetaHora);
   if (dialecto.etiquetaReferencia !== undefined) base.push(dialecto.etiquetaReferencia);
   return [...base, ...dialecto.columnasDescripcion];
+}
+
+/**
+ * Texto de una celda de monto, o `null` si la celda está vacía. En el modo
+ * `DEBITO_CREDITO_SEPARADOS` la ausencia es información (marca de qué lado
+ * NO es el movimiento), así que una celda vacía es un estado legítimo y no
+ * un error — a diferencia del modo de columna única, donde no tener monto sí
+ * es un archivo mal formado.
+ */
+function textoDeCeldaMonto(cruda: CeldaCruda): string | null {
+  if (cruda === null) return null;
+  if (typeof cruda !== 'string') {
+    throw new ArchivoFormatoNoReconocidoError(
+      `la celda de monto tiene un tipo inesperado (${cruda instanceof Date ? 'fecha' : typeof cruda})`,
+    );
+  }
+  const texto = cruda.trim();
+  return texto.length > 0 ? texto : null;
+}
+
+/**
+ * Resuelve monto + `LadoBancario` de una fila según el mapeo del dialecto.
+ *
+ * En `DEBITO_CREDITO_SEPARADOS` el lado sale de QUÉ columna trae valor y el
+ * signo de la celda se descarta (`leerMontoCelda` ya devuelve el monto en
+ * valor absoluto). Se exige que venga EXACTAMENTE una de las dos: con las
+ * dos llenas el archivo es ambiguo y con ninguna no hay movimiento —
+ * adivinar cualquiera de los dos casos escribiría un movimiento con el lado
+ * invertido, que es un error contable silencioso.
+ */
+function leerMontoDeFila(
+  fila: FilaCruda,
+  columnas: ReadonlyMap<string, number>,
+  dialecto: DialectoXlsx,
+): MontoLeido {
+  const mapeo = dialecto.mapeoMonto;
+
+  if (mapeo.modo === 'COLUMNA_UNICA_CON_SIGNO') {
+    const celda = valorColumna(fila, columnas, mapeo.etiqueta);
+    const texto = textoDeCeldaMonto(celda);
+    if (texto === null) {
+      throw new ArchivoFormatoNoReconocidoError('la celda de Monto no es un valor numérico');
+    }
+    return leerMontoCelda(texto, dialecto.dialectoMonto);
+  }
+
+  const debito = textoDeCeldaMonto(valorColumna(fila, columnas, mapeo.etiquetaDebito));
+  const credito = textoDeCeldaMonto(valorColumna(fila, columnas, mapeo.etiquetaCredito));
+
+  if (debito !== null && credito !== null) {
+    throw new ArchivoFormatoNoReconocidoError(
+      `la fila trae valor en '${mapeo.etiquetaDebito}' y en '${mapeo.etiquetaCredito}' a la vez — no se puede determinar el lado del movimiento`,
+    );
+  }
+  if (debito === null && credito === null) {
+    throw new ArchivoFormatoNoReconocidoError(
+      `la fila no trae valor ni en '${mapeo.etiquetaDebito}' ni en '${mapeo.etiquetaCredito}'`,
+    );
+  }
+
+  const esDebito = debito !== null;
+  const { monto } = leerMontoCelda((debito ?? credito) as string, dialecto.dialectoMonto);
+  return { monto, tipo: esDebito ? 'DEBITO' : 'CREDITO' };
 }
 
 /** Lee el valor de `etiqueta` en `fila` usando el mapa de columnas del header. Null si la etiqueta no aplica a este dialecto. */
@@ -171,11 +245,7 @@ export class XlsxCoreExtractoParser extends ExtractoParserPort {
       const hora =
         horaDeCeldaFecha ?? (typeof celdaHoraSeparada === 'string' ? celdaHoraSeparada : null);
 
-      const celdaMonto = valorColumna(fila, encabezados.columnas, d.etiquetaMonto);
-      if (typeof celdaMonto !== 'string') {
-        throw new ArchivoFormatoNoReconocidoError('la celda de Monto no es un valor numérico');
-      }
-      const { monto, tipo } = leerMontoCelda(celdaMonto, d.dialectoMonto);
+      const { monto, tipo } = leerMontoDeFila(fila, encabezados.columnas, d);
 
       const celdaSaldo = valorColumna(fila, encabezados.columnas, d.etiquetaSaldo);
       const saldo =

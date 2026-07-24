@@ -24,6 +24,29 @@ export interface ExtraccionNumeroCuenta {
 /** Cómo distinguir la columna Fecha para discriminar entre dialectos que comparten generador (§8.2). */
 export type TipoCeldaFecha = 'DATE_EXCEL' | 'TEXTO';
 
+/**
+ * De dónde sale el monto del movimiento y, sobre todo, de dónde sale su
+ * `LadoBancario`. Dos familias de export, mutuamente excluyentes:
+ *
+ *   - `COLUMNA_UNICA_CON_SIGNO` (BancoSol, Económico, Unión, BCP): una sola
+ *     columna de monto; el lado se deduce del SIGNO (`-` → DEBITO).
+ *   - `DEBITO_CREDITO_SEPARADOS` (Fortaleza, BMSC): dos columnas; el lado lo
+ *     determina CUÁL de las dos trae valor, y el signo de la celda se ignora
+ *     por completo (los montos vienen positivos en ambas columnas).
+ *
+ * Es una unión discriminada y no dos campos opcionales a propósito: con
+ * campos opcionales, un dialecto podría declarar ambos —o ninguno— y el
+ * compilador lo dejaría pasar hasta que un extracto real reventara en
+ * producción.
+ */
+export type MapeoMonto =
+  | { readonly modo: 'COLUMNA_UNICA_CON_SIGNO'; readonly etiqueta: string }
+  | {
+      readonly modo: 'DEBITO_CREDITO_SEPARADOS';
+      readonly etiquetaDebito: string;
+      readonly etiquetaCredito: string;
+    };
+
 export interface DialectoXlsx {
   readonly perfil: PerfilExtracto;
   readonly banco: string;
@@ -44,7 +67,7 @@ export interface DialectoXlsx {
   readonly etiquetaFecha: string;
   readonly etiquetaHora?: string;
   readonly etiquetaReferencia?: string;
-  readonly etiquetaMonto: string;
+  readonly mapeoMonto: MapeoMonto;
   readonly etiquetaSaldo: string;
   /** Columnas que se concatenan (unidas por ' ') para formar `descripcion` — design §4.5 WARNING. */
   readonly columnasDescripcion: readonly string[];

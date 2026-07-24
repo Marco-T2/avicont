@@ -45,7 +45,7 @@ export const DIALECTO_UNION_XLSX: DialectoXlsx = {
 
   etiquetaFecha: 'Fecha Movimiento',
   etiquetaReferencia: 'Nro Documento',
-  etiquetaMonto: 'Monto',
+  mapeoMonto: { modo: 'COLUMNA_UNICA_CON_SIGNO', etiqueta: 'Monto' },
   etiquetaSaldo: 'Saldo',
   columnasDescripcion: ['Descripción'],
 

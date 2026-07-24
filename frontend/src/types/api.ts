@@ -356,12 +356,22 @@ export interface ListarTiposDocumentoFisicoParams {
 // Conciliación bancaria — Cuentas bancarias (slice 1, pack contabilidad.conciliacion)
 // ============================================================
 
+/**
+ * El `satisfies` usa el union generado como CLAVE del `Record`, no como valor:
+ * así TypeScript exige que estén TODOS los perfiles del backend y agregar un
+ * banco sin sumarlo acá deja de compilar. Con el union como valor (la forma
+ * anterior) faltar un perfil pasaba desapercibido, y el costo era silencioso:
+ * el `<Select>` los ofrece igual —se llenan desde `GET /cuentas-bancarias/perfiles`—
+ * pero el `z.enum` del form, que deriva de esta const, rechazaba el envío.
+ */
 export const PerfilExtracto = {
   BANCOSOL_XLSX: 'BANCOSOL_XLSX',
   ECONOMICO_XLSX: 'ECONOMICO_XLSX',
   UNION_XLSX: 'UNION_XLSX',
   BCP_XLSX: 'BCP_XLSX',
-} as const satisfies Record<string, Schemas['CuentaBancariaResponseDto']['perfilExtracto']>;
+  FORTALEZA_XLSX: 'FORTALEZA_XLSX',
+  BMSC_XLSX: 'BMSC_XLSX',
+} as const satisfies Record<Schemas['CuentaBancariaResponseDto']['perfilExtracto'], string>;
 export type PerfilExtracto = (typeof PerfilExtracto)[keyof typeof PerfilExtracto];
 
 /**
