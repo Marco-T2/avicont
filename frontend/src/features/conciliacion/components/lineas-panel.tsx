@@ -1,13 +1,5 @@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import { cn } from '@/lib/utils';
@@ -30,6 +22,12 @@ interface LineasPanelProps {
  *
  * `EN_TRANSITO` es DERIVADO (REQ-CB-11): no existe ninguna fila persistida con
  * ese estado — es "línea de la cuenta banco sin un match de vínculo válido".
+ *
+ * **Layout: filas compactas de 2 renglones, no tabla** — mismo criterio que
+ * `MovimientosPanel`: el panel ocupa media pantalla y el MONTO (el dato que se
+ * compara contra el extracto) nunca puede quedar detrás de un scroll
+ * horizontal. La glosa baja al segundo renglón recortada a 2 líneas, con el
+ * texto completo accesible vía `title`.
  */
 export function LineasPanel({
   lineas,
@@ -42,7 +40,7 @@ export function LineasPanel({
     return (
       <div className="space-y-2">
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+          <Skeleton key={i} className="h-14 w-full" />
         ))}
       </div>
     );
@@ -59,80 +57,79 @@ export function LineasPanel({
   }
 
   return (
-    <div className="relative overflow-x-auto rounded-md border">
-      <Table className="min-w-[720px]">
-        <TableHeader>
-          <TableRow>
-            {!modoConsulta && <TableHead className="w-10" />}
-            <TableHead className="w-28">Fecha</TableHead>
-            <TableHead className="w-36">Comprobante</TableHead>
-            <TableHead className="min-w-[200px]">Glosa</TableHead>
-            <TableHead>Lado</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
-            <TableHead>Estado</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {lineas.map((l) => {
-            // Anti-F-06: la línea no tiene id propio; su identidad es el ancla.
-            const clave = claveLinea(l.comprobanteId, l.orden);
-            const seleccionable = l.estadoEfectivo === 'EN_TRANSITO';
+    <ul className="divide-y rounded-md border">
+      {lineas.map((l) => {
+        // Anti-F-06: la línea no tiene id propio; su identidad es el ancla.
+        const clave = claveLinea(l.comprobanteId, l.orden);
+        const seleccionable = l.estadoEfectivo === 'EN_TRANSITO';
 
-            return (
-              <TableRow key={clave}>
-                {!modoConsulta && (
-                  <TableCell>
-                    {seleccionable && (
-                      <input
-                        type="radio"
-                        name="linea-conciliacion"
-                        className="h-4 w-4 accent-primary"
-                        aria-label={`Seleccionar línea ${l.numeroComprobante ?? l.comprobanteId} #${l.orden}`}
-                        checked={seleccionadaClave === clave}
-                        onChange={() => onSeleccionar(l.comprobanteId, l.orden)}
-                      />
-                    )}
-                  </TableCell>
+        return (
+          <li key={clave} className="flex gap-2 px-3 py-3">
+            {!modoConsulta && (
+              <span className="flex w-8 shrink-0 justify-center pt-1 sm:w-6">
+                {seleccionable && (
+                  <input
+                    type="radio"
+                    name="linea-conciliacion"
+                    // Más grande en mobile: es el tap target de la selección (§7).
+                    className="h-5 w-5 accent-primary sm:h-4 sm:w-4"
+                    aria-label={`Seleccionar línea ${l.numeroComprobante ?? l.comprobanteId} #${l.orden}`}
+                    checked={seleccionadaClave === clave}
+                    onChange={() => onSeleccionar(l.comprobanteId, l.orden)}
+                  />
                 )}
-                <TableCell className="whitespace-nowrap tabular-nums">
+              </span>
+            )}
+
+            {/* min-w-0: sin esto la glosa larga estira el flex item y el
+                recorte de 2 líneas nunca se aplica. */}
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
                   {formatearFechaContable(l.fecha)}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {l.numeroComprobante ?? '—'}
-                  <span className="ml-1 text-xs text-muted-foreground">#{l.orden}</span>
-                </TableCell>
-                <TableCell>
-                  <span className="block">{l.glosa}</span>
-                  {l.glosaLinea !== null && (
-                    <span className="block text-xs text-muted-foreground">{l.glosaLinea}</span>
-                  )}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-sm">
-                  {etiquetaLadoContable(l.tipo)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
+                </span>
+                {/* El monto es el dato que se compara: nunca sale del viewport. */}
+                <span className="whitespace-nowrap text-base font-semibold tabular-nums">
                   {formatearMontoBob(l.monto)}
-                  <span className="ml-1 text-xs text-muted-foreground">{l.moneda}</span>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    role="status"
-                    variant="outline"
-                    className={cn(
-                      'font-normal',
-                      l.estadoEfectivo === 'EN_TRANSITO'
-                        ? 'text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-900'
-                        : 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900',
-                    )}
-                  >
-                    {etiquetaEstadoEfectivoLinea(l.estadoEfectivo)}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">{l.moneda}</span>
+                </span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {l.numeroComprobante ?? '—'}
+                  <span className="ml-1">#{l.orden}</span>
+                </span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {etiquetaLadoContable(l.tipo)}
+                </span>
+                <Badge
+                  role="status"
+                  variant="outline"
+                  className={cn(
+                    'font-normal',
+                    l.estadoEfectivo === 'EN_TRANSITO'
+                      ? 'text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-900'
+                      : 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900',
+                  )}
+                >
+                  {etiquetaEstadoEfectivoLinea(l.estadoEfectivo)}
+                </Badge>
+              </div>
+
+              {/* Glosa: texto libre del asiento, sin techo de largo. */}
+              <p className="line-clamp-2 break-words text-sm" title={l.glosa}>
+                {l.glosa}
+              </p>
+              {l.glosaLinea !== null && (
+                <p
+                  className="line-clamp-1 break-words text-xs text-muted-foreground"
+                  title={l.glosaLinea}
+                >
+                  {l.glosaLinea}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

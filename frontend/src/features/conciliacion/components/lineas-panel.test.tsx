@@ -39,9 +39,13 @@ function renderPanel(overrides: Overrides = {}) {
     onSeleccionar: vi.fn(),
     ...overrides,
   };
-  render(<LineasPanel {...props} />);
-  return props;
+  const utils = render(<LineasPanel {...props} />);
+  return { ...props, ...utils };
 }
+
+/** Glosa larga: mismo caso que la descripción del extracto (bug de layout 5B). */
+const GLOSA_LARGA =
+  'Cobro de factura 77 al cliente TARQUI ALEJO ANTONIO por venta de pollo del lote 0506 — transferencia QR';
 
 describe('LineasPanel — líneas contables de la cuenta banco', () => {
   it('muestra fecha, número de comprobante, glosa y monto', () => {
@@ -90,6 +94,39 @@ describe('LineasPanel — líneas contables de la cuenta banco', () => {
     renderPanel({ lineas: [linea({ numeroComprobante: null })] });
 
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('LineasPanel — layout compacto (sin scroll horizontal)', () => {
+  it('una glosa larga se recorta y el texto completo queda accesible', () => {
+    renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA })] });
+
+    const glosa = screen.getByText(GLOSA_LARGA);
+    expect(glosa.className).toContain('line-clamp-2');
+    expect(glosa).toHaveAttribute('title', GLOSA_LARGA);
+  });
+
+  it('con una glosa larga el monto y el estado se siguen renderizando', () => {
+    renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA, monto: '4800.00' })] });
+
+    expect(screen.getByText('4.800,00')).toBeInTheDocument();
+    expect(screen.getByText('En tránsito')).toBeInTheDocument();
+  });
+
+  it('el panel no fuerza scroll horizontal: sin overflow-x ni ancho mínimo fijo', () => {
+    const { container } = renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA })] });
+
+    expect(container.querySelector('[class*="overflow-x"]')).toBeNull();
+    expect(container.querySelector('[class*="min-w-["]')).toBeNull();
+  });
+
+  it('las filas son una lista, no una tabla de columnas fijas', () => {
+    renderPanel({
+      lineas: [linea({ orden: 1 }), linea({ orden: 2 })],
+    });
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 });
 

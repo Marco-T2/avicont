@@ -46,9 +46,13 @@ function renderPanel(overrides: Overrides = {}) {
     accionEnCurso: false,
     ...overrides,
   };
-  render(<MovimientosPanel {...props} />);
-  return props;
+  const utils = render(<MovimientosPanel {...props} />);
+  return { ...props, ...utils };
 }
+
+/** Caso real de extracto: descripción sin techo de largo (bug de layout 5B). */
+const DESCRIPCION_LARGA =
+  'Transferencia via QR | Remitente: 795857-000-003 TARQUI ALEJO ANTONIO Glosa: Pago de pollo al 0506';
 
 describe('MovimientosPanel — datos del extracto', () => {
   it('muestra fecha, descripción y monto formateado del movimiento', () => {
@@ -93,6 +97,44 @@ describe('MovimientosPanel — datos del extracto', () => {
     renderPanel({ movimientos: [] });
 
     expect(screen.getByText(/no hay movimientos bancarios/i)).toBeInTheDocument();
+  });
+});
+
+describe('MovimientosPanel — layout compacto (sin scroll horizontal)', () => {
+  it('una descripción larga se recorta y el texto completo queda accesible', () => {
+    renderPanel({ movimientos: [movimiento({ descripcion: DESCRIPCION_LARGA })] });
+
+    const descripcion = screen.getByText(DESCRIPCION_LARGA);
+    // El recorte es visual (2 líneas); el dato completo no se pierde.
+    expect(descripcion.className).toContain('line-clamp-2');
+    expect(descripcion).toHaveAttribute('title', DESCRIPCION_LARGA);
+  });
+
+  it('con una descripción larga el monto y el estado se siguen renderizando', () => {
+    renderPanel({
+      movimientos: [movimiento({ descripcion: DESCRIPCION_LARGA, monto: '4800.00' })],
+    });
+
+    expect(screen.getByText('4.800,00')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente')).toBeInTheDocument();
+  });
+
+  it('el panel no fuerza scroll horizontal: sin overflow-x ni ancho mínimo fijo', () => {
+    const { container } = renderPanel({
+      movimientos: [movimiento({ descripcion: DESCRIPCION_LARGA })],
+    });
+
+    expect(container.querySelector('[class*="overflow-x"]')).toBeNull();
+    expect(container.querySelector('[class*="min-w-["]')).toBeNull();
+  });
+
+  it('las filas son una lista, no una tabla de columnas fijas', () => {
+    renderPanel({
+      movimientos: [movimiento({ id: 'mov-1' }), movimiento({ id: 'mov-2' })],
+    });
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 });
 

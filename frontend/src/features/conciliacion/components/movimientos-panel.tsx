@@ -1,13 +1,5 @@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import type { MovimientoConciliacion } from '@/types/api';
@@ -39,6 +31,15 @@ interface MovimientosPanelProps {
  *
  * El estado que se pinta es `estadoEfectivo` (derivado), nunca la columna
  * persistida — ver `EstadoMovimientoBadge`.
+ *
+ * **Layout: filas compactas de 2 renglones, no tabla.** Los dos paneles del
+ * workspace van lado a lado (`xl:grid-cols-2`), o sea media pantalla cada uno:
+ * una tabla de 7 columnas no entra y termina escondiendo el MONTO detrás de un
+ * scroll horizontal, justo el dato que el usuario está comparando. Acá el
+ * renglón de arriba lleva fecha + monto + estado + acción (siempre visibles, sin
+ * scroll horizontal en ningún viewport) y la descripción del banco —texto libre
+ * de un tercero, sin techo de largo— baja al segundo renglón recortada a 2
+ * líneas, con el texto completo accesible vía `title`.
  */
 export function MovimientosPanel({
   movimientos,
@@ -54,7 +55,7 @@ export function MovimientosPanel({
     return (
       <div className="space-y-2">
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full" />
+          <Skeleton key={i} className="h-14 w-full" />
         ))}
       </div>
     );
@@ -71,75 +72,68 @@ export function MovimientosPanel({
   }
 
   return (
-    <div className="relative overflow-x-auto rounded-md border">
-      <Table className="min-w-[720px]">
-        <TableHeader>
-          <TableRow>
-            {!modoConsulta && <TableHead className="w-10" />}
-            <TableHead className="w-28">Fecha</TableHead>
-            <TableHead className="min-w-[200px]">Descripción</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
-            <TableHead>Estado</TableHead>
-            {!modoConsulta && <TableHead className="text-right">Acciones</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {movimientos.map((mov) => {
-            // Un movimiento solo entra al pool de match manual si su estado
-            // EFECTIVO es PENDIENTE — incluye los de vínculo roto (REQ-CB-11).
-            const seleccionable = mov.estadoEfectivo === 'PENDIENTE';
-            // Solo un vínculo SANO se puede deshacer: uno roto ya devolvió el
-            // movimiento al pool (REQ-CB-11) y la salida es ignorarlo o
-            // re-confirmarlo contra otra línea.
-            const matchDeshacible =
-              mov.vinculo !== null && mov.vinculo.roto === null ? mov.vinculo.matchId : null;
+    <ul className="divide-y rounded-md border">
+      {movimientos.map((mov) => {
+        // Un movimiento solo entra al pool de match manual si su estado
+        // EFECTIVO es PENDIENTE — incluye los de vínculo roto (REQ-CB-11).
+        const seleccionable = mov.estadoEfectivo === 'PENDIENTE';
+        // Solo un vínculo SANO se puede deshacer: uno roto ya devolvió el
+        // movimiento al pool (REQ-CB-11) y la salida es ignorarlo o
+        // re-confirmarlo contra otra línea.
+        const matchDeshacible =
+          mov.vinculo !== null && mov.vinculo.roto === null ? mov.vinculo.matchId : null;
 
-            return (
-              // Anti-F-06: key = id real del movimiento; las filas se reordenan
-              // al confirmar o deshacer un match.
-              <TableRow key={mov.id}>
-                {!modoConsulta && (
-                  <TableCell>
-                    {seleccionable && (
-                      <input
-                        type="radio"
-                        name="movimiento-conciliacion"
-                        className="h-4 w-4 accent-primary"
-                        aria-label={`Seleccionar movimiento ${mov.descripcion}`}
-                        checked={seleccionadoId === mov.id}
-                        onChange={() => onSeleccionar(mov.id)}
-                      />
-                    )}
-                  </TableCell>
+        return (
+          // Anti-F-06: key = id real del movimiento; las filas se reordenan
+          // al confirmar o deshacer un match.
+          <li key={mov.id} className="flex gap-2 px-3 py-3">
+            {!modoConsulta && (
+              // Placeholder de ancho fijo también cuando la fila no es
+              // seleccionable: mantiene alineadas todas las filas.
+              <span className="flex w-8 shrink-0 justify-center pt-1 sm:w-6">
+                {seleccionable && (
+                  <input
+                    type="radio"
+                    name="movimiento-conciliacion"
+                    // Más grande en mobile: es el tap target de la selección (§7).
+                    className="h-5 w-5 accent-primary sm:h-4 sm:w-4"
+                    aria-label={`Seleccionar movimiento ${mov.descripcion}`}
+                    checked={seleccionadoId === mov.id}
+                    onChange={() => onSeleccionar(mov.id)}
+                  />
                 )}
-                <TableCell className="whitespace-nowrap tabular-nums">
+              </span>
+            )}
+
+            {/* min-w-0: sin esto el texto largo del hijo estira el flex item
+                y el recorte de 2 líneas nunca se aplica. */}
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
                   {formatearFechaContable(mov.fecha)}
-                </TableCell>
-                <TableCell>
-                  <span className="block">{mov.descripcion}</span>
-                  {mov.referencia !== null && (
-                    <span className="block text-xs text-muted-foreground">
-                      Ref. {mov.referencia}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-sm">
-                  {etiquetaLadoBancario(mov.tipo)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
+                </span>
+                {/* El monto es el dato que se compara: nunca sale del viewport. */}
+                <span className="whitespace-nowrap text-base font-semibold tabular-nums">
                   {formatearMontoBob(mov.monto)}
-                  <span className="ml-1 text-xs text-muted-foreground">{mov.moneda}</span>
-                </TableCell>
-                <TableCell>
-                  <EstadoMovimientoBadge movimiento={mov} />
-                </TableCell>
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    {mov.moneda}
+                  </span>
+                </span>
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {etiquetaLadoBancario(mov.tipo)}
+                </span>
+                <EstadoMovimientoBadge
+                  movimiento={mov}
+                  className="flex-row flex-wrap items-center gap-x-2"
+                />
+
                 {!modoConsulta && (
-                  <TableCell className="text-right whitespace-nowrap">
+                  <span className="ml-auto">
                     {matchDeshacible !== null && (
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onDeshacer(matchDeshacible)}
                       >
@@ -150,6 +144,7 @@ export function MovimientosPanel({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onCambiarEstado(mov.id, 'IGNORADO')}
                       >
@@ -160,19 +155,34 @@ export function MovimientosPanel({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onCambiarEstado(mov.id, 'PENDIENTE')}
                       >
                         No ignorar
                       </Button>
                     )}
-                  </TableCell>
+                  </span>
                 )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+              </div>
+
+              {/* Descripción del banco: texto de un tercero, sin techo de largo.
+                  `line-clamp-2` la recorta; `title` conserva el texto completo. */}
+              <p className="line-clamp-2 break-words text-sm" title={mov.descripcion}>
+                {mov.descripcion}
+              </p>
+              {mov.referencia !== null && (
+                <p
+                  className="line-clamp-1 break-all text-xs text-muted-foreground"
+                  title={mov.referencia}
+                >
+                  Ref. {mov.referencia}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
