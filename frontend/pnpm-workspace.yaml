@@ -21,7 +21,23 @@ minimumReleaseAgeStrict: true
 #   GHSA-hm92-r4w5-c3mj / TLS cert bypass. Parche 7.28.0 (maduro). Dev-only: no entra
 #   al runtime del bundle. Tope <8: jsdom@29 alcanza internals de undici (wrap-handler)
 #   que cambiaron en 8.x; sin el tope, el override sube a 8.x y rompe jsdom.
+#
+# Tanda 2026-07 (advisories publicados DESPUÉS del último merge a main; ambas entran
+# por el toolchain de build/test, ninguna llega al bundle de runtime):
+# - brace-expansion GHSA-3jxr-9vmj-r5cp (DoS por expansión exponencial de grupos {}
+#   consecutivos). Dos líneas de versión con parche propio cada una: 2.x (vía eslint>
+#   @eslint/config-array>minimatch) y 5.x (vía write-excel-file>archiver-node>minimatch
+#   y openapi-typescript>@redocly/openapi-core>minimatch). Se acotan POR MAJOR: un
+#   override global forzaría a todos los consumidores a la misma major.
+# - js-yaml GHSA-52cp-r559-cp3m (consumo cuadrático de CPU por cadenas de merge keys).
+#   Vía openapi-typescript>@redocly/openapi-core. 4.3.0 es minor dentro de la misma
+#   major; se acota a ^4 para no saltar a la 5 (que sí cambió API).
+# (axios GHSA-gcfj-64vw-6mp9 —proxy heredado tras clonar config en interceptores— NO
+#  va acá: es dependencia DIRECTA y se subió en package.json a ^1.18.0.)
 overrides:
   form-data: '>=4.0.6'
   vite: '>=8.0.16'
   undici: '^7.28.0'
+  'brace-expansion@2': '^2.1.2'
+  'brace-expansion@5': '^5.0.7'
+  'js-yaml@4': '^4.3.0'
