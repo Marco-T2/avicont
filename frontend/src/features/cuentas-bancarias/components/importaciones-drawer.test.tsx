@@ -64,9 +64,9 @@ function importacion(overrides: Partial<ImportacionExtracto> = {}): ImportacionE
   };
 }
 
-function mockImportaciones(items: ImportacionExtracto[]): void {
+function mockImportaciones(items: ImportacionExtracto[], total = items.length): void {
   vi.mocked(useImportaciones).mockReturnValue({
-    data: { items, total: items.length, page: 1, pageSize: 20 },
+    data: { items, total, page: 1, pageSize: 10 },
     isLoading: false,
     isError: false,
   } as unknown as ReturnType<typeof useImportaciones>);
@@ -136,6 +136,72 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
     renderDrawer();
 
     expect(screen.getByText(/todavía no importaste/i)).toBeInTheDocument();
+  });
+
+  it('pide la primera página con un tamaño chico, no el default de 50 del backend', () => {
+    renderDrawer();
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenCalledWith('cb-1', {
+      page: 1,
+      pageSize: 10,
+    });
+  });
+
+  it('con más de una página muestra la paginación y avanza', async () => {
+    const user = userEvent.setup();
+    mockImportaciones([importacion()], 25);
+
+    renderDrawer();
+
+    await user.click(screen.getByRole('button', { name: /página siguiente/i }));
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
+      page: 2,
+      pageSize: 10,
+    });
+  });
+
+  it('cambiar de cuenta vuelve a la página 1', async () => {
+    // El drawer NO se desmonta al cerrarse: sin reseteo, quedar en la página 2 y
+    // abrir otra cuenta con una sola página devolvía lista vacía y el empty state
+    // afirmaba que nunca se importó nada.
+    const user = userEvent.setup();
+    mockImportaciones([importacion()], 25);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={vi.fn()} />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /página siguiente/i }));
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
+      page: 2,
+      pageSize: 10,
+    });
+
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer
+          cuentaBancaria={{ ...CUENTA, id: 'cb-2', alias: 'Caja de ahorro Unión' }}
+          open
+          onOpenChange={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-2', {
+      page: 1,
+      pageSize: 10,
+    });
+  });
+
+  it('con una sola página no renderiza la paginación', () => {
+    mockImportaciones([importacion()], 1);
+
+    renderDrawer();
+
+    expect(screen.queryByRole('button', { name: /página siguiente/i })).not.toBeInTheDocument();
   });
 });
 
@@ -212,6 +278,41 @@ describe('ImportacionesDrawer — subida del archivo', () => {
     renderDrawer();
 
     expect(screen.getByRole('button', { name: /importando/i })).toBeDisabled();
+  });
+});
+
+describe('ImportacionesDrawer — errores de importación', () => {
+  it('el error se muestra en un panel fijo, no en un toast que se va solo', () => {
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: {
+        response: { data: { error: { code: 'CONCILIACION_ARCHIVO_XLS_LEGACY' } } },
+      },
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    // El mensaje es accionable: dice QUÉ hacer, no solo que falló.
+    expect(screen.getByRole('alert')).toHaveTextContent(/guardalo como \.xlsx/i);
+  });
+
+  it('el input acepta .xls para que el backend pueda explicar por qué no sirve', () => {
+    renderDrawer();
+
+    // Filtrarlo en el picker dejaba el archivo en gris y sin explicación; se deja
+    // pasar a propósito para que el backend lo detecte por magic bytes.
+    //
+    // Se asserta contra el MIME del .xls y NO contra la cadena ".xls": ".xlsx"
+    // la contiene como substring, así que un `stringContaining('.xls')` pasaría
+    // igual con el accept viejo y no probaría nada.
+    const accept = screen.getByLabelText(/archivo del extracto/i).getAttribute('accept') ?? '';
+
+    expect(accept.split(',')).toContain('.xls');
+    expect(accept.split(',')).toContain('application/vnd.ms-excel');
   });
 });
 

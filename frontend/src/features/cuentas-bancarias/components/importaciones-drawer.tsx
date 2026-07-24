@@ -1,6 +1,7 @@
 import { AlertTriangle, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 
+import { PaginationBar } from '@/components/shared/pagination-bar';
 import { PermissionButton } from '@/components/shared/permission-button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
+import { mensajeConciliacion } from '@/lib/error-messages';
 import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { EstadoVerificacionExtracto } from '@/types/api';
@@ -40,6 +42,25 @@ const CLASES_VERIFICACION: Record<EstadoVerificacionExtracto, string> = {
 function soloFecha(iso: string): string {
   return iso.slice(0, 10);
 }
+
+// El drawer es angosto: el default de 50 del backend obliga a un scroll enorme.
+const IMPORTACIONES_POR_PAGINA = 10;
+
+/**
+ * Se acepta `.xls` a propósito, aunque el importador SOLO procese `.xlsx`.
+ *
+ * Filtrarlo acá lo dejaba en gris en el explorador de archivos: el usuario con
+ * un extracto viejo no podía ni elegirlo y no había forma de enterarse por qué.
+ * Dejándolo pasar, el backend lo detecta por magic bytes (OLE2) y responde
+ * `CONCILIACION_ARCHIVO_XLS_LEGACY`, que sí explica qué hacer: abrirlo en Excel
+ * y guardarlo como `.xlsx`.
+ */
+const ACCEPT_EXTRACTO = [
+  '.xlsx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xls',
+  'application/vnd.ms-excel',
+].join(',');
 
 /**
  * Lo MÍNIMO que el drawer necesita de una cuenta bancaria.
@@ -78,7 +99,23 @@ export function ImportacionesDrawer({
   onOpenChange,
 }: ImportacionesDrawerProps): React.JSX.Element {
   const cuentaId = cuentaBancaria?.id ?? null;
-  const { data, isLoading } = useImportaciones(open ? cuentaId : null);
+  const [page, setPage] = useState(1);
+
+  // El drawer NO se desmonta al cerrarse (el padre lo deja montado y le pasa
+  // `open`), así que la página sobrevive al cambio de cuenta: quedarse en la 2
+  // sobre una cuenta con una sola página devolvería una lista vacía y el empty
+  // state mentiría diciendo que nunca se importó nada. Ajuste de estado en
+  // render — la variante recomendada por React sobre un useEffect, que
+  // renderizaría una vez con la página equivocada.
+  const [cuentaDeLaPagina, setCuentaDeLaPagina] = useState(cuentaId);
+  if (cuentaDeLaPagina !== cuentaId) {
+    setCuentaDeLaPagina(cuentaId);
+    setPage(1);
+  }
+  const { data, isLoading } = useImportaciones(open ? cuentaId : null, {
+    page,
+    pageSize: IMPORTACIONES_POR_PAGINA,
+  });
   const importar = useImportarExtracto();
 
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -99,6 +136,9 @@ export function ImportacionesDrawer({
           if (res.requiereConfirmacionCuenta) return;
           setArchivo(null);
           if (inputRef.current !== null) inputRef.current.value = '';
+          // El historial viene del más reciente al más viejo: lo recién importado
+          // está en la página 1, no en la que el usuario estuviera mirando.
+          setPage(1);
         },
       },
     );
@@ -125,7 +165,7 @@ export function ImportacionesDrawer({
                 id="archivo-extracto"
                 ref={inputRef}
                 type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept={ACCEPT_EXTRACTO}
                 className="text-base md:text-sm"
                 // Cambiar el archivo mientras sube dejaría el resultado hablando
                 // de un archivo que ya no es el seleccionado.
@@ -172,6 +212,16 @@ export function ImportacionesDrawer({
                 <Upload className="h-4 w-4 mr-2" />
                 {importar.isPending ? 'Importando…' : 'Importar extracto'}
               </PermissionButton>
+            )}
+
+            {importar.isError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                <span>{mensajeConciliacion(importar.error)}</span>
+              </div>
             )}
 
             {resultado !== undefined && !resultado.requiereConfirmacionCuenta && (
@@ -249,6 +299,13 @@ export function ImportacionesDrawer({
                 </li>
               ))}
             </ul>
+
+            <PaginationBar
+              page={page}
+              limit={IMPORTACIONES_POR_PAGINA}
+              total={data?.total ?? 0}
+              onPageChange={setPage}
+            />
           </section>
         </div>
       </SheetContent>
