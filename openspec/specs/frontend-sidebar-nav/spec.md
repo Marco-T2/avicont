@@ -1,8 +1,8 @@
 # frontend-sidebar-nav — Especificación
 
 <!--
-Última edición: 2026-06-14
-Última revisión contra core: 2026-06-14
+Última edición: 2026-07-24
+Última revisión contra core: 2026-07-24
 Owner: frontend-lead
 -->
 
@@ -10,7 +10,8 @@ Owner: frontend-lead
 > Fase: spec (live)
 > Proyecto: avicont
 > Capability nueva: `frontend-sidebar-nav` (no existía spec previa)
-> Origen: change `sidebar-por-modulo` (en progreso)
+> Origen: change `sidebar-por-modulo` (archivado, PR #192)
+> Extendida por: change `conciliacion-bancaria` (PR #236) — REQ-SB-10
 > Stack: frontend (Vite + React 19 + TanStack Query)
 
 ---
@@ -425,6 +426,45 @@ de headers de sección.
 - CUANDO se renderiza `NavList` dentro del drawer
 - ENTONCES los headers de sección "Administración" y "Configuración" son legibles
 - Y los tap targets de los ítems son de al menos 44 px de alto
+
+---
+
+### REQ-SB-10: Primer ítem de navegación de pack de dominio (conciliación)
+
+> Origen: change `conciliacion-bancaria`. El mecanismo genérico de gating por
+> pack en la navegación YA EXISTE y ya está cubierto por REQ-SB-05 (cascada
+> `pasaPermiso ∧ pasaVertical ∧ pasaPack ∧ pasaSystemRole`). Este requisito NO
+> cambia el mecanismo — registra que `conciliacion-bancaria` es el primer
+> `NavItem` **real** (no de prueba) que declara `pack`, con su regresión.
+
+El `NavItem` de "Conciliación bancaria" DEBE declarar
+`pack: 'contabilidad.conciliacion'` (además de `requiredPermission:
+'contabilidad.conciliacion.read'` y `vertical: 'CONTABILIDAD'`), y DEBE
+quedar sujeto exactamente a la misma cascada fail-closed descrita en
+REQ-SB-05, sin código nuevo en `NavList` ni en el filtrado por pack.
+
+#### Escenario: Pack `contabilidad.conciliacion` activo — ítem visible
+
+- DADO un usuario con `contabilidad.conciliacion.read`, vertical
+  `'CONTABILIDAD'` y el pack `'contabilidad.conciliacion'` activo
+- CUANDO se renderiza `NavList`
+- ENTONCES el ítem "Conciliación bancaria" está en el DOM
+
+#### Escenario: Pack `contabilidad.conciliacion` no activo — ítem oculto
+
+- DADO un usuario con `contabilidad.conciliacion.read` y vertical
+  `'CONTABILIDAD'`, pero sin el pack `'contabilidad.conciliacion'` activo
+  (org que lo desactivó tras el otorgamiento por defecto)
+- CUANDO se renderiza `NavList`
+- ENTONCES el ítem "Conciliación bancaria" NO está en el DOM
+
+#### Escenario: Permiso ausente — ítem oculto aunque el pack esté activo
+
+- DADO un usuario sin `contabilidad.conciliacion.read`, con el pack
+  `'contabilidad.conciliacion'` activo
+- CUANDO se renderiza `NavList`
+- ENTONCES el ítem "Conciliación bancaria" NO está en el DOM (la cascada es
+  AND — el pack activo no compensa un permiso faltante)
 
 ---
 

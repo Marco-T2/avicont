@@ -1,5 +1,39 @@
 # Tasks: Conciliación bancaria (pack `contabilidad.conciliacion`)
 
+<!-- ============================================================
+NOTA DE CIERRE (agregada al archivar, 2026-07-24 — PR #236, main cd8e8b3)
+
+153/166 tareas marcadas. Las 13 sin marcar NO son trabajo olvidado; se
+cierran así, de forma explícita:
+
+1. **Slice 6 (6.1–6.5) — DIFERIDO, autorizado.** `proposal.md` permite
+   explícitamente diferir el slice 6 (atajo "crear asiento de comisión/ITF")
+   sin bloquear el cierre del change. Queda como backlog, no como deuda:
+   la v1 no lo necesita.
+   Excepción: 6.5 (`[ARCH]` test estático de REQ-CB-15 escenario 2 — que
+   ningún controller/service de conciliación escriba `Comprobante`) sigue
+   pendiente. La propiedad SÍ se sostiene hoy (el módulo solo consume
+   `LineasCuentaReaderPort`, un reader), pero no hay test que la CONGELE.
+   Es el residual real de este change.
+
+2. **Checklist final (líneas ~812-822) — ejecutado, sin marcar.**
+   Verificado al archivar, no asumido:
+   - Coverage dominio ≥95%: **CUMPLE** — 99.47% stmts / 100% branch /
+     97.87% funcs sobre `domain/**`.
+     ⚠️ El comando del propio checklist (`jest src/conciliacion-bancaria/domain
+     --coverage`) reporta 77.6% y SUBESTIMA la meta: al acotar el scope a
+     `domain/`, deja fuera los specs de adapters/services que ejercitan las
+     3 clases de error declarativas (`*-errors.ts`), que aparecen en 0%.
+     El comando correcto es `jest src/conciliacion-bancaria --coverage
+     --collectCoverageFrom='src/conciliacion-bancaria/domain/**/*.ts'`.
+   - Ningún controller expone `detectarHuecos`: **CONFIRMADO** por grep
+     (REQ-CB-09 sigue sin endpoint en v1, como manda la spec).
+   - `require-pack-tenant-guard.arch.spec.ts` existe y cubre los 3
+     controllers nuevos sin modificarse.
+   - tsc + lint + vitest + `contract-drift`: **verdes en el CI real** de
+     #236 (3 jobs), no solo en local.
+============================================================ -->
+
 > Strict TDD ON: toda tarea de implementación está precedida por su tarea de test (RED → GREEN).
 > Slices 0–6 tal como los cortó `proposal.md`. `spec.md` = **18 REQ-CB, 61 escenarios** · `design.md`
 > = **revisión 5**. Ambos son la verdad viva; este documento se alineó contra ellos en esta ronda.
