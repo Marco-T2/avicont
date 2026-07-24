@@ -8,7 +8,7 @@
     "start": "node dist/main.js",
     "start:dev": "nest start --watch --path tsconfig.build.json",
     "start:prod": "node dist/main.js",
-    "lint": "eslint src",
+    "lint": "eslint src test",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
