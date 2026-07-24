@@ -819,15 +819,30 @@ describe('DocumentosFisicos (e2e)', () => {
     });
 
     // Tenant A crea 3 documentos
-    await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' }).expect(201);
-    await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' }).expect(201);
-    const resA3 = await postDocumento(a.token, { tipoDocumentoFisicoId: tipoIdA, fechaEmision: '2026-06-14' });
+    await postDocumento(a.token, {
+      tipoDocumentoFisicoId: tipoIdA,
+      fechaEmision: '2026-06-14',
+    }).expect(201);
+    await postDocumento(a.token, {
+      tipoDocumentoFisicoId: tipoIdA,
+      fechaEmision: '2026-06-14',
+    }).expect(201);
+    const resA3 = await postDocumento(a.token, {
+      tipoDocumentoFisicoId: tipoIdA,
+      fechaEmision: '2026-06-14',
+    });
     expect(resA3.status).toBe(201);
     expect(resA3.body.numero).toBe('3');
 
     // Tenant B crea 2 documentos — contador independiente
-    await postDocumento(b.token, { tipoDocumentoFisicoId: tipoIdB, fechaEmision: '2026-06-14' }).expect(201);
-    const resB2 = await postDocumento(b.token, { tipoDocumentoFisicoId: tipoIdB, fechaEmision: '2026-06-14' });
+    await postDocumento(b.token, {
+      tipoDocumentoFisicoId: tipoIdB,
+      fechaEmision: '2026-06-14',
+    }).expect(201);
+    const resB2 = await postDocumento(b.token, {
+      tipoDocumentoFisicoId: tipoIdB,
+      fechaEmision: '2026-06-14',
+    });
     expect(resB2.status).toBe(201);
     expect(resB2.body.numero).toBe('2'); // contador B independiente de A
   });

@@ -4,13 +4,7 @@ import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
-import { ActivityCursor } from '../src/platform/lib/activity-cursor';
-import {
-  cleanupTestData,
-  createTestTenant,
-  createTestUser,
-  prisma,
-} from './helpers/test-factory';
+import { cleanupTestData, createTestTenant, createTestUser, prisma } from './helpers/test-factory';
 
 async function buildApp(): Promise<INestApplication> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -53,7 +47,11 @@ describe('Platform Dashboard — GET /admin/platform/dashboard', () => {
 
     const saPass = 'superpass123';
     await prisma.user.create({
-      data: { email: 'sa-dash@test.com', hashedPassword: await bcrypt.hash(saPass, 10), isSuperAdmin: true },
+      data: {
+        email: 'sa-dash@test.com',
+        hashedPassword: await bcrypt.hash(saPass, 10),
+        isSuperAdmin: true,
+      },
     });
     superAdminToken = await login(app, 'sa-dash@test.com', saPass);
 

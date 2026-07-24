@@ -4,6 +4,7 @@ import { SystemRole } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
+import { cleanupTestData } from './helpers/test-factory';
 import * as bcrypt from 'bcrypt';
 
 describe('Tenant Isolation (e2e)', () => {
@@ -30,30 +31,12 @@ describe('Tenant Isolation (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.$transaction([
-      prisma.refreshToken.deleteMany({}),
-      prisma.impersonationAction.deleteMany({}),
-      prisma.impersonationLog.deleteMany({}),
-      prisma.invitation.deleteMany({}),
-      prisma.membership.deleteMany({}),
-      prisma.customRole.deleteMany({}),
-      prisma.featureFlag.deleteMany({}),
-      prisma.organization.deleteMany({}),
-      prisma.user.deleteMany({}),
-    ]);
+    await cleanupTestData();
     await app.close();
   });
 
   beforeEach(async () => {
-    await prisma.refreshToken.deleteMany({});
-    await prisma.impersonationAction.deleteMany({});
-    await prisma.impersonationLog.deleteMany({});
-    await prisma.invitation.deleteMany({});
-    await prisma.membership.deleteMany({});
-    await prisma.customRole.deleteMany({});
-    await prisma.featureFlag.deleteMany({});
-    await prisma.organization.deleteMany({});
-    await prisma.user.deleteMany({});
+    await cleanupTestData();
   });
 
   describe('Cross-tenant isolation', () => {
@@ -113,13 +96,47 @@ describe('Tenant Isolation (e2e)', () => {
       tenant2Token = res2.body.accessToken;
     });
 
-    it('should not allow user to access other tenant data', async () => {
+    it('cada token resuelve únicamente su propio tenant', async () => {
+      const res1 = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${tenant1Token}`)
+        .expect(200);
+
+      expect(res1.body.id).toBe(tenant1Id);
+      expect(res1.body.id).not.toBe(tenant2Id);
+
+      const res2 = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${tenant2Token}`)
+        .expect(200);
+
+      expect(res2.body.id).toBe(tenant2Id);
+      expect(res2.body.id).not.toBe(tenant1Id);
+    });
+
+    // §4.2 / §5.4: `TenantGuard` acepta X-Tenant-ID de cualquier usuario, no solo
+    // de super-admin — lo que contiene el salto es la verificación de membresía.
+    // Por eso el caso negativo se afirma sobre el 403 exacto y sobre la ausencia
+    // de datos del tenant ajeno en el body, no sobre un rango de status.
+    it('X-Tenant-ID hacia un tenant ajeno → 403 y sin fuga de datos', async () => {
       const response = await request(app.getHttpServer())
         .get('/api/tenants/current')
         .set('Authorization', `Bearer ${tenant1Token}`)
-        .set('X-Tenant-ID', tenant2Id);
+        .set('X-Tenant-ID', tenant2Id)
+        .expect(403);
 
-      expect([401, 403]).toContain(response.status);
+      expect(JSON.stringify(response.body)).not.toContain(tenant2Id);
+      expect(JSON.stringify(response.body)).not.toContain('Tenant Two');
+    });
+
+    it('X-Tenant-ID hacia el tenant propio sigue siendo válido', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/tenants/current')
+        .set('Authorization', `Bearer ${tenant1Token}`)
+        .set('X-Tenant-ID', tenant1Id)
+        .expect(200);
+
+      expect(response.body.id).toBe(tenant1Id);
     });
   });
 });

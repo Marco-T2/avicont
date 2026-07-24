@@ -6,6 +6,7 @@ import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
+import { cleanupTestData } from './helpers/test-factory';
 
 /**
  * E2E del cierre de la deuda RBAC (packs-riel Slice 7): el catálogo asignable
@@ -39,7 +40,7 @@ describe('Permisos asignables filtrados por vertical + packs (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await cleanup(prisma);
+    await cleanupTestData();
   });
 
   // ---- Helpers ----
@@ -85,7 +86,9 @@ describe('Permisos asignables filtrados por vertical + packs (e2e)', () => {
     return pack.id;
   }
 
-  function clavesDe(body: Array<{ submodulos: Array<{ permisos: Array<{ key: string }> }> }>): string[] {
+  function clavesDe(
+    body: Array<{ submodulos: Array<{ permisos: Array<{ key: string }> }> }>,
+  ): string[] {
     return body.flatMap((g) => g.submodulos.flatMap((s) => s.permisos.map((p) => p.key)));
   }
 
@@ -247,18 +250,3 @@ describe('Permisos asignables filtrados por vertical + packs (e2e)', () => {
     });
   });
 });
-
-async function cleanup(prisma: PrismaService) {
-  await prisma.refreshToken.deleteMany({});
-  await prisma.platformAudit.deleteMany({});
-  await prisma.impersonationAction.deleteMany({});
-  await prisma.impersonationLog.deleteMany({});
-  await prisma.invitation.deleteMany({});
-  await prisma.membership.deleteMany({});
-  await prisma.customRole.deleteMany({});
-  await prisma.orgPackEntitlement.deleteMany({});
-  await prisma.pack.deleteMany({});
-  await prisma.featureFlag.deleteMany({});
-  await prisma.organization.deleteMany({});
-  await prisma.user.deleteMany({});
-}

@@ -38,9 +38,7 @@ async function buildApp(): Promise<INestApplication> {
 }
 
 async function login(app: INestApplication, email: string, password: string): Promise<string> {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password });
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password });
   expect(res.status).toBe(200);
   return res.body.accessToken as string;
 }
@@ -131,7 +129,10 @@ describe('Packs entitlement admin (Slice 5)', () => {
   // ---------------------------------------------------------------
 
   it('[+] super-admin habilita pack del vertical correcto (por clave) → 201 + fila activo=false', async () => {
-    await seedPack({ clave: 'contabilidad.adjuntos', verticalAplicable: VerticalPack.CONTABILIDAD });
+    await seedPack({
+      clave: 'contabilidad.adjuntos',
+      verticalAplicable: VerticalPack.CONTABILIDAD,
+    });
 
     const res = await request(app.getHttpServer())
       .post(`/api/admin/platform/orgs/${contabilidadOrgId}/packs`)
@@ -194,7 +195,10 @@ describe('Packs entitlement admin (Slice 5)', () => {
   });
 
   it('[-] habilitar en org inexistente → 404', async () => {
-    await seedPack({ clave: 'contabilidad.adjuntos', verticalAplicable: VerticalPack.CONTABILIDAD });
+    await seedPack({
+      clave: 'contabilidad.adjuntos',
+      verticalAplicable: VerticalPack.CONTABILIDAD,
+    });
     const res = await request(app.getHttpServer())
       .post('/api/admin/platform/orgs/00000000-0000-0000-0000-000000000000/packs')
       .set('Authorization', `Bearer ${superAdminToken}`)
@@ -203,7 +207,10 @@ describe('Packs entitlement admin (Slice 5)', () => {
   });
 
   it('[+] habilitar deja fila en platform_audit con targetOrganizationId', async () => {
-    await seedPack({ clave: 'contabilidad.adjuntos', verticalAplicable: VerticalPack.CONTABILIDAD });
+    await seedPack({
+      clave: 'contabilidad.adjuntos',
+      verticalAplicable: VerticalPack.CONTABILIDAD,
+    });
 
     const res = await request(app.getHttpServer())
       .post(`/api/admin/platform/orgs/${contabilidadOrgId}/packs`)

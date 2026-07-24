@@ -278,7 +278,10 @@ describe('POST /api/tenants (e2e)', () => {
     });
 
     it('org nueva GRANJA NO recibe contabilidad.conciliacion (otro vertical)', async () => {
-      const res = await crearTenant({ name: `Org Granja Sin Pack ${Date.now()}`, modulo: 'GRANJA' });
+      const res = await crearTenant({
+        name: `Org Granja Sin Pack ${Date.now()}`,
+        modulo: 'GRANJA',
+      });
       expect(res.status).toBe(201);
 
       const orgId = res.body.id as string;
@@ -293,7 +296,10 @@ describe('POST /api/tenants (e2e)', () => {
     });
 
     it('org nueva GRANJA SÍ recibe el pack otorgadoPorDefecto propio de su vertical', async () => {
-      const res = await crearTenant({ name: `Org Granja Con Pack ${Date.now()}`, modulo: 'GRANJA' });
+      const res = await crearTenant({
+        name: `Org Granja Con Pack ${Date.now()}`,
+        modulo: 'GRANJA',
+      });
       expect(res.status).toBe(201);
 
       const orgId = res.body.id as string;

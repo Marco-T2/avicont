@@ -32,7 +32,14 @@ import { cleanupTestData } from './helpers/test-factory';
 
 const PACK_CLAVE = 'contabilidad.conciliacion';
 const PASSWORD = 'password123';
-const FIXTURES_DIR = join(__dirname, '..', 'src', 'conciliacion-bancaria', 'adapters', '__fixtures__');
+const FIXTURES_DIR = join(
+  __dirname,
+  '..',
+  'src',
+  'conciliacion-bancaria',
+  'adapters',
+  '__fixtures__',
+);
 
 function fixture(nombre: string): Buffer {
   return readFileSync(join(FIXTURES_DIR, nombre));

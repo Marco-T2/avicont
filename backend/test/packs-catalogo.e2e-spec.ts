@@ -5,7 +5,13 @@ import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
-import { cleanupTestData, createTestMembership, createTestTenant, createTestUser, prisma } from './helpers/test-factory';
+import {
+  cleanupTestData,
+  createTestMembership,
+  createTestTenant,
+  createTestUser,
+  prisma,
+} from './helpers/test-factory';
 
 /**
  * E2E del Slice 0: catálogo global de packs para super-admin.
@@ -29,9 +35,7 @@ async function buildApp(): Promise<INestApplication> {
 }
 
 async function login(app: INestApplication, email: string, password: string): Promise<string> {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password });
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password });
   expect(res.status).toBe(200);
   return res.body.accessToken as string;
 }
@@ -134,8 +138,7 @@ describe('Catálogo de packs (GET /api/admin/platform/packs) — super-admin', (
   });
 
   it('[-] sin JWT → 401', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/api/admin/platform/packs');
+    const res = await request(app.getHttpServer()).get('/api/admin/platform/packs');
 
     expect(res.status).toBe(401);
   });

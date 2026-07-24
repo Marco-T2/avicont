@@ -8,9 +8,7 @@ import { RedisService } from '../src/cache/redis.service';
 import { cleanupTestData, prisma } from './helpers/test-factory';
 
 async function login(app: INestApplication, email: string, password: string): Promise<string> {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password });
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password });
   expect(res.status).toBe(200);
   return res.body.accessToken as string;
 }
