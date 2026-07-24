@@ -268,6 +268,20 @@ describe('MatchConciliacionService (integration, REQ-CB-17/13)', () => {
     return { comprobanteId, movimientoId };
   }
 
+  /**
+   * Matches existentes en los DOS tenants del test.
+   *
+   * Existe para que ninguna aserción use `matchConciliacion.count()` sin filtro:
+   * la suite corre contra la BD de desarrollo compartida, así que un conteo
+   * global mide también los datos que dejó cualquier otra suite —o el uso real
+   * de la app— y el test pasa o falla por motivos ajenos a lo que verifica.
+   */
+  async function matchesDeLosTenantsDelTest(): Promise<number> {
+    return prisma.matchConciliacion.count({
+      where: { organizationId: { in: [tenantA, tenantB] } },
+    });
+  }
+
   async function cleanup() {
     const orgs = await prisma.organization.findMany({
       where: { slug: { in: [SLUG_A, SLUG_B] } },
@@ -598,7 +612,9 @@ describe('MatchConciliacionService (integration, REQ-CB-17/13)', () => {
       }),
     ).rejects.toMatchObject({ code: 'CONCILIACION_MOVIMIENTO_NO_ENCONTRADO' });
 
-    expect(await prisma.matchConciliacion.count()).toBe(0);
+    // Acotado a los tenants del test: un `count()` global haría depender el
+    // resultado de lo que haya en la BD compartida (datos de dev, otra suite).
+    expect(await matchesDeLosTenantsDelTest()).toBe(0);
   });
 
   it('5.23ter — confirmar contra una línea de OTRO tenant ⇒ la línea no resuelve, 422', async () => {
@@ -622,7 +638,7 @@ describe('MatchConciliacionService (integration, REQ-CB-17/13)', () => {
       code: 'CONCILIACION_LINEA_NO_CONCILIABLE',
       details: expect.objectContaining({ motivo: 'LINEA_INEXISTENTE' }),
     });
-    expect(await prisma.matchConciliacion.count()).toBe(0);
+    expect(await matchesDeLosTenantsDelTest()).toBe(0);
   });
 
   // ==========================================================
