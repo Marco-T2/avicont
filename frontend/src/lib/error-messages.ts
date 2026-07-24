@@ -309,6 +309,61 @@ export function mensajeCierreEjercicio(err: unknown): string {
   }
 }
 
+// ============================================================
+// Conciliación bancaria — codes CONCILIACION_* (workspace + importación).
+// ============================================================
+
+/**
+ * Mapeo de los códigos del pack `contabilidad.conciliacion`.
+ *
+ * CUIDADO con el par que parece redundante y NO lo es:
+ * - `CONCILIACION_MOVIMIENTO_YA_TIENE_MATCH` (409) → el movimiento ya tiene un
+ *   match; se dispara al CONFIRMAR (REQ-CB-17 escenario 2).
+ * - `CONCILIACION_MOVIMIENTO_YA_CONCILIADO` (422) → el movimiento está
+ *   conciliado; se dispara al IGNORAR (REQ-CB-18 escenario 4).
+ *
+ * Son dos situaciones distintas con dos salidas distintas para el usuario:
+ * mapearlas al mismo texto le escondería qué acción estaba haciendo.
+ */
+export function mensajeConciliacion(err: unknown): string {
+  const p = extractBackendError(err);
+  switch (p.code) {
+    // — Confirmar / deshacer match (REQ-CB-17) —
+    case 'CONCILIACION_MOVIMIENTO_YA_TIENE_MATCH':
+      return 'Este movimiento ya está conciliado con otra línea. Deshacé ese match antes de crear uno nuevo.';
+    case 'CONCILIACION_LINEA_YA_CONCILIADA':
+      return 'Esa línea contable ya está conciliada con otro movimiento bancario.';
+    case 'CONCILIACION_LINEA_NO_CONCILIABLE':
+      return 'La línea contable no se puede conciliar: no existe, está anulada, no está contabilizada o pertenece a otra cuenta.';
+    case 'CONCILIACION_MATCH_NO_ENCONTRADO':
+      return 'El match ya no existe. Actualizá la pantalla.';
+
+    // — Ignorar / des-ignorar (REQ-CB-18) —
+    case 'CONCILIACION_MOVIMIENTO_YA_CONCILIADO':
+      return 'El movimiento está conciliado. Deshacé el match antes de ignorarlo.';
+    case 'CONCILIACION_MOVIMIENTO_NO_ENCONTRADO':
+      return 'El movimiento bancario ya no existe. Actualizá la pantalla.';
+
+    // — Consulta del workspace —
+    case 'CONCILIACION_RANGO_INVALIDO':
+      return 'El rango de fechas es inválido: "desde" no puede ser posterior a "hasta".';
+
+    // — Importación de extracto (REQ-CB-16) —
+    // El mensaje del backend trae LOS DOS números de cuenta (el del archivo y
+    // el de la cuenta destino): reescribirlo acá le sacaría al usuario justo el
+    // dato que necesita para ver qué dígito difiere.
+    case 'CONCILIACION_ARCHIVO_CUENTA_NO_COINCIDE':
+      return p.message ?? FALLBACK_GENERICO;
+    case 'CONCILIACION_ARCHIVO_PERFIL_NO_COINCIDE':
+      return 'El archivo no coincide con el perfil de extracto configurado para esta cuenta bancaria.';
+    case 'CONCILIACION_ARCHIVO_XLS_LEGACY':
+      return 'El archivo está en formato .xls antiguo. Abrilo en Excel y guardalo como .xlsx antes de importarlo.';
+
+    default:
+      return p.message ?? FALLBACK_GENERICO;
+  }
+}
+
 // Labels humanizados para los conceptos de OrgConfiguracionContable.
 export const CONCEPTO_LABELS: Record<string, string> = {
   ivaCreditoId: 'IVA Crédito Fiscal',

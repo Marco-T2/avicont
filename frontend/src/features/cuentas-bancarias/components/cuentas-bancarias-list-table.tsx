@@ -24,6 +24,7 @@ interface CuentasBancariasListTableProps {
   isLoading: boolean;
   onEditar: (cb: CuentaBancaria) => void;
   onEliminar: (cb: CuentaBancaria) => void;
+  onVerExtractos: (cb: CuentaBancaria) => void;
 }
 
 export function CuentasBancariasListTable({
@@ -31,6 +32,7 @@ export function CuentasBancariasListTable({
   isLoading,
   onEditar,
   onEliminar,
+  onVerExtractos,
 }: CuentasBancariasListTableProps): React.JSX.Element {
   if (isLoading && items.length === 0) {
     return (
@@ -101,6 +103,18 @@ export function CuentasBancariasListTable({
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
+                  {/* Historial de extractos importados: es LECTURA de un
+                      sub-recurso de la cuenta, por eso va con `.read` y no con
+                      `.importar` (importar se gatea dentro del drawer). */}
+                  <PermissionButton
+                    permission={PERMISSIONS.contabilidad.conciliacion.read}
+                    deniedReason="No tenés permiso para ver los extractos importados"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onVerExtractos(cb)}
+                  >
+                    Extractos
+                  </PermissionButton>
                   <PermissionButton
                     permission={PERMISSIONS.contabilidad.conciliacion.update}
                     deniedReason="No tenés permiso para modificar cuentas bancarias"

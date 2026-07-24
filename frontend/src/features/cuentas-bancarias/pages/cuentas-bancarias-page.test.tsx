@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { CuentaBancaria } from '@/types/api';
 
 import { useCuentasBancarias } from '../hooks/use-cuentas-bancarias';
+import { useImportaciones } from '../hooks/use-importaciones';
+import { useImportarExtracto } from '../hooks/use-importar-extracto';
 import { CuentasBancariasPage } from './cuentas-bancarias-page';
 
 const { hasMock } = vi.hoisted(() => ({
@@ -16,6 +19,9 @@ const { hasMock } = vi.hoisted(() => ({
 vi.mock('../hooks/use-cuentas-bancarias', () => ({
   useCuentasBancarias: vi.fn(),
 }));
+
+vi.mock('../hooks/use-importaciones', () => ({ useImportaciones: vi.fn() }));
+vi.mock('../hooks/use-importar-extracto', () => ({ useImportarExtracto: vi.fn() }));
 
 vi.mock('@/lib/use-permissions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
@@ -58,6 +64,15 @@ beforeEach(() => {
     data: { items: [CUENTA_BANCARIA], total: 1, page: 1, pageSize: 50 },
     isLoading: false,
   } as unknown as ReturnType<typeof useCuentasBancarias>);
+  vi.mocked(useImportaciones).mockReturnValue({
+    data: { items: [], total: 0, page: 1, pageSize: 20 },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useImportaciones>);
+  vi.mocked(useImportarExtracto).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+    data: undefined,
+  } as unknown as ReturnType<typeof useImportarExtracto>);
 });
 
 describe('CuentasBancariasPage — gating fail-closed por permiso (§14.7)', () => {
@@ -89,5 +104,33 @@ describe('CuentasBancariasPage — gating fail-closed por permiso (§14.7)', () 
     renderPage();
 
     expect(screen.getByRole('button', { name: /^eliminar$/i })).toBeDisabled();
+  });
+});
+
+// ============================================================
+// Tarea 5.39 — acceso al historial de importaciones desde el listado.
+// ============================================================
+
+describe('CuentasBancariasPage — drawer de extractos (tarea 5.39)', () => {
+  it('cada fila ofrece abrir el historial de extractos de esa cuenta', () => {
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /extractos/i })).toBeInTheDocument();
+  });
+
+  it('abrir el drawer muestra el historial de la cuenta elegida', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /extractos/i }));
+
+    expect(await screen.findByText('Extractos importados')).toBeInTheDocument();
+    expect(screen.getByText(/todavía no importaste/i)).toBeInTheDocument();
+  });
+
+  it('el drawer arranca cerrado', () => {
+    renderPage();
+
+    expect(screen.queryByText('Extractos importados')).not.toBeInTheDocument();
   });
 });

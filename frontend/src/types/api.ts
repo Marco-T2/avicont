@@ -420,6 +420,20 @@ export interface WorkspaceConciliacionParams {
 }
 
 // ============================================================
+// Conciliación bancaria — Importaciones de extracto (slices 3-4)
+// ============================================================
+
+export type ImportacionExtracto = Schemas['ImportacionExtractoListItemDto'];
+
+export type ListarImportacionesResponse = Schemas['ListarImportacionesResponseDto'];
+
+export type ImportarExtractoResponse = Schemas['ImportarExtractoResponseDto'];
+
+export type AdvertenciaImportacion = Schemas['AdvertenciaImportacionDto'];
+
+export type EstadoVerificacionExtracto = ImportacionExtracto['estadoVerificacion'];
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

@@ -8,6 +8,7 @@ import type { CuentaBancaria } from '@/types/api';
 import { CuentaBancariaFormSheet } from '../components/cuenta-bancaria-form-sheet';
 import { CuentasBancariasListTable } from '../components/cuentas-bancarias-list-table';
 import { EliminarCuentaBancariaDialog } from '../components/eliminar-cuenta-bancaria-dialog';
+import { ImportacionesDrawer } from '../components/importaciones-drawer';
 import { useCuentasBancarias } from '../hooks/use-cuentas-bancarias';
 
 export function CuentasBancariasPage(): React.JSX.Element {
@@ -18,6 +19,10 @@ export function CuentasBancariasPage(): React.JSX.Element {
 
   const [eliminarDialogOpen, setEliminarDialogOpen] = useState(false);
   const [eliminando, setEliminando] = useState<CuentaBancaria | null>(null);
+
+  // Tarea 5.39: el historial de extractos se abre desde la fila de su cuenta.
+  const [extractosDrawerOpen, setExtractosDrawerOpen] = useState(false);
+  const [viendoExtractosDe, setViendoExtractosDe] = useState<CuentaBancaria | null>(null);
 
   function handleNueva(): void {
     setEditando(null);
@@ -32,6 +37,11 @@ export function CuentasBancariasPage(): React.JSX.Element {
   function handleEliminar(cb: CuentaBancaria): void {
     setEliminando(cb);
     setEliminarDialogOpen(true);
+  }
+
+  function handleVerExtractos(cb: CuentaBancaria): void {
+    setViendoExtractosDe(cb);
+    setExtractosDrawerOpen(true);
   }
 
   function handleSheetOpenChange(open: boolean): void {
@@ -64,6 +74,7 @@ export function CuentasBancariasPage(): React.JSX.Element {
         isLoading={isLoading}
         onEditar={handleEditar}
         onEliminar={handleEliminar}
+        onVerExtractos={handleVerExtractos}
       />
 
       <CuentaBancariaFormSheet
@@ -76,6 +87,12 @@ export function CuentasBancariasPage(): React.JSX.Element {
         cuentaBancaria={eliminando}
         open={eliminarDialogOpen}
         onOpenChange={setEliminarDialogOpen}
+      />
+
+      <ImportacionesDrawer
+        cuentaBancaria={viendoExtractosDe}
+        open={extractosDrawerOpen}
+        onOpenChange={setExtractosDrawerOpen}
       />
     </div>
   );

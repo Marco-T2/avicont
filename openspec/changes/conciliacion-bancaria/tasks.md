@@ -699,16 +699,70 @@
       403; usuario `.read`+`.conciliar` → acciones permitidas.
 - [x] 5.34 GREEN guards/permisos finales en los 3 controllers del módulo.
 - [x] 5.35 `[OPENAPI]` Regenerar (workspace + matches + estado de movimiento).
-- [ ] 5.36 `[FE]` `frontend/src/features/conciliacion/` (molde `features/libro-mayor/`): 2 paneles
+> ✅ **Slice 5B FRONTEND (5.36-5.39) COMPLETO** (2026-07-23). Strict TDD, RED→GREEN por unidad.
+>
+> **Verde real**: `pnpm exec vitest run` → **226 archivos / 1767 tests** (baseline previa 215/1642 →
+> **+11 archivos, +125 tests**), corrido DOS veces para descartar flakiness. `pnpm exec tsc -b`
+> limpio, `pnpm run lint` limpio. Backend NO tocado; `openapi.json` y `api.generated.ts` NO tocados
+> (contract-drift safe) — lo único que se agregó en tipos es `src/types/api.ts`, la fachada escrita
+> a mano (aliases de importaciones de extracto, que faltaban).
+>
+> **Gating = "modo consulta" a nivel PANTALLA (decisión de producto FIRMADA por Marco)**: REQ-CB-14
+> dice que las acciones quedan "ocultas" y cita `frontend/CLAUDE.md §14.7` como respaldo, pero §14.7
+> dice lo CONTRARIO para botones ("deshabilitar + tooltip, NO ocultar"). Resolución: sin
+> `contabilidad.conciliacion.conciliar` la pantalla muestra UN banner de "Modo consulta" arriba y las
+> acciones por fila NO se renderizan. Motivo: `<PermissionButton>` por fila llenaría 2 paneles de
+> decenas de botones grises repitiendo el mismo tooltip — la afordancia deja de informar por
+> saturación. Es **excepción documentada a §14.7 para pantallas densas en acciones repetidas por
+> fila**, NO generalizable. La ruta y el ítem de sidebar siguen ocultándose/bloqueándose fail-closed
+> sin `.read` (ahí §14.7 sí manda ocultar). Está escrito en el JSDoc de `ModoConsultaBanner`.
+> **PENDIENTE para el PR final**: reflejar esta excepción en el texto de `REQ-CB-14` del spec.
+>
+> **La UI renderiza `estadoEfectivo`, NUNCA la columna `estado`**. `EstadoMovimientoBadge` recibe el
+> movimiento ENTERO a propósito (no un `estado: string`): así es imposible pasarle la columna
+> persistida por error. Test dedicado: columna `CONCILIADO` + `vinculo.roto` → la pantalla muestra
+> "Pendiente" y NUNCA "Conciliado", más el motivo de ruptura legible en español (los 7 motivos
+> traducidos, no se traga ninguno).
+>
+> **UI de importación de extracto construida aunque NINGUNA tarea la pedía** (hueco del plan: hay
+> tareas FE para el CRUD de cuentas (1.14-1.16) y para el workspace (5.36-5.39), pero ninguna para
+> `POST /:id/importaciones`). Sin ella no hay forma de meter un movimiento desde el navegador y el
+> workspace es incontrasteable. Vive en `ImportacionesDrawer` junto al historial, incluye el flujo
+> de DOS viajes de REQ-CB-16 (número de cuenta detectado → confirmación explícita del usuario → recién
+> ahí importa) y muestra contadores, checksum y advertencias sin tragárselos.
+>
+> **`ImportacionesDrawer` vive en `features/cuentas-bancarias/`** (el endpoint es sub-recurso de la
+> cuenta) y el workspace lo importa cross-feature con el comentario de §14.6. Su prop es
+> `CuentaBancariaResumen {id, alias}` y no `CuentaBancaria`, porque el workspace devuelve una
+> proyección más chica (`CuentaBancariaWorkspaceDto`) y ambas calzan estructuralmente. Precedente de
+> import cross-feature de componentes: 10 casos ya en el repo (`topbar`, `dashboard-shell`, etc.).
+>
+> **Match MANUAL incluido además del de sugerencias**: el motor solo sugiere con monto exacto, así
+> que sin selección manual un movimiento sin candidato exacto solo podría ignorarse. Radios en ambos
+> paneles + barra "Conciliar seleccionados"; el manual va SIN `confianzaSugerida` (no salió del motor).
+>
+> **Secciones con `aria-label`** (`role="region"`): la pantalla es densa y el mismo movimiento aparece
+> en el panel de sugerencias Y en el de movimientos. Sin nombre accesible por panel, ni el usuario de
+> lector de pantalla ni los tests pueden distinguirlos.
+>
+> **Test del router con timeout explícito de 60s**: importar `@/routes/router` arrastra TODAS las
+> páginas (incluido `@react-pdf/renderer`) y con la suite completa en paralelo supera los 5s por
+> defecto. Es costo de import, no de lógica — se cazó porque el test pasaba aislado y fallaba en la
+> corrida completa.
+
+- [x] 5.36 `[FE]` `frontend/src/features/conciliacion/` (molde `features/libro-mayor/`): 2 paneles
       (movimientos bancarios / líneas en tránsito), badges de `estadoEfectivo`+motivo de vínculo roto,
       panel de sugerencias por confianza, drawer de historial de importaciones (`GET
       /:id/importaciones`), toggle "modo consulta".
-- [ ] 5.37 RED `[FE]` confirmar match, deshacer, ignorar/des-ignorar; REQ-CB-14 escenario 1 (botones
+- [x] 5.37 RED `[FE]` confirmar match, deshacer, ignorar/des-ignorar; REQ-CB-14 escenario 1 (botones
       ocultos en modo `.read`-only); REQ-CB-14 escenario 2 (ruta bloqueada sin `.read`, ítem ausente
-      del sidebar).
-- [ ] 5.38 GREEN implementación de la feature.
-- [ ] 5.39 `[FE]` cablear el acceso al drawer de historial de importaciones desde
-      `/settings/cuentas-bancarias` si no quedó resuelto en 1.14-1.16.
+      del sidebar). El ítem de sidebar ya estaba cubierto por `nav-list.test.tsx` (REQ-SB-10, tareas
+      0.20-0.21); la ruta se cubrió con `conciliacion-route.test.tsx`.
+- [x] 5.38 GREEN implementación de la feature.
+- [x] 5.39 `[FE]` cablear el acceso al drawer de historial de importaciones desde
+      `/settings/cuentas-bancarias` si no quedó resuelto en 1.14-1.16. NO estaba resuelto: se agregó
+      botón "Extractos" por fila (gateado por `.read`, porque el historial es LECTURA; `importar` se
+      gatea aparte dentro del drawer).
 
 ## Slice 6 — Atajo "crear asiento de comisión/ITF"
 
