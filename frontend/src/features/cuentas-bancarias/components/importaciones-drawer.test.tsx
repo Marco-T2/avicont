@@ -64,9 +64,9 @@ function importacion(overrides: Partial<ImportacionExtracto> = {}): ImportacionE
   };
 }
 
-function mockImportaciones(items: ImportacionExtracto[]): void {
+function mockImportaciones(items: ImportacionExtracto[], total = items.length): void {
   vi.mocked(useImportaciones).mockReturnValue({
-    data: { items, total: items.length, page: 1, pageSize: 20 },
+    data: { items, total, page: 1, pageSize: 5 },
     isLoading: false,
     isError: false,
   } as unknown as ReturnType<typeof useImportaciones>);
@@ -122,6 +122,15 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
     expect(screen.getByText(/2 ya existían/i)).toBeInTheDocument();
   });
 
+  it('muestra cuándo se subió el archivo, con hora de La Paz', () => {
+    // createdAt es un instante real (UTC): 10:00Z son las 06:00 en Bolivia.
+    mockImportaciones([importacion({ createdAt: '2026-07-01T10:00:00.000Z' })]);
+
+    renderDrawer();
+
+    expect(screen.getByText(/subido el 01\/07\/2026, 06:00/i)).toBeInTheDocument();
+  });
+
   it('muestra el estado de verificación del checksum', () => {
     mockImportaciones([importacion({ estadoVerificacion: 'DESCUADRE', diferencia: '15.00' })]);
 
@@ -136,6 +145,72 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
     renderDrawer();
 
     expect(screen.getByText(/todavía no importaste/i)).toBeInTheDocument();
+  });
+
+  it('pide la primera página con un tamaño chico, no el default de 50 del backend', () => {
+    renderDrawer();
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenCalledWith('cb-1', {
+      page: 1,
+      pageSize: 5,
+    });
+  });
+
+  it('con más de una página muestra la paginación y avanza', async () => {
+    const user = userEvent.setup();
+    mockImportaciones([importacion()], 25);
+
+    renderDrawer();
+
+    await user.click(screen.getByRole('button', { name: /página siguiente/i }));
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
+      page: 2,
+      pageSize: 5,
+    });
+  });
+
+  it('cambiar de cuenta vuelve a la página 1', async () => {
+    // El drawer NO se desmonta al cerrarse: sin reseteo, quedar en la página 2 y
+    // abrir otra cuenta con una sola página devolvía lista vacía y el empty state
+    // afirmaba que nunca se importó nada.
+    const user = userEvent.setup();
+    mockImportaciones([importacion()], 25);
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={vi.fn()} />
+      </TooltipProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /página siguiente/i }));
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
+      page: 2,
+      pageSize: 5,
+    });
+
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer
+          cuentaBancaria={{ ...CUENTA, id: 'cb-2', alias: 'Caja de ahorro Unión' }}
+          open
+          onOpenChange={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-2', {
+      page: 1,
+      pageSize: 5,
+    });
+  });
+
+  it('con una sola página no renderiza la paginación', () => {
+    mockImportaciones([importacion()], 1);
+
+    renderDrawer();
+
+    expect(screen.queryByRole('button', { name: /página siguiente/i })).not.toBeInTheDocument();
   });
 });
 
@@ -201,6 +276,44 @@ describe('ImportacionesDrawer — subida del archivo', () => {
     expect(screen.getByRole('button', { name: /importar extracto/i })).toBeDisabled();
   });
 
+  it('cerrar y reabrir el drawer no deja el archivo anterior cargado por dentro', async () => {
+    // Reportado en el smoke: el input volvía a decir "ningún archivo seleccionado"
+    // (Radix desmonta el contenido) pero el File seguía en el estado del
+    // componente, que NO se desmonta. El botón quedaba habilitado y al tocarlo se
+    // volvía a subir el archivo de la sesión anterior.
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
+
+    await user.upload(
+      screen.getByLabelText(/archivo del extracto/i),
+      new File(['contenido'], 'extracto.xlsx'),
+    );
+    expect(screen.getByRole('button', { name: /importar extracto/i })).toBeEnabled();
+
+    // Cerrar por la vía real de Radix (overlay, X o Esc): todas llaman onOpenChange.
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open={false} onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /importar extracto/i })).toBeDisabled();
+  });
+
   it('mientras importa, el botón queda deshabilitado (Anti-F-07)', () => {
     vi.mocked(useImportarExtracto).mockReturnValue({
       mutate: vi.fn(),
@@ -212,6 +325,41 @@ describe('ImportacionesDrawer — subida del archivo', () => {
     renderDrawer();
 
     expect(screen.getByRole('button', { name: /importando/i })).toBeDisabled();
+  });
+});
+
+describe('ImportacionesDrawer — errores de importación', () => {
+  it('el error se muestra en un panel fijo, no en un toast que se va solo', () => {
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: {
+        response: { data: { error: { code: 'CONCILIACION_ARCHIVO_XLS_LEGACY' } } },
+      },
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    // El mensaje es accionable: dice QUÉ hacer, no solo que falló.
+    expect(screen.getByRole('alert')).toHaveTextContent(/guardalo como \.xlsx/i);
+  });
+
+  it('el input acepta .xls para que el backend pueda explicar por qué no sirve', () => {
+    renderDrawer();
+
+    // Filtrarlo en el picker dejaba el archivo en gris y sin explicación; se deja
+    // pasar a propósito para que el backend lo detecte por magic bytes.
+    //
+    // Se asserta contra el MIME del .xls y NO contra la cadena ".xls": ".xlsx"
+    // la contiene como substring, así que un `stringContaining('.xls')` pasaría
+    // igual con el accept viejo y no probaría nada.
+    const accept = screen.getByLabelText(/archivo del extracto/i).getAttribute('accept') ?? '';
+
+    expect(accept.split(',')).toContain('.xls');
+    expect(accept.split(',')).toContain('application/vnd.ms-excel');
   });
 });
 
@@ -273,6 +421,44 @@ describe('ImportacionesDrawer — confirmación del número de cuenta (REQ-CB-16
 
     expect(screen.getByText(/12 movimientos nuevos/i)).toBeInTheDocument();
     expect(screen.getByText(/3 ya existían/i)).toBeInTheDocument();
+  });
+
+  it('cambiar el archivo invalida el pedido de confirmación del archivo anterior', async () => {
+    // El caso peligroso: el cartel pregunta por el número detectado en el archivo
+    // A y el usuario cambia a B. Si el resultado sobrevive, "Sí, es esta cuenta"
+    // manda B con confirmarNumeroCuenta y el backend graba en la cuenta el número
+    // declarado por B, cuando en pantalla se confirmó el de A.
+    const user = userEvent.setup();
+    const reset = vi.fn();
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      data: { requiereConfirmacionCuenta: true, numeroDetectado: '1191959-000-007' },
+      reset,
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    const input = screen.getByLabelText(/archivo del extracto/i);
+    await user.upload(input, new File(['a'], 'extracto-A.xlsx'));
+    expect(reset).toHaveBeenCalledTimes(1);
+
+    await user.upload(input, new File(['b'], 'extracto-B.xlsx'));
+
+    expect(reset).toHaveBeenCalledTimes(2);
+  });
+
+  it('mientras importa, el input de archivo queda bloqueado', () => {
+    vi.mocked(useImportarExtracto).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: true,
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useImportarExtracto>);
+
+    renderDrawer();
+
+    expect(screen.getByLabelText(/archivo del extracto/i)).toBeDisabled();
   });
 
   it('las advertencias de la importación se muestran, no se tragan', () => {
