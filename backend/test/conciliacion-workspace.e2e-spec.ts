@@ -219,11 +219,7 @@ describe('Conciliación — Workspace (e2e)', () => {
   }
 
   /** Miembro con CustomRole de permisos acotados (REQ-CB-14). */
-  async function seedMiembro(
-    orgId: string,
-    slug: string,
-    permissions: string[],
-  ): Promise<string> {
+  async function seedMiembro(orgId: string, slug: string, permissions: string[]): Promise<string> {
     const hashedPassword = await bcrypt.hash(PASSWORD, 10);
     const user = await prisma.user.create({
       data: { email: `member+${slug}@ws.bo`, hashedPassword, isEmailVerified: true },
@@ -359,7 +355,10 @@ describe('Conciliación — Workspace (e2e)', () => {
 
     const porMovimiento = new Map<string, string[]>();
     for (const s of res.body.sugerencias as Array<{ movimientoId: string; confianza: string }>) {
-      porMovimiento.set(s.movimientoId, [...(porMovimiento.get(s.movimientoId) ?? []), s.confianza]);
+      porMovimiento.set(s.movimientoId, [
+        ...(porMovimiento.get(s.movimientoId) ?? []),
+        s.confianza,
+      ]);
     }
 
     expect(porMovimiento.get(movAlta.id)).toEqual(['ALTA']);
@@ -381,9 +380,9 @@ describe('Conciliación — Workspace (e2e)', () => {
     // NINGUNA sugerencia crea un match sin acción explícita del usuario.
     expect(await prisma.matchConciliacion.count()).toBe(0);
     expect(
-      (
-        res.body.movimientos as Array<{ estadoEfectivo: string }>
-      ).every((m) => m.estadoEfectivo === 'PENDIENTE'),
+      (res.body.movimientos as Array<{ estadoEfectivo: string }>).every(
+        (m) => m.estadoEfectivo === 'PENDIENTE',
+      ),
     ).toBe(true);
     expect(res.body.resumen.lineasEnTransito).toBe(4);
   });

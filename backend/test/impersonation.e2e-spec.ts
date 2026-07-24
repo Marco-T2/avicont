@@ -312,7 +312,7 @@ describe('Impersonation (e2e)', () => {
         data: { email: 'stranger@imp.bo', hashedPassword, isEmailVerified: true },
       });
       // Crear org propia para poder loguearse
-      const strangerOrg = await prisma.organization.create({
+      await prisma.organization.create({
         data: {
           slug: 'stranger-org',
           name: 'Stranger Org',

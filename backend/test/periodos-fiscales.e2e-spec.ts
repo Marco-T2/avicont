@@ -257,9 +257,9 @@ describe('PeriodosFiscales (e2e)', () => {
     }
 
     // Verificar el período de enero (empresa COMERCIAL: mesInicio=1)
-    const enero = (res.body as Array<{ month: number; fechaInicio: string; fechaFin: string }>).find(
-      (p) => p.month === 1,
-    );
+    const enero = (
+      res.body as Array<{ month: number; fechaInicio: string; fechaFin: string }>
+    ).find((p) => p.month === 1);
     expect(enero?.fechaInicio).toBe('2026-01-01');
     expect(enero?.fechaFin).toBe('2026-01-31');
   });

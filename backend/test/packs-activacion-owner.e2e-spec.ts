@@ -1,4 +1,11 @@
-import { Controller, Get, INestApplication, Module, UseGuards, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  INestApplication,
+  Module,
+  UseGuards,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SystemRole, TipoPack, VerticalPack } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -68,9 +75,7 @@ async function buildApp(): Promise<INestApplication> {
 }
 
 async function login(app: INestApplication, email: string, password: string): Promise<string> {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password });
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password });
   expect(res.status).toBe(200);
   return res.body.accessToken as string;
 }
@@ -111,7 +116,10 @@ describe('Packs — shakedown end-to-end del riel (Slice 6)', () => {
     });
     superAdminToken = await login(app, 'sa-shakedown@test.com', 'superpass123');
 
-    const owner = await createTestUser({ email: 'owner-shakedown@test.com', password: 'pass12345' });
+    const owner = await createTestUser({
+      email: 'owner-shakedown@test.com',
+      password: 'pass12345',
+    });
     const tenant = await createTestTenant({ name: `Org A Shakedown ${Date.now()}` });
     await createTestMembership(owner.id, tenant.id, SystemRole.OWNER);
     orgAId = tenant.id;
@@ -184,7 +192,10 @@ describe('Packs — shakedown end-to-end del riel (Slice 6)', () => {
     await seedPack(CLAVE, VerticalPack.CONTABILIDAD);
 
     // Org B con su propio Owner, ambos packs habilitados por el super-admin.
-    const ownerB = await createTestUser({ email: 'owner-b-shakedown@test.com', password: 'pass12345' });
+    const ownerB = await createTestUser({
+      email: 'owner-b-shakedown@test.com',
+      password: 'pass12345',
+    });
     const tenantB = await createTestTenant({ name: `Org B Shakedown ${Date.now()}` });
     await createTestMembership(ownerB.id, tenantB.id, SystemRole.OWNER);
     const ownerBToken = await login(app, 'owner-b-shakedown@test.com', 'pass12345');

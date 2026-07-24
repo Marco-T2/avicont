@@ -48,14 +48,8 @@ async function buildApp(): Promise<INestApplication> {
 /**
  * Logea y devuelve el accessToken.
  */
-async function login(
-  app: INestApplication,
-  email: string,
-  password: string,
-): Promise<string> {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password });
+async function login(app: INestApplication, email: string, password: string): Promise<string> {
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password });
   expect(res.status).toBe(200);
   return res.body.accessToken as string;
 }

@@ -273,11 +273,7 @@ describe('CuentasBancarias (e2e)', () => {
       },
     });
 
-    const res = await crear(
-      token,
-      { moneda: 'USD' },
-      cuentaRestringida.id,
-    );
+    const res = await crear(token, { moneda: 'USD' }, cuentaRestringida.id);
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('CONCILIACION_MONEDA_INCOMPATIBLE');
   });
@@ -301,7 +297,12 @@ describe('CuentasBancarias (e2e)', () => {
   // ==========================================================
 
   it('404 cross-tenant — obtener una cuenta bancaria de otro tenant', async () => {
-    const { token: tokenA, orgId: orgA, ownerId: ownerA, cuentaId: cuentaA } = await seed('org-cb-a');
+    const {
+      token: tokenA,
+      orgId: orgA,
+      ownerId: ownerA,
+      cuentaId: cuentaA,
+    } = await seed('org-cb-a');
     const packId = await crearPack();
     await otorgarPackActivo(orgA, packId, ownerA);
 
@@ -319,12 +320,22 @@ describe('CuentasBancarias (e2e)', () => {
   });
 
   it('404 cross-tenant — listado siempre acotado al tenant activo', async () => {
-    const { token: tokenA, orgId: orgA, ownerId: ownerA, cuentaId: cuentaA } = await seed('org-cb-a');
+    const {
+      token: tokenA,
+      orgId: orgA,
+      ownerId: ownerA,
+      cuentaId: cuentaA,
+    } = await seed('org-cb-a');
     const packId = await crearPack();
     await otorgarPackActivo(orgA, packId, ownerA);
     await crear(tokenA, {}, cuentaA);
 
-    const { token: tokenB, orgId: orgB, ownerId: ownerB, cuentaId: cuentaB } = await seed('org-cb-b');
+    const {
+      token: tokenB,
+      orgId: orgB,
+      ownerId: ownerB,
+      cuentaId: cuentaB,
+    } = await seed('org-cb-b');
     await otorgarPackActivo(orgB, packId, ownerB);
     await crear(tokenB, {}, cuentaB);
 

@@ -1153,7 +1153,7 @@ describe('Comprobantes (e2e)', () => {
     });
 
     it('422 con code COMPROBANTE_EXPORT_RANGO_EXCEDIDO cuando supera el cap', async () => {
-      const { token } = await seed('org-export-cap');
+      await seed('org-export-cap');
       // El cap por defecto es 1000. Para este test forzamos el cap a 0
       // sobreescribiendo la env var temporalmente — o bien creamos suficientes
       // comprobantes. Como 1000 es alto, usamos process.env override vía
@@ -1184,7 +1184,9 @@ describe('Comprobantes (e2e)', () => {
       }).compile();
       const capApp = modFixture.createNestApplication();
       capApp.setGlobalPrefix('api');
-      capApp.useGlobalPipes(new VP({ whitelist: true, transform: true, forbidUnknownValues: true }));
+      capApp.useGlobalPipes(
+        new VP({ whitelist: true, transform: true, forbidUnknownValues: true }),
+      );
       await capApp.init();
 
       // Login con el token del org ya creado
