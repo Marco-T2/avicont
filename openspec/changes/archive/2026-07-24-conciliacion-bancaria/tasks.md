@@ -11,10 +11,16 @@ cierran así, de forma explícita:
    sin bloquear el cierre del change. Queda como backlog, no como deuda:
    la v1 no lo necesita.
    Excepción: 6.5 (`[ARCH]` test estático de REQ-CB-15 escenario 2 — que
-   ningún controller/service de conciliación escriba `Comprobante`) sigue
-   pendiente. La propiedad SÍ se sostiene hoy (el módulo solo consume
-   `LineasCuentaReaderPort`, un reader), pero no hay test que la CONGELE.
-   Es el residual real de este change.
+   ningún controller/service de conciliación escriba `Comprobante`) quedó
+   pendiente al archivar: la propiedad SÍ se sostenía, pero por disciplina y
+   sin test que la CONGELARA. Era el residual real de este change.
+   **CERRADO el 2026-07-24, después del archive**, en
+   `backend/src/conciliacion-bancaria/no-escribe-comprobantes.arch.spec.ts`
+   (4 chequeos: escrituras Prisma sobre `Comprobante`/`LineaComprobante`,
+   SQL crudo sobre sus tablas, whitelist de imports hacia `comprobantes/`, y
+   una guarda contra escanear en vacío). Validado por mutación: los tres
+   chequeos fallan ante un archivo que viola cada vía. El change ya estaba
+   archivado, así que la casilla 6.5 se marca acá sin reabrirlo.
 
 2. **Checklist final (líneas ~812-822) — ejecutado, sin marcar.**
    Verificado al archivar, no asumido:
@@ -811,10 +817,11 @@ cierran así, de forma explícita:
       con los campos prellenados; el comprobante NO se crea hasta que el usuario confirma el
       formulario existente (REQ-CB-15 escenario 1).
 - [ ] 6.4 GREEN implementación del atajo.
-- [ ] 6.5 `[ARCH]` REQ-CB-15 escenario 2: test estático que recorre los controllers/services de
+- [x] 6.5 `[ARCH]` REQ-CB-15 escenario 2: test estático que recorre los controllers/services de
       `conciliacion-bancaria/` y falla si alguno invoca creación/edición/anulación de
       `Comprobante`/`LineaComprobante` — confirma que NO existe ningún writer-port hacia
-      `comprobantes/`.
+      `comprobantes/`. Cerrado post-archive (2026-07-24) en
+      `src/conciliacion-bancaria/no-escribe-comprobantes.arch.spec.ts` — ver nota de cierre arriba.
 
 ## Matriz de cobertura REQ-CB → tareas (verificación final, pedida por el coordinador)
 
