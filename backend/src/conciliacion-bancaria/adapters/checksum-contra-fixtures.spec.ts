@@ -44,7 +44,8 @@ const TODOS: ReadonlyArray<[string, DialectoXlsx, string]> = [
   ['BCP', DIALECTO_BCP, 'bcp-extracto.xlsx'],
   ['Fortaleza — por rango', DIALECTO_FORTALEZA, 'fortaleza-por-rango.xlsx'],
   ['Fortaleza — últimos 30', DIALECTO_FORTALEZA, 'fortaleza-ultimos-30.xlsx'],
-  ['BMSC', DIALECTO_BMSC, 'bmsc-extracto.xlsx'],
+  ['BMSC — julio/septiembre', DIALECTO_BMSC, 'bmsc-extracto.xlsx'],
+  ['BMSC — marzo/mayo', DIALECTO_BMSC, 'bmsc-marzo-mayo.xlsx'],
 ];
 
 describe('Checksum contra los extractos reales — los 6 perfiles cuadran', () => {
@@ -100,5 +101,32 @@ describe('Checksum — el orden canónico NO sirve para anclar el saldo (bug de 
       });
       expect(resultado.estadoVerificacion).toBe('VERIFICADO');
     }
+  });
+});
+
+describe('Checksum — BMSC también estaba afectado, no solo Fortaleza', () => {
+  it('el extracto de marzo/mayo descuadra Bs 40.164,23 con orden canónico y cuadra con el cronológico', async () => {
+    // Segundo caso REAL del mismo bug, reportado desde la app con un archivo
+    // distinto y un número distinto. Importa porque el otro fixture de BMSC
+    // (julio/septiembre) cuadraba por casualidad — abre su día más antiguo con
+    // un débito de Bs 1,00, que al ser el de menor monto es también el primero
+    // del orden canónico. Sin este fixture, BMSC parecía sano.
+    const parseado = await new XlsxCoreExtractoParser(DIALECTO_BMSC).parse(
+      leerFixture('bmsc-marzo-mayo.xlsx'),
+    );
+    const datos = { saldoInicialDeclarado: null, saldoFinalDeclarado: null };
+
+    expect(parseado.movimientos).toHaveLength(143);
+
+    const conCanonico = verificarChecksum('DERIVADO', ordenarCanonico(parseado.movimientos), datos);
+    expect(conCanonico.estadoVerificacion).toBe('DESCUADRE');
+    expect(conCanonico.diferencia?.toBob()).toBe('40164.23');
+
+    const conCronologico = verificarChecksum(
+      'DERIVADO',
+      ordenarCronologico(parseado.movimientos)!,
+      datos,
+    );
+    expect(conCronologico.estadoVerificacion).toBe('VERIFICADO');
   });
 });
