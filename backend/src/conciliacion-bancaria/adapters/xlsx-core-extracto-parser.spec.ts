@@ -7,7 +7,10 @@ import { verificarChecksum } from '../domain/checksum-extracto';
 import { ArchivoFormatoNoReconocidoError } from '../domain/importacion-errors';
 import { DIALECTO_BANCOSOL } from './dialectos/bancosol.dialecto';
 import { DIALECTO_BCP } from './dialectos/bcp.dialecto';
+import { DIALECTO_BMSC } from './dialectos/bmsc.dialecto';
+import type { DialectoXlsx } from './dialectos/dialecto-xlsx';
 import { DIALECTO_ECONOMICO } from './dialectos/economico.dialecto';
+import { DIALECTO_FORTALEZA } from './dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './xlsx-core-extracto-parser';
 import { buscarValorDeEtiqueta } from './xlsx/escaneo-cabecera';
@@ -424,4 +427,215 @@ describe('XlsxCoreExtractoParser — mapeo por nombre, nunca por índice (task 3
     // vacías intercaladas), igual se reconoce correctamente.
     await expect(parser.reconoce(leerFixture('economico-extracto.xlsx'))).resolves.toBe(true);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Fortaleza y BMSC: los dos primeros perfiles con columnas `Débito`/`Crédito`
+// SEPARADAS (`mapeoMonto.modo === 'DEBITO_CREDITO_SEPARADOS'`). Acá el lado
+// del movimiento NO sale del signo del monto sino de cuál de las dos columnas
+// trae valor — es la única mecánica del motor que estos perfiles estrenan.
+// ---------------------------------------------------------------------------
+
+describe('XlsxCoreExtractoParser — Fortaleza XLSX', () => {
+  const parser = new XlsxCoreExtractoParser(DIALECTO_FORTALEZA);
+
+  it('reconoce() -> true contra los DOS exports del banco', async () => {
+    await expect(parser.reconoce(leerFixture('fortaleza-por-rango.xlsx'))).resolves.toBe(true);
+    await expect(parser.reconoce(leerFixture('fortaleza-ultimos-30.xlsx'))).resolves.toBe(true);
+  });
+
+  it('parse() — export por rango: 73 movimientos, cuenta declarada, checksum DERIVADO', async () => {
+    const resultado = await parser.parse(leerFixture('fortaleza-por-rango.xlsx'));
+
+    expect(resultado.movimientos).toHaveLength(73);
+    expect(resultado.numeroCuentaDeclarado).toBe('5651023390');
+    // No publica saldos en cabecera — se derivan de la fila más antigua.
+    expect(resultado.saldoInicialDeclarado).toBeNull();
+    expect(resultado.saldoFinalDeclarado).toBeNull();
+  });
+
+  it('parse() — el MISMO dialecto cubre el export "Últimos 30 movimientos" (30 filas, orden DESC)', async () => {
+    const resultado = await parser.parse(leerFixture('fortaleza-ultimos-30.xlsx'));
+    expect(resultado.movimientos).toHaveLength(30);
+    // El export corto viene en orden inverso al de rango; el motor no depende
+    // del orden, así que la cobertura se calcula igual de bien.
+    expect(resultado.cobertura.desde.isBefore(resultado.cobertura.hasta)).toBe(true);
+  });
+
+  it('el lado sale de la COLUMNA, no del signo: Crédito -> CREDITO, Débito -> DEBITO', async () => {
+    const resultado = await parser.parse(leerFixture('fortaleza-por-rango.xlsx'));
+
+    // Fila 9 del archivo: sólo la columna `Crédito` tiene valor ('Bs.  20,000.00').
+    const credito = resultado.movimientos[0]!;
+    expect(credito.tipo).toBe('CREDITO');
+    expect(credito.monto.toBob()).toBe('20000.00');
+    expect(credito.saldo?.toBob()).toBe('30340.55');
+
+    // Fila 10: sólo la columna `Débito`. El monto en el archivo es POSITIVO
+    // ('Bs.  10,000.00') — un motor que dedujera el lado del signo lo habría
+    // clasificado como CREDITO.
+    const debito = resultado.movimientos[1]!;
+    expect(debito.tipo).toBe('DEBITO');
+    expect(debito.monto.toBob()).toBe('10000.00');
+  });
+
+  it('la hora viene EMBEBIDA en la celda de fecha y se normaliza a HH:MM:SS', async () => {
+    const resultado = await parser.parse(leerFixture('fortaleza-por-rango.xlsx'));
+    const primero = resultado.movimientos[0]!;
+
+    expect(primero.fecha.toIso()).toBe('2026-05-09'); // '09/05/2026 10:52' -> DD/MM/YYYY
+    expect(primero.hora).toBe('10:52:00');
+  });
+
+  it('descripcion = Tipo + " " + Glosa; referencia = Nro. Transacción', async () => {
+    const resultado = await parser.parse(leerFixture('fortaleza-por-rango.xlsx'));
+    const primero = resultado.movimientos[0]!;
+
+    expect(primero.descripcion).toBe('DEPOSITO DE EFECTIVO ALEJANDRINA CHOQUE VILLCA');
+    expect(primero.referencia).toBe('50605681');
+  });
+});
+
+describe('XlsxCoreExtractoParser — BMSC XLSX', () => {
+  const parser = new XlsxCoreExtractoParser(DIALECTO_BMSC);
+
+  it('reconoce() -> true contra su propio fixture', async () => {
+    await expect(parser.reconoce(leerFixture('bmsc-extracto.xlsx'))).resolves.toBe(true);
+  });
+
+  it('parse() — 193 movimientos sobre un header de 21 columnas, cuenta declarada', async () => {
+    const resultado = await parser.parse(leerFixture('bmsc-extracto.xlsx'));
+
+    expect(resultado.movimientos).toHaveLength(193);
+    expect(resultado.numeroCuentaDeclarado).toBe('4066710701');
+  });
+
+  it('el `Saldo:` de cabecera NO se toma como saldo declarado (es el saldo vigente, no el del rango)', async () => {
+    const resultado = await parser.parse(leerFixture('bmsc-extracto.xlsx'));
+
+    expect(resultado.saldoInicialDeclarado).toBeNull();
+    expect(resultado.saldoFinalDeclarado).toBeNull();
+    // El valor SÍ está en el archivo — lo que se afirma es que el dialecto
+    // deliberadamente no lo usa.
+    const matriz = await leerMatrizXlsx(leerFixture('bmsc-extracto.xlsx'));
+    expect(buscarValorDeEtiqueta(matriz, 'Saldo:', 11)).toBe('Bs 78,453.95');
+  });
+
+  it('lado por columna + hora en columna SEPARADA (no embebida en la fecha)', async () => {
+    const resultado = await parser.parse(leerFixture('bmsc-extracto.xlsx'));
+
+    const debito = resultado.movimientos[0]!;
+    expect(debito.tipo).toBe('DEBITO');
+    expect(debito.monto.toBob()).toBe('1.00');
+    expect(debito.fecha.toIso()).toBe('2025-07-01');
+    expect(debito.hora).toBe('06:27:52');
+    expect(debito.saldo?.toBob()).toBe('113079.13');
+
+    const credito = resultado.movimientos[5]!;
+    expect(credito.tipo).toBe('CREDITO');
+    expect(credito.monto.toBob()).toBe('8000.00');
+
+    const ultimo = resultado.movimientos[192]!;
+    expect(ultimo.tipo).toBe('DEBITO');
+    expect(ultimo.monto.toBob()).toBe('80.09');
+    expect(ultimo.saldo?.toBob()).toBe('78453.95');
+  });
+
+  it('las columnas de contraparte entran a la descripcion (soportaContraparte queda en false)', async () => {
+    const resultado = await parser.parse(leerFixture('bmsc-extracto.xlsx'));
+
+    expect(parser.descriptor.soportaContraparte).toBe(false);
+    expect(resultado.movimientos[5]!.contraparteNombre).toBeNull();
+    // 'Descripción' + 'Nombre/Denominación Depositante' + 'Nom.Destinatario'
+    expect(resultado.movimientos[5]!.descripcion).toBe(
+      'DEPOSITOS-VALOR EFECTIVO SAAVEDRA SORIA GALVARRO ROGER LUIS TARQUI ALANOCA MARCO ANTONIO',
+    );
+  });
+});
+
+describe('XlsxCoreExtractoParser — modo DEBITO_CREDITO_SEPARADOS: el lado nunca se adivina', () => {
+  it('si AMBAS columnas traen valor, falla en vez de elegir una', async () => {
+    // `Saldo` siempre tiene valor y `Débito` lo tiene en la primera fila del
+    // fixture: apuntar el mapeo a ese par fuerza el caso ambiguo con datos
+    // reales, sin necesidad de un fixture sintético.
+    const parser = new XlsxCoreExtractoParser({
+      ...DIALECTO_BMSC,
+      mapeoMonto: {
+        modo: 'DEBITO_CREDITO_SEPARADOS',
+        etiquetaDebito: 'Débito',
+        etiquetaCredito: 'Saldo',
+      },
+    });
+
+    await expect(parser.parse(leerFixture('bmsc-extracto.xlsx'))).rejects.toThrow(
+      ArchivoFormatoNoReconocidoError,
+    );
+  });
+
+  it('si NINGUNA de las dos trae valor, falla en vez de asumir un monto', async () => {
+    const parser = new XlsxCoreExtractoParser({
+      ...DIALECTO_BMSC,
+      mapeoMonto: {
+        modo: 'DEBITO_CREDITO_SEPARADOS',
+        etiquetaDebito: 'Nro.Cheque',
+        etiquetaCredito: 'Nro/Nom.Plantilla',
+      },
+    });
+
+    await expect(parser.parse(leerFixture('bmsc-extracto.xlsx'))).rejects.toThrow(
+      ArchivoFormatoNoReconocidoError,
+    );
+  });
+});
+
+describe('XlsxCoreExtractoParser — anti-reuso de mapeo Fortaleza/BMSC ↔ resto de perfiles', () => {
+  const previos: ReadonlyArray<[string, DialectoXlsx, string]> = [
+    ['BancoSol', DIALECTO_BANCOSOL, 'bancosol-a-mayo-junio.xlsx'],
+    ['Económico', DIALECTO_ECONOMICO, 'economico-extracto.xlsx'],
+    ['Unión', DIALECTO_UNION_XLSX, 'union-extracto-por-rango.xlsx'],
+    ['BCP', DIALECTO_BCP, 'bcp-extracto.xlsx'],
+  ];
+  const nuevos: ReadonlyArray<[string, DialectoXlsx, string]> = [
+    ['Fortaleza', DIALECTO_FORTALEZA, 'fortaleza-por-rango.xlsx'],
+    ['BMSC', DIALECTO_BMSC, 'bmsc-extracto.xlsx'],
+  ];
+
+  it.each(previos)(
+    'el dialecto %s NO reconoce los fixtures de Fortaleza ni de BMSC',
+    async (_nombre, dialecto) => {
+      const parser = new XlsxCoreExtractoParser(dialecto);
+      await expect(parser.reconoce(leerFixture('fortaleza-por-rango.xlsx'))).resolves.toBe(false);
+      await expect(parser.reconoce(leerFixture('bmsc-extracto.xlsx'))).resolves.toBe(false);
+    },
+  );
+
+  it.each(nuevos)(
+    'el dialecto %s NO reconoce los fixtures de los perfiles previos',
+    async (_nombre, dialecto) => {
+      const parser = new XlsxCoreExtractoParser(dialecto);
+      for (const [, , fixture] of previos) {
+        await expect(parser.reconoce(leerFixture(fixture))).resolves.toBe(false);
+      }
+    },
+  );
+
+  it('Fortaleza y BMSC no se reconocen entre sí (ambos DD/MM/YYYY en celda de texto)', async () => {
+    const fortaleza = new XlsxCoreExtractoParser(DIALECTO_FORTALEZA);
+    const bmsc = new XlsxCoreExtractoParser(DIALECTO_BMSC);
+
+    await expect(fortaleza.reconoce(leerFixture('bmsc-extracto.xlsx'))).resolves.toBe(false);
+    await expect(bmsc.reconoce(leerFixture('fortaleza-por-rango.xlsx'))).resolves.toBe(false);
+  });
+
+  it.each(nuevos)(
+    'parse(): el fixture de %s con el dialecto de otro perfil FALLA — nunca devuelve datos corridos',
+    async (_nombre, _dialecto, fixture) => {
+      for (const [, dialectoPrevio] of previos) {
+        const parser = new XlsxCoreExtractoParser(dialectoPrevio);
+        await expect(parser.parse(leerFixture(fixture))).rejects.toThrow(
+          ArchivoFormatoNoReconocidoError,
+        );
+      }
+    },
+  );
 });

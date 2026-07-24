@@ -30,7 +30,7 @@ export const DIALECTO_ECONOMICO: DialectoXlsx = {
   etiquetaFecha: 'Fecha',
   etiquetaHora: 'Hora',
   etiquetaReferencia: 'Nro Trn./Cheque',
-  etiquetaMonto: 'Monto',
+  mapeoMonto: { modo: 'COLUMNA_UNICA_CON_SIGNO', etiqueta: 'Monto' },
   etiquetaSaldo: 'Saldo',
   columnasDescripcion: ['Transacción', 'Nota'],
 

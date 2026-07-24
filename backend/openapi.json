@@ -10607,7 +10607,9 @@
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
               "UNION_XLSX",
-              "BCP_XLSX"
+              "BCP_XLSX",
+              "FORTALEZA_XLSX",
+              "BMSC_XLSX"
             ]
           },
           "banco": {
@@ -10680,7 +10682,9 @@
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
               "UNION_XLSX",
-              "BCP_XLSX"
+              "BCP_XLSX",
+              "FORTALEZA_XLSX",
+              "BMSC_XLSX"
             ],
             "description": "Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación."
           },
@@ -10727,7 +10731,9 @@
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
               "UNION_XLSX",
-              "BCP_XLSX"
+              "BCP_XLSX",
+              "FORTALEZA_XLSX",
+              "BMSC_XLSX"
             ]
           },
           "numeroCuenta": {
@@ -10900,7 +10906,9 @@
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
               "UNION_XLSX",
-              "BCP_XLSX"
+              "BCP_XLSX",
+              "FORTALEZA_XLSX",
+              "BMSC_XLSX"
             ]
           },
           "fechaDesde": {
