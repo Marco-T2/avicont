@@ -11,7 +11,10 @@ import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancari
 import { PrismaImportacionExtractoRepository } from './adapters/prisma-importacion-extracto.repository';
 import { PrismaMovimientoBancarioRepository } from './adapters/prisma-movimiento-bancario.repository';
 import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
+import { DIALECTO_BCP } from './adapters/dialectos/bcp.dialecto';
+import { DIALECTO_BMSC } from './adapters/dialectos/bmsc.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
+import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
 import type { ExtractoParseado, MovimientoParseado } from './ports/extracto-parser.port';
@@ -158,9 +161,15 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
 
   const servicioReal = () =>
     servicioConParsers([
+      // Los 6 perfiles, igual que `conciliacion-bancaria.module.ts`. Esta lista
+      // se había quedado en 3 al sumar BCP/Fortaleza/BMSC, así que el servicio
+      // no podía ejercitarse con esos perfiles en integración.
       new XlsxCoreExtractoParser(DIALECTO_BANCOSOL),
       new XlsxCoreExtractoParser(DIALECTO_ECONOMICO),
       new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX),
+      new XlsxCoreExtractoParser(DIALECTO_BCP),
+      new XlsxCoreExtractoParser(DIALECTO_FORTALEZA),
+      new XlsxCoreExtractoParser(DIALECTO_BMSC),
     ]);
 
   async function crearCuentaBancaria(numeroCuenta: string | null) {
@@ -168,6 +177,16 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
       cuentaId: cuentaIdA,
       alias: 'Cuenta corriente BancoSol',
       perfilExtracto: PerfilExtracto.BANCOSOL_XLSX,
+      numeroCuenta,
+      moneda: 'BOB',
+    });
+  }
+
+  async function crearCuentaBancariaFortaleza(numeroCuenta: string | null) {
+    return cuentaBancariaRepo.create(tenantA, {
+      cuentaId: cuentaIdA,
+      alias: 'Cuenta Fortaleza',
+      perfilExtracto: PerfilExtracto.FORTALEZA_XLSX,
       numeroCuenta,
       moneda: 'BOB',
     });
@@ -253,6 +272,28 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
       { confirmarNumeroCuenta: false },
     );
     if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+    expect(res.estadoVerificacion).toBe('VERIFICADO');
+  });
+
+  // Regresión: el checksum DERIVADO consumía el orden CANÓNICO, que desempata
+  // por monto y no por hora. En el export "Últimos 30" de Fortaleza el día más
+  // antiguo trae tres créditos (45.000, 50.000, 41.000) y el ancla del saldo
+  // caía en el de 41.000 — el cronológicamente ÚLTIMO del día — produciendo un
+  // DESCUADRE fantasma de Bs 95.000 sobre 30 movimientos correctos. Este test
+  // corre por el SERVICIO a propósito: congela el wiring, no solo el dominio.
+  it('Fortaleza "Últimos 30" (DERIVADO): cuadra — el ancla del saldo sale del orden cronológico', async () => {
+    const cb = await crearCuentaBancariaFortaleza('5651023390');
+    const service = servicioReal();
+
+    const res = await service.importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(leerFixture('fortaleza-ultimos-30.xlsx'), 'fortaleza-ultimos-30.xlsx'),
+      { confirmarNumeroCuenta: false },
+    );
+    if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+    expect(res.movimientosNuevos).toBe(30);
     expect(res.estadoVerificacion).toBe('VERIFICADO');
   });
 
