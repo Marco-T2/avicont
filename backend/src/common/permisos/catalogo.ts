@@ -3,7 +3,11 @@
 //
 // Reglas (ver CLAUDE.md §10.4 y permission-matcher.ts):
 //   - Formato: {modulo}.{submodulo}.{accion}
-//   - Acciones canónicas: read, create, update, delete, post, void, execute, interact
+//   - Acciones más comunes: read, create, update, delete, post, void, execute,
+//     interact. NO es una lista cerrada: submódulos con verbos de dominio
+//     propios (ej. cerrar, reabrir, marcar-definitivo, importar, conciliar)
+//     son válidos — la acción es libre, lo único fijo es el formato de 3
+//     segmentos `{modulo}.{submodulo}.{accion}`.
 //   - Los wildcards (modulo.*, modulo.submodulo.*, modulo.*.accion) son válidos
 //     solo en CustomRole.permissions, no en este catálogo.
 //
@@ -206,6 +210,19 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
     modulo: 'contabilidad',
     submodulo: 'documentos-fisicos',
     acciones: CRUD('documentos físicos'),
+  },
+  // Pack contabilidad.conciliacion (conciliación bancaria). Primer pack con
+  // permisos propios (adjuntos reusó asientos.read/update). El filtrado
+  // pack↔submódulo ya es genérico (catalogo-asignable.ts) — la clave del pack
+  // ES el prefijo `contabilidad.conciliacion` de estos permisos.
+  {
+    modulo: 'contabilidad',
+    submodulo: 'conciliacion',
+    acciones: {
+      ...CRUD('cuentas bancarias y movimientos de conciliación'),
+      importar: 'Importar extractos bancarios',
+      conciliar: 'Confirmar o deshacer conciliaciones, ignorar movimientos',
+    },
   },
 
   // ---------- Granja ----------

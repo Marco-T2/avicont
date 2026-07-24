@@ -40,6 +40,8 @@ import { FeatureFlagsPage } from '@/features/platform-admin/pages/feature-flags-
 import { OrgMembersPage } from '@/features/platform-admin/pages/org-members-page';
 import { CierreEjercicioPage } from '@/features/cierre-ejercicio/pages/cierre-ejercicio-page';
 import { CierreGestionActivaRedirect } from '@/features/cierre-ejercicio/components/cierre-gestion-activa-redirect';
+import { CuentasBancariasPage } from '@/features/cuentas-bancarias/pages/cuentas-bancarias-page';
+import { ConciliacionPage } from '@/features/conciliacion/pages/conciliacion-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -253,6 +255,25 @@ export const router = createBrowserRouter([
               <RequireSystemRole roles={['OWNER', 'ADMIN']}>
                 <ComplementosPage />
               </RequireSystemRole>
+            ),
+          },
+          {
+            path: '/settings/cuentas-bancarias',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
+                <CuentasBancariasPage />
+              </RequirePermission>
+            ),
+          },
+          // REQ-CB-14 escenario 2: la ruta se bloquea fail-closed sin `.read`.
+          // Las ACCIONES de la pantalla se gatean aparte con `.conciliar`
+          // (modo consulta) — ver `ModoConsultaBanner`.
+          {
+            path: '/conciliacion',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
+                <ConciliacionPage />
+              </RequirePermission>
             ),
           },
           // ─── Granja ──────────────────────────────────────────────────────

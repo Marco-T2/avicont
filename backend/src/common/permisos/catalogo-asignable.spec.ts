@@ -104,6 +104,32 @@ describe('filtrarCatalogoAsignable', () => {
       expect(keys).toContain('contabilidad.asientos.read');
       expect(keys).toContain('contabilidad.plan-cuentas.read');
     });
+
+    // Task 0.18 (conciliacion-bancaria): primer pack con permisos PROPIOS en
+    // el catálogo (adjuntos reusó asientos.read/update, es placeholder). Cierra
+    // el loop con datos reales: confirma que el mecanismo genérico alcanza sin
+    // tocar catalogo-asignable.ts.
+    it('contabilidad.conciliacion (primer pack con permisos propios): filtrado real por pack activo/inactivo', () => {
+      const PACKS_CON_CONCILIACION = [...PACKS_CATALOGO, 'contabilidad.conciliacion'];
+      const ctxConPacks = (over: Partial<ContextoAsignable> = {}): ContextoAsignable => ({
+        vertical: 'CONTABILIDAD',
+        packsCatalogo: PACKS_CON_CONCILIACION,
+        packsActivos: [],
+        ...over,
+      });
+
+      const inactivo = filtrarCatalogoAsignable(CATALOGO_PERMISOS, ctxConPacks()).map((p) => p.key);
+      expect(inactivo).not.toContain('contabilidad.conciliacion.read');
+      expect(inactivo).not.toContain('contabilidad.conciliacion.importar');
+
+      const activo = filtrarCatalogoAsignable(
+        CATALOGO_PERMISOS,
+        ctxConPacks({ packsActivos: ['contabilidad.conciliacion'] }),
+      ).map((p) => p.key);
+      expect(activo).toContain('contabilidad.conciliacion.read');
+      expect(activo).toContain('contabilidad.conciliacion.importar');
+      expect(activo).toContain('contabilidad.conciliacion.conciliar');
+    });
   });
 });
 

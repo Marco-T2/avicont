@@ -10,6 +10,7 @@ import { MembershipsModule } from '../memberships/memberships.module';
 import { CuentasModule } from '../cuentas/cuentas.module';
 import { TiposDocumentoFisicoModule } from '../tipos-documento-fisico/tipos-documento-fisico.module';
 import { GranjaModule } from '../granja/granja.module';
+import { PacksModule } from '@/packs/pack.module';
 import { TENANT_REPOSITORY_PORT } from './ports/tenant.repository.port';
 import { PrismaTenantRepository } from './adapters/prisma-tenant.repository';
 import { ORG_STATUS_READER_PORT } from '@/common/ports/org-status-reader.port';
@@ -33,6 +34,11 @@ import { PrismaOrgStatusReaderAdapter } from './adapters/prisma-org-status-reade
 // registro fábrica al activar el vertical granja (design granja-v1 §8).
 // Dependencia unidireccional sin forwardRef: tenants → granja. No hay ciclo:
 // GranjaModule no importa TenantsModule (verificado con grep).
+//
+// PacksModule provee PackService para el auto-otorgamiento de packs
+// `otorgadoPorDefecto` al crear la org (design conciliacion-bancaria §7.2/§7.3).
+// Dependencia unidireccional sin forwardRef: PacksModule es un leaf (no
+// importa ningún módulo, solo declara providers) — imposible cerrar ciclo.
 @Module({
   imports: [
     RbacModule,
@@ -41,6 +47,7 @@ import { PrismaOrgStatusReaderAdapter } from './adapters/prisma-org-status-reade
     CuentasModule,
     TiposDocumentoFisicoModule,
     GranjaModule,
+    PacksModule,
   ],
   controllers: [TenantsController],
   providers: [

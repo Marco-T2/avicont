@@ -353,6 +353,87 @@ export interface ListarTiposDocumentoFisicoParams {
 }
 
 // ============================================================
+// Conciliación bancaria — Cuentas bancarias (slice 1, pack contabilidad.conciliacion)
+// ============================================================
+
+export const PerfilExtracto = {
+  BANCOSOL_XLSX: 'BANCOSOL_XLSX',
+  ECONOMICO_XLSX: 'ECONOMICO_XLSX',
+  UNION_XLSX: 'UNION_XLSX',
+} as const satisfies Record<string, Schemas['CuentaBancariaResponseDto']['perfilExtracto']>;
+export type PerfilExtracto = (typeof PerfilExtracto)[keyof typeof PerfilExtracto];
+
+export type CuentaBancaria = Schemas['CuentaBancariaResponseDto'];
+
+export type ListarCuentasBancariasResponse = Schemas['ListarCuentasBancariasResponseDto'];
+
+export type CreateCuentaBancariaRequest = Schemas['CreateCuentaBancariaDto'];
+
+export type UpdateCuentaBancariaRequest = Schemas['UpdateCuentaBancariaDto'];
+
+export interface ListarCuentasBancariasParams {
+  activa?: boolean | 'all';
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
+// Conciliación bancaria — Workspace (slice 5)
+// ============================================================
+
+export type WorkspaceConciliacion = Schemas['WorkspaceConciliacionResponseDto'];
+
+export type MovimientoConciliacion = Schemas['MovimientoConciliacionDto'];
+
+export type LineaConciliacion = Schemas['LineaConciliacionDto'];
+
+export type SugerenciaConciliacion = Schemas['SugerenciaConciliacionDto'];
+
+export type VinculoConciliacion = Schemas['VinculoConciliacionDto'];
+
+export type ResumenConciliacion = Schemas['ResumenConciliacionDto'];
+
+export type MatchConciliacion = Schemas['MatchConciliacionResponseDto'];
+
+export type CrearMatchRequest = Schemas['CrearMatchDto'];
+
+export type MovimientoBancario = Schemas['MovimientoBancarioResponseDto'];
+
+export type ActualizarEstadoMovimientoRequest = Schemas['ActualizarEstadoMovimientoDto'];
+
+/** DERIVADO en cada lectura (REQ-CB-10/11) — no es la columna persistida. */
+export type EstadoEfectivoMovimiento = MovimientoConciliacion['estadoEfectivo'];
+
+/** `EN_TRANSITO` nunca se persiste: siempre se deriva en la consulta (REQ-CB-11). */
+export type EstadoEfectivoLinea = LineaConciliacion['estadoEfectivo'];
+
+export type MotivoVinculoRoto = NonNullable<VinculoConciliacion['roto']>;
+
+export type ConfianzaSugerencia = SugerenciaConciliacion['confianza'];
+
+export interface WorkspaceConciliacionParams {
+  cuentaBancariaId: string;
+  /** `YYYY-MM-DD`, inclusive. */
+  desde: string;
+  /** `YYYY-MM-DD`, inclusive. */
+  hasta: string;
+}
+
+// ============================================================
+// Conciliación bancaria — Importaciones de extracto (slices 3-4)
+// ============================================================
+
+export type ImportacionExtracto = Schemas['ImportacionExtractoListItemDto'];
+
+export type ListarImportacionesResponse = Schemas['ListarImportacionesResponseDto'];
+
+export type ImportarExtractoResponse = Schemas['ImportarExtractoResponseDto'];
+
+export type AdvertenciaImportacion = Schemas['AdvertenciaImportacionDto'];
+
+export type EstadoVerificacionExtracto = ImportacionExtracto['estadoVerificacion'];
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

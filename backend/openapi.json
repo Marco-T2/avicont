@@ -5608,6 +5608,517 @@
         ]
       }
     },
+    "/api/cuentas-bancarias/perfiles": {
+      "get": {
+        "operationId": "CuentasBancariasController_listarPerfiles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PerfilExtractoResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Catálogo de perfiles de extracto soportados (banco/formato, instructivo, checksum). Única fuente de verdad para la UI.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/cuentas-bancarias": {
+      "post": {
+        "operationId": "CuentasBancariasController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Vincula una cuenta del plan (elegida por el usuario) a una cuenta bancaria (REQ-CB-01).",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "get": {
+        "operationId": "CuentasBancariasController_listar",
+        "parameters": [
+          {
+            "name": "activa",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por estado activo. Omitir para listar solo activas.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarCuentasBancariasResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista las cuentas bancarias del tenant activo.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/cuentas-bancarias/{id}": {
+      "get": {
+        "operationId": "CuentasBancariasController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Obtiene una cuenta bancaria por id.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "patch": {
+        "operationId": "CuentasBancariasController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCuentaBancariaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "PATCH de la cuenta bancaria. cuentaId y perfilExtracto son inmutables — no se exponen acá.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "delete": {
+        "operationId": "CuentasBancariasController_eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Elimina una cuenta bancaria. Falla con 409 si tiene movimientos o importaciones asociadas.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/cuentas-bancarias/{id}/importaciones": {
+      "post": {
+        "operationId": "CuentasBancariasController_importarExtracto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "confirmarNumeroCuenta": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportarExtractoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Importa un extracto bancario (design §10). Ver REQ-CB-16 para el flujo de confirmación de número de cuenta.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      },
+      "get": {
+        "operationId": "CuentasBancariasController_listarImportaciones",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarImportacionesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista las importaciones de una cuenta bancaria, más reciente primero.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
+    "/api/conciliacion": {
+      "get": {
+        "description": "Verifica el ancla de cada match en memoria contra su snapshot (REQ-CB-10). Es LECTURA PURA: nunca escribe, ni siquiera para \"curar\" un vínculo roto.",
+        "operationId": "ConciliacionController_obtenerWorkspace",
+        "parameters": [
+          {
+            "name": "cuentaBancariaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive.",
+            "schema": {
+              "example": "2026-06-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive.",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceConciliacionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Workspace de conciliación: movimientos bancarios + líneas contables de la cuenta banco en el rango, con estados DERIVADOS y sugerencias ranqueadas.",
+        "tags": [
+          "Conciliación bancaria — Workspace"
+        ]
+      }
+    },
+    "/api/conciliacion/matches": {
+      "post": {
+        "operationId": "ConciliacionController_crearMatch",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearMatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchConciliacionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Confirma un par movimiento ↔ línea contable creando el MatchConciliacion (REQ-CB-17). El sistema NUNCA auto-confirma.",
+        "tags": [
+          "Conciliación bancaria — Workspace"
+        ]
+      }
+    },
+    "/api/conciliacion/matches/{id}": {
+      "delete": {
+        "operationId": "ConciliacionController_borrarMatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Deshace un match: lo borra y devuelve el movimiento a PENDIENTE. NUNCA toca el comprobante ni sus líneas (REQ-CB-15).",
+        "tags": [
+          "Conciliación bancaria — Workspace"
+        ]
+      }
+    },
+    "/api/movimientos-bancarios/{id}/estado": {
+      "patch": {
+        "operationId": "MovimientosBancariosController_cambiarEstado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarEstadoMovimientoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovimientoBancarioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Ignora (IGNORADO) o des-ignora (PENDIENTE) un movimiento bancario. Nunca borra el movimiento ni toca sus matches (REQ-CB-18).",
+        "tags": [
+          "Conciliación bancaria — Movimientos"
+        ]
+      }
+    },
     "/api/me/permissions": {
       "get": {
         "operationId": "MeController_permissions",
@@ -10085,6 +10596,910 @@
           "diferencia",
           "advertencias",
           "cuentasEfectivoDetectadasPorHeuristica"
+        ]
+      },
+      "PerfilExtractoResponseDto": {
+        "type": "object",
+        "properties": {
+          "perfil": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "banco": {
+            "type": "string"
+          },
+          "formato": {
+            "type": "string"
+          },
+          "extensiones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estrategiaChecksum": {
+            "type": "string"
+          },
+          "soportaContraparte": {
+            "type": "boolean"
+          },
+          "soportaHora": {
+            "type": "boolean"
+          },
+          "exponeNumeroCuenta": {
+            "type": "boolean"
+          },
+          "instruccionesDescarga": {
+            "type": "string"
+          },
+          "advertencia": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "perfil",
+          "banco",
+          "formato",
+          "extensiones",
+          "mimeTypes",
+          "estrategiaChecksum",
+          "soportaContraparte",
+          "soportaHora",
+          "exponeNumeroCuenta",
+          "instruccionesDescarga"
+        ]
+      },
+      "CreateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta del plan de cuentas ELEGIDA por el usuario (esDetalle=true, activa=true). No se adivina."
+          },
+          "alias": {
+            "type": "string",
+            "example": "Cuenta corriente BancoSol",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ],
+            "description": "Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación."
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "example": "1191959-000-001",
+            "maxLength": 50,
+            "description": "Puede quedar vacío al crear — se captura y confirma en la primera importación (REQ-CB-16)."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "description": "Un extracto tiene una única moneda por definición. Validada contra la cuenta del plan (REQ-CB-02)."
+          }
+        },
+        "required": [
+          "cuentaId",
+          "alias",
+          "perfilExtracto",
+          "moneda"
+        ]
+      },
+      "CuentaBancariaResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "cuentaId": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "nullable": true
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "activa": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "cuentaId",
+          "alias",
+          "perfilExtracto",
+          "numeroCuenta",
+          "moneda",
+          "activa",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ListarCuentasBancariasResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CuentaBancariaResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "alias": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "numeroCuenta": {
+            "type": "object",
+            "example": "1191959-000-001",
+            "maxLength": 50,
+            "nullable": true,
+            "description": "null limpia el número capturado; se vuelve a capturar en la próxima importación."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ],
+            "description": "Re-valida REQ-CB-02 contra la cuenta del plan ya vinculada."
+          },
+          "activa": {
+            "type": "boolean",
+            "description": "Activar o desactivar la cuenta bancaria sin eliminarla."
+          }
+        }
+      },
+      "AdvertenciaImportacionDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "mensaje"
+        ]
+      },
+      "ImportarExtractoResponseDto": {
+        "type": "object",
+        "properties": {
+          "requiereConfirmacionCuenta": {
+            "type": "boolean"
+          },
+          "numeroDetectado": {
+            "type": "string",
+            "description": "Solo si requiereConfirmacionCuenta=true (REQ-CB-16)."
+          },
+          "importacionId": {
+            "type": "string"
+          },
+          "movimientosNuevos": {
+            "type": "number"
+          },
+          "movimientosDuplicados": {
+            "type": "number"
+          },
+          "filasLeidas": {
+            "type": "number"
+          },
+          "estadoVerificacion": {
+            "type": "string",
+            "enum": [
+              "VERIFICADO",
+              "SIN_VERIFICAR",
+              "DESCUADRE"
+            ]
+          },
+          "diferencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "advertencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdvertenciaImportacionDto"
+            }
+          }
+        },
+        "required": [
+          "requiereConfirmacionCuenta"
+        ]
+      },
+      "ImportacionExtractoListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nombreArchivo": {
+            "type": "string"
+          },
+          "sha256Archivo": {
+            "type": "string"
+          },
+          "tamanioBytes": {
+            "type": "number"
+          },
+          "perfilExtracto": {
+            "type": "string",
+            "enum": [
+              "BANCOSOL_XLSX",
+              "ECONOMICO_XLSX",
+              "UNION_XLSX"
+            ]
+          },
+          "fechaDesde": {
+            "type": "string"
+          },
+          "fechaHasta": {
+            "type": "string"
+          },
+          "coberturaDeclarada": {
+            "type": "boolean"
+          },
+          "saldoInicial": {
+            "type": "string",
+            "nullable": true
+          },
+          "saldoFinal": {
+            "type": "string",
+            "nullable": true
+          },
+          "estadoVerificacion": {
+            "type": "string",
+            "enum": [
+              "VERIFICADO",
+              "SIN_VERIFICAR",
+              "DESCUADRE"
+            ]
+          },
+          "diferencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "filasLeidas": {
+            "type": "number"
+          },
+          "movimientosNuevos": {
+            "type": "number"
+          },
+          "movimientosDuplicados": {
+            "type": "number"
+          },
+          "importadoPorUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombreArchivo",
+          "sha256Archivo",
+          "tamanioBytes",
+          "perfilExtracto",
+          "fechaDesde",
+          "fechaHasta",
+          "coberturaDeclarada",
+          "saldoInicial",
+          "saldoFinal",
+          "estadoVerificacion",
+          "diferencia",
+          "filasLeidas",
+          "movimientosNuevos",
+          "movimientosDuplicados",
+          "importadoPorUserId",
+          "createdAt"
+        ]
+      },
+      "ListarImportacionesResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportacionExtractoListItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "CuentaBancariaWorkspaceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "cuentaId": {
+            "type": "string"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "cuentaId",
+          "moneda",
+          "numeroCuenta"
+        ]
+      },
+      "VinculoConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "matchId": {
+            "type": "string"
+          },
+          "comprobanteId": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "number"
+          },
+          "roto": {
+            "type": "string",
+            "enum": [
+              "LINEA_INEXISTENTE",
+              "COMPROBANTE_ANULADO",
+              "CUENTA_CAMBIADA",
+              "MONTO_CAMBIADO",
+              "LADO_CAMBIADO",
+              "MONEDA_CAMBIADA",
+              "FECHA_CAMBIADA"
+            ],
+            "nullable": true,
+            "description": "null ⇒ el vínculo es válido. Cualquier otro valor ⇒ roto, con el motivo exacto."
+          }
+        },
+        "required": [
+          "matchId",
+          "comprobanteId",
+          "orden",
+          "roto"
+        ]
+      },
+      "MovimientoConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-10",
+            "description": "Calendario puro, sin UTC (§4.6)."
+          },
+          "hora": {
+            "type": "string",
+            "nullable": true
+          },
+          "monto": {
+            "type": "string",
+            "example": "1500.00",
+            "description": "Monto como string (§4.5), siempre positivo."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DEBITO",
+              "CREDITO"
+            ],
+            "description": "Perspectiva del BANCO."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "referencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "saldo": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONCILIADO",
+              "IGNORADO"
+            ],
+            "description": "Columna PERSISTIDA (proyección cacheada). NO es lo que se muestra."
+          },
+          "estadoEfectivo": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONCILIADO",
+              "IGNORADO"
+            ],
+            "description": "DERIVADO en cada lectura (REQ-CB-10/11). Esto es lo que se muestra."
+          },
+          "vinculo": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VinculoConciliacionDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fecha",
+          "hora",
+          "monto",
+          "tipo",
+          "moneda",
+          "descripcion",
+          "referencia",
+          "saldo",
+          "estado",
+          "estadoEfectivo",
+          "vinculo"
+        ]
+      },
+      "LineaConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "comprobanteId": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "number"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-10"
+          },
+          "numeroComprobante": {
+            "type": "string",
+            "nullable": true
+          },
+          "glosa": {
+            "type": "string"
+          },
+          "glosaLinea": {
+            "type": "string",
+            "nullable": true
+          },
+          "monto": {
+            "type": "string",
+            "example": "1500.00",
+            "description": "Moneda ORIGINAL, siempre positivo."
+          },
+          "montoBob": {
+            "type": "string",
+            "example": "1500.00",
+            "description": "Equivalente en BOB, solo para mostrar."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DEBITO",
+              "CREDITO"
+            ],
+            "description": "Perspectiva de la EMPRESA."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "estadoEfectivo": {
+            "type": "string",
+            "enum": [
+              "EN_TRANSITO",
+              "CONCILIADO"
+            ],
+            "description": "EN_TRANSITO es DERIVADO — no existe fila persistida con ese estado (REQ-CB-11)."
+          }
+        },
+        "required": [
+          "comprobanteId",
+          "orden",
+          "fecha",
+          "numeroComprobante",
+          "glosa",
+          "glosaLinea",
+          "monto",
+          "montoBob",
+          "tipo",
+          "moneda",
+          "estadoEfectivo"
+        ]
+      },
+      "SugerenciaConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "movimientoId": {
+            "type": "string"
+          },
+          "comprobanteId": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "number"
+          },
+          "confianza": {
+            "type": "string",
+            "enum": [
+              "ALTA",
+              "MEDIA",
+              "BAJA"
+            ]
+          },
+          "diferenciaDias": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "movimientoId",
+          "comprobanteId",
+          "orden",
+          "confianza",
+          "diferenciaDias"
+        ]
+      },
+      "ResumenConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "movimientosPendientes": {
+            "type": "number"
+          },
+          "movimientosConciliados": {
+            "type": "number"
+          },
+          "movimientosIgnorados": {
+            "type": "number"
+          },
+          "lineasEnTransito": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "movimientosPendientes",
+          "movimientosConciliados",
+          "movimientosIgnorados",
+          "lineasEnTransito"
+        ]
+      },
+      "WorkspaceConciliacionResponseDto": {
+        "type": "object",
+        "properties": {
+          "cuentaBancaria": {
+            "$ref": "#/components/schemas/CuentaBancariaWorkspaceDto"
+          },
+          "desde": {
+            "type": "string",
+            "example": "2026-06-01"
+          },
+          "hasta": {
+            "type": "string",
+            "example": "2026-06-30"
+          },
+          "movimientos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MovimientoConciliacionDto"
+            }
+          },
+          "lineas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineaConciliacionDto"
+            }
+          },
+          "sugerencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SugerenciaConciliacionDto"
+            }
+          },
+          "resumen": {
+            "$ref": "#/components/schemas/ResumenConciliacionDto"
+          }
+        },
+        "required": [
+          "cuentaBancaria",
+          "desde",
+          "hasta",
+          "movimientos",
+          "lineas",
+          "sugerencias",
+          "resumen"
+        ]
+      },
+      "CrearMatchDto": {
+        "type": "object",
+        "properties": {
+          "movimientoBancarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Mitad del ancla (design §2.1)."
+          },
+          "orden": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Mitad del ancla: posición de la línea (1..N)."
+          },
+          "confianzaSugerida": {
+            "type": "string",
+            "enum": [
+              "ALTA",
+              "MEDIA",
+              "BAJA"
+            ],
+            "description": "Confianza de la sugerencia que el usuario confirmó. Se omite cuando el match es manual."
+          }
+        },
+        "required": [
+          "movimientoBancarioId",
+          "comprobanteId",
+          "orden"
+        ]
+      },
+      "MatchConciliacionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "movimientoBancarioId": {
+            "type": "string"
+          },
+          "comprobanteId": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "number"
+          },
+          "snapshotCuentaId": {
+            "type": "string"
+          },
+          "snapshotMonto": {
+            "type": "string",
+            "example": "1500.00"
+          },
+          "snapshotTipo": {
+            "type": "string",
+            "enum": [
+              "DEBITO",
+              "CREDITO"
+            ]
+          },
+          "snapshotMoneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "snapshotFecha": {
+            "type": "string",
+            "example": "2026-06-10"
+          },
+          "confianzaSugerida": {
+            "type": "string",
+            "nullable": true
+          },
+          "conciliadoPorUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "movimientoBancarioId",
+          "comprobanteId",
+          "orden",
+          "snapshotCuentaId",
+          "snapshotMonto",
+          "snapshotTipo",
+          "snapshotMoneda",
+          "snapshotFecha",
+          "confianzaSugerida",
+          "conciliadoPorUserId",
+          "createdAt"
+        ]
+      },
+      "ActualizarEstadoMovimientoDto": {
+        "type": "object",
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": [
+              "IGNORADO",
+              "PENDIENTE"
+            ],
+            "description": "IGNORADO para ignorar, PENDIENTE para des-ignorar. CONCILIADO no se fija a mano (REQ-CB-17)."
+          }
+        },
+        "required": [
+          "estado"
+        ]
+      },
+      "MovimientoBancarioResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cuentaBancariaId": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-10"
+          },
+          "hora": {
+            "type": "string",
+            "nullable": true
+          },
+          "monto": {
+            "type": "string",
+            "example": "1500.00"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DEBITO",
+              "CREDITO"
+            ]
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "referencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "saldo": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONCILIADO",
+              "IGNORADO"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "cuentaBancariaId",
+          "fecha",
+          "hora",
+          "monto",
+          "tipo",
+          "moneda",
+          "descripcion",
+          "referencia",
+          "saldo",
+          "estado"
         ]
       },
       "MePermissionsResponseDto": {

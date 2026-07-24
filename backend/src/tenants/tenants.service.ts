@@ -1,6 +1,8 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import type { VerticalPack } from '@prisma/client';
 
 import { RedisService } from '../cache/redis.service';
+import { PackService } from '@/packs/pack.service';
 import {
   GESTIONES_READER_PORT,
   GestionesReaderPort,
@@ -60,6 +62,7 @@ export class TenantsService {
     @Inject(TIPO_REGISTRO_SEEDER_PORT)
     private readonly tipoRegistroSeeder: TipoRegistroSeederPort,
     private readonly prisma: PrismaService,
+    private readonly packs: PackService,
   ) {}
 
   /**
@@ -80,6 +83,21 @@ export class TenantsService {
     }
   }
 
+  /**
+   * Mapea el módulo elegido al vertical de packs (eje 2), o `null` para OTROS
+   * (sin vertical → sin auto-otorgamiento). Ver design conciliacion-bancaria §7.3.
+   */
+  private verticalParaModulo(modulo: ModuloOrganizacion): VerticalPack | null {
+    switch (modulo) {
+      case ModuloOrganizacion.CONTABILIDAD:
+        return 'CONTABILIDAD';
+      case ModuloOrganizacion.GRANJA:
+        return 'GRANJA';
+      case ModuloOrganizacion.OTROS:
+        return null;
+    }
+  }
+
   async create(dto: CreateTenantDto, ownerId: string) {
     const slug = TenantSlug.fromName(dto.name).toString();
     if (await this.repo.existsBySlug(slug)) {
@@ -87,33 +105,49 @@ export class TenantsService {
     }
 
     const flags = this.flagsParaModulo(dto.modulo);
+    const vertical = this.verticalParaModulo(dto.modulo);
 
-    return this.prisma.$transaction(async (tx) => {
-      const org = await this.repo.create(
+    const org = await this.prisma.$transaction(async (tx) => {
+      const created = await this.repo.create(
         { slug, name: dto.name, ownerUserId: ownerId, ...flags },
         tx,
       );
 
       switch (dto.modulo) {
         case ModuloOrganizacion.CONTABILIDAD:
-          await this.planCuentasSeeder.seedDefaultsForTenant(org.id, tx);
+          await this.planCuentasSeeder.seedDefaultsForTenant(created.id, tx);
           // Los tipos de documento físico respaldan comprobantes contables, así
           // que se siembran junto al plan de cuentas. Dentro de la misma TX: el
           // tenant nace con los 8 tipos universales o no nace (design §D3, §7.2).
-          await this.tiposDocSeeder.seedDefaultsForTenant(org.id, tx);
+          await this.tiposDocSeeder.seedDefaultsForTenant(created.id, tx);
           break;
         case ModuloOrganizacion.GRANJA:
           // Siembra los 12 tipos de registro fábrica dentro de la misma TX de
           // creación: la org GRANJA nace con sus tipos o no nace (design.md §8).
-          await this.tipoRegistroSeeder.seedDefaultsForTenant(org.id, tx);
+          await this.tipoRegistroSeeder.seedDefaultsForTenant(created.id, tx);
           break;
         case ModuloOrganizacion.OTROS:
           // no-op: sin módulo específico, sin seeding adicional
           break;
       }
 
-      return org;
+      // Auto-otorgamiento de packs (design conciliacion-bancaria §7.2/§7.3):
+      // dentro de la MISMA TX, recibiendo el vertical como parámetro — leerlo
+      // con OrgVerticalReaderPort acá adentro vería la fila de `organizations`
+      // sin commitear en otra conexión y devolvería null (design §7.1).
+      if (vertical !== null) {
+        await this.packs.otorgarPacksPorDefecto(created.id, vertical, ownerId, tx);
+      }
+
+      return created;
     });
+
+    // Invalidación del cache `org-packs:<id>` DESPUÉS del commit — un efecto
+    // sobre Redis no puede vivir dentro de una TX que puede hacer rollback
+    // (design §7.3).
+    await this.packs.invalidarCacheDeOrg(org.id);
+
+    return org;
   }
 
   async findById(id: string) {

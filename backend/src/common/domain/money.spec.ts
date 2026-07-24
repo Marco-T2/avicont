@@ -42,6 +42,11 @@ describe('Money.of', () => {
   it('rechaza string inválido', () => {
     expect(() => Money.of('abc')).toThrow(/inválido/);
   });
+
+  it('rechaza un tipo que no es string/number/Decimal/Money', () => {
+    const noEsDinero = { no: 'es dinero' } as unknown as string;
+    expect(() => Money.of(noEsDinero)).toThrow(/tipo inválido/);
+  });
 });
 
 describe('Money aritmética', () => {
@@ -133,6 +138,62 @@ describe('Money constantes', () => {
   });
 
   it('TOLERANCIA_BOB es 0.01', () => {
+    expect(Money.TOLERANCIA_BOB.toBob()).toBe('0.01');
+  });
+});
+
+// conciliacion-bancaria design §8.0 (CRITICAL-3): comparación currency-neutral
+// con tolerancia. NO reemplaza balanceadoEnBobCon/TOLERANCIA_BOB (BOB-específicos
+// del invariante de partida doble) — es un método NUEVO y aditivo. El caller
+// garantiza misma moneda (precondición documentada en el JSDoc del método).
+describe('Money.igualaConTolerancia (currency-neutral, §8.0)', () => {
+  it('diferencia 0 → true', () => {
+    expect(Money.of('1000.00').igualaConTolerancia(Money.of('1000.00'))).toBe(true);
+  });
+
+  it('diferencia dentro de la tolerancia default (0.01) → true', () => {
+    expect(Money.of('100.00').igualaConTolerancia(Money.of('100.01'))).toBe(true);
+    expect(Money.of('100.01').igualaConTolerancia(Money.of('100.00'))).toBe(true);
+  });
+
+  it('borde exacto 0.01 → true', () => {
+    expect(Money.of('50.00').igualaConTolerancia(Money.of('50.01'))).toBe(true);
+  });
+
+  it('fuera de tolerancia (0.02) → false', () => {
+    expect(Money.of('100.00').igualaConTolerancia(Money.of('100.02'))).toBe(false);
+  });
+
+  it('es simétrico: a.igualaConTolerancia(b) === b.igualaConTolerancia(a)', () => {
+    const a = Money.of('100.00');
+    const b = Money.of('100.015');
+    expect(a.igualaConTolerancia(b)).toBe(b.igualaConTolerancia(a));
+  });
+
+  it('funciona igual para USD que para BOB (currency-neutral — el caller garantiza misma moneda)', () => {
+    expect(Money.of('4.65').igualaConTolerancia(Money.of('4.66'))).toBe(true); // USD-shaped
+    expect(Money.of('1250.50').igualaConTolerancia(Money.of('1250.51'))).toBe(true); // BOB-shaped
+  });
+
+  it('caso real BCP: precisión de float residual 4.6500000000000004 vs 4.65 → true', () => {
+    // El parser de conciliación NUNCA usa Number() para dinero (§8.1), pero
+    // el VO debe tolerar el caso igual si algo upstream introdujera el residuo.
+    expect(Money.of('4.6500000000000004').igualaConTolerancia(Money.of('4.65'))).toBe(true);
+  });
+
+  it('acepta tolerancia custom explícita', () => {
+    expect(Money.of('100.00').igualaConTolerancia(Money.of('100.10'), Money.of('0.10'))).toBe(true);
+    expect(Money.of('100.00').igualaConTolerancia(Money.of('100.11'), Money.of('0.10'))).toBe(
+      false,
+    );
+  });
+
+  it('descompensación grande → false', () => {
+    expect(Money.of('1000').igualaConTolerancia(Money.of('500'))).toBe(false);
+  });
+
+  it('no toca balanceadoEnBobCon ni TOLERANCIA_BOB — ambos siguen intactos', () => {
+    expect(Money.of('1000.00').balanceadoEnBobCon('1000.01')).toBe(true);
     expect(Money.TOLERANCIA_BOB.toBob()).toBe('0.01');
   });
 });

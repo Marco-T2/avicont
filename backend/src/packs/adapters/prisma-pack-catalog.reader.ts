@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Pack as PrismaPack } from '@prisma/client';
+import type { Pack as PrismaPack, VerticalPack } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -33,6 +33,14 @@ export class PrismaPackCatalogReader extends PackCatalogReaderPort {
   override async findById(id: string): Promise<Pack | null> {
     const pack = await this.prisma.pack.findUnique({ where: { id } });
     return pack === null ? null : toPack(pack);
+  }
+
+  override async listarOtorgadosPorDefecto(vertical: VerticalPack): Promise<Pack[]> {
+    const packs = await this.prisma.pack.findMany({
+      where: { verticalAplicable: vertical, otorgadoPorDefecto: true, activo: true },
+      orderBy: { clave: 'asc' },
+    });
+    return packs.map(toPack);
   }
 }
 

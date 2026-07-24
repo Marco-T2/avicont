@@ -1,0 +1,79 @@
+// Puerto del repositorio de `ImportacionExtracto` (REQ-CB-05/06/13). Multi-tenancy
+// defense in depth (CLAUDE.md §4.2): toda query filtra por tenantId.
+
+import type {
+  EstadoVerificacionExtracto,
+  ImportacionExtracto,
+  PerfilExtracto,
+  Prisma,
+} from '@prisma/client';
+
+export const IMPORTACION_EXTRACTO_REPOSITORY_PORT = Symbol('IMPORTACION_EXTRACTO_REPOSITORY_PORT');
+
+export interface ImportacionExtractoCreateData {
+  cuentaBancariaId: string;
+  nombreArchivo: string;
+  sha256Archivo: string;
+  tamanioBytes: number;
+  perfilExtracto: PerfilExtracto;
+  fechaDesde: Date;
+  fechaHasta: Date;
+  coberturaDeclarada: boolean;
+  saldoInicial: Prisma.Decimal | null;
+  saldoFinal: Prisma.Decimal | null;
+  estadoVerificacion: EstadoVerificacionExtracto;
+  diferencia: Prisma.Decimal | null;
+  filasLeidas: number;
+  movimientosNuevos: number;
+  movimientosDuplicados: number;
+  importadoPorUserId: string;
+}
+
+export interface ListarImportacionesPagination {
+  page: number;
+  limit: number;
+}
+
+export abstract class ImportacionExtractoRepositoryPort {
+  abstract crear(
+    tenantId: string,
+    data: ImportacionExtractoCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ImportacionExtracto>;
+
+  /** REQ-CB-13: null si no existe o pertenece a otro tenant. */
+  abstract findById(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ImportacionExtracto | null>;
+
+  /** Lista las importaciones de una cuenta bancaria, orden createdAt DESC. */
+  abstract listarPorCuentaBancaria(
+    tenantId: string,
+    cuentaBancariaId: string,
+    pagination: ListarImportacionesPagination,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ items: ImportacionExtracto[]; total: number }>;
+
+  /**
+   * Actualiza los contadores finales de una importación (design §10): se
+   * crea la fila ANTES de insertar los movimientos (FK `importacionId`
+   * requerido) con contadores en 0, y se corrigen tras conocer el resultado
+   * real de `createMany({ skipDuplicates: true })`. Misma `$transaction`.
+   */
+  abstract actualizarContadores(
+    tenantId: string,
+    id: string,
+    contadores: { movimientosNuevos: number; movimientosDuplicados: number },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ImportacionExtracto>;
+
+  /** design §10 — "ya existe para la cuenta → aviso, NO error". */
+  abstract existePorSha256(
+    tenantId: string,
+    cuentaBancariaId: string,
+    sha256Archivo: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<boolean>;
+}

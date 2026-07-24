@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { OrganizationStatus } from '@prisma/client';
+import type { OrganizationStatus, VerticalPack } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 import { RedisService } from '@/cache/redis.service';
@@ -119,6 +119,7 @@ export class PlatformAdminService {
     }
 
     const flags = this.flagsParaModulo(dto.modulo);
+    const vertical = this.verticalParaModulo(dto.modulo);
 
     const org = await this.prisma.$transaction(async (tx) => {
       const created = await this.orgsWriter.create(
@@ -139,8 +140,22 @@ export class PlatformAdminService {
           break;
       }
 
+      // Auto-otorgamiento de packs (design conciliacion-bancaria §7.2/§7.3):
+      // dentro de la MISMA TX, recibiendo el vertical como parámetro — leerlo
+      // con OrgVerticalReaderPort acá adentro vería la fila de `organizations`
+      // sin commitear en otra conexión y devolvería null (design §7.1).
+      if (vertical !== null) {
+        await this.packs.otorgarPacksPorDefecto(created.id, vertical, owner.id, tx);
+      }
+
       return created;
     });
+
+    // Invalidación del cache `org-packs:<id>` DESPUÉS del commit — un efecto
+    // sobre Redis no puede vivir dentro de una TX que puede hacer rollback
+    // (design §7.3). Redundante hoy (el id acababa de generarse), pero evita
+    // que copiar el patrón para una org existente herede un bug silencioso.
+    await this.packs.invalidarCacheDeOrg(org.id);
 
     this.logger.log(`Org '${org.name}' (${org.id}) creada por super-admin. OWNER: ${email}`);
 
@@ -367,6 +382,23 @@ export class PlatformAdminService {
         return { contabilidadEnabled: false, granjaEnabled: true };
       case ModuloOrganizacion.OTROS:
         return { contabilidadEnabled: false, granjaEnabled: false };
+    }
+  }
+
+  /**
+   * Mapea el módulo elegido al vertical de packs (eje 2), o `null` para OTROS
+   * (sin vertical → sin auto-otorgamiento). Replica la lógica de
+   * TenantsService.verticalParaModulo para desacople de módulos (mismo
+   * criterio que flagsParaModulo). Ver design conciliacion-bancaria §7.3.
+   */
+  private verticalParaModulo(modulo: ModuloOrganizacion): VerticalPack | null {
+    switch (modulo) {
+      case ModuloOrganizacion.CONTABILIDAD:
+        return 'CONTABILIDAD';
+      case ModuloOrganizacion.GRANJA:
+        return 'GRANJA';
+      case ModuloOrganizacion.OTROS:
+        return null;
     }
   }
 }

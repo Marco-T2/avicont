@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { Prisma, VerticalPack } from '@prisma/client';
 
 import { RedisService } from '@/cache/redis.service';
 
@@ -45,6 +46,17 @@ export class PackService {
   /** Clave del cache Redis de packs activos de la org (espejo del PackEnabledGuard). */
   private cacheKey(organizationId: string): string {
     return `org-packs:${organizationId}`;
+  }
+
+  /**
+   * Invalida el cache `org-packs:<id>` de la org. Método público reusable —
+   * antes solo existía como `redis.del(this.cacheKey(...))` inline en cada
+   * mutación. Lo invoca `otorgarPacksPorDefecto` (indirectamente, vía el
+   * caller: ver JSDoc de ese método) DESPUÉS del commit de la TX de provisión
+   * (design conciliacion-bancaria §7.2/§7.3).
+   */
+  async invalidarCacheDeOrg(organizationId: string): Promise<void> {
+    await this.redis.del(this.cacheKey(organizationId));
   }
 
   /** Lista el catálogo de packs activos (vendibles). */
@@ -170,5 +182,38 @@ export class PackService {
     const updated = await this.repo.setActivo(organizationId, packId, activo);
     await this.redis.del(this.cacheKey(organizationId));
     return updated;
+  }
+
+  /**
+   * Otorga (entitlement + activación) los packs marcados `otorgadoPorDefecto`
+   * del vertical dado, DENTRO de la transacción de provisión de la org
+   * (design conciliacion-bancaria §7.2).
+   *
+   * Recibe `vertical` como PARÁMETRO en vez de leerlo con
+   * `OrgVerticalReaderPort`: dentro de la TX la fila de `organizations`
+   * todavía no está commiteada y el reader usa su propia conexión → devolvería
+   * `null` (bug documentado — design §7.1). El caller ya lo conoce: sale de
+   * `dto.modulo`.
+   *
+   * NO invalida el cache Redis: un efecto externo no puede vivir dentro de
+   * una TX que puede hacer rollback. El caller invalida DESPUÉS del commit
+   * vía `invalidarCacheDeOrg`.
+   *
+   * @returns claves de los packs otorgados (para log/telemetría del caller)
+   */
+  async otorgarPacksPorDefecto(
+    organizationId: string,
+    vertical: VerticalPack,
+    habilitadoPorUserId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<string[]> {
+    const packs = await this.catalog.listarOtorgadosPorDefecto(vertical);
+    for (const pack of packs) {
+      await this.repo.habilitar(organizationId, pack.id, habilitadoPorUserId, {
+        activo: true,
+        tx,
+      });
+    }
+    return packs.map((p) => p.clave);
   }
 }

@@ -1,0 +1,185 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { LineaConciliacion } from '@/types/api';
+
+import { LineasPanel } from './lineas-panel';
+
+function linea(overrides: Partial<LineaConciliacion> = {}): LineaConciliacion {
+  return {
+    comprobanteId: 'comp-1',
+    orden: 1,
+    fecha: '2026-06-10',
+    numeroComprobante: 'D2606-000001',
+    glosa: 'Depósito de cliente',
+    glosaLinea: null,
+    monto: '1500.00',
+    montoBob: '1500.00',
+    tipo: 'DEBITO',
+    moneda: 'BOB',
+    estadoEfectivo: 'EN_TRANSITO',
+    ...overrides,
+  };
+}
+
+interface Overrides {
+  lineas?: LineaConciliacion[];
+  modoConsulta?: boolean;
+  seleccionadaClave?: string | null;
+  onSeleccionar?: (comprobanteId: string, orden: number) => void;
+}
+
+function renderPanel(overrides: Overrides = {}) {
+  const props = {
+    lineas: [linea()],
+    isLoading: false,
+    modoConsulta: false,
+    seleccionadaClave: null,
+    onSeleccionar: vi.fn(),
+    ...overrides,
+  };
+  const utils = render(<LineasPanel {...props} />);
+  return { ...props, ...utils };
+}
+
+/** Glosa larga: mismo caso que la descripción del extracto (bug de layout 5B). */
+const GLOSA_LARGA =
+  'Cobro de factura 77 al cliente TARQUI ALEJO ANTONIO por venta de pollo del lote 0506 — transferencia QR';
+
+describe('LineasPanel — líneas contables de la cuenta banco', () => {
+  it('muestra fecha, número de comprobante, glosa y monto', () => {
+    renderPanel({
+      lineas: [
+        linea({
+          fecha: '2026-06-12',
+          numeroComprobante: 'D2606-000042',
+          glosa: 'Cobro factura 77',
+          monto: '2300.50',
+        }),
+      ],
+    });
+
+    expect(screen.getByText('12/06/2026')).toBeInTheDocument();
+    expect(screen.getByText('D2606-000042')).toBeInTheDocument();
+    expect(screen.getByText('Cobro factura 77')).toBeInTheDocument();
+    expect(screen.getByText('2.300,50')).toBeInTheDocument();
+  });
+
+  it('muestra el lado con el vocabulario contable (Debe / Haber)', () => {
+    renderPanel({ lineas: [linea({ tipo: 'CREDITO' })] });
+
+    expect(screen.getByText('Haber')).toBeInTheDocument();
+  });
+
+  it('una línea sin match muestra "En tránsito" (REQ-CB-11, estado DERIVADO)', () => {
+    renderPanel({ lineas: [linea({ estadoEfectivo: 'EN_TRANSITO' })] });
+
+    expect(screen.getByText('En tránsito')).toBeInTheDocument();
+  });
+
+  it('una línea con match válido muestra "Conciliado"', () => {
+    renderPanel({ lineas: [linea({ estadoEfectivo: 'CONCILIADO' })] });
+
+    expect(screen.getByText('Conciliado')).toBeInTheDocument();
+  });
+
+  it('sin líneas muestra un empty state', () => {
+    renderPanel({ lineas: [] });
+
+    expect(screen.getByText(/no hay líneas contables/i)).toBeInTheDocument();
+  });
+
+  it('un comprobante sin número (borrador nunca llega acá) cae a un guion', () => {
+    renderPanel({ lineas: [linea({ numeroComprobante: null })] });
+
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('LineasPanel — layout compacto (sin scroll horizontal)', () => {
+  it('una glosa larga se recorta y el texto completo queda accesible', () => {
+    renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA })] });
+
+    const glosa = screen.getByText(GLOSA_LARGA);
+    expect(glosa.className).toContain('line-clamp-2');
+    expect(glosa).toHaveAttribute('title', GLOSA_LARGA);
+  });
+
+  it('con una glosa larga el monto y el estado se siguen renderizando', () => {
+    renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA, monto: '4800.00' })] });
+
+    expect(screen.getByText('4.800,00')).toBeInTheDocument();
+    expect(screen.getByText('En tránsito')).toBeInTheDocument();
+  });
+
+  it('el panel no fuerza scroll horizontal: sin overflow-x ni ancho mínimo fijo', () => {
+    const { container } = renderPanel({ lineas: [linea({ glosa: GLOSA_LARGA })] });
+
+    expect(container.querySelector('[class*="overflow-x"]')).toBeNull();
+    expect(container.querySelector('[class*="min-w-["]')).toBeNull();
+  });
+
+  it('las filas son una lista, no una tabla de columnas fijas', () => {
+    renderPanel({
+      lineas: [linea({ orden: 1 }), linea({ orden: 2 })],
+    });
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+});
+
+describe('LineasPanel — selección para match manual', () => {
+  it('una línea EN_TRANSITO se puede seleccionar y emite su ancla completa', async () => {
+    const user = userEvent.setup();
+    const props = renderPanel({
+      lineas: [linea({ comprobanteId: 'comp-9', orden: 3, estadoEfectivo: 'EN_TRANSITO' })],
+    });
+
+    await user.click(screen.getByRole('radio', { name: /seleccionar línea/i }));
+
+    expect(props.onSeleccionar).toHaveBeenCalledWith('comp-9', 3);
+  });
+
+  it('la línea seleccionada aparece marcada', () => {
+    renderPanel({
+      lineas: [linea({ comprobanteId: 'comp-9', orden: 3 })],
+      seleccionadaClave: 'comp-9#3',
+    });
+
+    expect(screen.getByRole('radio', { name: /seleccionar línea/i })).toBeChecked();
+  });
+
+  it('una línea ya CONCILIADA no se puede seleccionar', () => {
+    renderPanel({ lineas: [linea({ estadoEfectivo: 'CONCILIADO' })] });
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('dos líneas del mismo comprobante se renderizan ambas (clave por ancla, no por comprobante)', () => {
+    renderPanel({
+      lineas: [
+        linea({ comprobanteId: 'comp-1', orden: 1, glosaLinea: 'Primera' }),
+        linea({ comprobanteId: 'comp-1', orden: 2, glosaLinea: 'Segunda' }),
+      ],
+    });
+
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+});
+
+describe('LineasPanel — modo consulta (REQ-CB-14 escenario 1)', () => {
+  it('en modo consulta no se puede seleccionar nada', () => {
+    renderPanel({ modoConsulta: true });
+
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('en modo consulta los datos se siguen viendo', () => {
+    renderPanel({ modoConsulta: true, lineas: [linea({ glosa: 'Cobro factura 77' })] });
+
+    expect(screen.getByText('Cobro factura 77')).toBeInTheDocument();
+    expect(screen.getByText('En tránsito')).toBeInTheDocument();
+  });
+});

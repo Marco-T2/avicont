@@ -1912,6 +1912,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cuentas-bancarias/perfiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catálogo de perfiles de extracto soportados (banco/formato, instructivo, checksum). Única fuente de verdad para la UI. */
+        get: operations["CuentasBancariasController_listarPerfiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuentas-bancarias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista las cuentas bancarias del tenant activo. */
+        get: operations["CuentasBancariasController_listar"];
+        put?: never;
+        /** Vincula una cuenta del plan (elegida por el usuario) a una cuenta bancaria (REQ-CB-01). */
+        post: operations["CuentasBancariasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cuentas-bancarias/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtiene una cuenta bancaria por id. */
+        get: operations["CuentasBancariasController_obtener"];
+        put?: never;
+        post?: never;
+        /** Elimina una cuenta bancaria. Falla con 409 si tiene movimientos o importaciones asociadas. */
+        delete: operations["CuentasBancariasController_eliminar"];
+        options?: never;
+        head?: never;
+        /** PATCH de la cuenta bancaria. cuentaId y perfilExtracto son inmutables — no se exponen acá. */
+        patch: operations["CuentasBancariasController_actualizar"];
+        trace?: never;
+    };
+    "/api/cuentas-bancarias/{id}/importaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista las importaciones de una cuenta bancaria, más reciente primero. */
+        get: operations["CuentasBancariasController_listarImportaciones"];
+        put?: never;
+        /** Importa un extracto bancario (design §10). Ver REQ-CB-16 para el flujo de confirmación de número de cuenta. */
+        post: operations["CuentasBancariasController_importarExtracto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Workspace de conciliación: movimientos bancarios + líneas contables de la cuenta banco en el rango, con estados DERIVADOS y sugerencias ranqueadas.
+         * @description Verifica el ancla de cada match en memoria contra su snapshot (REQ-CB-10). Es LECTURA PURA: nunca escribe, ni siquiera para "curar" un vínculo roto.
+         */
+        get: operations["ConciliacionController_obtenerWorkspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirma un par movimiento ↔ línea contable creando el MatchConciliacion (REQ-CB-17). El sistema NUNCA auto-confirma. */
+        post: operations["ConciliacionController_crearMatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion/matches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deshace un match: lo borra y devuelve el movimiento a PENDIENTE. NUNCA toca el comprobante ni sus líneas (REQ-CB-15). */
+        delete: operations["ConciliacionController_borrarMatch"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/movimientos-bancarios/{id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Ignora (IGNORADO) o des-ignora (PENDIENTE) un movimiento bancario. Nunca borra el movimiento ni toca sus matches (REQ-CB-18). */
+        patch: operations["MovimientosBancariosController_cambiarEstado"];
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3520,6 +3663,291 @@ export interface components {
              */
             advertencias: string[];
             cuentasEfectivoDetectadasPorHeuristica: components["schemas"]["CuentaEfectivoHeuristicaDto"][];
+        };
+        PerfilExtractoResponseDto: {
+            /** @enum {string} */
+            perfil: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            banco: string;
+            formato: string;
+            extensiones: string[];
+            mimeTypes: string[];
+            estrategiaChecksum: string;
+            soportaContraparte: boolean;
+            soportaHora: boolean;
+            exponeNumeroCuenta: boolean;
+            instruccionesDescarga: string;
+            advertencia?: string;
+        };
+        CreateCuentaBancariaDto: {
+            /**
+             * Format: uuid
+             * @description Cuenta del plan de cuentas ELEGIDA por el usuario (esDetalle=true, activa=true). No se adivina.
+             */
+            cuentaId: string;
+            /** @example Cuenta corriente BancoSol */
+            alias: string;
+            /**
+             * @description Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación.
+             * @enum {string}
+             */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            /**
+             * @description Puede quedar vacío al crear — se captura y confirma en la primera importación (REQ-CB-16).
+             * @example 1191959-000-001
+             */
+            numeroCuenta?: string;
+            /**
+             * @description Un extracto tiene una única moneda por definición. Validada contra la cuenta del plan (REQ-CB-02).
+             * @enum {string}
+             */
+            moneda: "BOB" | "USD";
+        };
+        CuentaBancariaResponseDto: {
+            id: string;
+            organizationId: string;
+            cuentaId: string;
+            alias: string;
+            /** @enum {string} */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            numeroCuenta: string | null;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            activa: boolean;
+            createdAt: string;
+            updatedAt: string;
+        };
+        ListarCuentasBancariasResponseDto: {
+            items: components["schemas"]["CuentaBancariaResponseDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        UpdateCuentaBancariaDto: {
+            alias?: string;
+            /**
+             * @description null limpia el número capturado; se vuelve a capturar en la próxima importación.
+             * @example 1191959-000-001
+             */
+            numeroCuenta?: Record<string, never> | null;
+            /**
+             * @description Re-valida REQ-CB-02 contra la cuenta del plan ya vinculada.
+             * @enum {string}
+             */
+            moneda?: "BOB" | "USD";
+            /** @description Activar o desactivar la cuenta bancaria sin eliminarla. */
+            activa?: boolean;
+        };
+        AdvertenciaImportacionDto: {
+            codigo: string;
+            mensaje: string;
+        };
+        ImportarExtractoResponseDto: {
+            requiereConfirmacionCuenta: boolean;
+            /** @description Solo si requiereConfirmacionCuenta=true (REQ-CB-16). */
+            numeroDetectado?: string;
+            importacionId?: string;
+            movimientosNuevos?: number;
+            movimientosDuplicados?: number;
+            filasLeidas?: number;
+            /** @enum {string} */
+            estadoVerificacion?: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
+            diferencia?: string | null;
+            advertencias?: components["schemas"]["AdvertenciaImportacionDto"][];
+        };
+        ImportacionExtractoListItemDto: {
+            id: string;
+            nombreArchivo: string;
+            sha256Archivo: string;
+            tamanioBytes: number;
+            /** @enum {string} */
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX";
+            fechaDesde: string;
+            fechaHasta: string;
+            coberturaDeclarada: boolean;
+            saldoInicial: string | null;
+            saldoFinal: string | null;
+            /** @enum {string} */
+            estadoVerificacion: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
+            diferencia: string | null;
+            filasLeidas: number;
+            movimientosNuevos: number;
+            movimientosDuplicados: number;
+            importadoPorUserId: string;
+            createdAt: string;
+        };
+        ListarImportacionesResponseDto: {
+            items: components["schemas"]["ImportacionExtractoListItemDto"][];
+            total: number;
+            page: number;
+            pageSize: number;
+        };
+        CuentaBancariaWorkspaceDto: {
+            id: string;
+            alias: string;
+            cuentaId: string;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            numeroCuenta: string | null;
+        };
+        VinculoConciliacionDto: {
+            matchId: string;
+            comprobanteId: string;
+            orden: number;
+            /**
+             * @description null ⇒ el vínculo es válido. Cualquier otro valor ⇒ roto, con el motivo exacto.
+             * @enum {string|null}
+             */
+            roto: "LINEA_INEXISTENTE" | "COMPROBANTE_ANULADO" | "CUENTA_CAMBIADA" | "MONTO_CAMBIADO" | "LADO_CAMBIADO" | "MONEDA_CAMBIADA" | "FECHA_CAMBIADA" | null;
+        };
+        MovimientoConciliacionDto: {
+            id: string;
+            /**
+             * @description Calendario puro, sin UTC (§4.6).
+             * @example 2026-06-10
+             */
+            fecha: string;
+            hora: string | null;
+            /**
+             * @description Monto como string (§4.5), siempre positivo.
+             * @example 1500.00
+             */
+            monto: string;
+            /**
+             * @description Perspectiva del BANCO.
+             * @enum {string}
+             */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            referencia: string | null;
+            saldo: string | null;
+            /**
+             * @description Columna PERSISTIDA (proyección cacheada). NO es lo que se muestra.
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            /**
+             * @description DERIVADO en cada lectura (REQ-CB-10/11). Esto es lo que se muestra.
+             * @enum {string}
+             */
+            estadoEfectivo: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            vinculo: components["schemas"]["VinculoConciliacionDto"] | null;
+        };
+        LineaConciliacionDto: {
+            comprobanteId: string;
+            orden: number;
+            /** @example 2026-06-10 */
+            fecha: string;
+            numeroComprobante: string | null;
+            glosa: string;
+            glosaLinea: string | null;
+            /**
+             * @description Moneda ORIGINAL, siempre positivo.
+             * @example 1500.00
+             */
+            monto: string;
+            /**
+             * @description Equivalente en BOB, solo para mostrar.
+             * @example 1500.00
+             */
+            montoBob: string;
+            /**
+             * @description Perspectiva de la EMPRESA.
+             * @enum {string}
+             */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            /**
+             * @description EN_TRANSITO es DERIVADO — no existe fila persistida con ese estado (REQ-CB-11).
+             * @enum {string}
+             */
+            estadoEfectivo: "EN_TRANSITO" | "CONCILIADO";
+        };
+        SugerenciaConciliacionDto: {
+            movimientoId: string;
+            comprobanteId: string;
+            orden: number;
+            /** @enum {string} */
+            confianza: "ALTA" | "MEDIA" | "BAJA";
+            diferenciaDias: number;
+        };
+        ResumenConciliacionDto: {
+            movimientosPendientes: number;
+            movimientosConciliados: number;
+            movimientosIgnorados: number;
+            lineasEnTransito: number;
+        };
+        WorkspaceConciliacionResponseDto: {
+            cuentaBancaria: components["schemas"]["CuentaBancariaWorkspaceDto"];
+            /** @example 2026-06-01 */
+            desde: string;
+            /** @example 2026-06-30 */
+            hasta: string;
+            movimientos: components["schemas"]["MovimientoConciliacionDto"][];
+            lineas: components["schemas"]["LineaConciliacionDto"][];
+            sugerencias: components["schemas"]["SugerenciaConciliacionDto"][];
+            resumen: components["schemas"]["ResumenConciliacionDto"];
+        };
+        CrearMatchDto: {
+            /** Format: uuid */
+            movimientoBancarioId: string;
+            /**
+             * Format: uuid
+             * @description Mitad del ancla (design §2.1).
+             */
+            comprobanteId: string;
+            /** @description Mitad del ancla: posición de la línea (1..N). */
+            orden: number;
+            /**
+             * @description Confianza de la sugerencia que el usuario confirmó. Se omite cuando el match es manual.
+             * @enum {string}
+             */
+            confianzaSugerida?: "ALTA" | "MEDIA" | "BAJA";
+        };
+        MatchConciliacionResponseDto: {
+            id: string;
+            movimientoBancarioId: string;
+            comprobanteId: string;
+            orden: number;
+            snapshotCuentaId: string;
+            /** @example 1500.00 */
+            snapshotMonto: string;
+            /** @enum {string} */
+            snapshotTipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            snapshotMoneda: "BOB" | "USD";
+            /** @example 2026-06-10 */
+            snapshotFecha: string;
+            confianzaSugerida: string | null;
+            conciliadoPorUserId: string;
+            createdAt: string;
+        };
+        ActualizarEstadoMovimientoDto: {
+            /**
+             * @description IGNORADO para ignorar, PENDIENTE para des-ignorar. CONCILIADO no se fija a mano (REQ-CB-17).
+             * @enum {string}
+             */
+            estado: "IGNORADO" | "PENDIENTE";
+        };
+        MovimientoBancarioResponseDto: {
+            id: string;
+            cuentaBancariaId: string;
+            /** @example 2026-06-10 */
+            fecha: string;
+            hora: string | null;
+            /** @example 1500.00 */
+            monto: string;
+            /** @enum {string} */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            referencia: string | null;
+            saldo: string | null;
+            /** @enum {string} */
+            estado: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -7174,6 +7602,283 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EstadoFlujoEfectivoResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_listarPerfiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerfilExtractoResponseDto"][];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtrar por estado activo. Omitir para listar solo activas. */
+                activa?: boolean;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarCuentasBancariasResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCuentaBancariaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_eliminar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CuentasBancariasController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCuentaBancariaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CuentaBancariaResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_listarImportaciones: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarImportacionesResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_importarExtracto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file?: string;
+                    /** @enum {string} */
+                    confirmarNumeroCuenta?: "true" | "false";
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportarExtractoResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_obtenerWorkspace: {
+        parameters: {
+            query: {
+                cuentaBancariaId: string;
+                /** @description Inclusive. */
+                desde: string;
+                /** @description Inclusive. */
+                hasta: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_crearMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearMatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_borrarMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MovimientosBancariosController_cambiarEstado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActualizarEstadoMovimientoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovimientoBancarioResponseDto"];
                 };
             };
         };

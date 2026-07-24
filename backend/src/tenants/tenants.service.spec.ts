@@ -47,6 +47,7 @@ import {
   type TipoRegistroSeederPort,
 } from '@/granja/ports/tipo-registro-seeder.port';
 import { PrismaService } from '@/common/prisma.service';
+import { PackService } from '@/packs/pack.service';
 
 /**
  * Unit tests de TenantsService. Cubren:
@@ -72,6 +73,7 @@ describe('TenantsService (unit)', () => {
   type PlanCuentasSeederMock = jest.Mocked<PlanCuentasSeederPort>;
   type TiposDocSeederMock = jest.Mocked<TipoDocumentoFisicoSeederPort>;
   type TipoRegistroSeederMock = jest.Mocked<TipoRegistroSeederPort>;
+  type PacksMock = { otorgarPacksPorDefecto: jest.Mock; invalidarCacheDeOrg: jest.Mock };
 
   let service: TenantsService;
   let repo: RepoMock;
@@ -82,6 +84,7 @@ describe('TenantsService (unit)', () => {
   let planCuentasSeeder: PlanCuentasSeederMock;
   let tiposDocSeeder: TiposDocSeederMock;
   let tipoRegistroSeeder: TipoRegistroSeederMock;
+  let packs: PacksMock;
 
   function mkOrg(overrides: Partial<Organization> = {}): Organization {
     return {
@@ -151,6 +154,11 @@ describe('TenantsService (unit)', () => {
       seedDefaultsForTenant: jest.fn().mockResolvedValue(undefined),
     } as unknown as TipoRegistroSeederMock;
 
+    packs = {
+      otorgarPacksPorDefecto: jest.fn().mockResolvedValue([]),
+      invalidarCacheDeOrg: jest.fn().mockResolvedValue(undefined),
+    };
+
     // $transaction ejecuta el callback con TX_MOCK y retorna lo que devuelve el callback
     prismaMock = {
       $transaction: jest
@@ -171,6 +179,7 @@ describe('TenantsService (unit)', () => {
         { provide: TIPO_DOCUMENTO_FISICO_SEEDER_PORT, useValue: tiposDocSeeder },
         { provide: TIPO_REGISTRO_SEEDER_PORT, useValue: tipoRegistroSeeder },
         { provide: PrismaService, useValue: prismaMock },
+        { provide: PackService, useValue: packs },
       ],
     }).compile();
 
@@ -364,6 +373,73 @@ describe('TenantsService (unit)', () => {
       await expect(
         service.create({ name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD }, OWNER_ID),
       ).rejects.toThrow('fallo de plantilla COMERCIAL');
+    });
+  });
+
+  // Auto-otorgamiento de packs (design conciliacion-bancaria §7.2/§7.3).
+  describe('create — auto-otorgamiento de packs', () => {
+    it('CONTABILIDAD: llama packs.otorgarPacksPorDefecto(org.id, "CONTABILIDAD", ownerId, TX_MOCK)', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(packs.otorgarPacksPorDefecto).toHaveBeenCalledWith(
+        TENANT_ID,
+        'CONTABILIDAD',
+        OWNER_ID,
+        TX_MOCK,
+      );
+    });
+
+    it('GRANJA: llama packs.otorgarPacksPorDefecto con vertical "GRANJA"', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: true });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Granja Feliz', modulo: ModuloOrganizacion.GRANJA }, OWNER_ID);
+
+      expect(packs.otorgarPacksPorDefecto).toHaveBeenCalledWith(
+        TENANT_ID,
+        'GRANJA',
+        OWNER_ID,
+        TX_MOCK,
+      );
+    });
+
+    it('OTROS: NO llama packs.otorgarPacksPorDefecto (sin vertical)', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+
+      await service.create({ name: 'Otros SA', modulo: ModuloOrganizacion.OTROS }, OWNER_ID);
+
+      expect(packs.otorgarPacksPorDefecto).not.toHaveBeenCalled();
+    });
+
+    it('invalida el cache DESPUÉS de que $transaction resuelve (post-commit)', async () => {
+      const created = mkOrgConMemberships({ contabilidadEnabled: true, granjaEnabled: false });
+      repo.create.mockResolvedValue(created);
+      const orden: string[] = [];
+      prismaMock.$transaction.mockImplementation(
+        async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
+          const result = await cb(TX_MOCK);
+          orden.push('transaction-resuelta');
+          return result;
+        },
+      );
+      packs.invalidarCacheDeOrg.mockImplementation(async () => {
+        orden.push('cache-invalidado');
+      });
+
+      await service.create(
+        { name: 'Acme Corp', modulo: ModuloOrganizacion.CONTABILIDAD },
+        OWNER_ID,
+      );
+
+      expect(packs.invalidarCacheDeOrg).toHaveBeenCalledWith(TENANT_ID);
+      expect(orden).toEqual(['transaction-resuelta', 'cache-invalidado']);
     });
   });
 

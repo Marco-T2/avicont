@@ -222,6 +222,13 @@ model Organization {
   // docs/disenos/packs-eje2.md §4.4.
   packEntitlements     OrgPackEntitlement[]
 
+  // Pack `contabilidad.conciliacion` (conciliación bancaria). Ver design
+  // conciliacion-bancaria §9.
+  cuentasBancarias      CuentaBancaria[]
+  movimientosBancarios  MovimientoBancario[]
+  importacionesExtracto ImportacionExtracto[]
+  matchesConciliacion   MatchConciliacion[]
+
   @@map("organizations")
 }
 
@@ -468,6 +475,10 @@ model Cuenta {
 
   // Líneas de comprobante que referencian esta cuenta (no se borra con movimientos)
   lineasComprobante LineaComprobante[]
+
+  // Pack `contabilidad.conciliacion`: la cuenta banco que el usuario vinculó
+  // a esta cuenta del plan (a lo sumo una, @@unique en CuentaBancaria).
+  cuentaBancaria CuentaBancaria?
 
   @@unique([organizationId, codigoInterno])
   @@index([organizationId, claseCuenta])
@@ -1235,6 +1246,9 @@ model Pack {
   tipo        TipoPack
   // Un pack retirado del catálogo no se vende (no afecta entitlements existentes).
   activo      Boolean      @default(true)
+  // Si true, se otorga (habilitado + ACTIVO) automáticamente al provisionar
+  // una org del vertical aplicable. Ver design conciliacion-bancaria §7.
+  otorgadoPorDefecto Boolean @default(false)
   createdAt   DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
 
@@ -1265,4 +1279,190 @@ model OrgPackEntitlement {
   @@unique([organizationId, packId])
   @@index([organizationId])
   @@map("org_pack_entitlements")
+}
+
+// ---------------------------------------------------------------------------
+// Pack `contabilidad.conciliacion` (conciliación bancaria). Ver design
+// openspec/changes/conciliacion-bancaria/design.md §9.
+// ---------------------------------------------------------------------------
+
+// Perfil de extracto: identifica banco + formato por construcción (un enum,
+// no dos campos `banco`+`formato` — R-3). v1 = 3 valores; UNION_TXT queda
+// como perfil futuro (design §4.3.2), no se agrega al enum hasta construirse.
+enum PerfilExtracto {
+  BANCOSOL_XLSX
+  ECONOMICO_XLSX
+  UNION_XLSX
+}
+
+// Perspectiva del BANCO (extracto): lo que el banco declara en cada fila.
+enum LadoBancario {
+  DEBITO
+  CREDITO
+}
+
+enum EstadoMovimientoBancario {
+  PENDIENTE
+  CONCILIADO
+  IGNORADO
+}
+
+enum EstadoVerificacionExtracto {
+  VERIFICADO
+  SIN_VERIFICAR
+  DESCUADRE
+}
+
+// Perspectiva de la EMPRESA (línea de comprobante). DISTINTO de LadoBancario:
+// un CREDITO bancario (entra plata) es un DEBITO contable en la cuenta de
+// activo (design §5.1) — confundirlos es el bug más fácil de cometer del
+// módulo, por eso son DOS enums, no uno reusado. `MatchConciliacion.snapshotTipo`
+// usa este tipo, nunca LadoBancario.
+enum LadoContable {
+  DEBITO
+  CREDITO
+}
+
+// Cuenta bancaria del usuario, vinculada 1:1 a una Cuenta del plan de
+// cuentas. Es el destino de las importaciones de extracto.
+model CuentaBancaria {
+  id             String   @id @default(uuid())
+  organizationId String
+  // @unique (no solo parte del compuesto de abajo): Prisma exige un campo
+  // FK unívoco del lado que define una relación 1:1 (Cuenta.cuentaBancaria
+  // es singular, no []). Documenta el mismo invariante que @@unique([organizationId, cuentaId]).
+  cuentaId       String   @unique // Cuenta del plan que ELIGE el usuario
+  alias          String
+  // R-3 / REQ-CB-01 / CRITICAL-5: `perfilExtracto` es la ÚNICA fuente de verdad
+  // del banco+formato. `banco` y `formato` los aporta el descriptor del adaptador
+  // (read-only). Acá NO se persiste `banco` como columna: era la mitad de una
+  // constraint de identidad (`@@unique([org, banco, numeroCuenta])`) y como texto
+  // libre "BancoSol" vs "Banco Sol" no protegía nada. Si se quiere un alias de UI
+  // editable, va en `alias`, que NO participa de ninguna unicidad.
+  perfilExtracto PerfilExtracto      // enum — un perfil identifica el banco por construcción
+  // NULLABLE (REQ-CB-16): se puede crear la cuenta sin el número y capturarlo en
+  // la primera importación, con confirmación explícita del usuario — elimina el
+  // error de transcripción manual. Mientras sea null NO se puede validar destino:
+  // el importador advierte, no rechaza.
+  numeroCuenta   String?
+  moneda         Moneda              // validada vs cuenta.permiteMultiMoneda/monedaFuncional
+  activa         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt      @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cuenta       Cuenta       @relation(fields: [cuentaId],       references: [id], onDelete: Restrict)
+  movimientos  MovimientoBancario[]
+  importaciones ImportacionExtracto[]
+
+  @@unique([organizationId, cuentaId])                  // 1 cuenta contable ↔ 1 cuenta bancaria
+  // CRITICAL-5: identidad por `perfilExtracto` (no `banco`). El perfil ya fija el
+  // banco por construcción, y es un enum → sin ambigüedad "BancoSol"/"Banco Sol".
+  // Postgres permite múltiples NULL en un UNIQUE ⇒ varias cuentas del mismo perfil
+  // coexisten sin número hasta que la primera importación lo capture. La unicidad
+  // aplica en cuanto el número existe (evita dos CuentaBancaria apuntando al mismo extracto).
+  @@unique([organizationId, perfilExtracto, numeroCuenta])
+  @@index([organizationId, activa])
+  @@map("cuentas_bancarias")
+}
+
+model MovimientoBancario {
+  id               String   @id @default(uuid())
+  organizationId   String
+  cuentaBancariaId String
+  importacionId    String                       // trazabilidad del origen
+
+  fecha            DateTime @db.Date            // §4.6 — calendario puro
+  hora             String?                      // 'HH:MM:SS'
+  monto            Decimal  @db.Decimal(18, 2)  // SIEMPRE positivo
+  tipo             LadoBancario
+  moneda           Moneda
+  descripcion            String
+  descripcionNormalizada String
+  referencia             String?
+  saldo            Decimal? @db.Decimal(18, 2)
+  contraparteNombre     String?
+  contraparteDocumento  String?
+  datosOriginales  Json                          // renglón crudo, celdas como STRING
+
+  ordinalDia       Int
+  hashDedup        String
+  estado           EstadoMovimientoBancario @default(PENDIENTE)  // proyección cacheada (design §2.3)
+
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt      @db.Timestamptz(3)
+
+  organization   Organization        @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
+  cuentaBancaria CuentaBancaria      @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+  importacion    ImportacionExtracto @relation(fields: [importacionId],    references: [id], onDelete: Restrict)
+  match          MatchConciliacion?
+
+  @@unique([cuentaBancariaId, hashDedup])       // idempotencia ESTRUCTURAL (decisión 7)
+  @@index([organizationId, cuentaBancariaId, fecha])
+  @@index([cuentaBancariaId, estado, fecha])
+  @@map("movimientos_bancarios")
+}
+
+model ImportacionExtracto {
+  id               String   @id @default(uuid())
+  organizationId   String
+  cuentaBancariaId String
+  nombreArchivo    String
+  sha256Archivo    String                       // R-2: SIN storageKey, SIN binario en v1
+  tamanioBytes     Int
+  perfilExtracto   PerfilExtracto
+  fechaDesde       DateTime @db.Date
+  fechaHasta       DateTime @db.Date
+  coberturaDeclarada Boolean                     // true ⇒ del encabezado; false ⇒ min/max de filas
+  saldoInicial     Decimal? @db.Decimal(18, 2)
+  saldoFinal       Decimal? @db.Decimal(18, 2)
+  estadoVerificacion EstadoVerificacionExtracto
+  diferencia       Decimal? @db.Decimal(18, 2)
+  filasLeidas            Int
+  movimientosNuevos      Int
+  movimientosDuplicados  Int
+  importadoPorUserId String
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  organization   Organization   @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
+  cuentaBancaria CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+  movimientos    MovimientoBancario[]
+
+  @@index([organizationId, cuentaBancariaId, createdAt])
+  @@index([cuentaBancariaId, sha256Archivo])    // "este archivo ya lo subiste" gratis
+  @@map("importaciones_extracto")
+}
+
+model MatchConciliacion {
+  id                  String @id @default(uuid())
+  organizationId      String
+  // @unique: Prisma exige un campo FK unívoco del lado que define una
+  // relación 1:1 (MovimientoBancario.match es singular, no []). v1: 1↔1
+  // (design §5.3). Documenta el mismo invariante que el compuesto de abajo.
+  movimientoBancarioId String @unique
+
+  // Ancla SIN FK — deliberado. Restrict bloquearía editar comprobantes (viola
+  // decisión 3); Cascade borraría el match dejando el movimiento CONCILIADO
+  // huérfano (viola decisión 4). La verificación contra el snapshot en CADA
+  // lectura es el mecanismo único que cubre los 3 casos. Ver design §2.
+  comprobanteId       String
+  orden               Int
+
+  snapshotCuentaId String
+  snapshotMonto    Decimal      @db.Decimal(18, 2)
+  snapshotTipo     LadoContable                       // lado CONTABLE de la línea (NO LadoBancario)
+  snapshotMoneda   Moneda
+  snapshotFecha    DateTime     @db.Date
+
+  confianzaSugerida  String?                          // 'ALTA'|'MEDIA'|'BAJA'|null (manual)
+  conciliadoPorUserId String
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization       @relation(fields: [organizationId],       references: [id], onDelete: Cascade)
+  movimiento   MovimientoBancario @relation(fields: [movimientoBancarioId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, movimientoBancarioId])    // v1: 1↔1 (design §5.3)
+  @@unique([organizationId, comprobanteId, orden])    // una línea se reclama una vez
+  @@index([organizationId, comprobanteId])
+  @@map("matches_conciliacion")
 }

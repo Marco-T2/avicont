@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import type { Pack } from '../domain/pack';
 
 export const ORG_PACK_REPOSITORY_PORT = Symbol('ORG_PACK_REPOSITORY_PORT');
@@ -33,11 +35,19 @@ export abstract class OrgPackRepositoryPort {
    * Crea la fila de entitlement con `activo = false` (habilitar ≠ activar).
    * La constraint `@@unique([organizationId, packId])` rechaza el doble
    * entitlement bajo concurrencia (defense in depth §4.8).
+   *
+   * `opts.activo` permite nacer YA activo (auto-otorgamiento, design
+   * conciliacion-bancaria §7.2 — el pack por defecto nace `activo: true`,
+   * a diferencia del camino manual del super-admin que sigue naciendo
+   * `activo: false`). `opts.tx` permite ejecutar dentro de una transacción
+   * externa (patrón `tx?` de `CierreComprobanteWriterPort`). Ambos opcionales
+   * y retrocompatibles: sin `opts`, comportamiento idéntico al actual.
    */
   abstract habilitar(
     organizationId: string,
     packId: string,
     habilitadoPorUserId: string,
+    opts?: { activo?: boolean; tx?: Prisma.TransactionClient },
   ): Promise<OrgPackEntitlementRow>;
 
   /** Borra la fila de entitlement de la org (revoca también la activación). */

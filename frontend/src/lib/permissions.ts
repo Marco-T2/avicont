@@ -66,6 +66,16 @@ export const PERMISSIONS = {
       create: 'contabilidad.tipos-documento-fisico.create',
       update: 'contabilidad.tipos-documento-fisico.update',
     },
+    // Pack `contabilidad.conciliacion` (conciliación bancaria). Primer pack
+    // con permisos propios en el catálogo — ver NavItem con `pack` en nav-items.ts.
+    conciliacion: {
+      read: 'contabilidad.conciliacion.read',
+      create: 'contabilidad.conciliacion.create',
+      update: 'contabilidad.conciliacion.update',
+      delete: 'contabilidad.conciliacion.delete',
+      importar: 'contabilidad.conciliacion.importar',
+      conciliar: 'contabilidad.conciliacion.conciliar',
+    },
   },
   granja: {
     dashboard: { read: 'granja.dashboard.read' },

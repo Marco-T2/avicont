@@ -19,6 +19,10 @@ import { OrgsWriterPort } from './ports/orgs-writer.port';
 import { PlatformAdminService } from './platform-admin.service';
 import { ActivityCursor } from './lib/activity-cursor';
 import { PlatformActivityCursorInvalidoError } from './domain/platform-errors';
+import { CreateOrgDto } from './dto/create-org.dto';
+import { ModuloOrganizacion } from '@/tenants/dto/create-tenant.dto';
+import type { Prisma } from '@prisma/client';
+import type { OrganizationConMemberships } from '@/tenants/ports/tenant.repository.port';
 
 function buildService(
   overrides: {
@@ -28,6 +32,8 @@ function buildService(
     activityReader?: Partial<PlatformActivityReaderPort>;
     clock?: Partial<ClockPort>;
     prisma?: Partial<PrismaService>;
+    usersReader?: Partial<UsersReaderPort>;
+    packs?: Partial<PackService>;
   } = {},
 ): {
   service: PlatformAdminService;
@@ -36,6 +42,8 @@ function buildService(
   statsReader: jest.Mocked<PlatformStatsReaderPort>;
   activityReader: jest.Mocked<PlatformActivityReaderPort>;
   clock: jest.Mocked<ClockPort>;
+  packs: jest.Mocked<PackService>;
+  usersReader: jest.Mocked<UsersReaderPort>;
 } {
   const orgsWriter = {
     create: jest.fn(),
@@ -70,7 +78,10 @@ function buildService(
   } as jest.Mocked<ClockPort>;
 
   const orgsReader = { listAll: jest.fn(), findById: jest.fn() } as jest.Mocked<OrgsReaderPort>;
-  const usersReader = { findMinimalByEmail: jest.fn() } as unknown as jest.Mocked<UsersReaderPort>;
+  const usersReader = {
+    findMinimalByEmail: jest.fn(),
+    ...overrides.usersReader,
+  } as unknown as jest.Mocked<UsersReaderPort>;
   const planCuentasSeeder = {
     seedDefaultsForTenant: jest.fn(),
   } as unknown as jest.Mocked<PlanCuentasSeederPort>;
@@ -87,6 +98,9 @@ function buildService(
     habilitarParaOrg: jest.fn(),
     revocar: jest.fn(),
     listarEntitlementsDeOrg: jest.fn().mockResolvedValue([]),
+    otorgarPacksPorDefecto: jest.fn().mockResolvedValue([]),
+    invalidarCacheDeOrg: jest.fn().mockResolvedValue(undefined),
+    ...overrides.packs,
   } as unknown as jest.Mocked<PackService>;
   const prismaInstance = {
     organization: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -113,8 +127,124 @@ function buildService(
 
   jest.spyOn(Logger.prototype, 'log').mockReturnValue(undefined);
 
-  return { service, orgsWriter, redis, statsReader, activityReader, clock };
+  return { service, orgsWriter, redis, statsReader, activityReader, clock, packs, usersReader };
 }
+
+// Auto-otorgamiento de packs (design conciliacion-bancaria §7.2/§7.3).
+describe('PlatformAdminService.crearOrgConOwner — auto-otorgamiento de packs', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  const TX_MOCK = { __isTxMock: true } as unknown as Prisma.TransactionClient;
+  const OWNER_ID = 'owner-uuid-1';
+  const ORG_ID = 'org-uuid-1';
+
+  function mkOrgConMemberships(
+    overrides: Partial<OrganizationConMemberships> = {},
+  ): OrganizationConMemberships {
+    return {
+      id: ORG_ID,
+      slug: 'org-nueva',
+      name: 'Org Nueva',
+      status: 'ACTIVE',
+      plan: 'FREE',
+      contabilidadEnabled: true,
+      granjaEnabled: false,
+      tipoEmpresaPrincipal: 'COMERCIAL',
+      tiposEmpresaActivos: ['COMERCIAL'],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      memberships: [{ id: 'm1', organizationId: ORG_ID, userId: OWNER_ID, systemRole: 'OWNER' }],
+      ...overrides,
+    } as unknown as OrganizationConMemberships;
+  }
+
+  function dto(modulo: ModuloOrganizacion): CreateOrgDto {
+    return { name: 'Org Nueva', modulo, ownerEmail: 'owner@test.com' } as CreateOrgDto;
+  }
+
+  it('CONTABILIDAD: llama packs.otorgarPacksPorDefecto(org.id, "CONTABILIDAD", owner.id, tx) dentro de la TX', async () => {
+    const { service, orgsWriter, packs, usersReader } = buildService({
+      usersReader: {
+        findMinimalByEmail: jest.fn().mockResolvedValue({ id: OWNER_ID, email: 'owner@test.com' }),
+      },
+      orgsWriter: { create: jest.fn().mockResolvedValue(mkOrgConMemberships()) },
+      prisma: {
+        $transaction: jest
+          .fn()
+          .mockImplementation(async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+            cb(TX_MOCK),
+          ),
+      },
+    });
+    void usersReader;
+    void orgsWriter;
+
+    await service.crearOrgConOwner(dto(ModuloOrganizacion.CONTABILIDAD));
+
+    expect(packs.otorgarPacksPorDefecto).toHaveBeenCalledWith(
+      ORG_ID,
+      'CONTABILIDAD',
+      OWNER_ID,
+      TX_MOCK,
+    );
+  });
+
+  it('OTROS: NO llama packs.otorgarPacksPorDefecto (sin vertical)', async () => {
+    const { service, packs } = buildService({
+      usersReader: {
+        findMinimalByEmail: jest.fn().mockResolvedValue({ id: OWNER_ID, email: 'owner@test.com' }),
+      },
+      orgsWriter: {
+        create: jest
+          .fn()
+          .mockResolvedValue(
+            mkOrgConMemberships({ contabilidadEnabled: false, granjaEnabled: false }),
+          ),
+      },
+      prisma: {
+        $transaction: jest
+          .fn()
+          .mockImplementation(async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+            cb(TX_MOCK),
+          ),
+      },
+    });
+
+    await service.crearOrgConOwner(dto(ModuloOrganizacion.OTROS));
+
+    expect(packs.otorgarPacksPorDefecto).not.toHaveBeenCalled();
+  });
+
+  it('invalida el cache DESPUÉS de que $transaction resuelve (post-commit)', async () => {
+    const orden: string[] = [];
+    const { service, packs } = buildService({
+      usersReader: {
+        findMinimalByEmail: jest.fn().mockResolvedValue({ id: OWNER_ID, email: 'owner@test.com' }),
+      },
+      orgsWriter: { create: jest.fn().mockResolvedValue(mkOrgConMemberships()) },
+      prisma: {
+        $transaction: jest
+          .fn()
+          .mockImplementation(async (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
+            const result = await cb(TX_MOCK);
+            orden.push('transaction-resuelta');
+            return result;
+          }),
+      },
+      packs: {
+        otorgarPacksPorDefecto: jest.fn().mockResolvedValue(['contabilidad.conciliacion']),
+        invalidarCacheDeOrg: jest.fn().mockImplementation(async () => {
+          orden.push('cache-invalidado');
+        }),
+      },
+    });
+
+    await service.crearOrgConOwner(dto(ModuloOrganizacion.CONTABILIDAD));
+
+    expect(packs.invalidarCacheDeOrg).toHaveBeenCalledWith(ORG_ID);
+    expect(orden).toEqual(['transaction-resuelta', 'cache-invalidado']);
+  });
+});
 
 describe('PlatformAdminService.actualizarStatus', () => {
   afterEach(() => jest.clearAllMocks());

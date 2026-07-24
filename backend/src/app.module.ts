@@ -23,6 +23,7 @@ import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos
 import { ReportesModule } from './reportes/reportes.module';
 import { CierreEjercicioModule } from './cierre-ejercicio/cierre-ejercicio.module';
 import { GranjaModule } from './granja/granja.module';
+import { ConciliacionBancariaModule } from './conciliacion-bancaria/conciliacion-bancaria.module';
 import { PacksModule } from './packs/pack.module';
 import { MeModule } from './me/me.module';
 import { PlatformModule } from './platform/platform.module';
@@ -96,6 +97,7 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     ReportesModule,
     CierreEjercicioModule,
     GranjaModule,
+    ConciliacionBancariaModule,
     PacksModule,
     MeModule,
     PlatformModule,

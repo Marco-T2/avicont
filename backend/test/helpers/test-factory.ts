@@ -103,6 +103,16 @@ export async function cleanupTestData() {
   // Plan de cuentas: OrgConfiguracionContable tiene FKs Restrict hacia Cuenta,
   // así que los borramos en orden explícito antes de tocar Organization.
   await prisma.orgConfiguracionContable.deleteMany({});
+  // Conciliación bancaria (slice 1): CuentaBancaria tiene FK Restrict hacia
+  // Cuenta (onDelete: Restrict) — debe borrarse ANTES de `cuenta.deleteMany`.
+  // Slice 3: MovimientoBancario/ImportacionExtracto tienen FK Restrict hacia
+  // CuentaBancaria — se borran ANTES de `cuentaBancaria.deleteMany`.
+  // MatchConciliacion (slice 5): FK Cascade hacia MovimientoBancario, pero se
+  // borra explícito ANTES para no depender del cascade.
+  await prisma.matchConciliacion.deleteMany({});
+  await prisma.movimientoBancario.deleteMany({});
+  await prisma.importacionExtracto.deleteMany({});
+  await prisma.cuentaBancaria.deleteMany({});
   await prisma.cuenta.deleteMany({});
   // Gestiones + períodos fiscales (Fase 1.2). Orden importa por las FKs.
   await prisma.periodoFiscalReopening.deleteMany({});

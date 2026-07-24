@@ -972,14 +972,30 @@ pnpm run prisma:studio           # UI web de Prisma en localhost:5555
 
 Correr **desde `backend/`**:
 
+> ⚠️ **`NODE_OPTIONS="--experimental-vm-modules"` es OBLIGATORIO** en cualquier corrida
+> que cargue `@aws-sdk/client-s3` (adapter de MinIO del pack de adjuntos) — o sea la suite
+> completa de `src/` y **todos** los E2E. Sin el flag, Node v24 + ts-jest fallan con
+> `ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG` y aparecen **6 fallos en
+> `minio-storage.adapter.integration.spec.ts` que parecen una regresión y NO lo son**.
+> Es infra, no lógica. Los comandos de abajo ya lo incluyen: usalos tal cual.
+
 **Unitarios + integración**:
 ```bash
 cd backend
-pnpm exec jest src/                                                           # solo unit (.spec.ts sin DB)
+NODE_OPTIONS="--experimental-vm-modules" \
+  pnpm exec jest src/                                                         # unit + integración (lee DATABASE_URL de backend/.env)
+
+NODE_OPTIONS="--experimental-vm-modules" \
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
-  pnpm exec jest src/                                                         # unit + integración (.integration.spec.ts vs Postgres real)
-pnpm test                                                                     # equivalente al primero
+  pnpm exec jest src/                                                         # ídem, con la URL explícita (Claude Code no accede al .env)
 ```
+
+> ⚠️ **Los `*.integration.spec.ts` corren contra la MISMA base de desarrollo (`saas`)** que
+> usás en el navegador — Prisma toma `DATABASE_URL` de `backend/.env`. Consecuencia práctica:
+> **una aserción de conteo SIN filtro por `organizationId` mide también tus datos reales** y
+> el test empieza a fallar el día que usás la app. Pasó de verdad (2026-07-23,
+> `match-conciliacion.service.integration.spec.ts`). En un test de integración, todo
+> `count()`/`findMany()` de verificación va acotado a los tenants que el propio test creó.
 
 **Convención de sufijos** (CLAUDE.md §7.3):
 - `*.spec.ts` — unit puro, sin DB ni NestJS. Corre con `pnpm exec jest src/` sin env.
@@ -989,6 +1005,7 @@ pnpm test                                                                     # 
 **E2E (requieren Postgres arriba)**:
 ```bash
 cd backend
+NODE_OPTIONS="--experimental-vm-modules" \
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/saas" \
 JWT_ACCESS_SECRET="test-secret" \
 JWT_REFRESH_SECRET="test-refresh" \
@@ -996,6 +1013,16 @@ pnpm exec jest test/ --runInBand --forceExit
 ```
 
 `--runInBand` es necesario para que los tests E2E de distintos módulos no pisen el mismo Postgres en paralelo. `--forceExit` porque PrismaClient deja handles que Jest no detecta (patrón consistente con el resto de los E2E del proyecto).
+
+**Nota histórica — deuda "W3" CERRADA (2026-07-23):** durante meses se documentó como
+bloqueante que los E2E/integración que tocan `MinioStorageAdapter` "no corren por infra
+preexistente (Node v24 + AWS SDK + ts-jest)". No requería cambiar configuración: **alcanza
+con el flag de arriba**. Cualquier doc o comentario que siga afirmando que esos tests están
+bloqueados está desactualizado.
+
+**Falla preexistente NO relacionada:** `test/auth-logout-all.e2e-spec.ts` falla ~5 tests
+cuando corre dentro de la suite E2E completa, pero pasa 5/5 en aislamiento. Es un problema
+de aislamiento cross-file, no una regresión de lo que estés tocando. Issue separado.
 
 ### 11.4 Lint y typecheck
 

@@ -1,4 +1,4 @@
-import type { VerticalPack } from '@prisma/client';
+import type { Prisma, VerticalPack } from '@prisma/client';
 
 import type { Pack } from './domain/pack';
 import {
@@ -70,6 +70,7 @@ function makeCatalogMock(): MockCatalog {
     listar: jest.fn(),
     findByClave: jest.fn(),
     findById: jest.fn(),
+    listarOtorgadosPorDefecto: jest.fn(),
   };
 }
 
@@ -348,6 +349,76 @@ describe('PackService', () => {
       catalog.listar.mockResolvedValue(packs);
 
       expect(await service.listarCatalogo()).toBe(packs);
+    });
+  });
+
+  // ==========================================================
+  // otorgarPacksPorDefecto (auto-otorgamiento, design conciliacion-bancaria §7.2)
+  // ==========================================================
+  describe('otorgarPacksPorDefecto', () => {
+    const FAKE_TX = { $fakeTransactionClient: true } as unknown as Prisma.TransactionClient;
+
+    it('habilita+activa (activo:true, tx) cada pack otorgadoPorDefecto del vertical, dentro de la TX', async () => {
+      const { service, repo, catalog } = makeService();
+      const packA = makePack({ id: 'pack-a', clave: 'contabilidad.conciliacion' });
+      const packB = makePack({ id: 'pack-b', clave: 'contabilidad.adjuntos' });
+      catalog.listarOtorgadosPorDefecto.mockResolvedValue([packA, packB]);
+      repo.habilitar.mockResolvedValue(makeEntitlementRow({ activo: true }));
+
+      const claves = await service.otorgarPacksPorDefecto(ORG_ID, 'CONTABILIDAD', USER_ID, FAKE_TX);
+
+      expect(catalog.listarOtorgadosPorDefecto).toHaveBeenCalledWith('CONTABILIDAD');
+      expect(repo.habilitar).toHaveBeenCalledWith(ORG_ID, 'pack-a', USER_ID, {
+        activo: true,
+        tx: FAKE_TX,
+      });
+      expect(repo.habilitar).toHaveBeenCalledWith(ORG_ID, 'pack-b', USER_ID, {
+        activo: true,
+        tx: FAKE_TX,
+      });
+      expect(claves).toEqual(['contabilidad.conciliacion', 'contabilidad.adjuntos']);
+    });
+
+    it('NO llama this.orgVertical.verticalDe (recibe el vertical como parámetro — design §7.1/§7.2)', async () => {
+      const { service, catalog, vertical } = makeService();
+      catalog.listarOtorgadosPorDefecto.mockResolvedValue([]);
+
+      await service.otorgarPacksPorDefecto(ORG_ID, 'CONTABILIDAD', USER_ID, FAKE_TX);
+
+      expect(vertical.verticalDe).not.toHaveBeenCalled();
+    });
+
+    it('NO invalida el cache Redis dentro de la función (efecto externo prohibido dentro de una TX)', async () => {
+      const { service, catalog, repo, redis } = makeService();
+      catalog.listarOtorgadosPorDefecto.mockResolvedValue([makePack()]);
+      repo.habilitar.mockResolvedValue(makeEntitlementRow({ activo: true }));
+
+      await service.otorgarPacksPorDefecto(ORG_ID, 'CONTABILIDAD', USER_ID, FAKE_TX);
+
+      expect(redis.del).not.toHaveBeenCalled();
+    });
+
+    it('sin packs otorgadoPorDefecto para el vertical → no llama habilitar, devuelve []', async () => {
+      const { service, repo, catalog } = makeService();
+      catalog.listarOtorgadosPorDefecto.mockResolvedValue([]);
+
+      const claves = await service.otorgarPacksPorDefecto(ORG_ID, 'CONTABILIDAD', USER_ID, FAKE_TX);
+
+      expect(repo.habilitar).not.toHaveBeenCalled();
+      expect(claves).toEqual([]);
+    });
+  });
+
+  // ==========================================================
+  // invalidarCacheDeOrg (método público nuevo, design §7.2/§7.3)
+  // ==========================================================
+  describe('invalidarCacheDeOrg', () => {
+    it('llama redis.del con la clave org-packs:<orgId>', async () => {
+      const { service, redis } = makeService();
+
+      await service.invalidarCacheDeOrg(ORG_ID);
+
+      expect(redis.del).toHaveBeenCalledWith(`org-packs:${ORG_ID}`);
     });
   });
 });

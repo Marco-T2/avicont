@@ -1,7 +1,7 @@
 import { PrismaClient, SystemRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-import { seedPacksCatalogo } from './seeds/packs-catalogo';
+import { seedPacksCatalogo, backfillOtorgamientoPorDefecto } from './seeds/packs-catalogo';
 
 const prisma = new PrismaClient();
 
@@ -135,11 +135,21 @@ async function main() {
   // Catálogo global de packs (riel eje 2). Idempotente, sin tenant.
   await seedPacksCatalogo(prisma);
 
+  // Backfill de orgs existentes: otorga contabilidad.conciliacion (y futuros
+  // packs otorgadoPorDefecto) a las orgs que nacieron antes de que el pack
+  // entrara al catálogo. Idempotente — ver design conciliacion-bancaria §7.4.
+  await backfillOtorgamientoPorDefecto(prisma);
+
   console.info('Seed complete:', {
     user: founder.email,
     organization: asociacion.slug,
     templates: ['contador', 'granjero'],
-    packsCatalogo: ['contabilidad.adjuntos', 'contabilidad.rag', 'granja.rag'],
+    packsCatalogo: [
+      'contabilidad.adjuntos',
+      'contabilidad.rag',
+      'granja.rag',
+      'contabilidad.conciliacion',
+    ],
   });
 
   // Bootstrap del primer super-admin de plataforma (huevo-gallina, REQ-SA-10).
