@@ -654,9 +654,9 @@ por su cuenta.
 ### REQ-CB-16: Validación del número de cuenta del extracto contra la `CuentaBancaria` destino
 
 Cuando el perfil expone el número de cuenta en la cabecera del archivo
-(confirmado para los 3 perfiles de v1: BancoSol y Económico bajo la misma
-etiqueta `Cuenta:`, Unión bajo `Cuenta:` — si un perfil futuro no lo
-expusiera, aplica el fallback de advertencia sin rechazo descrito más
+(confirmado para los 4 perfiles soportados: BancoSol, Económico y Unión bajo
+la misma etiqueta `Cuenta:`, BCP bajo `Nro. Cuenta:` — si un perfil futuro no
+lo expusiera, aplica el fallback de advertencia sin rechazo descrito más
 abajo), el servicio de importación DEBE extraerlo y
 compararlo contra `CuentaBancaria.numeroCuenta` **antes de persistir
 cualquier movimiento o fila de `ImportacionExtracto`**.
