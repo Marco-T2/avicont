@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
+import { formatearTimestampLaPaz } from '@/lib/formatear-timestamp';
 import { mensajeConciliacion } from '@/lib/error-messages';
 import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
@@ -44,7 +45,7 @@ function soloFecha(iso: string): string {
 }
 
 // El drawer es angosto: el default de 50 del backend obliga a un scroll enorme.
-const IMPORTACIONES_POR_PAGINA = 10;
+const IMPORTACIONES_POR_PAGINA = 5;
 
 /**
  * Se acepta `.xls` a propósito, aunque el importador SOLO procese `.xlsx`.
@@ -124,6 +125,29 @@ export function ImportacionesDrawer({
   const resultado = importar.data;
   const requiereConfirmacion = resultado?.requiereConfirmacionCuenta === true;
 
+  function limpiarSeleccion(): void {
+    setArchivo(null);
+    if (inputRef.current !== null) inputRef.current.value = '';
+  }
+
+  /**
+   * El componente NO se desmonta al cerrarse: el padre lo deja montado y solo
+   * cambia `open`. Radix sí desmonta el contenido, así que al reabrir aparece un
+   * `<input type="file">` nuevo y vacío — pero el `File` seguía vivo en el
+   * estado. Resultado: el input decía "ningún archivo seleccionado" y el botón
+   * de importar estaba habilitado, listo para volver a subir el archivo de la
+   * sesión anterior. Se limpia al cerrar para que lo que se ve y lo que se
+   * enviaría sean lo mismo.
+   */
+  function handleOpenChange(next: boolean): void {
+    if (!next) {
+      limpiarSeleccion();
+      importar.reset();
+      setPage(1);
+    }
+    onOpenChange(next);
+  }
+
   function lanzarImportacion(confirmarNumeroCuenta: boolean): void {
     if (cuentaId === null || archivo === null) return;
     importar.mutate(
@@ -134,8 +158,7 @@ export function ImportacionesDrawer({
           // falta confirmar el número de cuenta hay que conservar el archivo
           // para el segundo viaje.
           if (res.requiereConfirmacionCuenta) return;
-          setArchivo(null);
-          if (inputRef.current !== null) inputRef.current.value = '';
+          limpiarSeleccion();
           // El historial viene del más reciente al más viejo: lo recién importado
           // está en la página 1, no en la que el usuario estuviera mirando.
           setPage(1);
@@ -145,7 +168,7 @@ export function ImportacionesDrawer({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto overflow-x-hidden">
         <SheetHeader>
           <SheetTitle>Extractos importados</SheetTitle>
@@ -282,8 +305,13 @@ export function ImportacionesDrawer({
                 <li key={imp.id} className="rounded-md border bg-card px-4 py-3 space-y-1">
                   <p className="font-medium break-all">{imp.nombreArchivo}</p>
                   <p className="text-sm text-muted-foreground tabular-nums">
+                    {/* Rango que CUBRE el extracto (fecha contable, sin zona §4.6). */}
                     {formatearFechaContable(soloFecha(imp.fechaDesde))} —{' '}
                     {formatearFechaContable(soloFecha(imp.fechaHasta))}
+                  </p>
+                  <p className="text-sm text-muted-foreground tabular-nums">
+                    {/* Cuándo se SUBIÓ: instante real, en hora de La Paz (§4.6). */}
+                    Subido el {formatearTimestampLaPaz(imp.createdAt)}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {imp.filasLeidas} filas · {imp.movimientosNuevos} nuevos ·{' '}

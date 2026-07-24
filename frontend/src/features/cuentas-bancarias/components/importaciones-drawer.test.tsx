@@ -66,7 +66,7 @@ function importacion(overrides: Partial<ImportacionExtracto> = {}): ImportacionE
 
 function mockImportaciones(items: ImportacionExtracto[], total = items.length): void {
   vi.mocked(useImportaciones).mockReturnValue({
-    data: { items, total, page: 1, pageSize: 10 },
+    data: { items, total, page: 1, pageSize: 5 },
     isLoading: false,
     isError: false,
   } as unknown as ReturnType<typeof useImportaciones>);
@@ -122,6 +122,15 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
     expect(screen.getByText(/2 ya existían/i)).toBeInTheDocument();
   });
 
+  it('muestra cuándo se subió el archivo, con hora de La Paz', () => {
+    // createdAt es un instante real (UTC): 10:00Z son las 06:00 en Bolivia.
+    mockImportaciones([importacion({ createdAt: '2026-07-01T10:00:00.000Z' })]);
+
+    renderDrawer();
+
+    expect(screen.getByText(/subido el 01\/07\/2026, 06:00/i)).toBeInTheDocument();
+  });
+
   it('muestra el estado de verificación del checksum', () => {
     mockImportaciones([importacion({ estadoVerificacion: 'DESCUADRE', diferencia: '15.00' })]);
 
@@ -143,7 +152,7 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
 
     expect(vi.mocked(useImportaciones)).toHaveBeenCalledWith('cb-1', {
       page: 1,
-      pageSize: 10,
+      pageSize: 5,
     });
   });
 
@@ -157,7 +166,7 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
 
     expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
       page: 2,
-      pageSize: 10,
+      pageSize: 5,
     });
   });
 
@@ -177,7 +186,7 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
     await user.click(screen.getByRole('button', { name: /página siguiente/i }));
     expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-1', {
       page: 2,
-      pageSize: 10,
+      pageSize: 5,
     });
 
     rerender(
@@ -192,7 +201,7 @@ describe('ImportacionesDrawer — historial (GET /:id/importaciones)', () => {
 
     expect(vi.mocked(useImportaciones)).toHaveBeenLastCalledWith('cb-2', {
       page: 1,
-      pageSize: 10,
+      pageSize: 5,
     });
   });
 
@@ -263,6 +272,44 @@ describe('ImportacionesDrawer — subida del archivo', () => {
 
   it('sin archivo elegido el botón de importar está deshabilitado', () => {
     renderDrawer();
+
+    expect(screen.getByRole('button', { name: /importar extracto/i })).toBeDisabled();
+  });
+
+  it('cerrar y reabrir el drawer no deja el archivo anterior cargado por dentro', async () => {
+    // Reportado en el smoke: el input volvía a decir "ningún archivo seleccionado"
+    // (Radix desmonta el contenido) pero el File seguía en el estado del
+    // componente, que NO se desmonta. El botón quedaba habilitado y al tocarlo se
+    // volvía a subir el archivo de la sesión anterior.
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+
+    const { rerender } = render(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
+
+    await user.upload(
+      screen.getByLabelText(/archivo del extracto/i),
+      new File(['contenido'], 'extracto.xlsx'),
+    );
+    expect(screen.getByRole('button', { name: /importar extracto/i })).toBeEnabled();
+
+    // Cerrar por la vía real de Radix (overlay, X o Esc): todas llaman onOpenChange.
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open={false} onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
+    rerender(
+      <TooltipProvider>
+        <ImportacionesDrawer cuentaBancaria={CUENTA} open onOpenChange={onOpenChange} />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByRole('button', { name: /importar extracto/i })).toBeDisabled();
   });
