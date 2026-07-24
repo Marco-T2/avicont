@@ -3,7 +3,7 @@
  * (design §8.2, CLAUDE.md §4.6). `new Date(string)` PROHIBIDO en este
  * archivo — depende del locale del proceso que corre el servidor.
  *
- * Tres dialectos en v1 (design §8.2):
+ * Cuatro dialectos (design §8.2):
  *   - `SERIAL_EXCEL` (BancoSol): número de serie de Excel, época 1899-12-30
  *     (bug del año bisiesto 1900 de Excel). La parte fraccionaria es la
  *     hora del día.
@@ -11,13 +11,16 @@
  *     español, sin diacríticos, `SET` como alias de `SEP`.
  *   - `DD_MM_YYYY` (Unión XLSX): string `DD/MM/YYYY`, con hora opcional
  *     separada por espacio.
+ *   - `YYYYMMDD` (BCP XLSX): string compacto de 8 dígitos sin separadores
+ *     (`20260701`). Nunca trae hora — BCP la publica en una columna aparte.
  */
 import { FechaContable } from '@/common/domain/fecha-contable';
 
 export type DialectoFecha =
   | { readonly tipo: 'SERIAL_EXCEL' }
   | { readonly tipo: 'TEXTO_ES_DD_MMM_YYYY' }
-  | { readonly tipo: 'DD_MM_YYYY' };
+  | { readonly tipo: 'DD_MM_YYYY' }
+  | { readonly tipo: 'YYYYMMDD' };
 
 export interface FechaLeida {
   readonly fecha: FechaContable;
@@ -115,6 +118,25 @@ function leerDdMmYyyy(raw: string): FechaLeida {
   return { fecha, hora };
 }
 
+/**
+ * `YYYYMMDD` compacto (BCP). Se exige la forma EXACTA de 8 dígitos antes de
+ * cortar: un `slice` ciego sobre `'2026-07-01'` o sobre un `'20260701 10:22'`
+ * inesperado devolvería una fecha plausible pero equivocada, y una fecha mal
+ * leída se propaga silenciosa hasta el hash de dedup.
+ */
+function leerYyyyMmDd(raw: string): FechaLeida {
+  const s = raw.trim();
+  if (!/^\d{8}$/.test(s)) {
+    throw new RangeError(`leerFechaCelda: formato YYYYMMDD inválido ("${raw}")`);
+  }
+  const fecha = FechaContable.of(
+    Number(s.slice(0, 4)),
+    Number(s.slice(4, 6)),
+    Number(s.slice(6, 8)),
+  );
+  return { fecha, hora: null };
+}
+
 export function leerFechaCelda(raw: string, dialecto: DialectoFecha): FechaLeida {
   switch (dialecto.tipo) {
     case 'SERIAL_EXCEL':
@@ -123,5 +145,7 @@ export function leerFechaCelda(raw: string, dialecto: DialectoFecha): FechaLeida
       return leerTextoEs(raw);
     case 'DD_MM_YYYY':
       return leerDdMmYyyy(raw);
+    case 'YYYYMMDD':
+      return leerYyyyMmDd(raw);
   }
 }

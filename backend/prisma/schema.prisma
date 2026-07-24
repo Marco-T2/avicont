@@ -1287,12 +1287,17 @@ model OrgPackEntitlement {
 // ---------------------------------------------------------------------------
 
 // Perfil de extracto: identifica banco + formato por construcción (un enum,
-// no dos campos `banco`+`formato` — R-3). v1 = 3 valores; UNION_TXT queda
-// como perfil futuro (design §4.3.2), no se agrega al enum hasta construirse.
+// no dos campos `banco`+`formato` — R-3). v1 nació con 3 valores; BCP_XLSX se
+// sumó después sobre el mismo motor. UNION_TXT queda como perfil futuro
+// (design §4.3.2), no se agrega al enum hasta construirse.
+//
+// Agregar un valor acá SIN registrar su adapter rompe el bootstrap de la app:
+// `ExtractoParserRegistry` exige que todos los valores del enum tengan parser.
 enum PerfilExtracto {
   BANCOSOL_XLSX
   ECONOMICO_XLSX
   UNION_XLSX
+  BCP_XLSX
 }
 
 // Perspectiva del BANCO (extracto): lo que el banco declara en cada fila.

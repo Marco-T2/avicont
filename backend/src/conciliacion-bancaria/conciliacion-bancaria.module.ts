@@ -8,6 +8,7 @@ import { PacksModule } from '@/packs/pack.module';
 import { RbacModule } from '@/rbac/rbac.module';
 
 import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
+import { DIALECTO_BCP } from './adapters/dialectos/bcp.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
@@ -30,11 +31,12 @@ import { IMPORTACION_EXTRACTO_REPOSITORY_PORT } from './ports/importacion-extrac
 import { MATCH_CONCILIACION_REPOSITORY_PORT } from './ports/match-conciliacion.repository.port';
 import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario.repository.port';
 
-// Slice 4 del change `conciliacion-bancaria`: adaptador Unión XLSX — cierra
-// `EXTRACTO_PARSERS` con los 3 valores de `PerfilExtracto` (task 4.9).
+// `EXTRACTO_PARSERS` cubre TODOS los valores de `PerfilExtracto`: los 3 que
+// cerró el slice 4 del change `conciliacion-bancaria` (task 4.9) más
+// `BCP_XLSX`, agregado después sobre el mismo motor.
 //
 // `ExtractoParserRegistry` (fail-fast de `ports/extracto-parser.registry.ts`,
-// slice 1) ahora SÍ se provee: con los 3 dialectos presentes, su constructor
+// slice 1) SÍ se provee: con todos los dialectos presentes, su constructor
 // no revienta el bootstrap — al contrario, lo protege: si algún día se agrega
 // un valor a `PerfilExtracto` sin su adapter, el arranque de la app falla en
 // vez de fallar en producción (design §4.5). Nest instancia todo provider
@@ -45,7 +47,7 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
 // tocar como el lookup que consumen `ExtractoImportadorService` y
 // `CuentasBancariasController` — cerrar el TODO del slice 3 sin modificar
 // esos dos archivos (ni sus specs) evita blast radius sobre código ya
-// probado; con los 3 perfiles registrados su rama `undefined` (perfil sin
+// probado; con todos los perfiles registrados su rama `undefined` (perfil sin
 // adapter) queda inalcanzable en runtime, y el fail-fast de `Registry` es la
 // red que lo garantiza en bootstrap.
 //
@@ -98,6 +100,7 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
         new XlsxCoreExtractoParser(DIALECTO_BANCOSOL),
         new XlsxCoreExtractoParser(DIALECTO_ECONOMICO),
         new XlsxCoreExtractoParser(DIALECTO_UNION_XLSX),
+        new XlsxCoreExtractoParser(DIALECTO_BCP),
       ],
     },
   ],

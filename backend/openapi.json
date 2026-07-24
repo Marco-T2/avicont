@@ -10606,7 +10606,8 @@
             "enum": [
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
-              "UNION_XLSX"
+              "UNION_XLSX",
+              "BCP_XLSX"
             ]
           },
           "banco": {
@@ -10678,7 +10679,8 @@
             "enum": [
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
-              "UNION_XLSX"
+              "UNION_XLSX",
+              "BCP_XLSX"
             ],
             "description": "Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación."
           },
@@ -10724,7 +10726,8 @@
             "enum": [
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
-              "UNION_XLSX"
+              "UNION_XLSX",
+              "BCP_XLSX"
             ]
           },
           "numeroCuenta": {
@@ -10896,7 +10899,8 @@
             "enum": [
               "BANCOSOL_XLSX",
               "ECONOMICO_XLSX",
-              "UNION_XLSX"
+              "UNION_XLSX",
+              "BCP_XLSX"
             ]
           },
           "fechaDesde": {

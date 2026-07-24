@@ -9,8 +9,10 @@ import type { DescriptorPerfilExtracto } from '../ports/extracto-parser.port';
  * instructivo de descarga y el cartel de advertencia — todo sale de
  * `descriptor`, cero duplicación de verdad.
  *
- * v1 parcial (slice 3): solo expone los perfiles con adapter YA registrado
- * (`BANCOSOL_XLSX`, `ECONOMICO_XLSX`). `UNION_XLSX` se suma en el slice 4.
+ * Expone los perfiles con adapter registrado. Como el registro cubre TODOS
+ * los valores de `PerfilExtracto` (lo garantiza el fail-fast de
+ * `ExtractoParserRegistry` en bootstrap), sumar un banco acá es agregar su
+ * dialecto — este endpoint no se toca.
  */
 export class PerfilExtractoResponseDto {
   @ApiProperty({ enum: PerfilExtracto }) perfil!: PerfilExtracto;
