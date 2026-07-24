@@ -1139,30 +1139,72 @@ del navegador sigue con el comportamiento viejo. Parece un bug del código y **n
 lo es**.
 
 Causa: un `node dist/main` de una corrida anterior quedó **huérfano** (su padre
-murió; en WSL el PPID se reasigna a `/init`) y sigue aferrado al `:3000`. El
-`nest start --watch` recompila bien y arranca el proceso nuevo, pero ese muere
-con `EADDRINUSE: address already in use :::3000`. Node ya tiene el JS cargado en
-memoria: **el proceso viejo NO ve el `dist/` recompilado**. Pasó de verdad
-(2026-07-24): 27 reinicios perdidos y una jornada entera de cambios de backend
-que nunca llegaron a la app.
+murió; en WSL el PPID se reasigna a `/init`) y sigue aferrado al `:3000`. Node
+ya tiene el JS cargado en memoria: **el proceso viejo NO ve el `dist/`
+recompilado**.
 
-**Lo insidioso**: el log imprime `Nest application successfully started`
-**3 ms antes** del `EADDRINUSE`. Leyendo el tail parece que reinició bien. Y el
-watcher termina trabado: deja de escribir al log y ya no reacciona a cambios de
-archivo (un `touch` no lo despierta).
+**Mordió TRES veces el 2026-07-24, con tres síntomas distintos.** Por eso el
+chequeo decisivo no es ninguno de los síntomas, sino el del recuadro de abajo:
+
+| # | Watcher | `dist/` | En el log | Cómo se veía |
+|---|---------|---------|-----------|--------------|
+| 1 | vivo pero trabado | recompilaba | 27 × `EADDRINUSE` | una jornada de cambios que nunca llegaron a la app |
+| 2 | **no existía** | **borrado** | **nada** | app sirviendo un binario de 1h35m atrás, sin un solo rastro |
+| 3 | vivo y compilando OK | recompilaba | 18 × `EADDRINUSE` | un fix recién mergeado que "no funcionaba" (daba el MISMO número de error que antes del fix) |
+
+> **El chequeo que sirve SIEMPRE**: comparar el arranque del proceso que escucha
+> contra la fecha del `dist/`. **Si el `dist/` es más nuevo que el proceso, el
+> proceso no lo tiene** — sin importar qué diga el log.
+>
+> ```bash
+> ps -o pid,ppid,lstart,cmd -p $(ss -tlnp | grep -oP ':3000.*pid=\K[0-9]+' | head -1)
+> ls -la --time-style=+%H:%M:%S backend/dist/<algún-archivo-que-tocaste>.js
+> ```
+
+**Lo insidioso de la variante 1**: el log imprime `Nest application successfully
+started` **3 ms antes** del `EADDRINUSE`. Leyendo el tail parece que reinició
+bien. Y el watcher termina trabado: deja de escribir al log y ya no reacciona a
+cambios de archivo (un `touch` no lo despierta).
+
+**La variante 2 no deja rastro**: sin watcher no hay reinicios fallidos que
+loguear, así que `grep EADDRINUSE` da 0 y parece descartar el problema. **La
+ausencia de `EADDRINUSE` NO descarta nada.** Ahí el `dist/` ni existía: un
+`ls dist/main.js` que responde "No such file" mientras un proceso escucha en
+`:3000` **es el hallazgo**, no un error del diagnóstico.
+
+**La variante 3 es la más peligrosa**, porque miente sobre un arreglo: se
+reporta un fix, se corren los tests en verde, se le pide a alguien que pruebe
+y obtiene **exactamente el mismo error de antes** — lo que empuja a concluir
+que el diagnóstico estaba mal y a rehacer trabajo que ya estaba bien.
+**Antes de decir "ya está arreglado, probá", verificar el proceso vivo.**
 
 Diagnóstico (en orden):
 
 ```bash
 ss -tlnp | grep :3000                      # anotar el PID que escucha
-ps -o pid,ppid,etime,cmd -p <PID>          # etime >> último cambio, o PPID=1 → huérfano
-grep -c "EADDRINUSE" <log del start:dev>   # cuántos reinicios se perdieron
-ls -la backend/dist/main.js                # fecha de compilación vs etime del proceso
+ps -o pid,ppid,etime,lstart,cmd -p <PID>   # lstart vs. último cambio; PPID=1 o /init → huérfano
+ls -la backend/dist/<archivo>.js           # ¿el dist es MÁS NUEVO que el proceso? → no lo tiene
+grep -c "EADDRINUSE" <log del start:dev>   # >0 confirma; ==0 NO descarta (ver variante 2)
 ```
 
 Fix: `kill <pid-huerfano>`. Si el watcher quedó trabado, bajar el árbol entero
 (el `sh -c nest start --watch`, el `pnpm` y el bash padre) y relanzar
-`pnpm run start:dev`.
+`pnpm run start:dev`. Si el `dist/` quedó en un estado dudoso, `rm -rf dist`
+antes de relanzar.
+
+**Cómo evitarlo**: lanzar el dev server **desde una terminal propia que quede
+viva** (la del dev, o `! pnpm run start:dev` en el prompt de Claude Code). Un
+`start:dev` disparado en background por una herramienta que después termina deja
+el proceso desacoplado: cuando ese padre muere, el PPID se reasigna a `/init` y
+ya está huérfano. Así nacieron las variantes 2 y 3.
+
+Ojo con la trampa de verificar el PPID una sola vez: un proceso puede arrancar
+con padre real y **huerfanizarse minutos después**, cuando el padre termina
+(verificado el 2026-07-24: PPID `71511` al arrancar, `/init` media hora más
+tarde). Mientras nadie recompile sigue sirviendo lo correcto, así que el
+problema no se nota — hasta el próximo cambio de backend, que no llegará. Por
+eso el chequeo confiable es siempre **`lstart` del proceso vs. fecha del
+`dist/`**, no el parentesco.
 
 **Verificar contra el proceso VIVO** (no contra `dist/`) — sin necesidad de un
 JWT, porque el Swagger JSON es público en dev:
