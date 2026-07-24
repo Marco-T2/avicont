@@ -13,11 +13,8 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import type { CuentaBancaria } from '@/types/api';
 
-import { PERFIL_EXTRACTO_OPTIONS } from '../lib/perfil-extracto-options';
-
-const PERFIL_LABEL: Record<string, string> = Object.fromEntries(
-  PERFIL_EXTRACTO_OPTIONS.map(({ value, label }) => [value, label]),
-);
+import { usePerfilesExtracto } from '../hooks/use-perfiles-extracto';
+import { indiceEtiquetasPerfil } from '../lib/etiqueta-perfil-extracto';
 
 interface CuentasBancariasListTableProps {
   items: CuentaBancaria[];
@@ -34,6 +31,9 @@ export function CuentasBancariasListTable({
   onEliminar,
   onVerExtractos,
 }: CuentasBancariasListTableProps): React.JSX.Element {
+  const { data: perfiles } = usePerfilesExtracto();
+  const etiquetaPorPerfil = indiceEtiquetasPerfil(perfiles);
+
   if (isLoading && items.length === 0) {
     return (
       <div className="space-y-2">
@@ -71,7 +71,7 @@ export function CuentasBancariasListTable({
               <TableCell className="font-medium">{cb.alias}</TableCell>
               <TableCell>
                 <Badge variant="secondary" className="text-xs">
-                  {PERFIL_LABEL[cb.perfilExtracto] ?? cb.perfilExtracto}
+                  {etiquetaPorPerfil[cb.perfilExtracto] ?? cb.perfilExtracto}
                 </Badge>
               </TableCell>
               <TableCell>

@@ -9,6 +9,7 @@ import type { CuentaBancaria } from '@/types/api';
 import { useCuentasBancarias } from '../hooks/use-cuentas-bancarias';
 import { useImportaciones } from '../hooks/use-importaciones';
 import { useImportarExtracto } from '../hooks/use-importar-extracto';
+import { usePerfilesExtracto } from '../hooks/use-perfiles-extracto';
 import { CuentasBancariasPage } from './cuentas-bancarias-page';
 
 const { hasMock } = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ vi.mock('../hooks/use-cuentas-bancarias', () => ({
 
 vi.mock('../hooks/use-importaciones', () => ({ useImportaciones: vi.fn() }));
 vi.mock('../hooks/use-importar-extracto', () => ({ useImportarExtracto: vi.fn() }));
+vi.mock('../hooks/use-perfiles-extracto', () => ({ usePerfilesExtracto: vi.fn() }));
 
 vi.mock('@/lib/use-permissions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
@@ -73,6 +75,43 @@ beforeEach(() => {
     isPending: false,
     data: undefined,
   } as unknown as ReturnType<typeof useImportarExtracto>);
+  vi.mocked(usePerfilesExtracto).mockReturnValue({
+    data: [
+      {
+        perfil: 'BANCOSOL_XLSX',
+        banco: 'Banco Sol',
+        formato: 'Excel (.xlsx)',
+        extensiones: ['.xlsx'],
+        mimeTypes: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+        estrategiaChecksum: 'DERIVADO',
+        soportaContraparte: false,
+        soportaHora: true,
+        exponeNumeroCuenta: true,
+        instruccionesDescarga: 'Descargá el extracto en Excel.',
+      },
+    ],
+  } as unknown as ReturnType<typeof usePerfilesExtracto>);
+});
+
+// El catálogo de bancos dejó de estar hardcodeado en el frontend: lo sirve
+// `GET /api/cuentas-bancarias/perfiles`. Estos dos tests fijan el contrato de
+// esa lectura — que la etiqueta del backend llegue a la pantalla, y que la
+// pantalla no se rompa si el catálogo todavía no cargó.
+describe('CuentasBancariasPage — etiqueta de perfil servida por el backend', () => {
+  it('muestra la etiqueta del descriptor, no el valor crudo del enum', () => {
+    renderPage();
+    expect(screen.getByText('Banco Sol — Excel (.xlsx)')).toBeInTheDocument();
+    expect(screen.queryByText('BANCOSOL_XLSX')).not.toBeInTheDocument();
+  });
+
+  it('si el catálogo no cargó, cae al valor crudo del enum en vez de dejar la celda vacía', () => {
+    vi.mocked(usePerfilesExtracto).mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof usePerfilesExtracto>);
+
+    renderPage();
+    expect(screen.getByText('BANCOSOL_XLSX')).toBeInTheDocument();
+  });
 });
 
 describe('CuentasBancariasPage — gating fail-closed por permiso (§14.7)', () => {
