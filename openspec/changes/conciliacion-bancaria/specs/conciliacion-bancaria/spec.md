@@ -583,16 +583,31 @@ tabla, no solo a nivel de módulo:
 
 La misma pantalla de conciliación DEBE servir a un usuario con solo
 `contabilidad.conciliacion.read`: ve cuentas bancarias, movimientos,
-importaciones y sugerencias, pero las acciones (importar, confirmar match,
-ignorar, deshacer) quedan ocultas — fail-closed, igual que el resto del
-gating de permisos del proyecto (§14.7).
+importaciones y sugerencias, pero sin poder ejecutar acciones (importar,
+confirmar match, ignorar, deshacer) — fail-closed.
 
-#### Scenario: Usuario solo con `.read` — ve datos, sin acciones
+**Modo consulta a nivel pantalla.** Cuando falta
+`contabilidad.conciliacion.conciliar`, el workspace muestra un banner que
+explica la situación UNA vez, arriba, y las acciones por fila no se renderizan.
+
+Esto es una **excepción deliberada y acotada** a `frontend/CLAUDE.md §14.7`
+("deshabilitar + tooltip, NO ocultar"): esta pantalla repite las mismas
+acciones en cada fila de dos paneles, así que decenas de botones grises con
+idéntico tooltip saturan la afordancia en vez de informar. El banner cumple el
+propósito de §14.7 —que el usuario entienda POR QUÉ no puede actuar— sin ese
+ruido. La excepción aplica sólo a pantallas densas en acciones repetidas por
+fila; en el resto del proyecto sigue mandando `<PermissionButton>`.
+
+Ruta y nav item se ocultan/bloquean sin `.read` — ahí §14.7 SÍ manda ocultar,
+porque es navegación y no una acción puntual.
+
+#### Scenario: Usuario solo con `.read` — ve datos en modo consulta
 
 - GIVEN un usuario con `contabilidad.conciliacion.read` y ningún otro permiso
   del submódulo
 - WHEN accede al workspace de conciliación
 - THEN ve cuentas bancarias, movimientos y su estado, sugerencias e historial
+- AND ve un banner de modo consulta que explica que sólo tiene permiso de lectura
 - AND no ve los botones de importar, confirmar, ignorar ni deshacer
 
 #### Scenario: Usuario sin `.read` — ruta y nav item ocultos
@@ -784,6 +799,17 @@ orden)` que YA tiene un match:
   disparada por la confirmación del usuario — no contradice "una lectura
   nunca escribe" de REQ-CB-10, porque esto es una escritura, no una
   lectura) y crea el nuevo match en su lugar.
+  **En la MISMA transacción DEBE devolver a `PENDIENTE` el movimiento
+  bancario que quedó sin match** al borrarse el roto. Sin eso ese movimiento
+  quedaría con `estado=CONCILIADO` y sin ningún match apuntándolo, violando
+  la invariante `estado==='CONCILIADO' ⟺ existe MatchConciliacion` y —peor—
+  sin forma de deshacerlo desde la UI, porque no habría match que borrar.
+
+Cuando el usuario intenta confirmar contra un **movimiento** que ya tiene un
+match, el sistema DEBE rechazar con `CONCILIACION_MOVIMIENTO_YA_TIENE_MATCH`
+(409). Es un code DISTINTO de `CONCILIACION_MOVIMIENTO_YA_CONCILIADO` (422,
+REQ-CB-18): son condiciones distintas y un mismo code estable no puede viajar
+con dos estados HTTP en un contrato público.
 
 **Deshacer** un match DEBE borrar el `MatchConciliacion` y devolver
 `MovimientoBancario.estado = PENDIENTE`. Deshacer NUNCA toca el
@@ -803,9 +829,9 @@ exclusiva de la tabla de conciliación.
 
 - GIVEN un `MovimientoBancario` que ya tiene un `MatchConciliacion` válido
 - WHEN el usuario intenta confirmar otro match para ese mismo movimiento
-- THEN el sistema rechaza — la constraint `@@unique([organizationId,
-  movimientoBancarioId])` no permite un segundo match para el mismo
-  movimiento
+- THEN el sistema rechaza con `CONCILIACION_MOVIMIENTO_YA_TIENE_MATCH` (409)
+- AND la constraint `@@unique([organizationId, movimientoBancarioId])` lo
+  garantiza también en la base, aunque el servicio fallara (defense in depth)
 
 #### Scenario: Confirmar contra una línea ya conciliada con vínculo sano — 409
 
