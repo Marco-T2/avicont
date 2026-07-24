@@ -1,11 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import * as bcrypt from 'bcrypt';
 
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/prisma.service';
-import { RedisService } from '../src/cache/redis.service';
+import { cleanupTestData } from './helpers/test-factory';
 
 /**
  * E2E tests de POST /api/auth/logout-all (REQ-LA-03).
@@ -17,8 +15,6 @@ import { RedisService } from '../src/cache/redis.service';
  */
 describe('POST /api/auth/logout-all (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
-  let redis: RedisService;
 
   const email1 = `logout-all-u1-${Date.now()}@avicont.bo`;
   const email2 = `logout-all-u2-${Date.now()}@avicont.bo`;
@@ -39,9 +35,6 @@ describe('POST /api/auth/logout-all (e2e)', () => {
       }),
     );
     await app.init();
-
-    prisma = moduleFixture.get(PrismaService);
-    redis = moduleFixture.get(RedisService);
   });
 
   afterAll(async () => {
@@ -49,25 +42,13 @@ describe('POST /api/auth/logout-all (e2e)', () => {
   });
 
   beforeEach(async () => {
-    // Limpiar solo los tokens y users de este test; no borrar todo para no
-    // interferir con tests paralelos de otros suites (se corre con --runInBand).
-    await prisma.refreshToken.deleteMany({});
-    await prisma.membership.deleteMany({});
-    await prisma.customRole.deleteMany({});
-    await prisma.featureFlag.deleteMany({});
-    await prisma.impersonationAction.deleteMany({});
-    await prisma.impersonationLog.deleteMany({});
-    await prisma.invitation.deleteMany({});
-    await prisma.organization.deleteMany({});
-    await prisma.user.deleteMany({});
+    await cleanupTestData();
   });
 
   /**
    * Helper: registra un usuario y loguea, devuelve { accessToken, cookie }.
    */
-  async function registrarYLogear(
-    email: string,
-  ): Promise<{ accessToken: string; cookie: string }> {
+  async function registrarYLogear(email: string): Promise<{ accessToken: string; cookie: string }> {
     await request(app.getHttpServer())
       .post('/api/auth/register')
       .send({ email, password })
@@ -152,10 +133,7 @@ describe('POST /api/auth/logout-all (e2e)', () => {
     const { accessToken, cookie } = await registrarYLogear(email1);
 
     // Verificar que el refresh cookie es válido
-    await request(app.getHttpServer())
-      .post('/api/auth/refresh')
-      .set('Cookie', cookie)
-      .expect(200);
+    await request(app.getHttpServer()).post('/api/auth/refresh').set('Cookie', cookie).expect(200);
 
     // Re-logear para conseguir un refresh token fresco (el anterior fue rotado)
     const loginRes2 = await request(app.getHttpServer())

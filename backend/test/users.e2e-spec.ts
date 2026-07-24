@@ -3,11 +3,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/common/prisma.service';
+import { cleanupTestData } from './helpers/test-factory';
 
 describe('Users /me (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
   let accessToken: string;
 
   beforeAll(async () => {
@@ -25,8 +24,6 @@ describe('Users /me (e2e)', () => {
       }),
     );
     await app.init();
-
-    prisma = moduleFixture.get(PrismaService);
   });
 
   afterAll(async () => {
@@ -34,10 +31,7 @@ describe('Users /me (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await prisma.refreshToken.deleteMany({});
-    await prisma.membership.deleteMany({});
-    await prisma.organization.deleteMany({});
-    await prisma.user.deleteMany({});
+    await cleanupTestData();
 
     await request(app.getHttpServer())
       .post('/api/auth/register')

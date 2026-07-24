@@ -114,6 +114,15 @@ export async function cleanupTestData() {
   await prisma.importacionExtracto.deleteMany({});
   await prisma.cuentaBancaria.deleteMany({});
   await prisma.cuenta.deleteMany({});
+  // Granja (v1): los 4 modelos cascadean desde Organization, así que borrar la
+  // org sola alcanza. Se limpian explícitos por la misma razón que
+  // `comprobanteDocumentoFisico` más arriba: idempotencia y no depender del
+  // cascade. El orden respeta el FK Restrict de los movimientos hacia
+  // TipoRegistro, que es el único no-Cascade del bloque.
+  await prisma.movimientoInversion.deleteMany({});
+  await prisma.movimientoCantidad.deleteMany({});
+  await prisma.lote.deleteMany({});
+  await prisma.tipoRegistro.deleteMany({});
   // Gestiones + períodos fiscales (Fase 1.2). Orden importa por las FKs.
   await prisma.periodoFiscalReopening.deleteMany({});
   await prisma.periodoFiscal.deleteMany({});

@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
+import { cleanupTestData } from './helpers/test-factory';
 
 describe('CustomRoles (e2e)', () => {
   let app: INestApplication;
@@ -29,7 +30,7 @@ describe('CustomRoles (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await cleanup(prisma);
+    await cleanupTestData();
 
     const hashedPassword = await bcrypt.hash('password123', 10);
     const owner = await prisma.user.create({
@@ -140,18 +141,3 @@ describe('CustomRoles (e2e)', () => {
     });
   });
 });
-
-async function cleanup(prisma: PrismaService) {
-  await prisma.refreshToken.deleteMany({});
-  await prisma.platformAudit.deleteMany({});
-  await prisma.impersonationAction.deleteMany({});
-  await prisma.impersonationLog.deleteMany({});
-  await prisma.invitation.deleteMany({});
-  await prisma.membership.deleteMany({});
-  await prisma.customRole.deleteMany({});
-  await prisma.orgPackEntitlement.deleteMany({});
-  await prisma.pack.deleteMany({});
-  await prisma.featureFlag.deleteMany({});
-  await prisma.organization.deleteMany({});
-  await prisma.user.deleteMany({});
-}
