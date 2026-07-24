@@ -969,6 +969,23 @@ pnpm run prisma:generate         # genera el cliente Prisma
 pnpm run prisma:studio           # UI web de Prisma en localhost:5555
 ```
 
+**Recuperar el catálogo de packs tras correr los E2E:**
+
+`Pack` es catálogo **global** (seed data sin `organizationId`), pero `cleanupTestData()`
+lo borra junto con la data de test. Como los E2E corren contra la misma base de
+desarrollo (ver §11.3), **toda corrida de `jest test/` deja el entorno local sin packs**
+y la pantalla de Complementos vacía. Para recuperarlo:
+
+```bash
+cd backend
+pnpm run seed:packs              # catálogo + backfill de otorgadoPorDefecto + invalida el cache
+```
+
+Es idempotente (upsert por `clave`) y NO crea el usuario founder ni la org piloto que
+sí crea `pnpm run seed`. Invalida además el cache `saas:org-packs:<orgId>` del
+`PackEnabledGuard` (TTL 300s): sin eso la app sigue sirviendo la lista vacía que
+cacheó antes, hasta por 5 minutos.
+
 ### 11.3 Tests
 
 Correr **desde `backend/`**:

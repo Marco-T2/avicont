@@ -16,6 +16,7 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "seed": "ts-node prisma/seed.ts",
+    "seed:packs": "ts-node prisma/scripts/seed-packs.ts",
     "super-admin": "ts-node prisma/scripts/super-admin.ts",
     "openapi:dump": "ts-node -r tsconfig-paths/register scripts/dump-openapi.ts"
   },
