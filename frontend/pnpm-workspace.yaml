@@ -69,6 +69,19 @@ overrides:
 #   useParams, useSearchParams) siguen exportados desde la entrada principal de v8.
 #   Al ser un major puede haber cambios de comportamiento que solo revelan tsc + la
 #   suite; por eso va como change propio y no como bump acá. BORRAR este ignore ahí.
+# - brace-expansion GHSA-mh99-v99m-4gvg (HIGH): DoS por expansión sin límite de longitud
+#   → crash por out-of-memory. Distinto del GHSA-3jxr-9vmj-r5cp ya cubierto por los
+#   overrides de arriba; este afecta a TODA la línea 5.x hasta 5.0.7 inclusive, o sea a
+#   la versión a la que nos pinea `'brace-expansion@5': '^5.0.7'`.
+#   Superficie real: solo toolchain de build/test (eslint, write-excel-file>archiver-node,
+#   openapi-typescript>@redocly/openapi-core). Un DoS por expansión de llaves exige
+#   un patrón glob hostil; los patrones acá son literales del repo, no input de terceros.
+#   Nada de esto llega al runtime.
+#   Parche: 5.0.8, publicado 2026-07-23 11:39 UTC → madura 2026-07-26 ~11:39 UTC
+#   (07:39 La Paz). ACCIÓN al madurar: el override `^5.0.7` YA admite 5.0.8 — alcanza con
+#   `pnpm update brace-expansion` para mover el lockfile, sin tocar este archivo. Después
+#   BORRAR este ignore.
 auditConfig:
   ignoreGhsas:
     - GHSA-qwww-vcr4-c8h2
+    - GHSA-mh99-v99m-4gvg
