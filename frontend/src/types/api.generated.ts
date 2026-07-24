@@ -1984,6 +1984,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conciliacion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Workspace de conciliación: movimientos bancarios + líneas contables de la cuenta banco en el rango, con estados DERIVADOS y sugerencias ranqueadas.
+         * @description Verifica el ancla de cada match en memoria contra su snapshot (REQ-CB-10). Es LECTURA PURA: nunca escribe, ni siquiera para "curar" un vínculo roto.
+         */
+        get: operations["ConciliacionController_obtenerWorkspace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirma un par movimiento ↔ línea contable creando el MatchConciliacion (REQ-CB-17). El sistema NUNCA auto-confirma. */
+        post: operations["ConciliacionController_crearMatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion/matches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deshace un match: lo borra y devuelve el movimiento a PENDIENTE. NUNCA toca el comprobante ni sus líneas (REQ-CB-15). */
+        delete: operations["ConciliacionController_borrarMatch"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/movimientos-bancarios/{id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Ignora (IGNORADO) o des-ignora (PENDIENTE) un movimiento bancario. Nunca borra el movimiento ni toca sus matches (REQ-CB-18). */
+        patch: operations["MovimientosBancariosController_cambiarEstado"];
+        trace?: never;
+    };
     "/api/me/permissions": {
         parameters: {
             query?: never;
@@ -3709,6 +3780,174 @@ export interface components {
             total: number;
             page: number;
             pageSize: number;
+        };
+        CuentaBancariaWorkspaceDto: {
+            id: string;
+            alias: string;
+            cuentaId: string;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            numeroCuenta: string | null;
+        };
+        VinculoConciliacionDto: {
+            matchId: string;
+            comprobanteId: string;
+            orden: number;
+            /**
+             * @description null ⇒ el vínculo es válido. Cualquier otro valor ⇒ roto, con el motivo exacto.
+             * @enum {string|null}
+             */
+            roto: "LINEA_INEXISTENTE" | "COMPROBANTE_ANULADO" | "CUENTA_CAMBIADA" | "MONTO_CAMBIADO" | "LADO_CAMBIADO" | "MONEDA_CAMBIADA" | "FECHA_CAMBIADA" | null;
+        };
+        MovimientoConciliacionDto: {
+            id: string;
+            /**
+             * @description Calendario puro, sin UTC (§4.6).
+             * @example 2026-06-10
+             */
+            fecha: string;
+            hora: string | null;
+            /**
+             * @description Monto como string (§4.5), siempre positivo.
+             * @example 1500.00
+             */
+            monto: string;
+            /**
+             * @description Perspectiva del BANCO.
+             * @enum {string}
+             */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            referencia: string | null;
+            saldo: string | null;
+            /**
+             * @description Columna PERSISTIDA (proyección cacheada). NO es lo que se muestra.
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            /**
+             * @description DERIVADO en cada lectura (REQ-CB-10/11). Esto es lo que se muestra.
+             * @enum {string}
+             */
+            estadoEfectivo: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            vinculo: components["schemas"]["VinculoConciliacionDto"] | null;
+        };
+        LineaConciliacionDto: {
+            comprobanteId: string;
+            orden: number;
+            /** @example 2026-06-10 */
+            fecha: string;
+            numeroComprobante: string | null;
+            glosa: string;
+            glosaLinea: string | null;
+            /**
+             * @description Moneda ORIGINAL, siempre positivo.
+             * @example 1500.00
+             */
+            monto: string;
+            /**
+             * @description Equivalente en BOB, solo para mostrar.
+             * @example 1500.00
+             */
+            montoBob: string;
+            /**
+             * @description Perspectiva de la EMPRESA.
+             * @enum {string}
+             */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            /**
+             * @description EN_TRANSITO es DERIVADO — no existe fila persistida con ese estado (REQ-CB-11).
+             * @enum {string}
+             */
+            estadoEfectivo: "EN_TRANSITO" | "CONCILIADO";
+        };
+        SugerenciaConciliacionDto: {
+            movimientoId: string;
+            comprobanteId: string;
+            orden: number;
+            /** @enum {string} */
+            confianza: "ALTA" | "MEDIA" | "BAJA";
+            diferenciaDias: number;
+        };
+        ResumenConciliacionDto: {
+            movimientosPendientes: number;
+            movimientosConciliados: number;
+            movimientosIgnorados: number;
+            lineasEnTransito: number;
+        };
+        WorkspaceConciliacionResponseDto: {
+            cuentaBancaria: components["schemas"]["CuentaBancariaWorkspaceDto"];
+            /** @example 2026-06-01 */
+            desde: string;
+            /** @example 2026-06-30 */
+            hasta: string;
+            movimientos: components["schemas"]["MovimientoConciliacionDto"][];
+            lineas: components["schemas"]["LineaConciliacionDto"][];
+            sugerencias: components["schemas"]["SugerenciaConciliacionDto"][];
+            resumen: components["schemas"]["ResumenConciliacionDto"];
+        };
+        CrearMatchDto: {
+            /** Format: uuid */
+            movimientoBancarioId: string;
+            /**
+             * Format: uuid
+             * @description Mitad del ancla (design §2.1).
+             */
+            comprobanteId: string;
+            /** @description Mitad del ancla: posición de la línea (1..N). */
+            orden: number;
+            /**
+             * @description Confianza de la sugerencia que el usuario confirmó. Se omite cuando el match es manual.
+             * @enum {string}
+             */
+            confianzaSugerida?: "ALTA" | "MEDIA" | "BAJA";
+        };
+        MatchConciliacionResponseDto: {
+            id: string;
+            movimientoBancarioId: string;
+            comprobanteId: string;
+            orden: number;
+            snapshotCuentaId: string;
+            /** @example 1500.00 */
+            snapshotMonto: string;
+            /** @enum {string} */
+            snapshotTipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            snapshotMoneda: "BOB" | "USD";
+            /** @example 2026-06-10 */
+            snapshotFecha: string;
+            confianzaSugerida: string | null;
+            conciliadoPorUserId: string;
+            createdAt: string;
+        };
+        ActualizarEstadoMovimientoDto: {
+            /**
+             * @description IGNORADO para ignorar, PENDIENTE para des-ignorar. CONCILIADO no se fija a mano (REQ-CB-17).
+             * @enum {string}
+             */
+            estado: "IGNORADO" | "PENDIENTE";
+        };
+        MovimientoBancarioResponseDto: {
+            id: string;
+            cuentaBancariaId: string;
+            /** @example 2026-06-10 */
+            fecha: string;
+            hora: string | null;
+            /** @example 1500.00 */
+            monto: string;
+            /** @enum {string} */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            referencia: string | null;
+            saldo: string | null;
+            /** @enum {string} */
+            estado: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
         };
         MePermissionsResponseDto: {
             permissions: string[];
@@ -7548,6 +7787,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportarExtractoResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_obtenerWorkspace: {
+        parameters: {
+            query: {
+                cuentaBancariaId: string;
+                /** @description Inclusive. */
+                desde: string;
+                /** @description Inclusive. */
+                hasta: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_crearMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearMatchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    ConciliacionController_borrarMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MovimientosBancariosController_cambiarEstado: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActualizarEstadoMovimientoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovimientoBancarioResponseDto"];
                 };
             };
         };

@@ -107,9 +107,9 @@ export async function cleanupTestData() {
   // Cuenta (onDelete: Restrict) — debe borrarse ANTES de `cuenta.deleteMany`.
   // Slice 3: MovimientoBancario/ImportacionExtracto tienen FK Restrict hacia
   // CuentaBancaria — se borran ANTES de `cuentaBancaria.deleteMany`.
-  // MatchConciliacion llega en slice 5: cuando existan filas en tests, agregar
-  // su limpieza ACÁ ANTES de esta línea (FK Cascade hacia MovimientoBancario,
-  // pero mejor explícito).
+  // MatchConciliacion (slice 5): FK Cascade hacia MovimientoBancario, pero se
+  // borra explícito ANTES para no depender del cascade.
+  await prisma.matchConciliacion.deleteMany({});
   await prisma.movimientoBancario.deleteMany({});
   await prisma.importacionExtracto.deleteMany({});
   await prisma.cuentaBancaria.deleteMany({});

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { LineasCuentaReaderModule } from '@/comprobantes/lineas-cuenta-reader.module';
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import { CuentasModule } from '@/cuentas/cuentas.module';
@@ -11,15 +12,22 @@ import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
 import { PrismaImportacionExtractoRepository } from './adapters/prisma-importacion-extracto.repository';
+import { PrismaMatchConciliacionRepository } from './adapters/prisma-match-conciliacion.repository';
 import { PrismaMovimientoBancarioRepository } from './adapters/prisma-movimiento-bancario.repository';
 import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
+import { ConciliacionController } from './conciliacion.controller';
+import { ConciliacionService } from './conciliacion.service';
 import { CuentasBancariasController } from './cuentas-bancarias.controller';
 import { CuentasBancariasService } from './cuentas-bancarias.service';
 import { ExtractoImportadorService } from './extracto-importador.service';
 import { ExtractoParserLookupService } from './extracto-parser-lookup.service';
+import { MatchConciliacionService } from './match-conciliacion.service';
+import { MovimientosBancariosController } from './movimientos-bancarios.controller';
+import { MovimientosBancariosService } from './movimientos-bancarios.service';
 import { CUENTA_BANCARIA_REPOSITORY_PORT } from './ports/cuenta-bancaria.repository.port';
 import { EXTRACTO_PARSERS, ExtractoParserRegistry } from './ports/extracto-parser.registry';
 import { IMPORTACION_EXTRACTO_REPOSITORY_PORT } from './ports/importacion-extracto.repository.port';
+import { MATCH_CONCILIACION_REPOSITORY_PORT } from './ports/match-conciliacion.repository.port';
 import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario.repository.port';
 
 // Slice 4 del change `conciliacion-bancaria`: adaptador Unión XLSX — cierra
@@ -44,9 +52,14 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
 // `CUENTAS_READER_PORT` entra por `CuentasModule` (§3.7 CLAUDE.md — port para
 // lecturas síncronas cross-módulo, ya usado por `ComprobantesModule`).
 // `ORG_PACKS_READER_PORT` entra por `PacksModule` (lo consume `PackEnabledGuard`).
+//
+// Slice 5: `LINEAS_CUENTA_READER_PORT` entra por `LineasCuentaReaderModule` —
+// módulo-puerto LEAF de `comprobantes/` (design §3). Se importa ESE módulo y
+// NO `ComprobantesModule`: el leaf no importa nada, así que es estructuralmente
+// imposible cerrar un ciclo de carga CJS (precedente `PeriodosReaderModule`).
 @Module({
-  imports: [RbacModule, CuentasModule, PacksModule],
-  controllers: [CuentasBancariasController],
+  imports: [RbacModule, CuentasModule, PacksModule, LineasCuentaReaderModule],
+  controllers: [CuentasBancariasController, ConciliacionController, MovimientosBancariosController],
   providers: [
     PrismaService,
     TenantContextService,
@@ -54,6 +67,9 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
     ExtractoImportadorService,
     ExtractoParserLookupService,
     ExtractoParserRegistry,
+    ConciliacionService,
+    MatchConciliacionService,
+    MovimientosBancariosService,
 
     PrismaCuentaBancariaRepository,
     { provide: CUENTA_BANCARIA_REPOSITORY_PORT, useExisting: PrismaCuentaBancariaRepository },
@@ -68,6 +84,12 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
     {
       provide: IMPORTACION_EXTRACTO_REPOSITORY_PORT,
       useExisting: PrismaImportacionExtractoRepository,
+    },
+
+    PrismaMatchConciliacionRepository,
+    {
+      provide: MATCH_CONCILIACION_REPOSITORY_PORT,
+      useExisting: PrismaMatchConciliacionRepository,
     },
 
     {

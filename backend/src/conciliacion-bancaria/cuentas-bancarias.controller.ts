@@ -31,7 +31,6 @@ import { memoryStorage } from 'multer';
 
 import { RequireModule } from '@/common/decorators/require-module.decorator';
 import { RequirePack } from '@/common/decorators/require-pack.decorator';
-import { ForbiddenError } from '@/common/errors';
 import { ModuleEnabledGuard } from '@/common/guards/module-enabled.guard';
 import { PackEnabledGuard } from '@/common/guards/pack-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
@@ -62,28 +61,11 @@ import {
   ImportacionExtractoRepositoryPort,
   IMPORTACION_EXTRACTO_REPOSITORY_PORT,
 } from './ports/importacion-extracto.repository.port';
+import { AuthenticatedRequest, resolveTenantId } from './tenant-request';
 
 // REQ-CB-06: v1 no persiste el binario del archivo (R-2) — el tope solo
 // protege memoria del request, no hay storage detrás.
 const EXTRACTO_LIMITE_BYTES = 10 * 1024 * 1024;
-
-// Mismo resolver que el resto de controllers (tipos-documento-fisico, comprobantes).
-// El header X-Tenant-ID lo usa super-admin; para el resto vale activeTenantId del JWT.
-
-interface AuthenticatedRequest {
-  user: { sub: string; activeTenantId?: string };
-  headers: Record<string, string | string[] | undefined>;
-}
-
-function resolveTenantId(req: AuthenticatedRequest): string {
-  const fromHeader = req.headers['x-tenant-id'];
-  const tenantId =
-    (Array.isArray(fromHeader) ? fromHeader[0] : fromHeader) || req.user.activeTenantId;
-  if (tenantId === undefined || tenantId === '') {
-    throw new ForbiddenError('TENANT_CONTEXT_REQUIRED', 'Se requiere contexto de organización');
-  }
-  return tenantId;
-}
 
 const LIST_DEFAULT_PAGE = 1;
 const LIST_DEFAULT_PAGE_SIZE = 50;

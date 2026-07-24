@@ -1,7 +1,13 @@
 // Puerto del repositorio de `MovimientoBancario` (REQ-CB-05/07/13). Multi-tenancy
 // defense in depth (CLAUDE.md §4.2): toda query filtra por tenantId.
 
-import type { LadoBancario, Moneda, Prisma } from '@prisma/client';
+import type {
+  EstadoMovimientoBancario,
+  LadoBancario,
+  Moneda,
+  MovimientoBancario,
+  Prisma,
+} from '@prisma/client';
 
 export const MOVIMIENTO_BANCARIO_REPOSITORY_PORT = Symbol('MOVIMIENTO_BANCARIO_REPOSITORY_PORT');
 
@@ -44,4 +50,35 @@ export abstract class MovimientoBancarioRepositoryPort {
     cuentaBancariaId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<number>;
+
+  /**
+   * Panel `A` del workspace (design §10): movimientos de la cuenta bancaria
+   * dentro del rango de fechas, orden `fecha ASC, ordinalDia ASC, id ASC`
+   * (determinístico). REQ-CB-13: acotado al tenant activo.
+   */
+  abstract listarPorCuentaBancariaEnRango(
+    tenantId: string,
+    cuentaBancariaId: string,
+    rango: { fechaDesde: Date; fechaHasta: Date },
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario[]>;
+
+  /** REQ-CB-13: null si no existe o pertenece a otro tenant. */
+  abstract findById(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario | null>;
+
+  /**
+   * Actualiza la columna `estado` — proyección cacheada mantenida SOLO por
+   * los caminos de escritura (crear match → `CONCILIADO`, borrar match →
+   * `PENDIENTE`, ignorar/des-ignorar). Una LECTURA nunca la toca (design §2.3).
+   */
+  abstract actualizarEstado(
+    tenantId: string,
+    id: string,
+    estado: EstadoMovimientoBancario,
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario>;
 }

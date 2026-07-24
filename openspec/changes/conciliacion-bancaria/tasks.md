@@ -561,87 +561,144 @@
 
 ## Slice 5 — Workspace `/conciliacion`
 
-- [ ] 5.1 `backend/src/comprobantes/ports/lineas-cuenta-reader.port.ts`: crear `LineasCuentaReaderPort`
+> ✅ **Slice 5 BACKEND (5.1-5.35) COMPLETO** (2026-07-23). Las tareas 5.36-5.39 (frontend) quedan
+> deliberadamente fuera de esta tanda — se hacen con el usuario presente para smokear la UI.
+>
+> **Verde real**: `pnpm exec jest src/` → **199 suites / 2682 tests** (+1 todo). Módulo
+> `conciliacion-bancaria` → 25 suites / 285 tests (37 nuevos de slice 5: 8 del adapter de
+> `LineasCuentaReaderPort` + 15 del workspace + 15 del match service + 8 de ignorar/des-ignorar;
+> el conteo total del módulo no incluye el adapter, que vive en `comprobantes/`). E2E completo
+> `test/` → **45 suites / 592 tests** verdes (incl. 10 nuevos en `conciliacion-workspace.e2e-spec.ts`;
+> `auth-logout-all` NO falló esta corrida). `tsc --noEmit` limpio, `pnpm run lint` limpio.
+> Frontend: `tsc -b` limpio, 215 files / 1642 tests verdes. `openapi:dump` + `gen:api-types`
+> regenerados y determinísticos.
+>
+> **Decisión de código de error NO prevista por el spec (5.16)**: REQ-CB-17 escenario 2 ("confirmar
+> contra un movimiento que YA tiene match") no fija código en `spec.md`. Reusar
+> `CONCILIACION_MOVIMIENTO_YA_CONCILIADO` habría hecho que UN código estable viajara con DOS status
+> HTTP distintos (409 acá, 422 en REQ-CB-18) — inaceptable para un contrato público (§6.3). Se creó
+> `CONCILIACION_MOVIMIENTO_YA_TIENE_MATCH` (409, `ConflictError`) propio.
+>
+> **Implicación de diseño encontrada al implementar 5.18 (reemplazo de match roto)**: al borrar el
+> match roto para poner el nuevo, el movimiento del match VIEJO queda con `estado=CONCILIADO` y sin
+> match — viola la invariante `estado==='CONCILIADO' ⟺ existe MatchConciliacion` (design §2.3). El
+> `crearMatch` lo devuelve explícitamente a `PENDIENTE` dentro de la MISMA `$transaction`. El design
+> describe el reemplazo pero no menciona este efecto sobre el movimiento huérfano. Cubierto por test.
+>
+> **Borde de REQ-CB-18 resuelto por lectura literal del spec**: un movimiento con match de vínculo
+> ROTO **sí** puede ignorarse (el spec solo prohíbe la transición cuando el match es *válido*), y el
+> match roto **no** se borra (el preámbulo de REQ-CB-18 dice que ignorar "NUNCA crea o borra ningún
+> `MatchConciliacion`"). Queda entonces `estado=IGNORADO` con un match roto vivo: es coherente en
+> pantalla (`estadoEfectivo=IGNORADO`) y no bloquea nada, porque `crearMatch` sabe reemplazar un
+> match roto que ocupa el ancla (§2.4). Test dedicado: `5.30bis`.
+>
+> **`LineasCuentaReaderModule` necesita `TenantContextService` como provider local**, no solo
+> `PrismaService` — `PrismaService` lo inyecta en su constructor. El molde
+> `periodos-reader.module.ts` ya lo listaba; omitirlo revienta el bootstrap de TODA la app con
+> `Nest can't resolve dependencies of the PrismaService`. Cazado por el e2e (los tests de
+> integración construyen los adapters a mano y no pasan por DI, así que NO lo detectan).
+>
+> **Refactor de boundary (no estaba en las tareas)**: `mapeo-linea-contable.ts` en la raíz del
+> módulo — `claveAncla`/`ladoYMonto`/`aLineaContableActual`/`aSnapshot` compartidos por
+> `ConciliacionService` (lectura) y `MatchConciliacionService` (escritura). Si divergieran, un match
+> podría verse roto en el panel y sano al confirmar contra él. Vive FUERA de `domain/` porque conoce
+> el shape del puerto `LineaCuentaRow` (y para no ensuciar la métrica de cobertura de `domain/`).
+>
+> **`tenant-request.ts` (nuevo, raíz del módulo)**: `resolveTenantId` + `AuthenticatedRequest` se
+> extrajeron de `cuentas-bancarias.controller.ts` (slice 1) para que los 3 controllers compartan UNA
+> implementación. Único archivo de slice 1-4 tocado en lógica, y el cambio es mecánico (mismo código,
+> movido); cubierto por los 8 e2e preexistentes de `cuentas-bancarias`, que siguen verdes.
+>
+> **`test/helpers/test-factory.ts`**: se agregó `matchConciliacion.deleteMany({})` al cleanup, en el
+> lugar exacto que el comentario previsor de slice 3 dejaba marcado ("MatchConciliacion llega en
+> slice 5: agregar su limpieza ACÁ").
+>
+> **Contrato del workspace**: `GET /api/conciliacion` exige rango (`desde`/`hasta`, `YYYY-MM-DD`) —
+> sin acotar, la lectura crece sin techo. `CONCILIACION_RANGO_INVALIDO` (422) si `desde > hasta`.
+> El `estadoEfectivo` del movimiento se resuelve con vínculo-válido > `IGNORADO` > `PENDIENTE`: un
+> match SANO manda sobre la columna, y uno ROTO devuelve el movimiento al pool en la misma respuesta.
+
+- [x] 5.1 `backend/src/comprobantes/ports/lineas-cuenta-reader.port.ts`: crear `LineasCuentaReaderPort`
       (design §3) con `listarPorCuentaEnRango` + `listarPorAnclas`.
-- [ ] 5.2 RED `[INT]` `backend/src/comprobantes/adapters/prisma-lineas-cuenta-reader.adapter.integration.spec.ts`:
+- [x] 5.2 RED `[INT]` `backend/src/comprobantes/adapters/prisma-lineas-cuenta-reader.adapter.integration.spec.ts`:
       solo `CONTABILIZADO`/`BLOQUEADO` + `anulado=false`; orden determinístico `fechaContable ASC,
       numero ASC NULLS LAST, comprobanteId ASC, orden ASC`; aislamiento por tenant (Anti-31);
       `listarPorAnclas` resuelve anclas puntuales SIN filtrar por anulado/estado (diagnóstico).
-- [ ] 5.3 GREEN `prisma-lineas-cuenta-reader.adapter.ts` (query builder Prisma, NO `$queryRaw` —
+- [x] 5.3 GREEN `prisma-lineas-cuenta-reader.adapter.ts` (query builder Prisma, NO `$queryRaw` —
       design §3).
-- [ ] 5.4 `backend/src/comprobantes/lineas-cuenta-reader.module.ts`: módulo-puerto leaf calcado de
+- [x] 5.4 `backend/src/comprobantes/lineas-cuenta-reader.module.ts`: módulo-puerto leaf calcado de
       `periodos-reader.module.ts` (cero imports de módulos, imposible cerrar ciclo CJS).
-- [ ] 5.5 `ports/match-conciliacion.repository.port.ts` + adapter Prisma (último de los 4 repos del
+- [x] 5.5 `ports/match-conciliacion.repository.port.ts` + adapter Prisma (último de los 4 repos del
       módulo).
-- [ ] 5.6 `conciliacion.service.ts` (workspace) — esqueleto: orquesta `A` (movimientos propios) + `B`
+- [x] 5.6 `conciliacion.service.ts` (workspace) — esqueleto: orquesta `A` (movimientos propios) + `B`
       (`LineasCuentaReaderPort`) + `M` (matches) → `verificarAnclas` (dominio, slice 2) →
       `estadoEfectivo`, `EN_TRANSITO` derivado, `sugerir(...)` (design §10, flujo Workspace).
-- [ ] 5.7 RED `[INT]` **REQ-CB-11 (gap cerrado — no tenía tarea propia)**: una línea contable de la
+- [x] 5.7 RED `[INT]` **REQ-CB-11 (gap cerrado — no tenía tarea propia)**: una línea contable de la
       cuenta banco, dentro del rango consultado, sin `MatchConciliacion` con vínculo válido → aparece
       en la respuesta marcada `EN_TRANSITO`; **NINGUNA fila persistida representa ese estado** — el
       enum Prisma `EstadoMovimientoBancario` ni siquiera admite el valor `EN_TRANSITO`; el test
       confirma explícitamente que `movimientos_bancarios`/`matches_conciliacion` no cambiaron tras la
       consulta. Antes lo implementaban de pasada 5.6/5.11 sin test propio.
-- [ ] 5.8 RED `[INT]` REQ-CB-10/11: movimiento con match roto → columna DB `estado=CONCILIADO`,
+- [x] 5.8 RED `[INT]` REQ-CB-10/11: movimiento con match roto → columna DB `estado=CONCILIADO`,
       respuesta `estadoEfectivo=PENDIENTE` con motivo, **cero** `UPDATE` ejecutado en la lectura.
-- [ ] 5.9 RED `[INT]` caso benigno (design §2.4 / spec escenario): `orden` corrido tras editar el
+- [x] 5.9 RED `[INT]` caso benigno (design §2.4 / spec escenario): `orden` corrido tras editar el
       comprobante pero la línea que ocupa ese `orden` coincide en los 5 campos del snapshot → vínculo
       válido, sigue `CONCILIADO`.
-- [ ] 5.10 RED `[INT]` **test dedicado obligatorio del riesgo C-1**: editar el CONJUNTO de líneas de
+- [x] 5.10 RED `[INT]` **test dedicado obligatorio del riesgo C-1**: editar el CONJUNTO de líneas de
       un comprobante conciliado (insertar línea al principio, corre los `orden`) → el ancla que
       terminó apuntando a otro contenido rompe → `estadoEfectivo=PENDIENTE` con motivo correcto
       (`MONTO_CAMBIADO`/`CUENTA_CAMBIADA` según el caso).
-- [ ] 5.11 RED `[INT]` anular el comprobante → `COMPROBANTE_ANULADO`; mover `fechaContable` fuera del
+- [x] 5.11 RED `[INT]` anular el comprobante → `COMPROBANTE_ANULADO`; mover `fechaContable` fuera del
       rango consultado → línea ausente de `B`, ancla huérfana resuelta vía `listarPorAnclas` (1 query
       acotada, solo si hay huérfanas).
-- [ ] 5.12 GREEN `conciliacion.service.ts` — `obtenerWorkspace` (cierra 5.7-5.11).
-- [ ] 5.13 `conciliacion.controller.ts`: `GET /api/conciliacion?cuentaBancariaId&desde&hasta`.
-- [ ] 5.14 `match-conciliacion.service.ts` — esqueleto: `crearMatch` / `borrarMatch` (REQ-CB-17, **la
+- [x] 5.12 GREEN `conciliacion.service.ts` — `obtenerWorkspace` (cierra 5.7-5.11).
+- [x] 5.13 `conciliacion.controller.ts`: `GET /api/conciliacion?cuentaBancariaId&desde&hasta`.
+- [x] 5.14 `match-conciliacion.service.ts` — esqueleto: `crearMatch` / `borrarMatch` (REQ-CB-17, **la
       acción central del producto**).
-- [ ] 5.15 RED `[INT]` **REQ-CB-17 escenario 1**: confirmar una sugerencia (cualquier confianza) entre
+- [x] 5.15 RED `[INT]` **REQ-CB-17 escenario 1**: confirmar una sugerencia (cualquier confianza) entre
       un movimiento `PENDIENTE` sin match y una línea `EN_TRANSITO` sin match → crea
       `MatchConciliacion` con snapshot de los 5 campos de la línea en ese instante +
       `MovimientoBancario.estado` pasa a `CONCILIADO`.
-- [ ] 5.16 RED `[INT]` **REQ-CB-17 escenario 2**: confirmar contra un movimiento que YA tiene un match
+- [x] 5.16 RED `[INT]` **REQ-CB-17 escenario 2**: confirmar contra un movimiento que YA tiene un match
       válido → rechaza — la constraint `@@unique([organizationId, movimientoBancarioId])` no permite
       un segundo match para el mismo movimiento.
-- [ ] 5.17 RED `[INT]` **REQ-CB-17 escenario 3**: confirmar contra una línea `(comprobanteId, orden)`
+- [x] 5.17 RED `[INT]` **REQ-CB-17 escenario 3**: confirmar contra una línea `(comprobanteId, orden)`
       con un `MatchConciliacion` existente cuyo vínculo está SANO → `409
       CONCILIACION_LINEA_YA_CONCILIADA`, el match existente permanece intacto.
-- [ ] 5.18 RED `[INT]` **REQ-CB-17 escenario 4**: confirmar contra una línea cuyo `MatchConciliacion`
+- [x] 5.18 RED `[INT]` **REQ-CB-17 escenario 4**: confirmar contra una línea cuyo `MatchConciliacion`
       previo está ROTO (design §2.4) → el sistema borra el match roto (escritura explícita disparada
       por la confirmación del usuario) y crea el nuevo en su lugar — sin match huérfano.
-- [ ] 5.19 GREEN `crearMatch` (cierra 5.15-5.18).
-- [ ] 5.20 RED `[INT]` invariante: `crearMatch`→columna `estado=CONCILIADO`
+- [x] 5.19 GREEN `crearMatch` (cierra 5.15-5.18).
+- [x] 5.20 RED `[INT]` invariante: `crearMatch`→columna `estado=CONCILIADO`
       (`estado==='CONCILIADO' ⟺ existe MatchConciliacion`, design §2.3).
-- [ ] 5.21 RED `[INT]` **REQ-CB-17 escenario 5**: deshacer un match → `MatchConciliacion` se borra y
+- [x] 5.21 RED `[INT]` **REQ-CB-17 escenario 5**: deshacer un match → `MatchConciliacion` se borra y
       `MovimientoBancario.estado` vuelve a `PENDIENTE`; el comprobante y sus líneas contables NO se
       modifican (decisión 3, REQ-CB-15) — operación exclusiva de la tabla de conciliación.
-- [ ] 5.22 GREEN `borrarMatch` (cierra 5.20/5.21).
-- [ ] 5.23 RED `[INT]` REQ-CB-13: aislamiento cross-tenant para `MatchConciliacion` (confirmar o
+- [x] 5.22 GREEN `borrarMatch` (cierra 5.20/5.21).
+- [x] 5.23 RED `[INT]` REQ-CB-13: aislamiento cross-tenant para `MatchConciliacion` (confirmar o
       deshacer un match de otro tenant por id → 404, nunca expone ni permite operar datos de otra
       org).
-- [ ] 5.24 GREEN cierre de 5.23 en `match-conciliacion.service.ts`.
-- [ ] 5.25 `conciliacion.controller.ts`: `POST`/`DELETE /api/conciliacion/matches[/:id]` (wiring de
+- [x] 5.24 GREEN cierre de 5.23 en `match-conciliacion.service.ts`.
+- [x] 5.25 `conciliacion.controller.ts`: `POST`/`DELETE /api/conciliacion/matches[/:id]` (wiring de
       5.14-5.24).
-- [ ] 5.26 `movimientos-bancarios.controller.ts` — esqueleto: `PATCH
+- [x] 5.26 `movimientos-bancarios.controller.ts` — esqueleto: `PATCH
       /api/movimientos-bancarios/:id/estado` (REQ-CB-18, ignorar / des-ignorar).
-- [ ] 5.27 RED `[INT]` **REQ-CB-18 escenario 1**: ignorar un `MovimientoBancario` con
+- [x] 5.27 RED `[INT]` **REQ-CB-18 escenario 1**: ignorar un `MovimientoBancario` con
       `estado=PENDIENTE` → `estado` pasa a `IGNORADO`.
-- [ ] 5.28 RED `[INT]` **REQ-CB-18 escenario 2**: des-ignorar un movimiento `IGNORADO` → `estado`
+- [x] 5.28 RED `[INT]` **REQ-CB-18 escenario 2**: des-ignorar un movimiento `IGNORADO` → `estado`
       vuelve a `PENDIENTE`.
-- [ ] 5.29 RED `[INT]` **REQ-CB-18 escenario 3**: ignorar un movimiento `PENDIENTE` sin match no crea
+- [x] 5.29 RED `[INT]` **REQ-CB-18 escenario 3**: ignorar un movimiento `PENDIENTE` sin match no crea
       ni borra ningún `MatchConciliacion`; el movimiento no se borra, solo cambia su `estado`.
-- [ ] 5.30 RED `[INT]` **REQ-CB-18 escenario 4**: ignorar un movimiento con `estado=CONCILIADO` y
+- [x] 5.30 RED `[INT]` **REQ-CB-18 escenario 4**: ignorar un movimiento con `estado=CONCILIADO` y
       vínculo SANO → rechaza con `422 CONCILIACION_MOVIMIENTO_YA_CONCILIADO`, exige deshacer el match
       primero (REQ-CB-17) — nunca queda simultáneamente "conciliado" e "ignorado".
-- [ ] 5.31 GREEN implementación de ignorar/des-ignorar (cierra 5.27-5.30).
-- [ ] 5.32 RED `[E2E]` REQ-CB-12: sugerencias ALTA/MEDIA/BAJA calculadas sobre el workspace real;
+- [x] 5.31 GREEN implementación de ignorar/des-ignorar (cierra 5.27-5.30).
+- [x] 5.32 RED `[E2E]` REQ-CB-12: sugerencias ALTA/MEDIA/BAJA calculadas sobre el workspace real;
       ninguna sugerencia crea un `MatchConciliacion` sin acción explícita del usuario.
-- [ ] 5.33 RED `[E2E]` REQ-CB-14 fail-closed: usuario solo `.read` → endpoints de escritura devuelven
+- [x] 5.33 RED `[E2E]` REQ-CB-14 fail-closed: usuario solo `.read` → endpoints de escritura devuelven
       403; usuario `.read`+`.conciliar` → acciones permitidas.
-- [ ] 5.34 GREEN guards/permisos finales en los 3 controllers del módulo.
-- [ ] 5.35 `[OPENAPI]` Regenerar (workspace + matches + estado de movimiento).
+- [x] 5.34 GREEN guards/permisos finales en los 3 controllers del módulo.
+- [x] 5.35 `[OPENAPI]` Regenerar (workspace + matches + estado de movimiento).
 - [ ] 5.36 `[FE]` `frontend/src/features/conciliacion/` (molde `features/libro-mayor/`): 2 paneles
       (movimientos bancarios / líneas en tránsito), badges de `estadoEfectivo`+motivo de vínculo roto,
       panel de sugerencias por confianza, drawer de historial de importaciones (`GET

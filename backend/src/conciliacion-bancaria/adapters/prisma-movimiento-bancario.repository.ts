@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { EstadoMovimientoBancario, MovimientoBancario } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
+import { MovimientoBancarioNoEncontradoError } from '../domain/conciliacion-errors';
 import {
   MovimientoBancarioCreateData,
   MovimientoBancarioRepositoryPort,
@@ -59,5 +61,55 @@ export class PrismaMovimientoBancarioRepository extends MovimientoBancarioReposi
     return client.movimientoBancario.count({
       where: { organizationId: tenantId, cuentaBancariaId },
     });
+  }
+
+  async listarPorCuentaBancariaEnRango(
+    tenantId: string,
+    cuentaBancariaId: string,
+    rango: { fechaDesde: Date; fechaHasta: Date },
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario[]> {
+    const client = tx ?? this.prisma;
+    return client.movimientoBancario.findMany({
+      where: {
+        organizationId: tenantId,
+        cuentaBancariaId,
+        fecha: { gte: rango.fechaDesde, lte: rango.fechaHasta },
+      },
+      orderBy: [{ fecha: 'asc' }, { ordinalDia: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  async findById(
+    tenantId: string,
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario | null> {
+    const client = tx ?? this.prisma;
+    return client.movimientoBancario.findFirst({
+      where: { id, organizationId: tenantId },
+    });
+  }
+
+  async actualizarEstado(
+    tenantId: string,
+    id: string,
+    estado: EstadoMovimientoBancario,
+    tx?: Prisma.TransactionClient,
+  ): Promise<MovimientoBancario> {
+    const client = tx ?? this.prisma;
+    // updateMany + re-lectura en vez de `update`: `update` exige un unique y
+    // dejaría `organizationId` fuera del WHERE (Anti-31).
+    const { count } = await client.movimientoBancario.updateMany({
+      where: { id, organizationId: tenantId },
+      data: { estado },
+    });
+    if (count === 0) {
+      throw new MovimientoBancarioNoEncontradoError(id);
+    }
+    const actualizado = await client.movimientoBancario.findFirstOrThrow({
+      where: { id, organizationId: tenantId },
+    });
+    return actualizado;
   }
 }
