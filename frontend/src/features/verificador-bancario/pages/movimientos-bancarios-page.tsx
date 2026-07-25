@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';
-import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import type { ListarMovimientosBancariosParams } from '@/types/api';
 
 import { AuditoriaVinculosBanner } from '../components/auditoria-vinculos-banner';
@@ -41,6 +40,12 @@ export function MovimientosBancariosPage(): React.JSX.Element {
 
   const hayFiltros = filtros !== null;
   const mostrarSaldo = filtros?.cuentaBancariaId !== undefined;
+
+  // Con una sola moneda en el resultado, el código se rotula una vez en la
+  // cabecera de la tabla en vez de repetirse en cada fila. `totales` viene por
+  // moneda desde el backend, así que su largo ES la señal.
+  const monedaUnica =
+    data?.totales.length === 1 ? (data.totales[0]?.moneda ?? null) : null;
 
   return (
     <div className="space-y-6">
@@ -85,6 +90,7 @@ export function MovimientosBancariosPage(): React.JSX.Element {
           <SaldosPorCuenta
             saldos={data.saldos}
             resumen={data.saldosPorMoneda}
+            totales={data.totales}
             hasta={data.hasta}
           />
 
@@ -93,27 +99,9 @@ export function MovimientosBancariosPage(): React.JSX.Element {
             aliasPorCuenta={aliasPorCuenta}
           />
 
-          {data.totales.length > 0 && (
-            <section
-              aria-label="Totales por moneda"
-              className="rounded-md border bg-card px-4 py-3 flex flex-wrap gap-x-8 gap-y-2"
-            >
-              {/* REQ-VMB-11: subtotales POR MONEDA, sin conversión ni total combinado. */}
-              {data.totales.map((t) => (
-                <p key={t.moneda} className="text-sm">
-                  <span className="font-medium">{t.moneda}</span>
-                  <span className="text-muted-foreground"> · Débitos: </span>
-                  <span className="tabular-nums">{formatearMontoBob(t.totalDebitos)}</span>
-                  <span className="text-muted-foreground"> · Créditos: </span>
-                  <span className="tabular-nums">{formatearMontoBob(t.totalCreditos)}</span>
-                  <span className="text-muted-foreground">
-                    {' '}
-                    · {t.cantidad} {t.cantidad === 1 ? 'movimiento' : 'movimientos'}
-                  </span>
-                </p>
-              ))}
-            </section>
-          )}
+          {/* REQ-VMB-11: los subtotales POR MONEDA (sin conversión ni total
+              combinado) ya no viven en una franja propia — comparten la fila de
+              resumen de `SaldosPorCuenta` con el saldo de cada moneda. */}
 
           <section aria-label="Movimientos">
             <div className="mb-3 flex items-baseline justify-between">
@@ -128,6 +116,7 @@ export function MovimientosBancariosPage(): React.JSX.Element {
               movimientos={data.movimientos}
               aliasPorCuenta={aliasPorCuenta}
               mostrarSaldo={mostrarSaldo}
+              monedaUnica={monedaUnica}
               isLoading={isLoading}
             />
             <PaginationBar
