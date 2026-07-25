@@ -61,6 +61,9 @@ Migración **aditiva**, sin backfill.
 - [x] 3.4 Extraer `domain/estado-efectivo.ts` desde `conciliacion.service.ts`
       y hacer que el workspace lo consuma. **Refactor puro: la suite existente
       debe quedar intacta, sin cambiar comportamiento observable.**
+      _Follow-up (D4, aprobado por Marco): el verificador también consume la
+      función de dominio — copia duplicada eliminada de
+      `movimientos-bancarios.service.ts`._
 - [ ] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de
       `IGNORADO` con nombre propio, residuo ≠ 0 expuesto sin absorber, y
       diferencia permanente de período cerrado.
