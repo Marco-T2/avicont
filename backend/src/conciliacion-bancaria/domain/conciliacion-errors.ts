@@ -119,3 +119,19 @@ export class RangoConciliacionInvalidoError extends InvalidStateError {
     );
   }
 }
+
+/**
+ * REQ-VMB-01 escenario 2: el rango del listado cross-cuenta del verificador
+ * es obligatorio y `desde` no puede ser posterior a `hasta`. Código PROPIO
+ * (no reusa `CONCILIACION_RANGO_INVALIDO`): son endpoints distintos y un
+ * código estable no debe ambiguar su origen.
+ */
+export class ListadoMovimientosRangoInvalidoError extends InvalidStateError {
+  constructor(desde: string, hasta: string) {
+    super(
+      'CONCILIACION_LISTADO_RANGO_INVALIDO',
+      'El rango de fechas es inválido: "desde" no puede ser posterior a "hasta"',
+      { desde, hasta },
+    );
+  }
+}

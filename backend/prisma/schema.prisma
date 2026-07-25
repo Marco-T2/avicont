@@ -1394,6 +1394,9 @@ model MovimientoBancario {
   datosOriginales  Json                          // renglón crudo, celdas como STRING
 
   ordinalDia       Int
+  // Índice 0-based dentro del orden CRONOLÓGICO del archivo importado
+  // (REQ-CB-21). null = importado antes del change o secuencia NO_MONOTONA.
+  ordenFisico      Int?
   hashDedup        String
   estado           EstadoMovimientoBancario @default(PENDIENTE)  // proyección cacheada (design §2.3)
 
@@ -1407,6 +1410,7 @@ model MovimientoBancario {
 
   @@unique([cuentaBancariaId, hashDedup])       // idempotencia ESTRUCTURAL (decisión 7)
   @@index([organizationId, cuentaBancariaId, fecha])
+  @@index([organizationId, fecha])              // listado cross-cuenta del verificador (REQ-VMB-01)
   @@index([cuentaBancariaId, estado, fecha])
   @@map("movimientos_bancarios")
 }

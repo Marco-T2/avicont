@@ -439,6 +439,50 @@ export interface WorkspaceConciliacionParams {
 }
 
 // ============================================================
+// Conciliación bancaria — Verificador de movimientos (mayor unificado)
+// ============================================================
+
+export type ListadoMovimientosBancarios = Schemas['ListadoMovimientosBancariosResponseDto'];
+
+export type MovimientoVerificador = Schemas['MovimientoVerificadorDto'];
+
+/** Totales POR MONEDA, sin conversión a BOB ni total combinado (REQ-VMB-11). */
+export type TotalMoneda = Schemas['TotalMonedaDto'];
+
+/** Saldo vigente por cuenta: `null` honesto, sin fallback (REQ-VMB-08/09). */
+export type SaldoCuentaBancaria = Schemas['SaldoCuentaBancariaDto'];
+
+/**
+ * Agregado POR MONEDA de la franja `saldos`, calculado por el BACKEND con
+ * Money/decimal.js — el frontend lo presenta sin recalcular (REQ-VMB-10).
+ */
+export type ResumenSaldosMoneda = Schemas['ResumenSaldosMonedaDto'];
+
+export type AuditoriaVinculos = Schemas['AuditoriaVinculosDto'];
+
+export type VinculoRoto = Schemas['VinculoRotoDto'];
+
+/** Columna cacheada `estado` — filtro opt-in del verificador (REQ-VMB-03). */
+export type EstadoMovimientoBancario = MovimientoVerificador['estado'];
+
+export interface ListarMovimientosBancariosParams {
+  /** `YYYY-MM-DD`, inclusive. Obligatorio (REQ-VMB-01). */
+  desde: string;
+  /** `YYYY-MM-DD`, inclusive. Obligatorio (REQ-VMB-01). */
+  hasta: string;
+  cuentaBancariaId?: string;
+  /** Opt-in: sin este parámetro se muestra TODO (REQ-VMB-02). */
+  estado?: EstadoMovimientoBancario;
+  /** String decimal (§4.5). */
+  montoDesde?: string;
+  /** String decimal (§4.5). */
+  montoHasta?: string;
+  glosa?: string;
+  page?: number;
+  limit?: number;
+}
+
+// ============================================================
 // Conciliación bancaria — Importaciones de extracto (slices 3-4)
 // ============================================================
 

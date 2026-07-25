@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -717,5 +718,177 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
 
     const orgB = await prisma.organization.create({ data: { slug: SLUG_B, name: 'Org B' } });
     expect(await movimientoRepo.contarPorCuentaBancaria(orgB.id, cb.id)).toBe(0);
+  });
+
+  // ============================================================
+  // REQ-CB-21 — la importación persiste `ordenFisico` (change
+  // `verificador-movimientos-bancarios`). El hash de dedup NO cambia.
+  // ============================================================
+
+  describe('REQ-CB-21 — ordenFisico', () => {
+    // El hash incluye cuentaBancariaId, así que el GATE necesita un id FIJO
+    // para poder congelar los valores esperados entre corridas.
+    const CUENTA_BANCARIA_ID_GATE = '00000000-0000-4000-8000-00000000cb01';
+
+    /**
+     * Resumen determinístico de los hashes de la cuenta: sha256 de la lista
+     * ordenada. Congela el CONJUNTO exacto de hashes sin listar los 20.
+     */
+    async function resumenHashes(cuentaBancariaId: string): Promise<string> {
+      const movs = await prisma.movimientoBancario.findMany({
+        where: { organizationId: tenantA, cuentaBancariaId },
+        select: { hashDedup: true },
+      });
+      const ordenados = movs.map((m) => m.hashDedup).sort();
+      return createHash('sha256').update(ordenados.join('\n')).digest('hex');
+    }
+
+    async function movimientosDe(cuentaBancariaId: string) {
+      return prisma.movimientoBancario.findMany({
+        where: { organizationId: tenantA, cuentaBancariaId },
+      });
+    }
+
+    it('GATE: los hashes del fixture BancoSol son EXACTAMENTE los de antes del change', async () => {
+      // Valor capturado con el código PRE-change (aprobación). Si este test
+      // rompe, la captura de ordenFisico alteró la entrada de
+      // calcularHashDedup y una re-importación duplicaría TODO: PARAR.
+      const RESUMEN_PRE_CHANGE = '5518124c8399979923d1c05115bbd5ba9ace9491f2ed0b15cb2bac4aa49fa40d';
+
+      await prisma.cuentaBancaria.create({
+        data: {
+          id: CUENTA_BANCARIA_ID_GATE,
+          organizationId: tenantA,
+          cuentaId: cuentaIdA,
+          alias: 'Cuenta gate hashes',
+          perfilExtracto: PerfilExtracto.BANCOSOL_XLSX,
+          numeroCuenta: '5799375-760-305',
+          moneda: 'BOB',
+        },
+      });
+      const service = servicioReal();
+
+      const res = await service.importar(
+        tenantA,
+        CUENTA_BANCARIA_ID_GATE,
+        'user-1',
+        archivoDe(leerFixture('bancosol-20-movimientos-checksum.xlsx')),
+        { confirmarNumeroCuenta: false },
+      );
+      if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+      expect(res.movimientosNuevos).toBe(20);
+
+      expect(await resumenHashes(CUENTA_BANCARIA_ID_GATE)).toBe(RESUMEN_PRE_CHANGE);
+    });
+
+    it('importación ASC (BancoSol): ordenFisico 0..N-1 único y sigue la cronología', async () => {
+      const cb = await crearCuentaBancaria('5799375-760-305');
+      const service = servicioReal();
+
+      await service.importar(
+        tenantA,
+        cb.id,
+        'user-1',
+        archivoDe(leerFixture('bancosol-20-movimientos-checksum.xlsx')),
+        { confirmarNumeroCuenta: false },
+      );
+
+      const movs = await movimientosDe(cb.id);
+      expect(movs).toHaveLength(20);
+      const ordenes = movs.map((m) => m.ordenFisico).sort((a, b) => (a ?? -1) - (b ?? -1));
+      expect(ordenes).toEqual(Array.from({ length: 20 }, (_, i) => i));
+
+      // ordenFisico ASC ⇒ fecha no-decreciente (cronología, nunca fila cruda)
+      const porOrden = [...movs].sort((a, b) => a.ordenFisico! - b.ordenFisico!);
+      for (let i = 1; i < porOrden.length; i++) {
+        expect(porOrden[i]!.fecha.getTime()).toBeGreaterThanOrEqual(
+          porOrden[i - 1]!.fecha.getTime(),
+        );
+      }
+    });
+
+    it('export DESC (Fortaleza "Últimos 30"): el cronológicamente primero recibe 0 y la fila física 0 el máximo', async () => {
+      const cb = await crearCuentaBancariaFortaleza('5651023390');
+      const service = servicioReal();
+
+      await service.importar(
+        tenantA,
+        cb.id,
+        'user-1',
+        archivoDe(leerFixture('fortaleza-ultimos-30.xlsx'), 'fortaleza-ultimos-30.xlsx'),
+        { confirmarNumeroCuenta: false },
+      );
+
+      const movs = await movimientosDe(cb.id);
+      expect(movs).toHaveLength(30);
+      const porOrden = [...movs].sort((a, b) => a.ordenFisico! - b.ordenFisico!);
+
+      // Cronología global: si se hubiera usado el índice físico crudo, el
+      // export DESC saldría con fecha no-CRECIENTE y esto rompería.
+      for (let i = 1; i < porOrden.length; i++) {
+        expect(porOrden[i]!.fecha.getTime()).toBeGreaterThanOrEqual(
+          porOrden[i - 1]!.fecha.getTime(),
+        );
+      }
+
+      // El día más antiguo del fixture abre con TRES créditos (17:36 → 45.000,
+      // 17:37 → 50.000, 17:38 → 41.000 — el caso del descuadre fantasma de
+      // PR #250): sus ordenFisico deben ser 0,1,2 siguiendo la hora real.
+      const diaMasAntiguo = porOrden[0]!.fecha.getTime();
+      const delDia = porOrden.filter((m) => m.fecha.getTime() === diaMasAntiguo);
+      expect(delDia.map((m) => m.hora)).toEqual(['17:36:00', '17:37:00', '17:38:00']);
+      expect(delDia.map((m) => m.ordenFisico)).toEqual([0, 1, 2]);
+    });
+
+    it('secuencia NO_MONOTONA: todos se persisten con ordenFisico=null — nunca se adivina', async () => {
+      const cb = await crearCuentaBancaria(null);
+      const desordenados = [
+        movimientoFake({ fecha: FechaContable.of(2026, 6, 15), referencia: 'r1' }),
+        movimientoFake({ fecha: FechaContable.of(2026, 6, 10), referencia: 'r2' }),
+        movimientoFake({ fecha: FechaContable.of(2026, 6, 20), referencia: 'r3' }),
+      ];
+      const parser = fakeParser({
+        descriptor: { perfil: PerfilExtracto.BANCOSOL_XLSX, exponeNumeroCuenta: false },
+        movimientos: desordenados,
+        numeroCuentaDeclarado: null,
+      });
+      const service = servicioConParsers([parser]);
+
+      const res = await service.importar(tenantA, cb.id, 'user-1', archivoDe(Buffer.from('x')), {
+        confirmarNumeroCuenta: false,
+      });
+      if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+      expect(res.movimientosNuevos).toBe(3);
+
+      const movs = await movimientosDe(cb.id);
+      expect(movs).toHaveLength(3);
+      expect(movs.map((m) => m.ordenFisico)).toEqual([null, null, null]);
+    });
+
+    it('reimportar sobre preexistentes con ordenFisico=null: 0 nuevos, N ya existían, y siguen null', async () => {
+      const cb = await crearCuentaBancaria('5799375-760-305');
+      const service = servicioReal();
+      const buffer = leerFixture('bancosol-20-movimientos-checksum.xlsx');
+
+      await service.importar(tenantA, cb.id, 'user-1', archivoDe(buffer), {
+        confirmarNumeroCuenta: false,
+      });
+      // Simula filas importadas ANTES del change (columna recién agregada, null)
+      await prisma.movimientoBancario.updateMany({
+        where: { organizationId: tenantA, cuentaBancariaId: cb.id },
+        data: { ordenFisico: null },
+      });
+
+      const segunda = await service.importar(tenantA, cb.id, 'user-1', archivoDe(buffer), {
+        confirmarNumeroCuenta: false,
+      });
+      if (segunda.requiereConfirmacionCuenta) throw new Error('unreachable');
+      expect(segunda.movimientosNuevos).toBe(0);
+      expect(segunda.movimientosDuplicados).toBe(20);
+
+      const movs = await movimientosDe(cb.id);
+      expect(movs).toHaveLength(20);
+      expect(movs.every((m) => m.ordenFisico === null)).toBe(true);
+    });
   });
 });

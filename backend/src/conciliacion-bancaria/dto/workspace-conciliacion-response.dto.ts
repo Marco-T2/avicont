@@ -3,7 +3,7 @@ import { LadoBancario, LadoContable, Moneda, EstadoMovimientoBancario } from '@p
 
 import type { WorkspaceConciliacion } from '../conciliacion.service';
 
-const MOTIVOS_VINCULO_ROTO = [
+export const MOTIVOS_VINCULO_ROTO = [
   'LINEA_INEXISTENTE',
   'COMPROBANTE_ANULADO',
   'CUENTA_CAMBIADA',

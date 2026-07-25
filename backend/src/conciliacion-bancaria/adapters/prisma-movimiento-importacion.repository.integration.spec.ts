@@ -130,6 +130,7 @@ describe('PrismaMovimientoBancarioRepository + PrismaImportacionExtractoReposito
       contraparteDocumento: null,
       datosOriginales: {},
       ordinalDia: 0,
+      ordenFisico: null,
       hashDedup,
       ...overrides,
     };
