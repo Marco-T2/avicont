@@ -1,12 +1,40 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { InformeConciliacion, InformeConciliacionParams } from '@/types/api';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import type {
+  ArranqueAplicado,
+  InformeConciliacion,
+  InformeConciliacionParams,
+} from '@/types/api';
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 vi.mock('../hooks/use-informe-conciliacion', () => ({
   useInformeConciliacion: vi.fn(),
+}));
+
+vi.mock('../hooks/use-historial-arranques', () => ({
+  useHistorialArranques: vi.fn(),
+}));
+
+vi.mock('../hooks/use-declarar-arranque', () => ({
+  useDeclararArranque: vi.fn(),
+}));
+
+const { hasMock } = vi.hoisted(() => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- fija la firma para los tests que la sobreescriben.
+  hasMock: vi.fn((_p: string) => true),
+}));
+
+vi.mock('@/lib/use-permissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/use-permissions')>()),
+  usePermissions: () => ({
+    has: hasMock,
+    hasAll: (perms: string[]) => perms.every((p) => hasMock(p)),
+    isOwner: false,
+    permissions: [],
+  }),
 }));
 
 // Los filtros se reemplazan por un botón que emite params deterministas: el
@@ -22,6 +50,8 @@ vi.mock('../components/informe-filtros', () => ({
   ),
 }));
 
+import { useDeclararArranque } from '../hooks/use-declarar-arranque';
+import { useHistorialArranques } from '../hooks/use-historial-arranques';
 import { useInformeConciliacion } from '../hooks/use-informe-conciliacion';
 
 import { InformeConciliacionPage } from './informe-conciliacion-page';
@@ -104,6 +134,30 @@ const INFORME_ABSTENIDO: InformeConciliacion = {
   },
 };
 
+// Historial ordenado por el backend: `fecha DESC, createdAt DESC` (D8).
+const HISTORIAL: ArranqueAplicado[] = [
+  {
+    id: 'arr-dic',
+    fecha: '2026-12-31',
+    saldoExtracto: '2000.00',
+    saldoLibros: '2000.00',
+    diferenciaResidual: '0.00',
+    nota: null,
+    declaradoPorUserId: 'user-1',
+    declaradoEl: '2027-01-05T10:00:00.000Z',
+  },
+  {
+    id: 'arr-jun',
+    fecha: '2026-06-30',
+    saldoExtracto: '1000.00',
+    saldoLibros: '975.00',
+    diferenciaResidual: '25.00',
+    nota: null,
+    declaradoPorUserId: 'user-9',
+    declaradoEl: '2026-07-01T12:00:00.000Z',
+  },
+];
+
 function mockInforme(
   overrides: Partial<ReturnType<typeof useInformeConciliacion>> = {},
 ): void {
@@ -115,6 +169,13 @@ function mockInforme(
   } as unknown as ReturnType<typeof useInformeConciliacion>);
 }
 
+function mockHistorial(data: ArranqueAplicado[] | undefined = undefined): void {
+  vi.mocked(useHistorialArranques).mockReturnValue({
+    data,
+    isLoading: false,
+  } as unknown as ReturnType<typeof useHistorialArranques>);
+}
+
 /** Emite los filtros para que la página pase a tener params activos. */
 async function emitir(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.click(screen.getByRole('button', { name: /emitir filtros/i }));
@@ -122,7 +183,13 @@ async function emitir(user: ReturnType<typeof userEvent.setup>): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hasMock.mockReturnValue(true);
   mockInforme();
+  mockHistorial();
+  vi.mocked(useDeclararArranque).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useDeclararArranque>);
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -225,5 +292,71 @@ describe('InformeConciliacionPage — abstención visible (REQ-ICB-04/05)', () =
     expect(
       screen.queryByText(/no hay punto de arranque declarado:/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('la abstención ofrece declarar el arranque desde el propio aviso', async () => {
+    const user = userEvent.setup();
+    mockInforme({ data: INFORME_ABSTENIDO } as never);
+    render(<InformeConciliacionPage />);
+
+    await emitir(user);
+
+    // Dos accesos a la misma acción: el aviso de abstención y el header del historial.
+    expect(screen.getAllByRole('button', { name: /declarar arranque/i })).toHaveLength(2);
+  });
+});
+
+describe('InformeConciliacionPage — historial de arranques (task 3.11, D8)', () => {
+  it('tras emitir pide el historial de la cuenta y lo muestra señalando cuál aplica', async () => {
+    const user = userEvent.setup();
+    mockInforme({ data: INFORME } as never);
+    mockHistorial(HISTORIAL);
+    render(<InformeConciliacionPage />);
+
+    await emitir(user);
+
+    expect(vi.mocked(useHistorialArranques)).toHaveBeenLastCalledWith('cb-1');
+
+    const historial = screen.getByRole('region', { name: /declaraciones de arranque/i });
+    // Ambas declaraciones visibles (append-only) y la vigente al corte señalada.
+    expect(within(historial).getByText('31/12/2026')).toBeInTheDocument();
+    expect(within(historial).getByText('30/06/2026')).toBeInTheDocument();
+    expect(within(historial).getByText(/aplica a este corte/i)).toBeInTheDocument();
+  });
+
+  it('con permiso de conciliar, Declarar arranque abre el formulario de declaración', async () => {
+    const user = userEvent.setup();
+    mockInforme({ data: INFORME } as never);
+    mockHistorial(HISTORIAL);
+    render(<InformeConciliacionPage />);
+
+    await emitir(user);
+    await user.click(screen.getByRole('button', { name: /declarar arranque/i }));
+
+    expect(await screen.findByText('Declarar punto de arranque')).toBeInTheDocument();
+  });
+
+  it('con read pero sin conciliar: ve el informe y el historial, y el botón queda deshabilitado', async () => {
+    const user = userEvent.setup();
+    hasMock.mockImplementation((p: string) => p !== 'contabilidad.conciliacion.conciliar');
+    mockInforme({ data: INFORME } as never);
+    mockHistorial(HISTORIAL);
+    render(
+      <TooltipProvider>
+        <InformeConciliacionPage />
+      </TooltipProvider>,
+    );
+
+    await emitir(user);
+
+    // El botón existe pero está deshabilitado (afordancia honesta, §14.7).
+    expect(screen.getByRole('button', { name: /declarar arranque/i })).toBeDisabled();
+    // Los datos se siguen viendo: quien solo mira, mira todo.
+    expect(screen.getByRole('region', { name: /papel de trabajo/i })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: /declaraciones de arranque/i })).getByText(
+        '30/06/2026',
+      ),
+    ).toBeInTheDocument();
   });
 });

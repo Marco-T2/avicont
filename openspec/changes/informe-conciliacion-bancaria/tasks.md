@@ -95,7 +95,7 @@ Migración **aditiva**, sin backfill.
 - [x] 3.10 Vista del puente como **papel de trabajo** (no una tabla más):
       ambos saldos, partidas con signo, residuo destacado y la abstención
       visible cuando corresponda.
-- [ ] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
+- [x] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
 - [x] 3.12 `nav-items.ts`: 4º ítem en el grupo `bancos` con
       `pack: 'contabilidad.conciliacion'`. Actualizar `nav-list.test.tsx`
       (guard bidireccional).

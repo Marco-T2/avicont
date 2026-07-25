@@ -45,6 +45,19 @@ describe('AbstencionArranque — la abstención es visible y accionable, no un e
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('renderiza la acción de declarar cuando la página la provee (task 3.11)', () => {
+    render(
+      <AbstencionArranque
+        informe={INFORME_ABSTENIDO}
+        accionDeclarar={<button type="button">Declarar arranque</button>}
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /declarar arranque/i }),
+    ).toBeInTheDocument();
+  });
+
   it('sin saldo publicado por el banco lo dice en lugar de inventar un cero', () => {
     render(
       <AbstencionArranque

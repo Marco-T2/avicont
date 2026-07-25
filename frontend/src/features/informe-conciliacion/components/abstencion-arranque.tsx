@@ -6,6 +6,11 @@ import type { InformeConciliacion } from '@/types/api';
 
 interface AbstencionArranqueProps {
   informe: InformeConciliacion;
+  /**
+   * Acción para declarar el arranque (task 3.11): la página la provee ya
+   * gateada por permiso — la abstención no solo se explica, se resuelve acá.
+   */
+  accionDeclarar?: React.ReactNode;
 }
 
 /**
@@ -14,7 +19,10 @@ interface AbstencionArranqueProps {
  * NORMAL de toda cuenta recién incorporada — la UI lo explica e invita a
  * declarar el punto de partida; NO pinta un error.
  */
-export function AbstencionArranque({ informe }: AbstencionArranqueProps): React.JSX.Element {
+export function AbstencionArranque({
+  informe,
+  accionDeclarar,
+}: AbstencionArranqueProps): React.JSX.Element {
   const corte = formatearFechaContable(informe.corte);
 
   return (
@@ -32,6 +40,7 @@ export function AbstencionArranque({ informe }: AbstencionArranqueProps): React.
           desde la cual se comparan, los dos saldos a esa fecha y la diferencia que se acepta como
           residual. Es el estado normal de una cuenta recién incorporada — no es un error.
         </p>
+        {accionDeclarar !== undefined && <div className="mt-4">{accionDeclarar}</div>}
       </div>
     </div>
   );
