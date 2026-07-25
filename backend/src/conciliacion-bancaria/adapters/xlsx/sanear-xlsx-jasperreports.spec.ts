@@ -102,6 +102,53 @@ describe('sanearXlsxJasperReports', () => {
       }
     });
   });
+
+  /**
+   * El saneo corre en la puerta única de `leerMatrizXlsx`: los 7 perfiles, dos
+   * veces por importación (`reconoce()` + `parse()`). Que un archivo sano NO se
+   * re-zipee es lo que deja a los otros seis bancos fuera del round-trip de
+   * fflate — que descarta metadata del zip — y les ahorra un `zipSync` síncrono
+   * del archivo entero. Es contrato, no detalle de implementación.
+   */
+  describe('el archivo sano NO se re-zipea (idempotencia literal)', () => {
+    it.each([
+      'fie-por-rango-sharedstrings.xlsx',
+      'bancosol-a-mayo-junio.xlsx',
+      'economico-extracto.xlsx',
+      'union-extracto-por-rango.xlsx',
+      'fortaleza-por-rango.xlsx',
+      'bmsc-extracto.xlsx',
+    ])('%s: devuelve el MISMO buffer, sin pasar por zipSync', (nombre) => {
+      const original = leerFixture(nombre);
+
+      expect(sanearXlsxJasperReports(original)).toBe(original);
+    });
+
+    it('en cambio un archivo malformado SÍ produce un buffer nuevo', () => {
+      const original = leerFixture('fie-ultimas-transacciones.xlsx');
+
+      expect(sanearXlsxJasperReports(original)).not.toBe(original);
+    });
+
+    /**
+     * BCP es el único perfil sano que SÍ se toca, y la conducta es la misma que
+     * traía el saneo desde el PR #253: declara `<dimension ref="B1:AB42"/>`
+     * teniendo celdas en la columna A, y el rango emitido ancla en A1. Se
+     * congela acá para que no se lo confunda con un archivo intacto ni se lo
+     * "arregle" cambiándole el parseo a un perfil que hoy funciona.
+     */
+    it('bcp-extracto.xlsx: se amplía a la izquierda (declara B1 con celdas en la columna A)', () => {
+      const original = leerFixture('bcp-extracto.xlsx');
+
+      const saneado = sanearXlsxJasperReports(original);
+
+      expect(saneado).not.toBe(original);
+      const hoja = Buffer.from(
+        unzipSync(new Uint8Array(saneado))['xl/worksheets/sheet1.xml'] ?? new Uint8Array(),
+      ).toString('utf8');
+      expect(hoja).toContain('<dimension ref="A1:AB42"/>');
+    });
+  });
 });
 
 describe('sanearHojaXml (parches a nivel XML, aislados)', () => {
@@ -122,6 +169,54 @@ describe('sanearHojaXml (parches a nivel XML, aislados)', () => {
       '</sheetData></worksheet>';
 
     expect(sanearHojaXml(xml)).toContain('<dimension ref="A1:AA1"/>');
+  });
+
+  /**
+   * El recálculo AMPLÍA, nunca achica ni normaliza. Reemplazar a ciegas rompía
+   * hojas sanas que declaran filas sin celdas `<c>`: el extracto de Unión
+   * declara `A1:AD46` con celdas hasta la 45, y el recálculo puro le comía la
+   * última fila — la falla de FIE al revés, sobre un archivo que estaba bien.
+   */
+  describe('el <dimension> declarado se AMPLÍA, nunca se achica', () => {
+    it('declarado más ancho que las celdas: queda intacto (no se achica)', () => {
+      const xml =
+        '<worksheet><dimension ref="A1:AD46"/><sheetData>' +
+        '<row r="45"><c r="AD45"><v>1</v></c></row>' +
+        '</sheetData></worksheet>';
+
+      expect(sanearHojaXml(xml)).toBe(xml);
+    });
+
+    it('declarado exacto pero con otro formato: no se normaliza el tag (cero churn)', () => {
+      // BancoSol declara `<dimension ref="A1:N77" />`, con espacio antes del
+      // cierre. Reescribirlo obligaría a re-zipear un archivo que está sano.
+      const xml =
+        '<worksheet><dimension ref="A1:B2" /><sheetData>' +
+        '<row r="2"><c r="B2"><v>1</v></c></row>' +
+        '</sheetData></worksheet>';
+
+      expect(sanearHojaXml(xml)).toBe(xml);
+    });
+
+    it('unión por eje: se toma el máximo declarado/real en cada dimensión', () => {
+      // Declarado corto en filas (2 < 9) y largo en columnas (D > B).
+      const xml =
+        '<worksheet><dimension ref="A1:D2"/><sheetData>' +
+        '<row r="9"><c r="B9"><v>1</v></c></row>' +
+        '</sheetData></worksheet>';
+
+      expect(sanearHojaXml(xml)).toContain('<dimension ref="A1:D9"/>');
+    });
+
+    it('declarado que arranca fuera de A1 y deja celdas afuera: se amplía a la izquierda', () => {
+      // BCP declara `B1:AB42` teniendo celdas en la columna A.
+      const xml =
+        '<worksheet><dimension ref="B1:C2"/><sheetData>' +
+        '<row r="2"><c r="A2"><v>1</v></c><c r="C2"><v>2</v></c></row>' +
+        '</sheetData></worksheet>';
+
+      expect(sanearHojaXml(xml)).toContain('<dimension ref="A1:C2"/>');
+    });
   });
 
   it('quita t="inlineStr" SOLO a las celdas sin hijo <is> (formas pareada y auto-cerrada)', () => {
