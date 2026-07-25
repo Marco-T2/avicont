@@ -58,7 +58,7 @@ Migración **aditiva**, sin backfill.
 
 ### Dominio
 
-- [ ] 3.4 Extraer `domain/estado-efectivo.ts` desde `conciliacion.service.ts`
+- [x] 3.4 Extraer `domain/estado-efectivo.ts` desde `conciliacion.service.ts`
       y hacer que el workspace lo consuma. **Refactor puro: la suite existente
       debe quedar intacta, sin cambiar comportamiento observable.**
 - [ ] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de

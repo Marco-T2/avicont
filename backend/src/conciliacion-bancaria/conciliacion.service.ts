@@ -19,6 +19,13 @@ import { Money } from '@/common/domain/money';
 
 import { CuentasBancariasService } from './cuentas-bancarias.service';
 import { RangoConciliacionInvalidoError } from './domain/conciliacion-errors';
+import {
+  derivarEstadoEfectivoLinea,
+  derivarEstadoEfectivoMovimiento,
+  esVinculoValido,
+  EstadoEfectivoLinea,
+  EstadoEfectivoMovimiento,
+} from './domain/estado-efectivo';
 import { sugerir, Sugerencia } from './domain/motor-sugerencias';
 import { MotivoVinculoRoto, verificarAnclas } from './domain/verificar-anclas';
 import { aLineaContableActual, aSnapshot, claveAncla, ladoYMonto } from './mapeo-linea-contable';
@@ -35,8 +42,9 @@ import {
 // Vistas del workspace — todos los montos como STRING (§4.5 core)
 // ============================================================
 
-export type EstadoEfectivoMovimiento = 'PENDIENTE' | 'CONCILIADO' | 'IGNORADO';
-export type EstadoEfectivoLinea = 'EN_TRANSITO' | 'CONCILIADO';
+// La derivación (y sus tipos) vive en el dominio puro — se re-exporta para
+// conservar la superficie pública original del service.
+export type { EstadoEfectivoLinea, EstadoEfectivoMovimiento } from './domain/estado-efectivo';
 
 export interface VinculoView {
   matchId: string;
@@ -238,7 +246,7 @@ export class ConciliacionService {
     // un match roto devuelve su línea al pool en la misma respuesta (design §2.3).
     const reclamadasPorVinculoValido = new Set(
       [...verificaciones.values()]
-        .filter((v) => v.roto === null)
+        .filter((v) => esVinculoValido(v))
         .map((v) => claveAncla(v.comprobanteId, v.orden)),
     );
 
@@ -297,15 +305,12 @@ export class ConciliacionService {
     mov: MovimientoBancario,
     vinculo: VinculoView | null,
   ): MovimientoConciliacionView {
-    // Orden deliberado: un vínculo VÁLIDO manda sobre la columna persistida; si
-    // está roto, el movimiento vuelve a PENDIENTE aunque la columna diga
-    // CONCILIADO (REQ-CB-11) — la columna NO es la verdad de display.
-    const estadoEfectivo: EstadoEfectivoMovimiento =
-      vinculo !== null && vinculo.roto === null
-        ? 'CONCILIADO'
-        : mov.estado === 'IGNORADO'
-          ? 'IGNORADO'
-          : 'PENDIENTE';
+    // La regla vive en el dominio puro (`domain/estado-efectivo.ts`) para que
+    // workspace e informe deriven el estado con el MISMO código (design D4).
+    const estadoEfectivo: EstadoEfectivoMovimiento = derivarEstadoEfectivoMovimiento(
+      mov.estado,
+      vinculo,
+    );
 
     return {
       id: mov.id,
@@ -336,7 +341,7 @@ export class ConciliacionService {
       montoBob: montoBob.toBob(),
       tipo,
       moneda: fila.moneda,
-      estadoEfectivo: conVinculoValido ? 'CONCILIADO' : 'EN_TRANSITO',
+      estadoEfectivo: derivarEstadoEfectivoLinea(conVinculoValido),
     };
   }
 }
