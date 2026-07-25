@@ -42,6 +42,7 @@ import { CierreEjercicioPage } from '@/features/cierre-ejercicio/pages/cierre-ej
 import { CierreGestionActivaRedirect } from '@/features/cierre-ejercicio/components/cierre-gestion-activa-redirect';
 import { CuentasBancariasPage } from '@/features/cuentas-bancarias/pages/cuentas-bancarias-page';
 import { ConciliacionPage } from '@/features/conciliacion/pages/conciliacion-page';
+import { InformeConciliacionPage } from '@/features/informe-conciliacion/pages/informe-conciliacion-page';
 import { MovimientosBancariosPage } from '@/features/verificador-bancario/pages/movimientos-bancarios-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
@@ -284,6 +285,17 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
                 <ConciliacionPage />
+              </RequirePermission>
+            ),
+          },
+          // REQ-ICB-09 / D7: consultar el informe es lectura — fail-closed sin
+          // `.read`. Declarar un arranque se gatea aparte con `.conciliar` en
+          // la propia pantalla (task 3.11).
+          {
+            path: '/conciliacion/informe',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
+                <InformeConciliacionPage />
               </RequirePermission>
             ),
           },
