@@ -42,6 +42,7 @@ import { CierreEjercicioPage } from '@/features/cierre-ejercicio/pages/cierre-ej
 import { CierreGestionActivaRedirect } from '@/features/cierre-ejercicio/components/cierre-gestion-activa-redirect';
 import { CuentasBancariasPage } from '@/features/cuentas-bancarias/pages/cuentas-bancarias-page';
 import { ConciliacionPage } from '@/features/conciliacion/pages/conciliacion-page';
+import { MovimientosBancariosPage } from '@/features/verificador-bancario/pages/movimientos-bancarios-page';
 import { PERMISSIONS } from '@/lib/permissions';
 
 import { IndexRedirect } from './index-redirect';
@@ -262,6 +263,16 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
                 <CuentasBancariasPage />
+              </RequirePermission>
+            ),
+          },
+          // REQ-VMB-14: fail-closed sin `contabilidad.conciliacion.read` (el
+          // eje pack cierra por el catálogo de /me/permissions filtrado por packs).
+          {
+            path: '/movimientos-bancarios',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.conciliacion.read}>
+                <MovimientosBancariosPage />
               </RequirePermission>
             ),
           },

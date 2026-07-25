@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRight,
   Banknote,
   Bird,
   BookCheck,
@@ -184,6 +185,16 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: FileStack,
         requiredPermission: PERMISSIONS.contabilidad.documentosFisicos.read,
         vertical: 'CONTABILIDAD',
+      },
+      // REQ-VMB-14: mayor unificado cross-cuenta, puerta de entrada al módulo
+      // de conciliación — misma cascada permiso ∧ pack que el workspace.
+      {
+        to: '/movimientos-bancarios',
+        label: 'Movimientos bancarios',
+        icon: ArrowLeftRight,
+        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+        vertical: 'CONTABILIDAD',
+        pack: 'contabilidad.conciliacion',
       },
       // Primer NAV_ITEM con `pack` (riel eje 2, REQ-SB-10). La página se
       // construye en slice 5 del change conciliacion-bancaria.

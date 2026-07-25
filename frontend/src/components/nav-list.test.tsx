@@ -127,6 +127,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/plan-cuentas',
       '/contactos',
       '/documentos-fisicos',
+      '/movimientos-bancarios',
       '/conciliacion',
     ]);
   });
@@ -810,5 +811,55 @@ describe('NAV_ITEMS — primer ítem de pack de dominio (REQ-SB-10, conciliació
       </Wrapper>,
     );
     expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
+  });
+});
+
+// REQ-VMB-14 (change verificador-movimientos-bancarios): "Movimientos
+// bancarios" vive en Contabilidad con la MISMA cascada permiso ∧ pack que
+// Conciliación bancaria — sin cualquiera de los dos, oculto (fail-closed).
+describe('NAV_ITEMS — Movimientos bancarios (REQ-VMB-14, verificador)', () => {
+  it('el ítem "Movimientos bancarios" declara pack, requiredPermission y vertical', () => {
+    const item = NAV_ITEMS.find((i) => i.to === '/movimientos-bancarios');
+    expect(item).toBeDefined();
+    expect(item?.label).toBe('Movimientos bancarios');
+    expect(item?.pack).toBe('contabilidad.conciliacion');
+    expect(item?.requiredPermission).toBe('contabilidad.conciliacion.read');
+    expect(item?.vertical).toBe('CONTABILIDAD');
+  });
+
+  it('pack activo + permiso + vertical CONTABILIDAD: el ítem está visible', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Movimientos bancarios').length).toBeGreaterThan(0);
+  });
+
+  it('sin el pack activo: el ítem está oculto', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks([]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Movimientos bancarios')).not.toBeInTheDocument();
+  });
+
+  it('sin el permiso .read (con pack activo): el ítem está oculto', () => {
+    mockPermissions({ allowedPermissions: [] });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Movimientos bancarios')).not.toBeInTheDocument();
   });
 });

@@ -67,7 +67,7 @@ Depende de: grupo 6.
 
 Depende de: grupos 1–7 verdes (backend completo primero).
 
-- [ ] 8.1 RED — vitest: hook `useMovimientosBancarios`; saldo dual (columna `saldo` visible solo con cuenta seleccionada, oculta cross-cuenta); badge desactualización cuando `fechaUltimoMovimiento < hasta`; suma solo misma moneda con `null` excluido + indicador; franja auditoría con link al workspace; nav item fail-closed (sin permiso o sin pack ⇒ oculto y ruta bloqueada).
-- [ ] 8.2 GREEN — `frontend/src/features/verificador-bancario/` (`api/ hooks/ components/ pages/`, molde conciliación; badges reusados de `features/conciliacion`); ruta `/movimientos-bancarios`.
-- [ ] 8.3 GREEN — `nav-items.ts`: ítem "Movimientos bancarios" en Contabilidad con `conciliacion.read` + `pack` (molde línea 189).
-- [ ] 8.4 Verde: `cd frontend && pnpm exec tsc --noEmit && pnpm exec vitest run`.
+- [x] 8.1 RED — vitest: hook `useMovimientosBancarios`; saldo dual (columna `saldo` visible solo con cuenta seleccionada, oculta cross-cuenta); badge desactualización cuando `fechaUltimoMovimiento < hasta`; suma solo misma moneda con `null` excluido + indicador; franja auditoría con link al workspace; nav item fail-closed (sin permiso o sin pack ⇒ oculto y ruta bloqueada). 36 tests nuevos en 6 archivos (lib pura `saldos` + hook + 3 componentes + ruta) + nav-list.test.tsx (orden T-02 y bloque REQ-VMB-14).
+- [x] 8.2 GREEN — `frontend/src/features/verificador-bancario/` (`api/ hooks/ components/ pages/`, molde conciliación; badges reusados de `features/conciliacion`); ruta `/movimientos-bancarios`. Suma de saldos en centavos enteros (`sumarMontos`) — el backend no manda ese agregado y un `parseFloat` naive driftea (0.10+0.20). Aliases nuevos en `types/api.ts` (fachada): `ListadoMovimientosBancarios`, `MovimientoVerificador`, `TotalMoneda`, `SaldoCuentaBancaria`, `AuditoriaVinculos`, `VinculoRoto`, `EstadoMovimientoBancario`, `ListarMovimientosBancariosParams`.
+- [x] 8.3 GREEN — `nav-items.ts`: ítem "Movimientos bancarios" en Contabilidad con `conciliacion.read` + `pack` (molde línea 189, icono `ArrowLeftRight` — `Landmark` ya lo usa Evolución del Patrimonio).
+- [x] 8.4 Verde: `cd frontend && pnpm exec tsc --noEmit && pnpm exec vitest run` → 234 suites / 1829 tests (baseline pre-grupo: 228 / 1793). Lint limpio sobre los archivos tocados.
