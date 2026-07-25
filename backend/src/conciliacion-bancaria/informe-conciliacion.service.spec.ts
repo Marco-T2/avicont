@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 
 import type { LineaCuentaRow } from '@/comprobantes/ports/lineas-cuenta-reader.port';
 import type { LineasCuentaReaderPort } from '@/comprobantes/ports/lineas-cuenta-reader.port';
+import { Money } from '@/common/domain/money';
 
 import type { CuentasBancariasService } from './cuentas-bancarias.service';
 import { InformeConciliacionService } from './informe-conciliacion.service';
@@ -631,6 +632,69 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       ]);
       expect(informe.insumos.importaciones[0]?.fechaDesde.toIso()).toBe('2026-07-01');
       expect(informe.insumos.importaciones[0]?.fechaHasta.toIso()).toBe('2026-07-31');
+    });
+  });
+
+  // ==========================================================
+  // Task 3.8 — declararArranque (REQ-ICB-04): comando explícito
+  // ==========================================================
+
+  describe('declararArranque', () => {
+    const DECLARACION = {
+      cuentaBancariaId: CB_ID,
+      fecha: new Date('2026-06-30T00:00:00.000Z'),
+      saldoExtracto: Money.of('1000.00'),
+      saldoLibros: Money.of('990.00'),
+      diferenciaResidual: Money.of('10.00'),
+      nota: null,
+    };
+
+    it('cuenta en USD → CONCILIACION_MONEDA_NO_SOPORTADA y NO se persiste nada', async () => {
+      cuentasBancarias.findById.mockResolvedValue(cuentaBancariaRow({ moneda: 'USD' }));
+
+      await expect(service.declararArranque(TENANT, 'user-1', DECLARACION)).rejects.toMatchObject({
+        code: 'CONCILIACION_MONEDA_NO_SOPORTADA',
+      });
+
+      expect(arranques.crear).not.toHaveBeenCalled();
+    });
+
+    it('persiste los CUATRO datos DECLARADOS — la diferencia residual NUNCA se calcula', async () => {
+      arranques.crear.mockResolvedValue(arranqueRow());
+
+      // saldoExtracto − saldoLibros = 10, pero el usuario declara residual 3:
+      // la parte que asume como inexplicable. El service NO la recalcula.
+      const declarado = await service.declararArranque(TENANT, 'user-7', {
+        ...DECLARACION,
+        diferenciaResidual: Money.of('3.00'),
+        nota: 'migración inicial',
+      });
+
+      expect(arranques.crear).toHaveBeenCalledTimes(1);
+      const [tenant, data] = arranques.crear.mock.calls[0] as [
+        string,
+        {
+          cuentaBancariaId: string;
+          fecha: Date;
+          saldoExtracto: Prisma.Decimal;
+          saldoLibros: Prisma.Decimal;
+          diferenciaResidual: Prisma.Decimal;
+          nota: string | null;
+          declaradoPorUserId: string;
+        },
+      ];
+      expect(tenant).toBe(TENANT);
+      expect(data.cuentaBancariaId).toBe(CB_ID);
+      expect(data.fecha).toEqual(new Date('2026-06-30T00:00:00.000Z'));
+      expect(data.saldoExtracto.toFixed(2)).toBe('1000.00');
+      expect(data.saldoLibros.toFixed(2)).toBe('990.00');
+      expect(data.diferenciaResidual.toFixed(2)).toBe('3.00');
+      expect(data.nota).toBe('migración inicial');
+      expect(data.declaradoPorUserId).toBe('user-7');
+
+      expect(declarado.id).toBe('arr-1');
+      expect(declarado.fecha.toIso()).toBe('2026-06-30');
+      expect(declarado.diferenciaResidual.toBob()).toBe('10.00');
     });
   });
 });

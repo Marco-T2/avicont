@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoVerificacionExtracto, Moneda } from '@prisma/client';
 
 import type {
+  ArranqueAplicadoView,
   InformeConciliacionResultado,
   MotivoNoConciliado,
 } from '../informe-conciliacion.service';
@@ -228,6 +229,20 @@ function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
   }
 }
 
+/** También es la respuesta del `POST` de arranque (task 3.8): mismo acto, mismo shape. */
+export function toArranqueAplicadoResponse(arranque: ArranqueAplicadoView): ArranqueAplicadoDto {
+  return {
+    id: arranque.id,
+    fecha: arranque.fecha.toIso(),
+    saldoExtracto: arranque.saldoExtracto.toBob(),
+    saldoLibros: arranque.saldoLibros.toBob(),
+    diferenciaResidual: arranque.diferenciaResidual.toBob(),
+    nota: arranque.nota,
+    declaradoPorUserId: arranque.declaradoPorUserId,
+    declaradoEl: arranque.declaradoEl.toISOString(),
+  };
+}
+
 export function toInformeConciliacionResponse(
   r: InformeConciliacionResultado,
 ): InformeConciliacionResponseDto {
@@ -236,19 +251,7 @@ export function toInformeConciliacionResponse(
     corte: r.corte.toIso(),
     saldoExtracto: r.saldoExtracto === null ? null : r.saldoExtracto.toBob(),
     saldoLibros: r.saldoLibros.toBob(),
-    arranque:
-      r.arranque === null
-        ? null
-        : {
-            id: r.arranque.id,
-            fecha: r.arranque.fecha.toIso(),
-            saldoExtracto: r.arranque.saldoExtracto.toBob(),
-            saldoLibros: r.arranque.saldoLibros.toBob(),
-            diferenciaResidual: r.arranque.diferenciaResidual.toBob(),
-            nota: r.arranque.nota,
-            declaradoPorUserId: r.arranque.declaradoPorUserId,
-            declaradoEl: r.arranque.declaradoEl.toISOString(),
-          },
+    arranque: r.arranque === null ? null : toArranqueAplicadoResponse(r.arranque),
     partidas:
       r.partidas === null
         ? null

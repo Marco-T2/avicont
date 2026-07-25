@@ -125,6 +125,21 @@ export interface InformeConciliacionResultado {
   insumos: { importaciones: ImportacionInsumoView[] };
 }
 
+/** Los CUATRO datos del arranque, DECLARADOS por el usuario (REQ-ICB-04). */
+export interface DeclaracionArranque {
+  cuentaBancariaId: string;
+  /** Corte del arranque — `@db.Date`-like (medianoche UTC, §4.6). */
+  fecha: Date;
+  saldoExtracto: Money;
+  saldoLibros: Money;
+  /**
+   * DECLARADA, jamás derivada: positiva cuando el extracto queda por encima
+   * de los libros (convención fijada en `ArranqueParaInforme`).
+   */
+  diferenciaResidual: Money;
+  nota: string | null;
+}
+
 /** Vínculo verificado de un match: la línea ACTUAL resuelta + motivo de rotura. */
 interface VinculoVerificado {
   match: MatchConciliacion;
@@ -279,6 +294,53 @@ export class InformeConciliacionService {
         residuo: informe.residuo,
         cobertura,
       }),
+    };
+  }
+
+  /**
+   * Declara un punto de arranque conciliado (REQ-ICB-04): comando EXPLÍCITO,
+   * append-only, atribuido. Los CUATRO datos — fecha, ambos saldos y la
+   * diferencia residual — vienen DECLARADOS por el usuario: la residual es la
+   * parte que asume como inexplicable y JAMÁS se calcula como
+   * `saldoExtracto − saldoLibros` (esa resta congelaría las partidas en
+   * tránsito abiertas a esa fecha y las cobraría dos veces — ver
+   * `ArranqueParaInforme`). Una declaración con fecha anterior a otra
+   * existente se ACEPTA (D8): `vigenteA` decide cuál aplica y el historial
+   * conserva todas.
+   */
+  async declararArranque(
+    tenantId: string,
+    userId: string,
+    declaracion: DeclaracionArranque,
+  ): Promise<ArranqueAplicadoView> {
+    // 404 si la cuenta no existe o es de otro tenant (REQ-ICB-09).
+    const cuentaBancaria = await this.cuentasBancarias.findById(
+      tenantId,
+      declaracion.cuentaBancariaId,
+    );
+    // Un arranque sobre una cuenta no conciliable fijaría un punto de partida
+    // que ningún informe podrá usar (v1 = BOB).
+    this.exigirMonedaSoportada(cuentaBancaria);
+
+    const creado = await this.arranques.crear(tenantId, {
+      cuentaBancariaId: cuentaBancaria.id,
+      fecha: declaracion.fecha,
+      saldoExtracto: declaracion.saldoExtracto.toPrismaDecimal(),
+      saldoLibros: declaracion.saldoLibros.toPrismaDecimal(),
+      diferenciaResidual: declaracion.diferenciaResidual.toPrismaDecimal(),
+      nota: declaracion.nota,
+      declaradoPorUserId: userId,
+    });
+
+    return {
+      id: creado.id,
+      fecha: FechaContable.fromDbDate(creado.fecha),
+      saldoExtracto: Money.of(creado.saldoExtracto),
+      saldoLibros: Money.of(creado.saldoLibros),
+      diferenciaResidual: Money.of(creado.diferenciaResidual),
+      nota: creado.nota,
+      declaradoPorUserId: creado.declaradoPorUserId,
+      declaradoEl: creado.createdAt,
     };
   }
 

@@ -2058,6 +2058,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conciliacion/informe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Informe de conciliación a una fecha de corte: saldo según extracto ± partidas = saldo según libros, con el puente detallado.
+         * @description LECTURA PURA (REQ-ICB-04): consultar jamás crea, modifica ni infiere un arranque. Sin arranque declarado el informe se emite ABSTENIDO; con insumos no confiables se emite igual y la sección `confiabilidad` nombra el problema (REQ-ICB-05).
+         */
+        get: operations["InformeConciliacionController_obtenerInforme"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/conciliacion/arranques": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Declara un punto de arranque conciliado: fecha, ambos saldos y la diferencia residual ACEPTADA — los cuatro datos declarados por el usuario.
+         * @description Append-only (REQ-ICB-04): una declaración posterior nunca borra ni sobrescribe las anteriores; `vigenteA` decide cuál aplica a cada corte. La diferencia residual NO se calcula como extracto − libros: el usuario declara solo la parte que asume como inexplicable.
+         */
+        post: operations["InformeConciliacionController_declararArranque"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movimientos-bancarios": {
         parameters: {
             query?: never;
@@ -4000,6 +4040,186 @@ export interface components {
             confianzaSugerida: string | null;
             conciliadoPorUserId: string;
             createdAt: string;
+        };
+        CuentaBancariaInformeDto: {
+            id: string;
+            alias: string;
+            cuentaId: string;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            numeroCuenta: string | null;
+        };
+        ArranqueAplicadoDto: {
+            id: string;
+            /** @example 2026-06-30 */
+            fecha: string;
+            /** @example 1000.00 */
+            saldoExtracto: string;
+            /** @example 990.00 */
+            saldoLibros: string;
+            /**
+             * @description DECLARADA por el usuario al fijar el arranque — jamás calculada como extracto − libros. Positiva cuando el extracto queda por encima de los libros.
+             * @example 10.00
+             */
+            diferenciaResidual: string;
+            nota: string | null;
+            declaradoPorUserId: string;
+            /** @example 2026-07-01T12:00:00.000Z */
+            declaradoEl: string;
+        };
+        DetalleMovimientoPendienteDto: {
+            movimientoId: string;
+            /** @example 2026-07-10 */
+            fecha: string;
+            /**
+             * @description Contribución FIRMADA extracto→libros.
+             * @example -200.00
+             */
+            importe: string;
+            /** @description No-nulo ⇒ el asiento existe pero es POSTERIOR al corte: la diferencia de este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada. */
+            asentadoEl: string | null;
+        };
+        PartidaPendientesDto: {
+            /**
+             * @description Suma firmada del detalle.
+             * @example -200.00
+             */
+            importe: string;
+            detalle: components["schemas"]["DetalleMovimientoPendienteDto"][];
+        };
+        DetalleMovimientoIgnoradoDto: {
+            movimientoId: string;
+            /** @example 2026-07-12 */
+            fecha: string;
+            /** @example -10.00 */
+            importe: string;
+        };
+        PartidaIgnoradosDto: {
+            /** @example -10.00 */
+            importe: string;
+            detalle: components["schemas"]["DetalleMovimientoIgnoradoDto"][];
+        };
+        DetalleLineaEnTransitoDto: {
+            comprobanteId: string;
+            orden: number;
+            /** @example 2026-07-20 */
+            fecha: string;
+            /** @example -400.00 */
+            importe: string;
+            /** @description No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl). */
+            registradoPorBancoEl: string | null;
+        };
+        PartidaEnTransitoDto: {
+            /** @example -400.00 */
+            importe: string;
+            detalle: components["schemas"]["DetalleLineaEnTransitoDto"][];
+        };
+        PartidaArranqueDto: {
+            /** @example 2026-06-30 */
+            fecha: string;
+            /**
+             * @description Contribución al puente: −diferenciaResidual declarada.
+             * @example -10.00
+             */
+            importe: string;
+        };
+        PartidasInformeDto: {
+            /** @description El banco lo registró; los libros, al corte, no. */
+            pendientes: components["schemas"]["PartidaPendientesDto"];
+            /** @description Partida con NOMBRE PROPIO (REQ-ICB-02): los libros nunca lo registrarán. */
+            ignorados: components["schemas"]["PartidaIgnoradosDto"];
+            /** @description Los libros lo registraron; el banco, al corte, no. */
+            enTransito: components["schemas"]["PartidaEnTransitoDto"];
+            arranque: components["schemas"]["PartidaArranqueDto"];
+        };
+        MotivoNoConciliadoDto: {
+            /** @enum {string} */
+            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
+            /** @description Solo DESCUADRE. */
+            importacionId?: string;
+            /**
+             * @description Solo HUECO.
+             * @example 2026-07-11
+             */
+            desde?: string;
+            /**
+             * @description Solo HUECO.
+             * @example 2026-07-19
+             */
+            hasta?: string;
+            /** @description Solo DISCONTINUIDAD. */
+            anteriorId?: string;
+            /** @description Solo DISCONTINUIDAD. */
+            siguienteId?: string;
+            /**
+             * @description Solo DISCONTINUIDAD. Siempre positiva.
+             * @example 200.00
+             */
+            diferencia?: string;
+            /**
+             * @description Solo RESIDUO_NO_EXPLICADO. Firmado.
+             * @example -0.01
+             */
+            importe?: string;
+        };
+        ConfiabilidadInformeDto: {
+            /** @description true SOLO con arranque declarado, saldo de extracto publicado, insumos sanos y residuo cero exacto. La confiabilidad CALIFICA el informe, nunca lo suprime (REQ-ICB-05). */
+            conciliado: boolean;
+            motivos: components["schemas"]["MotivoNoConciliadoDto"][];
+        };
+        ImportacionInsumoDto: {
+            id: string;
+            /** @example 2026-07-01 */
+            fechaDesde: string;
+            /** @example 2026-07-31 */
+            fechaHasta: string;
+            /** @enum {string} */
+            estadoVerificacion: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
+        };
+        InsumosInformeDto: {
+            /** @description Importaciones que cubren el rango del informe (REQ-ICB-08). */
+            importaciones: components["schemas"]["ImportacionInsumoDto"][];
+        };
+        InformeConciliacionResponseDto: {
+            cuentaBancaria: components["schemas"]["CuentaBancariaInformeDto"];
+            /** @example 2026-07-31 */
+            corte: string;
+            /** @description Saldo del último movimiento ≤ corte. null si ninguno publica saldo (REQ-ICB-03). */
+            saldoExtracto: string | null;
+            /** @example 990.00 */
+            saldoLibros: string;
+            /** @description null ⇔ sin arranque declarado: el informe se emite ABSTENIDO (REQ-ICB-04). */
+            arranque: components["schemas"]["ArranqueAplicadoDto"] | null;
+            partidas: components["schemas"]["PartidasInformeDto"] | null;
+            /** @description Lo que las partidas NO explican. Se expone tal cual, jamás se ajusta ni se reparte (REQ-ICB-06). null sin arranque o sin saldo de extracto. */
+            residuo: string | null;
+            confiabilidad: components["schemas"]["ConfiabilidadInformeDto"];
+            insumos: components["schemas"]["InsumosInformeDto"];
+        };
+        DeclararArranqueDto: {
+            /** Format: uuid */
+            cuentaBancariaId: string;
+            /**
+             * @description Corte del arranque (§4.6).
+             * @example 2026-06-30
+             */
+            fecha: string;
+            /**
+             * @description Saldo del extracto a esa fecha (§4.5).
+             * @example 1000.00
+             */
+            saldoExtracto: string;
+            /**
+             * @description Saldo según libros a esa fecha (§4.5).
+             * @example 990.00
+             */
+            saldoLibros: string;
+            /**
+             * @description Diferencia ACEPTADA como inexplicable — declarada, jamás calculada. Positiva cuando el extracto queda por encima de los libros.
+             * @example 10.00
+             */
+            diferenciaResidual: string;
+            nota?: string;
         };
         MovimientoVerificadorDto: {
             id: string;
@@ -8070,6 +8290,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    InformeConciliacionController_obtenerInforme: {
+        parameters: {
+            query: {
+                cuentaBancariaId: string;
+                /** @description Fecha de corte, inclusive. */
+                corte: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InformeConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    InformeConciliacionController_declararArranque: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclararArranqueDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArranqueAplicadoDto"];
+                };
             };
         };
     };

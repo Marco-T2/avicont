@@ -6110,6 +6110,92 @@
         ]
       }
     },
+    "/api/conciliacion/informe": {
+      "get": {
+        "description": "LECTURA PURA (REQ-ICB-04): consultar jamás crea, modifica ni infiere un arranque. Sin arranque declarado el informe se emite ABSTENIDO; con insumos no confiables se emite igual y la sección `confiabilidad` nombra el problema (REQ-ICB-05).",
+        "operationId": "InformeConciliacionController_obtenerInforme",
+        "parameters": [
+          {
+            "name": "cuentaBancariaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "corte",
+            "required": true,
+            "in": "query",
+            "description": "Fecha de corte, inclusive.",
+            "schema": {
+              "example": "2026-07-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InformeConciliacionResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Informe de conciliación a una fecha de corte: saldo según extracto ± partidas = saldo según libros, con el puente detallado.",
+        "tags": [
+          "Conciliación bancaria — Informe"
+        ]
+      }
+    },
+    "/api/conciliacion/arranques": {
+      "post": {
+        "description": "Append-only (REQ-ICB-04): una declaración posterior nunca borra ni sobrescribe las anteriores; `vigenteA` decide cuál aplica a cada corte. La diferencia residual NO se calcula como extracto − libros: el usuario declara solo la parte que asume como inexplicable.",
+        "operationId": "InformeConciliacionController_declararArranque",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclararArranqueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArranqueAplicadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Declara un punto de arranque conciliado: fecha, ambos saldos y la diferencia residual ACEPTADA — los cuatro datos declarados por el usuario.",
+        "tags": [
+          "Conciliación bancaria — Informe"
+        ]
+      }
+    },
     "/api/movimientos-bancarios": {
       "get": {
         "description": "Herramienta de APOYO, no limitante: sin filtro `estado` nada se esconde (REQ-VMB-02). Es LECTURA PURA — nunca escribe, ni siquiera para \"curar\" un vínculo roto (REQ-VMB-06).",
@@ -11670,6 +11756,495 @@
           "confianzaSugerida",
           "conciliadoPorUserId",
           "createdAt"
+        ]
+      },
+      "CuentaBancariaInformeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "cuentaId": {
+            "type": "string"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "numeroCuenta": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "cuentaId",
+          "moneda",
+          "numeroCuenta"
+        ]
+      },
+      "ArranqueAplicadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-30"
+          },
+          "saldoExtracto": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "saldoLibros": {
+            "type": "string",
+            "example": "990.00"
+          },
+          "diferenciaResidual": {
+            "type": "string",
+            "example": "10.00",
+            "description": "DECLARADA por el usuario al fijar el arranque — jamás calculada como extracto − libros. Positiva cuando el extracto queda por encima de los libros."
+          },
+          "nota": {
+            "type": "string",
+            "nullable": true
+          },
+          "declaradoPorUserId": {
+            "type": "string"
+          },
+          "declaradoEl": {
+            "type": "string",
+            "example": "2026-07-01T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "fecha",
+          "saldoExtracto",
+          "saldoLibros",
+          "diferenciaResidual",
+          "nota",
+          "declaradoPorUserId",
+          "declaradoEl"
+        ]
+      },
+      "DetalleMovimientoPendienteDto": {
+        "type": "object",
+        "properties": {
+          "movimientoId": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-07-10"
+          },
+          "importe": {
+            "type": "string",
+            "example": "-200.00",
+            "description": "Contribución FIRMADA extracto→libros."
+          },
+          "asentadoEl": {
+            "type": "string",
+            "nullable": true,
+            "description": "No-nulo ⇒ el asiento existe pero es POSTERIOR al corte: la diferencia de este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada."
+          }
+        },
+        "required": [
+          "movimientoId",
+          "fecha",
+          "importe",
+          "asentadoEl"
+        ]
+      },
+      "PartidaPendientesDto": {
+        "type": "object",
+        "properties": {
+          "importe": {
+            "type": "string",
+            "example": "-200.00",
+            "description": "Suma firmada del detalle."
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetalleMovimientoPendienteDto"
+            }
+          }
+        },
+        "required": [
+          "importe",
+          "detalle"
+        ]
+      },
+      "DetalleMovimientoIgnoradoDto": {
+        "type": "object",
+        "properties": {
+          "movimientoId": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-07-12"
+          },
+          "importe": {
+            "type": "string",
+            "example": "-10.00"
+          }
+        },
+        "required": [
+          "movimientoId",
+          "fecha",
+          "importe"
+        ]
+      },
+      "PartidaIgnoradosDto": {
+        "type": "object",
+        "properties": {
+          "importe": {
+            "type": "string",
+            "example": "-10.00"
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetalleMovimientoIgnoradoDto"
+            }
+          }
+        },
+        "required": [
+          "importe",
+          "detalle"
+        ]
+      },
+      "DetalleLineaEnTransitoDto": {
+        "type": "object",
+        "properties": {
+          "comprobanteId": {
+            "type": "string"
+          },
+          "orden": {
+            "type": "number"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-07-20"
+          },
+          "importe": {
+            "type": "string",
+            "example": "-400.00"
+          },
+          "registradoPorBancoEl": {
+            "type": "string",
+            "nullable": true,
+            "description": "No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl)."
+          }
+        },
+        "required": [
+          "comprobanteId",
+          "orden",
+          "fecha",
+          "importe",
+          "registradoPorBancoEl"
+        ]
+      },
+      "PartidaEnTransitoDto": {
+        "type": "object",
+        "properties": {
+          "importe": {
+            "type": "string",
+            "example": "-400.00"
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetalleLineaEnTransitoDto"
+            }
+          }
+        },
+        "required": [
+          "importe",
+          "detalle"
+        ]
+      },
+      "PartidaArranqueDto": {
+        "type": "object",
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-30"
+          },
+          "importe": {
+            "type": "string",
+            "example": "-10.00",
+            "description": "Contribución al puente: −diferenciaResidual declarada."
+          }
+        },
+        "required": [
+          "fecha",
+          "importe"
+        ]
+      },
+      "PartidasInformeDto": {
+        "type": "object",
+        "properties": {
+          "pendientes": {
+            "description": "El banco lo registró; los libros, al corte, no.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartidaPendientesDto"
+              }
+            ]
+          },
+          "ignorados": {
+            "description": "Partida con NOMBRE PROPIO (REQ-ICB-02): los libros nunca lo registrarán.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartidaIgnoradosDto"
+              }
+            ]
+          },
+          "enTransito": {
+            "description": "Los libros lo registraron; el banco, al corte, no.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartidaEnTransitoDto"
+              }
+            ]
+          },
+          "arranque": {
+            "$ref": "#/components/schemas/PartidaArranqueDto"
+          }
+        },
+        "required": [
+          "pendientes",
+          "ignorados",
+          "enTransito",
+          "arranque"
+        ]
+      },
+      "MotivoNoConciliadoDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "SIN_ARRANQUE",
+              "SIN_SALDO_EXTRACTO",
+              "DESCUADRE",
+              "HUECO",
+              "DISCONTINUIDAD",
+              "RESIDUO_NO_EXPLICADO"
+            ]
+          },
+          "importacionId": {
+            "type": "string",
+            "description": "Solo DESCUADRE."
+          },
+          "desde": {
+            "type": "string",
+            "example": "2026-07-11",
+            "description": "Solo HUECO."
+          },
+          "hasta": {
+            "type": "string",
+            "example": "2026-07-19",
+            "description": "Solo HUECO."
+          },
+          "anteriorId": {
+            "type": "string",
+            "description": "Solo DISCONTINUIDAD."
+          },
+          "siguienteId": {
+            "type": "string",
+            "description": "Solo DISCONTINUIDAD."
+          },
+          "diferencia": {
+            "type": "string",
+            "example": "200.00",
+            "description": "Solo DISCONTINUIDAD. Siempre positiva."
+          },
+          "importe": {
+            "type": "string",
+            "example": "-0.01",
+            "description": "Solo RESIDUO_NO_EXPLICADO. Firmado."
+          }
+        },
+        "required": [
+          "tipo"
+        ]
+      },
+      "ConfiabilidadInformeDto": {
+        "type": "object",
+        "properties": {
+          "conciliado": {
+            "type": "boolean",
+            "description": "true SOLO con arranque declarado, saldo de extracto publicado, insumos sanos y residuo cero exacto. La confiabilidad CALIFICA el informe, nunca lo suprime (REQ-ICB-05)."
+          },
+          "motivos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MotivoNoConciliadoDto"
+            }
+          }
+        },
+        "required": [
+          "conciliado",
+          "motivos"
+        ]
+      },
+      "ImportacionInsumoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fechaDesde": {
+            "type": "string",
+            "example": "2026-07-01"
+          },
+          "fechaHasta": {
+            "type": "string",
+            "example": "2026-07-31"
+          },
+          "estadoVerificacion": {
+            "type": "string",
+            "enum": [
+              "VERIFICADO",
+              "SIN_VERIFICAR",
+              "DESCUADRE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "fechaDesde",
+          "fechaHasta",
+          "estadoVerificacion"
+        ]
+      },
+      "InsumosInformeDto": {
+        "type": "object",
+        "properties": {
+          "importaciones": {
+            "description": "Importaciones que cubren el rango del informe (REQ-ICB-08).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportacionInsumoDto"
+            }
+          }
+        },
+        "required": [
+          "importaciones"
+        ]
+      },
+      "InformeConciliacionResponseDto": {
+        "type": "object",
+        "properties": {
+          "cuentaBancaria": {
+            "$ref": "#/components/schemas/CuentaBancariaInformeDto"
+          },
+          "corte": {
+            "type": "string",
+            "example": "2026-07-31"
+          },
+          "saldoExtracto": {
+            "type": "string",
+            "nullable": true,
+            "description": "Saldo del último movimiento ≤ corte. null si ninguno publica saldo (REQ-ICB-03)."
+          },
+          "saldoLibros": {
+            "type": "string",
+            "example": "990.00"
+          },
+          "arranque": {
+            "nullable": true,
+            "description": "null ⇔ sin arranque declarado: el informe se emite ABSTENIDO (REQ-ICB-04).",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ArranqueAplicadoDto"
+              }
+            ]
+          },
+          "partidas": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartidasInformeDto"
+              }
+            ]
+          },
+          "residuo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lo que las partidas NO explican. Se expone tal cual, jamás se ajusta ni se reparte (REQ-ICB-06). null sin arranque o sin saldo de extracto."
+          },
+          "confiabilidad": {
+            "$ref": "#/components/schemas/ConfiabilidadInformeDto"
+          },
+          "insumos": {
+            "$ref": "#/components/schemas/InsumosInformeDto"
+          }
+        },
+        "required": [
+          "cuentaBancaria",
+          "corte",
+          "saldoExtracto",
+          "saldoLibros",
+          "arranque",
+          "partidas",
+          "residuo",
+          "confiabilidad",
+          "insumos"
+        ]
+      },
+      "DeclararArranqueDto": {
+        "type": "object",
+        "properties": {
+          "cuentaBancariaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-30",
+            "description": "Corte del arranque (§4.6)."
+          },
+          "saldoExtracto": {
+            "type": "string",
+            "example": "1000.00",
+            "description": "Saldo del extracto a esa fecha (§4.5)."
+          },
+          "saldoLibros": {
+            "type": "string",
+            "example": "990.00",
+            "description": "Saldo según libros a esa fecha (§4.5)."
+          },
+          "diferenciaResidual": {
+            "type": "string",
+            "example": "10.00",
+            "description": "Diferencia ACEPTADA como inexplicable — declarada, jamás calculada. Positiva cuando el extracto queda por encima de los libros."
+          },
+          "nota": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "cuentaBancariaId",
+          "fecha",
+          "saldoExtracto",
+          "saldoLibros",
+          "diferenciaResidual"
         ]
       },
       "MovimientoVerificadorDto": {
