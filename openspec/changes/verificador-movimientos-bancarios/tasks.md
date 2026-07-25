@@ -24,11 +24,11 @@ Depende de: nada. DEBE mergear antes del grupo 5 (primer raw del módulo).
 
 Depende de: grupo 1.
 
-- [ ] 3.1 RED — extender `extracto-importador.service.integration.spec.ts`: hashes IDÉNTICOS contra los fixtures existentes (reimportar = "0 nuevos, N ya existían", preexistentes conservan `ordenFisico=null`). **Este test manda: si un hash cambia, la captura está MAL — parar.**
-- [ ] 3.2 RED — tests: fixture DESC → fila física 0 recibe `ordenFisico` máximo y el cronológicamente primero `0`; secuencia `NO_MONOTONA` → todos `null` (nunca adivinar).
-- [ ] 3.3 GREEN — `ports/movimiento-bancario.repository.port.ts`: `MovimientoBancarioCreateData` += `ordenFisico: number | null`; `crearMuchos` lo mapea en el adapter.
-- [ ] 3.4 GREEN — `extracto-importador.service.ts`: mover `ordenarCronologico` ANTES de `ordenarCanonico`, `Map` de identidad `posCronologica`, pasar `posCronologica.get(item.movimiento) ?? null`. `calcularHashDedup` NO se toca.
-- [ ] 3.5 Verde backend (3.1 y 3.2 en verde juntos).
+- [x] 3.1 RED — extender `extracto-importador.service.integration.spec.ts`: hashes IDÉNTICOS contra los fixtures existentes (reimportar = "0 nuevos, N ya existían", preexistentes conservan `ordenFisico=null`). **Este test manda: si un hash cambia, la captura está MAL — parar.** GATE PASÓ: sha256 del set de hashes idéntico al valor congelado pre-change.
+- [x] 3.2 RED — tests: fixture DESC → fila física 0 recibe `ordenFisico` máximo y el cronológicamente primero `0`; secuencia `NO_MONOTONA` → todos `null` (nunca adivinar).
+- [x] 3.3 GREEN — `ports/movimiento-bancario.repository.port.ts`: `MovimientoBancarioCreateData` += `ordenFisico: number | null`; `crearMuchos` lo mapea en el adapter.
+- [x] 3.4 GREEN — `extracto-importador.service.ts`: mover `ordenarCronologico` ANTES de `ordenarCanonico`, `Map` de identidad `posCronologica`, pasar `posCronologica.get(item.movimiento) ?? null`. `calcularHashDedup` NO se toca.
+- [x] 3.5 Verde backend (3.1 y 3.2 en verde juntos).
 
 ## Grupo 4 — Workspace adopta el orden (D10, REQ-CB-22) · `feat(conciliacion): adopt presentation order in workspace listing`
 

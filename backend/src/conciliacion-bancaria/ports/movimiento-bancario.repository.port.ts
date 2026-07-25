@@ -25,6 +25,11 @@ export interface MovimientoBancarioCreateData {
   contraparteDocumento: string | null;
   datosOriginales: Prisma.InputJsonValue;
   ordinalDia: number;
+  /**
+   * Índice 0-based dentro del orden CRONOLÓGICO del archivo (REQ-CB-21).
+   * `null` cuando la secuencia física no es monótona — no se adivina.
+   */
+  ordenFisico: number | null;
   hashDedup: string;
 }
 

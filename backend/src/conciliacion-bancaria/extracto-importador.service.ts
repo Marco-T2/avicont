@@ -31,7 +31,7 @@ import {
   CUENTA_BANCARIA_REPOSITORY_PORT,
   CuentaBancariaRepositoryPort,
 } from './ports/cuenta-bancaria.repository.port';
-import type { ExtractoParseado } from './ports/extracto-parser.port';
+import type { ExtractoParseado, MovimientoParseado } from './ports/extracto-parser.port';
 import {
   IMPORTACION_EXTRACTO_REPOSITORY_PORT,
   ImportacionExtractoRepositoryPort,
@@ -151,18 +151,29 @@ export class ExtractoImportadorService {
 
     // ══ Fin de compuertas de rechazo — de acá en más nada más lanza 422 ══
 
+    // El checksum y `ordenFisico` NO consumen el orden canónico: necesitan
+    // saber qué movimiento ocurrió primero, y el canónico desempata por monto
+    // (ver `domain/orden-cronologico.ts`). Si el archivo no viene ordenado por
+    // fecha, `ordenarCronologico` devuelve null: el checksum queda
+    // SIN_VERIFICAR y `ordenFisico` queda null — nunca se adivina (REQ-CB-21).
+    const cronologico = ordenarCronologico(parseado.movimientos);
+
+    // Map de IDENTIDAD (mismas referencias): `asignarOrdinalDia` envuelve el
+    // MISMO objeto en `{ movimiento, ordinalDia }`, así que el lookup resuelve.
+    const posCronologica = new Map<MovimientoParseado, number>();
+    cronologico?.forEach((mov, i) => posCronologica.set(mov, i));
+
     const canonico = ordenarCanonico(parseado.movimientos);
     const conOrdinal = asignarOrdinalDia(canonico);
     const filas: MovimientoBancarioCreateData[] = conOrdinal.map((item) =>
-      construirMovimientoCreateData(item, cuentaBancariaId, cuentaBancaria.moneda),
+      construirMovimientoCreateData(
+        item,
+        cuentaBancariaId,
+        cuentaBancaria.moneda,
+        posCronologica.get(item.movimiento) ?? null,
+      ),
     );
 
-    // El checksum NO consume el orden canónico: necesita saber qué movimiento
-    // ocurrió primero, y el canónico desempata por monto (ver
-    // `domain/orden-cronologico.ts`). Si el archivo no viene ordenado por
-    // fecha, `ordenarCronologico` devuelve null y el checksum queda
-    // SIN_VERIFICAR en vez de inventar un descuadre.
-    const cronologico = ordenarCronologico(parseado.movimientos);
     const checksum =
       cronologico === null
         ? { estadoVerificacion: 'SIN_VERIFICAR' as const, diferencia: null }
@@ -248,6 +259,7 @@ function construirMovimientoCreateData(
   item: MovimientoConOrdinalDia,
   cuentaBancariaId: string,
   moneda: Moneda,
+  ordenFisico: number | null,
 ): MovimientoBancarioCreateData {
   const { movimiento, ordinalDia } = item;
   const hashDedup = calcularHashDedup(cuentaBancariaId, item);
@@ -265,6 +277,7 @@ function construirMovimientoCreateData(
     contraparteDocumento: movimiento.contraparteDocumento,
     datosOriginales: movimiento.datosOriginales as Prisma.InputJsonValue,
     ordinalDia,
+    ordenFisico,
     hashDedup,
   };
 }

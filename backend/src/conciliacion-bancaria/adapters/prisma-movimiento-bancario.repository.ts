@@ -44,6 +44,7 @@ export class PrismaMovimientoBancarioRepository extends MovimientoBancarioReposi
         contraparteDocumento: m.contraparteDocumento,
         datosOriginales: m.datosOriginales,
         ordinalDia: m.ordinalDia,
+        ordenFisico: m.ordenFisico,
         hashDedup: m.hashDedup,
       })),
       skipDuplicates: true, // @@unique([cuentaBancariaId, hashDedup]) — idempotencia ESTRUCTURAL (design §6.1)
