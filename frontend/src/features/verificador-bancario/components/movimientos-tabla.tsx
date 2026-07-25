@@ -29,7 +29,20 @@ interface MovimientosTablaProps {
    * mostrarlas juntas no significa nada.
    */
   mostrarSaldo: boolean;
+  /**
+   * Código de moneda cuando TODO el resultado está en una sola moneda: se
+   * rotula una vez en la cabecera en vez de repetirlo en cada fila. `null`
+   * cuando hay más de una — ahí el código por fila SÍ discrimina y se muestra.
+   */
+  monedaUnica: string | null;
   isLoading: boolean;
+}
+
+// El backend publica la hora como HH:MM:SS; los extractos bancarios traen
+// precisión de minuto, así que los segundos son siempre ':00' — ruido en 263
+// filas. Se recorta en presentación, el dato crudo no se toca.
+function horaSinSegundos(hora: string): string {
+  return /^\d{2}:\d{2}:\d{2}$/.test(hora) ? hora.slice(0, 5) : hora;
 }
 
 /**
@@ -41,6 +54,7 @@ export function MovimientosTabla({
   movimientos,
   aliasPorCuenta,
   mostrarSaldo,
+  monedaUnica,
   isLoading,
 }: MovimientosTablaProps): React.JSX.Element {
   if (isLoading && movimientos.length === 0) {
@@ -73,8 +87,14 @@ export function MovimientosTabla({
             {!mostrarSaldo && <TableHead>Cuenta</TableHead>}
             <TableHead>Descripción</TableHead>
             <TableHead>Tipo</TableHead>
-            <TableHead className="text-right">Monto</TableHead>
-            {mostrarSaldo && <TableHead className="text-right">Saldo</TableHead>}
+            <TableHead className="text-right">
+              Monto{monedaUnica !== null ? ` (${monedaUnica})` : ''}
+            </TableHead>
+            {mostrarSaldo && (
+              <TableHead className="text-right">
+                Saldo{monedaUnica !== null ? ` (${monedaUnica})` : ''}
+              </TableHead>
+            )}
             <TableHead>Estado</TableHead>
           </TableRow>
         </TableHeader>
@@ -84,7 +104,9 @@ export function MovimientosTabla({
               <TableCell className="whitespace-nowrap tabular-nums">
                 {formatearFechaContable(mov.fecha)}
                 {mov.hora !== null && (
-                  <span className="ml-1 text-xs text-muted-foreground">{mov.hora}</span>
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    {horaSinSegundos(mov.hora)}
+                  </span>
                 )}
               </TableCell>
 
@@ -94,7 +116,19 @@ export function MovimientosTabla({
                 </TableCell>
               )}
 
-              <TableCell className="max-w-[24rem]">
+              {/* `whitespace-normal` NO es decorativo: TableCell trae
+                  `whitespace-nowrap` en su clase base (ui/table.tsx) y el <p>
+                  lo hereda, así que sin este reset el texto queda en UNA línea
+                  recortada a lo ancho por el overflow:hidden del line-clamp —
+                  sin elipsis y sin segunda línea. El clamp era código muerto.
+
+                  Y NO lleva ancho propio a propósito: con un `w-[26rem]` fijo el
+                  texto envolvía a los 416 px y dejaba el resto de la columna en
+                  blanco en pantallas grandes. Como las demás columnas son
+                  `nowrap` (no se dejan achicar) y ésta sí envuelve, el layout
+                  automático de la tabla le asigna todo el sobrante: la
+                  descripción se adapta al ancho real disponible. */}
+              <TableCell className="whitespace-normal">
                 <p className="line-clamp-2 break-words" title={mov.descripcion}>
                   {mov.descripcion}
                 </p>
@@ -114,7 +148,11 @@ export function MovimientosTabla({
 
               <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">
                 {formatearMontoBob(mov.monto)}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">{mov.moneda}</span>
+                {monedaUnica === null && (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    {mov.moneda}
+                  </span>
+                )}
               </TableCell>
 
               {mostrarSaldo && (
