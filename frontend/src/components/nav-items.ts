@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Banknote,
+  BarChart3,
   Bird,
   BookCheck,
   BookMarked,
@@ -16,9 +17,11 @@ import {
   FileBadge,
   FileStack,
   FileText,
+  FolderOpen,
   Home,
   Landmark,
   LayoutDashboard,
+  Library,
   ListChecks,
   Scale,
   Settings,
@@ -65,6 +68,34 @@ export interface NavItem {
   requiredSystemRole?: SystemRole[];
 }
 
+/**
+ * Subgrupo colapsable DENTRO de una sección — segundo (y último) nivel de
+ * jerarquía del menú.
+ *
+ * Deliberadamente NO tiene campos de gating. La visibilidad de un grupo se
+ * DERIVA de sus ítems: si ninguno pasa la cascada de `NavList`, el grupo entero
+ * (header incluido) desaparece, igual que una sección sin ítems visibles. Si el
+ * grupo declarara su propio `pack`/`vertical` habría dos verdades que se pueden
+ * desincronizar; la cascada por ítem sigue siendo la única fuente de verdad.
+ */
+export interface NavGroup {
+  /** ID estable: key de React y clave de plegado persistido en useSidebarStore. */
+  id: string;
+  /** Header clickeable del grupo. Ej: 'Bancos', 'Estados financieros'. */
+  label: string;
+  /**
+   * Icono que representa al grupo en el RIEL de 64px, donde el grupo colapsa a
+   * un único botón que abre un flyout. Obligatorio: sin icono el grupo sería un
+   * cuadrado vacío. En modo expandido NO se usa — ahí el header es chevron +
+   * label, que se lee como encabezado y no compite con los ítems.
+   *
+   * Puede repetir el icono de un ítem que viva en OTRO grupo: en el riel solo se
+   * ven iconos de grupo (nunca los de sus ítems), así que no hay colisión visual.
+   */
+  icon: React.ComponentType<{ className?: string }>;
+  items: NavItem[];
+}
+
 export interface NavSection {
   /** ID estable para la key de React (Anti-F-06). Ej: 'contabilidad', 'administracion'. */
   id: string;
@@ -77,8 +108,19 @@ export interface NavSection {
    *                sección tiene ≥1 ítem visible.
    */
   kind: 'modulo' | 'transversal';
-  /** Ítems de la sección. El gating sigue siendo por ítem (cada uno declara su gate). */
+  /**
+   * Ítems sueltos que van ARRIBA de los grupos, sin plegado. Reservado para los
+   * accesos de uso diario: enterrarlos tras un click sería un retroceso.
+   */
   items: NavItem[];
+  /** Subgrupos colapsables, renderizados DESPUÉS de `items`. */
+  groups?: NavGroup[];
+  /**
+   * Ítems sueltos que van ABAJO de los grupos, sin plegado. Para lo esporádico
+   * y de alto impacto (cierre de ejercicio): querés verlo, no buscarlo, pero
+   * tampoco compitiendo con el uso diario por el lugar de arriba.
+   */
+  trailingItems?: NavItem[];
 }
 
 // Ítem suelto Panel — siempre arriba, sin header de sección (D-01).
@@ -94,6 +136,7 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'contabilidad',
     label: 'Contabilidad',
     kind: 'modulo',
+    // Suelto arriba: es la pantalla de uso diario del contador.
     items: [
       {
         to: '/comprobantes',
@@ -102,109 +145,156 @@ export const NAV_SECTIONS: NavSection[] = [
         requiredPermission: PERMISSIONS.contabilidad.asientos.read,
         vertical: 'CONTABILIDAD',
       },
+    ],
+    groups: [
       {
-        to: '/libros/diario',
-        label: 'Libro Diario',
-        icon: BookText,
-        requiredPermission: PERMISSIONS.contabilidad.libroDiario.read,
-        vertical: 'CONTABILIDAD',
+        id: 'libros',
+        label: 'Libros',
+        icon: Library,
+        items: [
+          {
+            to: '/libros/diario',
+            label: 'Libro Diario',
+            icon: BookText,
+            requiredPermission: PERMISSIONS.contabilidad.libroDiario.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/libros/mayor',
+            label: 'Libro Mayor',
+            icon: BookMarked,
+            requiredPermission: PERMISSIONS.contabilidad.libroMayor.read,
+            vertical: 'CONTABILIDAD',
+          },
+        ],
       },
       {
-        to: '/libros/mayor',
-        label: 'Libro Mayor',
-        icon: BookMarked,
-        requiredPermission: PERMISSIONS.contabilidad.libroMayor.read,
-        vertical: 'CONTABILIDAD',
+        id: 'eeff',
+        label: 'Estados financieros',
+        icon: BarChart3,
+        items: [
+          {
+            to: '/eeff/balance',
+            label: 'Balance General',
+            icon: Scale,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/eeff/balance-comprobacion',
+            label: 'Balance de Comprobación',
+            icon: ListChecks,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/eeff/hoja-trabajo',
+            label: 'Hoja de Trabajo',
+            icon: Columns3,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/eeff/resultados',
+            label: 'Estado de Resultados',
+            icon: TrendingUp,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/eeff/evolucion-patrimonio',
+            label: 'Evolución del Patrimonio',
+            icon: Landmark,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/eeff/flujo-efectivo',
+            label: 'Estado de Flujo de Efectivo',
+            icon: Droplet,
+            requiredPermission: PERMISSIONS.contabilidad.eeff.read,
+            vertical: 'CONTABILIDAD',
+          },
+        ],
       },
+      // ─── Bancos = la superficie COMPLETA del pack `contabilidad.conciliacion`
+      // Un pack es una unidad comercial, no temática: el Owner lo activa desde
+      // /settings/complementos y tiene que ver aparecer UN bloque, no piezas
+      // repartidas por el menú. Antes "Cuentas bancarias" vivía en la sección
+      // Configuración y las otras dos acá — mismo gate, dos lugares distintos.
+      // El guard de nav-list.test.tsx impide que se vuelva a repartir.
       {
-        to: '/eeff/balance',
-        label: 'Balance General',
-        icon: Scale,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/eeff/balance-comprobacion',
-        label: 'Balance de Comprobación',
-        icon: ListChecks,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/eeff/hoja-trabajo',
-        label: 'Hoja de Trabajo',
-        icon: Columns3,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/eeff/resultados',
-        label: 'Estado de Resultados',
-        icon: TrendingUp,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/eeff/evolucion-patrimonio',
-        label: 'Evolución del Patrimonio',
+        id: 'bancos',
+        label: 'Bancos',
         icon: Landmark,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
+        items: [
+          // REQ-VMB-14: mayor unificado cross-cuenta, puerta de entrada al módulo
+          // de conciliación — misma cascada permiso ∧ pack que el workspace.
+          {
+            to: '/movimientos-bancarios',
+            label: 'Movimientos bancarios',
+            icon: ArrowLeftRight,
+            requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+            vertical: 'CONTABILIDAD',
+            pack: 'contabilidad.conciliacion',
+          },
+          // Primer NAV_ITEM con `pack` (riel eje 2, REQ-SB-10).
+          {
+            to: '/conciliacion',
+            label: 'Conciliación bancaria',
+            icon: Banknote,
+            requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+            vertical: 'CONTABILIDAD',
+            pack: 'contabilidad.conciliacion',
+          },
+          {
+            to: '/settings/cuentas-bancarias',
+            label: 'Cuentas bancarias',
+            icon: Wallet,
+            requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+            vertical: 'CONTABILIDAD',
+            pack: 'contabilidad.conciliacion',
+          },
+        ],
       },
       {
-        to: '/eeff/flujo-efectivo',
-        label: 'Estado de Flujo de Efectivo',
-        icon: Droplet,
-        requiredPermission: PERMISSIONS.contabilidad.eeff.read,
-        vertical: 'CONTABILIDAD',
+        id: 'maestros',
+        label: 'Maestros',
+        icon: FolderOpen,
+        items: [
+          {
+            to: '/plan-cuentas',
+            label: 'Plan de cuentas',
+            icon: BookOpen,
+            requiredPermission: PERMISSIONS.contabilidad.planCuentas.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/contactos',
+            label: 'Contactos',
+            icon: Contact,
+            requiredPermission: PERMISSIONS.contabilidad.contactos.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/documentos-fisicos',
+            label: 'Documentos físicos',
+            icon: FileStack,
+            requiredPermission: PERMISSIONS.contabilidad.documentosFisicos.read,
+            vertical: 'CONTABILIDAD',
+          },
+        ],
       },
+    ],
+    // Suelto abajo: una vez al año y de alto impacto — visible, pero sin
+    // competir con el uso diario por el lugar de arriba.
+    trailingItems: [
       {
         to: '/gestiones/cierre',
         label: 'Cierre del ejercicio',
         icon: BookCheck,
         requiredPermission: PERMISSIONS.contabilidad.gestiones.read,
         vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/plan-cuentas',
-        label: 'Plan de cuentas',
-        icon: BookOpen,
-        requiredPermission: PERMISSIONS.contabilidad.planCuentas.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/contactos',
-        label: 'Contactos',
-        icon: Contact,
-        requiredPermission: PERMISSIONS.contabilidad.contactos.read,
-        vertical: 'CONTABILIDAD',
-      },
-      {
-        to: '/documentos-fisicos',
-        label: 'Documentos físicos',
-        icon: FileStack,
-        requiredPermission: PERMISSIONS.contabilidad.documentosFisicos.read,
-        vertical: 'CONTABILIDAD',
-      },
-      // REQ-VMB-14: mayor unificado cross-cuenta, puerta de entrada al módulo
-      // de conciliación — misma cascada permiso ∧ pack que el workspace.
-      {
-        to: '/movimientos-bancarios',
-        label: 'Movimientos bancarios',
-        icon: ArrowLeftRight,
-        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
-        vertical: 'CONTABILIDAD',
-        pack: 'contabilidad.conciliacion',
-      },
-      // Primer NAV_ITEM con `pack` (riel eje 2, REQ-SB-10). La página se
-      // construye en slice 5 del change conciliacion-bancaria.
-      {
-        to: '/conciliacion',
-        label: 'Conciliación bancaria',
-        icon: Banknote,
-        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
-        vertical: 'CONTABILIDAD',
-        pack: 'contabilidad.conciliacion',
       },
     ],
   },
@@ -301,14 +391,8 @@ export const NAV_SECTIONS: NavSection[] = [
         requiredPermission: PERMISSIONS.contabilidad.tiposDocumento.read,
         vertical: 'CONTABILIDAD',
       },
-      {
-        to: '/settings/cuentas-bancarias',
-        label: 'Cuentas bancarias',
-        icon: Wallet,
-        requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
-        vertical: 'CONTABILIDAD',
-        pack: 'contabilidad.conciliacion',
-      },
+      // NOTA: "Cuentas bancarias" NO vive acá. Se movió al grupo `bancos` de
+      // Contabilidad junto al resto del pack `contabilidad.conciliacion`.
       // Configuración contable: ítem deshabilitado, pertenece a CONTABILIDAD.
       // Lleva vertical: 'CONTABILIDAD' para que el granjero no lo vea aunque esté disabled.
       {
@@ -324,5 +408,13 @@ export const NAV_SECTIONS: NavSection[] = [
 
 // Export derivado para retrocompat de tests (guards anti-drift) y para que
 // los consumidores que iteran el universo completo de ítems sigan funcionando.
+// Aplana en el MISMO orden en que NavList renderiza: sueltos → grupos → finales.
 // NavList itera NAV_SECTIONS directo (no este derivado) — D-05.
-export const NAV_ITEMS: NavItem[] = [PANEL_ITEM, ...NAV_SECTIONS.flatMap((s) => s.items)];
+export const NAV_ITEMS: NavItem[] = [
+  PANEL_ITEM,
+  ...NAV_SECTIONS.flatMap((s) => [
+    ...s.items,
+    ...(s.groups ?? []).flatMap((g) => g.items),
+    ...(s.trailingItems ?? []),
+  ]),
+];

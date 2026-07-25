@@ -28,7 +28,9 @@ export function AppSidebar(): React.JSX.Element {
         collapsed ? 'w-16' : 'w-60',
       )}
     >
-      <div className="flex h-14 items-center border-b px-4">
+      {/* shrink-0 en header y footer: sin esto el flex los comprime cuando el
+          <nav> del medio se pasa de alto, en vez de dejar que el nav scrollee. */}
+      <div className="flex h-14 shrink-0 items-center border-b px-4">
         <span
           className={cn(
             'text-base font-semibold tracking-tight text-sidebar-foreground',
@@ -42,7 +44,7 @@ export function AppSidebar(): React.JSX.Element {
 
       <NavList collapsed={collapsed} />
 
-      <div className="border-t p-2">
+      <div className="shrink-0 border-t p-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
