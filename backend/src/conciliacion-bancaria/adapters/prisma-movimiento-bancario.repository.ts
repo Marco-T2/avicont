@@ -77,7 +77,14 @@ export class PrismaMovimientoBancarioRepository extends MovimientoBancarioReposi
         cuentaBancariaId,
         fecha: { gte: rango.fechaDesde, lte: rango.fechaHasta },
       },
-      orderBy: [{ fecha: 'asc' }, { ordinalDia: 'asc' }, { id: 'asc' }],
+      // Orden de PRESENTACIÓN (REQ-CB-21/22): la hora manda, ordenFisico
+      // desempata dentro del día y el id cierra para que el orden sea total.
+      orderBy: [
+        { fecha: 'asc' },
+        { hora: { sort: 'asc', nulls: 'last' } },
+        { ordenFisico: { sort: 'asc', nulls: 'last' } },
+        { id: 'asc' },
+      ],
     });
   }
 

@@ -58,8 +58,9 @@ export abstract class MovimientoBancarioRepositoryPort {
 
   /**
    * Panel `A` del workspace (design §10): movimientos de la cuenta bancaria
-   * dentro del rango de fechas, orden `fecha ASC, ordinalDia ASC, id ASC`
-   * (determinístico). REQ-CB-13: acotado al tenant activo.
+   * dentro del rango de fechas, con el orden de PRESENTACIÓN de REQ-CB-21/22:
+   * `fecha ASC, hora ASC NULLS LAST, ordenFisico ASC NULLS LAST, id ASC`
+   * (total y determinístico). REQ-CB-13: acotado al tenant activo.
    */
   abstract listarPorCuentaBancariaEnRango(
     tenantId: string,

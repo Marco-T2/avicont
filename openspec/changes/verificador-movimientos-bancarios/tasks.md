@@ -34,9 +34,9 @@ Depende de: grupo 1.
 
 Depende de: grupo 3.
 
-- [ ] 4.1 RED — actualizar los tests de orden EXISTENTES de `listarPorCuentaBancariaEnRango` (van a romper: hoy `[{fecha},{ordinalDia},{id}]`) + test nuevo: horas `09:15/14:02/21:40` con ids desordenados salen cronológicos.
-- [ ] 4.2 GREEN — adapter: orderBy `fecha ASC, hora ASC NULLS LAST, ordenFisico ASC NULLS LAST, id ASC`; actualizar JSDoc del port.
-- [ ] 4.3 Verde backend + suite del workspace (`jest src/conciliacion-bancaria`).
+- [x] 4.1 RED — actualizar los tests de orden EXISTENTES de `listarPorCuentaBancariaEnRango` (van a romper: hoy `[{fecha},{ordinalDia},{id}]`) + test nuevo: horas `09:15/14:02/21:40` con ids desordenados salen cronológicos. NOTA: no existía NINGÚN test que fijara el orden viejo (vivía solo en el adapter, como dice REQ-CB-22) — se creó `adapters/prisma-movimiento-bancario.repository.integration.spec.ts` con 5 tests de orden (4 RED contra el orden viejo).
+- [x] 4.2 GREEN — adapter: orderBy `fecha ASC, hora ASC NULLS LAST, ordenFisico ASC NULLS LAST, id ASC`; actualizar JSDoc del port.
+- [x] 4.3 Verde backend + suite del workspace (`jest src/conciliacion-bancaria`).
 
 ## Grupo 5 — Port +5 métodos + adapter (D1/D2/D3) · `feat(conciliacion): add cross-account listing queries to repository`
 
