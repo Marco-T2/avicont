@@ -275,4 +275,271 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
       expect(movimientos.map((m) => m.id)).toEqual([ID_ALTO, ID_BAJO]);
     });
   });
+
+  // ============================================================
+  // Verificador cross-cuenta (REQ-VMB-01..05/07/08/09/11/13)
+  // ============================================================
+
+  async function crearSegundaCuentaBancariaA() {
+    const cuenta2 = await crearCuenta(tenantA, '1.1.1.002');
+    const cb2 = await crearCuentaBancaria(tenantA, cuenta2.id, 'Cuenta A2');
+    const imp2 = await crearImportacion(tenantA, cb2.id);
+    return { cuentaBancariaId: cb2.id, importacionId: imp2.id };
+  }
+
+  async function crearMatch(tenantId: string, movimientoBancarioId: string) {
+    return prisma.matchConciliacion.create({
+      data: {
+        organizationId: tenantId,
+        movimientoBancarioId,
+        comprobanteId: randomUUID(),
+        orden: 1,
+        snapshotCuentaId: randomUUID(),
+        snapshotMonto: new Prisma.Decimal('100.00'),
+        snapshotTipo: 'DEBITO',
+        snapshotMoneda: 'BOB',
+        snapshotFecha: new Date('2026-06-10T00:00:00.000Z'),
+        confianzaSugerida: null,
+        conciliadoPorUserId: 'user-1',
+      },
+    });
+  }
+
+  describe('listarCrossCuenta / contarCrossCuenta (REQ-VMB-01/03/04/05/13)', () => {
+    it('un solo request trae movimientos de TODAS las cuentas del tenant y de NINGÚN otro tenant', async () => {
+      const cb2 = await crearSegundaCuentaBancariaA();
+      const movA = await crearMovimiento({ fecha: '2026-06-10' });
+      const movA2 = await crearMovimiento({
+        fecha: '2026-06-11',
+        cuentaBancariaId: cb2.cuentaBancariaId,
+        importacionId: cb2.importacionId,
+      });
+      await crearMovimiento({ fecha: '2026-06-10', tenantId: tenantB });
+
+      const pagina = await repo.listarCrossCuenta(tenantA, RANGO_JUNIO, { skip: 0, take: 50 });
+      const total = await repo.contarCrossCuenta(tenantA, RANGO_JUNIO);
+
+      expect(pagina.map((m) => m.id)).toEqual([movA.id, movA2.id]);
+      expect(new Set(pagina.map((m) => m.cuentaBancariaId))).toEqual(
+        new Set([cuentaBancariaA, cb2.cuentaBancariaId]),
+      );
+      expect(total).toBe(2);
+    });
+
+    it('orden cross-cuenta: fecha, hora NULLS LAST, ordenFisico NULLS LAST, id — ids adversariales', async () => {
+      await crearMovimiento({ id: ID_BAJO, fecha: '2026-06-10', hora: null, ordenFisico: null });
+      await crearMovimiento({ id: ID_MEDIO, fecha: '2026-06-10', hora: null, ordenFisico: 0 });
+      await crearMovimiento({ id: ID_ALTO, fecha: '2026-06-10', hora: '09:00:00' });
+
+      const pagina = await repo.listarCrossCuenta(tenantA, RANGO_JUNIO, { skip: 0, take: 50 });
+
+      // hora manda (09:00 primero), luego ordenFisico 0, luego el null total.
+      // El orden por id sería exactamente el inverso.
+      expect(pagina.map((m) => m.id)).toEqual([ID_ALTO, ID_MEDIO, ID_BAJO]);
+    });
+
+    it('determinismo del offset: 2 páginas consecutivas no duplican ni pierden filas ante empates totales', async () => {
+      // 12 filas con fecha/hora/ordenFisico IDÉNTICOS: el único desempate es id.
+      // Sin el `id ASC` final, Postgres puede devolver cualquier orden y el
+      // offset duplica o pierde filas entre páginas.
+      const ids: string[] = [];
+      for (let i = 0; i < 12; i++) {
+        const mov = await crearMovimiento({ fecha: '2026-06-10', hora: null, ordenFisico: null });
+        ids.push(mov.id);
+      }
+
+      const pagina1 = await repo.listarCrossCuenta(tenantA, RANGO_JUNIO, { skip: 0, take: 6 });
+      const pagina2 = await repo.listarCrossCuenta(tenantA, RANGO_JUNIO, { skip: 6, take: 6 });
+
+      const vistos = [...pagina1, ...pagina2].map((m) => m.id);
+      expect(vistos).toHaveLength(12);
+      expect(new Set(vistos)).toEqual(new Set(ids));
+    });
+
+    it('filtros combinados: cuenta + rango de monto + glosa normalizada, y contar coincide', async () => {
+      const cb2 = await crearSegundaCuentaBancariaA();
+      const esperado = await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '250.00',
+        descripcionNormalizada: 'DEPOSITO EN EFECTIVO',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '250.00',
+        descripcionNormalizada: 'PAGO QR',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '750.00',
+        descripcionNormalizada: 'DEPOSITO GRANDE',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '250.00',
+        descripcionNormalizada: 'DEPOSITO OTRA CUENTA',
+        cuentaBancariaId: cb2.cuentaBancariaId,
+        importacionId: cb2.importacionId,
+      });
+
+      const filtros = {
+        ...RANGO_JUNIO,
+        cuentaBancariaId: cuentaBancariaA,
+        montoDesde: new Prisma.Decimal('100.00'),
+        montoHasta: new Prisma.Decimal('500.00'),
+        glosaNormalizada: 'DEPOSITO',
+      };
+      const pagina = await repo.listarCrossCuenta(tenantA, filtros, { skip: 0, take: 50 });
+      const total = await repo.contarCrossCuenta(tenantA, filtros);
+
+      expect(pagina.map((m) => m.id)).toEqual([esperado.id]);
+      expect(total).toBe(1);
+    });
+
+    it('filtro estado: solo la columna cacheada pedida', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', estado: 'PENDIENTE' });
+      const ignorado = await crearMovimiento({ fecha: '2026-06-11', estado: 'IGNORADO' });
+
+      const filtros = { ...RANGO_JUNIO, estado: 'IGNORADO' as const };
+      const pagina = await repo.listarCrossCuenta(tenantA, filtros, { skip: 0, take: 50 });
+
+      expect(pagina.map((m) => m.id)).toEqual([ignorado.id]);
+      expect(await repo.contarCrossCuenta(tenantA, filtros)).toBe(1);
+    });
+
+    it('cuentaBancariaId de OTRO tenant ⇒ vacío con total 0, sin revelar la cuenta (REQ-VMB-13)', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', tenantId: tenantB });
+
+      const filtros = { ...RANGO_JUNIO, cuentaBancariaId: cuentaBancariaB };
+      expect(await repo.listarCrossCuenta(tenantA, filtros, { skip: 0, take: 50 })).toEqual([]);
+      expect(await repo.contarCrossCuenta(tenantA, filtros)).toBe(0);
+    });
+  });
+
+  describe('totalesPorMoneda (REQ-VMB-11/13)', () => {
+    it('agrupa por moneda y tipo con total y cantidad propios, sin mezclar monedas ni tenants', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', monto: '100.00', tipo: 'DEBITO', moneda: 'BOB' });
+      await crearMovimiento({ fecha: '2026-06-11', monto: '200.50', tipo: 'DEBITO', moneda: 'BOB' });
+      await crearMovimiento({ fecha: '2026-06-12', monto: '50.00', tipo: 'CREDITO', moneda: 'BOB' });
+      await crearMovimiento({ fecha: '2026-06-13', monto: '10.00', tipo: 'DEBITO', moneda: 'USD' });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '999.00',
+        tipo: 'DEBITO',
+        moneda: 'USD',
+        tenantId: tenantB,
+      });
+
+      const totales = await repo.totalesPorMoneda(tenantA, RANGO_JUNIO);
+
+      const clave = (moneda: string, tipo: string) =>
+        totales.find((t) => t.moneda === moneda && t.tipo === tipo);
+      expect(totales).toHaveLength(3);
+      expect(clave('BOB', 'DEBITO')?.total.toFixed(2)).toBe('300.50');
+      expect(clave('BOB', 'DEBITO')?.cantidad).toBe(2);
+      expect(clave('BOB', 'CREDITO')?.total.toFixed(2)).toBe('50.00');
+      expect(clave('BOB', 'CREDITO')?.cantidad).toBe(1);
+      expect(clave('USD', 'DEBITO')?.total.toFixed(2)).toBe('10.00');
+      expect(clave('USD', 'DEBITO')?.cantidad).toBe(1);
+    });
+
+    it('respeta los filtros del listado (mismo where, sin drift)', async () => {
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '100.00',
+        descripcionNormalizada: 'DEPOSITO EN EFECTIVO',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '900.00',
+        descripcionNormalizada: 'PAGO QR',
+      });
+
+      const totales = await repo.totalesPorMoneda(tenantA, {
+        ...RANGO_JUNIO,
+        glosaNormalizada: 'DEPOSITO',
+      });
+
+      expect(totales).toHaveLength(1);
+      expect(totales[0]!.total.toFixed(2)).toBe('100.00');
+      expect(totales[0]!.cantidad).toBe(1);
+    });
+  });
+
+  describe('listarIdsConMatch (REQ-VMB-07/13)', () => {
+    it('solo ids de movimientos CON match dentro del rango filtrado, del tenant', async () => {
+      const conMatch = await crearMovimiento({ fecha: '2026-06-10' });
+      await crearMatch(tenantA, conMatch.id);
+      await crearMovimiento({ fecha: '2026-06-11' }); // sin match
+      const fueraDeRango = await crearMovimiento({ fecha: '2026-07-15' });
+      await crearMatch(tenantA, fueraDeRango.id);
+      const ajeno = await crearMovimiento({ fecha: '2026-06-10', tenantId: tenantB });
+      await crearMatch(tenantB, ajeno.id);
+
+      const ids = await repo.listarIdsConMatch(tenantA, RANGO_JUNIO);
+
+      expect(ids).toEqual([{ id: conMatch.id }]);
+    });
+  });
+
+  describe('saldosVigentes (REQ-VMB-08/09/13)', () => {
+    const CORTE_JUNIO = new Date('2026-06-30T00:00:00.000Z');
+
+    it('empate intra-día con hora null: elige la MISMA fila que cierra el listado (DESC NULLS FIRST)', async () => {
+      await crearMovimiento({ fecha: '2026-06-05', hora: '08:00:00', saldo: '999.00' });
+      await crearMovimiento({ id: ID_ALTO, fecha: '2026-06-10', hora: '09:00:00', saldo: '100.00' });
+      // hora null cierra el día en presentación (NULLS LAST) ⇒ su saldo es el vigente
+      await crearMovimiento({ id: ID_BAJO, fecha: '2026-06-10', hora: null, saldo: '300.00' });
+
+      const saldos = await repo.saldosVigentes(tenantA, CORTE_JUNIO);
+
+      expect(saldos).toHaveLength(1);
+      expect(saldos[0]!.cuentaBancariaId).toBe(cuentaBancariaA);
+      expect(saldos[0]!.fecha.toISOString().slice(0, 10)).toBe('2026-06-10');
+      expect(saldos[0]!.saldo?.toFixed(2)).toBe('300.00');
+    });
+
+    it('empate intra-día sin hora: gana el ordenFisico más alto (cierra el listado)', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', hora: null, ordenFisico: 0, saldo: '10.00' });
+      await crearMovimiento({ fecha: '2026-06-10', hora: null, ordenFisico: 2, saldo: '30.00' });
+      await crearMovimiento({ fecha: '2026-06-10', hora: null, ordenFisico: 1, saldo: '20.00' });
+
+      const saldos = await repo.saldosVigentes(tenantA, CORTE_JUNIO);
+
+      expect(saldos).toHaveLength(1);
+      expect(saldos[0]!.saldo?.toFixed(2)).toBe('30.00');
+    });
+
+    it('saldo null honesto: sin fallback a una fila anterior con saldo (REQ-VMB-09)', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', saldo: '500.00' });
+      await crearMovimiento({ fecha: '2026-06-12', saldo: null });
+
+      const saldos = await repo.saldosVigentes(tenantA, CORTE_JUNIO);
+
+      expect(saldos).toHaveLength(1);
+      expect(saldos[0]!.fecha.toISOString().slice(0, 10)).toBe('2026-06-12');
+      expect(saldos[0]!.saldo).toBeNull();
+    });
+
+    it('el corte excluye movimientos posteriores a `hasta`', async () => {
+      await crearMovimiento({ fecha: '2026-06-10', saldo: '100.00' });
+      await crearMovimiento({ fecha: '2026-07-05', saldo: '900.00' });
+
+      const saldos = await repo.saldosVigentes(tenantA, CORTE_JUNIO);
+
+      expect(saldos).toHaveLength(1);
+      expect(saldos[0]!.fecha.toISOString().slice(0, 10)).toBe('2026-06-10');
+      expect(saldos[0]!.saldo?.toFixed(2)).toBe('100.00');
+    });
+
+    it('multi-tenant (Anti-31): solo cuentas del tenant; una cuenta sin movimientos no produce fila', async () => {
+      await crearSegundaCuentaBancariaA(); // sin movimientos: el merge null/null lo hace el service
+      await crearMovimiento({ fecha: '2026-06-10', saldo: '100.00' });
+      await crearMovimiento({ fecha: '2026-06-10', saldo: '777.00', tenantId: tenantB });
+
+      const saldos = await repo.saldosVigentes(tenantA, CORTE_JUNIO);
+
+      expect(saldos).toHaveLength(1);
+      expect(saldos[0]!.cuentaBancariaId).toBe(cuentaBancariaA);
+    });
+  });
 });

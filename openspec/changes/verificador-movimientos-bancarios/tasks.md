@@ -42,9 +42,9 @@ Depende de: grupo 3.
 
 Depende de: grupos 1 y 2.
 
-- [ ] 5.1 RED — `prisma-movimiento-bancario.repository.integration.spec.ts` (Postgres real, obligatorio para el raw; datos acotados a tenants creados por el test): `listarCrossCuenta` orden con `hora`/`ordenFisico` null + **determinismo: 2 páginas consecutivas sin duplicar ni perder fila** (protege el `id ASC` final); `contarCrossCuenta`; `totalesPorMoneda`; `listarIdsConMatch`; `saldosVigentes` (empates intra-día → misma fila que cierra el listado por inversión `DESC NULLS FIRST`, `hora` null, `saldo` null ⇒ null sin fallback, multi-tenant Anti-31, cuenta de otro tenant ⇒ vacío).
-- [ ] 5.2 GREEN — port: `FiltrosListadoMovimientos` + 5 abstracts con JSDoc; adapter: builder Prisma para listado/count/groupBy, `$queryRaw` `DISTINCT ON` con `Prisma.sql` bindeado, `numeric` string → `Decimal` en el boundary.
-- [ ] 5.3 Arch-spec sigue verde (el raw pega contra `movimientos_bancarios`). Verde backend.
+- [x] 5.1 RED — `prisma-movimiento-bancario.repository.integration.spec.ts` (Postgres real, obligatorio para el raw; datos acotados a tenants creados por el test): `listarCrossCuenta` orden con `hora`/`ordenFisico` null + **determinismo: 2 páginas consecutivas sin duplicar ni perder fila** (protege el `id ASC` final); `contarCrossCuenta`; `totalesPorMoneda`; `listarIdsConMatch`; `saldosVigentes` (empates intra-día → misma fila que cierra el listado por inversión `DESC NULLS FIRST`, `hora` null, `saldo` null ⇒ null sin fallback, multi-tenant Anti-31, cuenta de otro tenant ⇒ vacío).
+- [x] 5.2 GREEN — port: `FiltrosListadoMovimientos` + 5 abstracts con JSDoc; adapter: builder Prisma para listado/count/groupBy, `$queryRaw` `DISTINCT ON` con `Prisma.sql` bindeado, `numeric` string → `Decimal` en el boundary.
+- [x] 5.3 Arch-spec sigue verde (el raw pega contra `movimientos_bancarios`). Verde backend. Nota: el arch-spec endurecido CAZÓ un falso positivo real — un comentario del adapter decía "de comprobantes" en el mismo archivo del `$queryRaw`; se reformuló el comentario (el chequeo es textual a propósito).
 
 ## Grupo 6 — DTO + service + controller (REQ-VMB-01..09, 11..13) · `feat(conciliacion): expose GET /movimientos-bancarios unified ledger`
 
