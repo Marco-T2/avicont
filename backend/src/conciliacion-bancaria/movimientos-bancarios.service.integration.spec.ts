@@ -57,7 +57,13 @@ describe('MovimientosBancariosService (integration, REQ-CB-18)', () => {
       matchRepo,
       lineasReader,
     );
-    service = new MovimientosBancariosService(movRepo, matchService);
+    service = new MovimientosBancariosService(
+      movRepo,
+      matchService,
+      matchRepo,
+      lineasReader,
+      new PrismaCuentaBancariaRepository(p),
+    );
   });
 
   afterAll(async () => {

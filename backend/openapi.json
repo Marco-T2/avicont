@@ -6072,6 +6072,127 @@
         ]
       }
     },
+    "/api/movimientos-bancarios": {
+      "get": {
+        "description": "Herramienta de APOYO, no limitante: sin filtro `estado` nada se esconde (REQ-VMB-02). Es LECTURA PURA — nunca escribe, ni siquiera para \"curar\" un vínculo roto (REQ-VMB-06).",
+        "operationId": "MovimientosBancariosController_listar",
+        "parameters": [
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive.",
+            "schema": {
+              "example": "2026-06-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "description": "Inclusive.",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cuentaBancariaId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por la columna cacheada. Activa la auditoría de vínculos rotos (REQ-VMB-07). Sin este parámetro se devuelve TODO (REQ-VMB-02).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDIENTE",
+                "CONCILIADO",
+                "IGNORADO"
+              ]
+            }
+          },
+          {
+            "name": "montoDesde",
+            "required": false,
+            "in": "query",
+            "description": "Monto mínimo inclusive, string (§4.5).",
+            "schema": {
+              "example": "100.00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "montoHasta",
+            "required": false,
+            "in": "query",
+            "description": "Monto máximo inclusive, string (§4.5).",
+            "schema": {
+              "example": "500.00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "glosa",
+            "required": false,
+            "in": "query",
+            "description": "Substring sobre la descripción, insensible a mayúsculas y diacríticos (REQ-VMB-03).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListadoMovimientosBancariosResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Mayor unificado cross-cuenta: movimientos de TODOS los bancos del rango con estado derivado, saldos vigentes por cuenta y totales por moneda (REQ-VMB-01).",
+        "tags": [
+          "Conciliación bancaria — Movimientos"
+        ]
+      }
+    },
     "/api/movimientos-bancarios/{id}/estado": {
       "patch": {
         "operationId": "MovimientosBancariosController_cambiarEstado",
@@ -11431,6 +11552,305 @@
           "confianzaSugerida",
           "conciliadoPorUserId",
           "createdAt"
+        ]
+      },
+      "MovimientoVerificadorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-10",
+            "description": "Calendario puro, sin UTC (§4.6)."
+          },
+          "hora": {
+            "type": "string",
+            "nullable": true
+          },
+          "monto": {
+            "type": "string",
+            "example": "1500.00",
+            "description": "Monto como string (§4.5), siempre positivo."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "DEBITO",
+              "CREDITO"
+            ],
+            "description": "Perspectiva del BANCO."
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "referencia": {
+            "type": "string",
+            "nullable": true
+          },
+          "saldo": {
+            "type": "string",
+            "nullable": true
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONCILIADO",
+              "IGNORADO"
+            ],
+            "description": "Columna PERSISTIDA (proyección cacheada). NO es lo que se muestra."
+          },
+          "estadoEfectivo": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "CONCILIADO",
+              "IGNORADO"
+            ],
+            "description": "DERIVADO en cada lectura (REQ-CB-10/11). Esto es lo que se muestra."
+          },
+          "vinculo": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VinculoConciliacionDto"
+              }
+            ]
+          },
+          "cuentaBancariaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ordenFisico": {
+            "type": "number",
+            "nullable": true,
+            "description": "Índice 0-based dentro del orden cronológico del archivo importado (REQ-CB-21). null = importado antes del change o secuencia no monótona."
+          }
+        },
+        "required": [
+          "id",
+          "fecha",
+          "hora",
+          "monto",
+          "tipo",
+          "moneda",
+          "descripcion",
+          "referencia",
+          "saldo",
+          "estado",
+          "estadoEfectivo",
+          "vinculo",
+          "cuentaBancariaId",
+          "ordenFisico"
+        ]
+      },
+      "TotalMonedaDto": {
+        "type": "object",
+        "properties": {
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "totalDebitos": {
+            "type": "string",
+            "example": "300.50",
+            "description": "String (§4.5). Sin conversión a BOB."
+          },
+          "totalCreditos": {
+            "type": "string",
+            "example": "50.00",
+            "description": "String (§4.5). Sin conversión a BOB."
+          },
+          "cantidad": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "moneda",
+          "totalDebitos",
+          "totalCreditos",
+          "cantidad"
+        ]
+      },
+      "SaldoCuentaBancariaDto": {
+        "type": "object",
+        "properties": {
+          "cuentaBancariaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "saldo": {
+            "type": "string",
+            "nullable": true,
+            "description": "Saldo publicado por el banco en el último movimiento con fecha <= hasta. null honesto: sin fallback (REQ-VMB-09)."
+          },
+          "fechaUltimoMovimiento": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fecha del último movimiento importado — SIEMPRE presente si hay movimiento (REQ-VMB-08)."
+          }
+        },
+        "required": [
+          "cuentaBancariaId",
+          "alias",
+          "moneda",
+          "saldo",
+          "fechaUltimoMovimiento"
+        ]
+      },
+      "VinculoRotoDto": {
+        "type": "object",
+        "properties": {
+          "movimientoBancarioId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cuentaBancariaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-10"
+          },
+          "monto": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string",
+            "enum": [
+              "LINEA_INEXISTENTE",
+              "COMPROBANTE_ANULADO",
+              "CUENTA_CAMBIADA",
+              "MONTO_CAMBIADO",
+              "LADO_CAMBIADO",
+              "MONEDA_CAMBIADA",
+              "FECHA_CAMBIADA"
+            ]
+          }
+        },
+        "required": [
+          "movimientoBancarioId",
+          "cuentaBancariaId",
+          "fecha",
+          "monto",
+          "moneda",
+          "descripcion",
+          "motivo"
+        ]
+      },
+      "AuditoriaVinculosDto": {
+        "type": "object",
+        "properties": {
+          "aplicada": {
+            "type": "boolean",
+            "description": "true solo cuando el request trae filtro `estado` (REQ-VMB-07)."
+          },
+          "total": {
+            "type": "number",
+            "description": "Total REAL de vínculos rotos en el rango filtrado."
+          },
+          "rotos": {
+            "description": "Tope 100 filas.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VinculoRotoDto"
+            }
+          }
+        },
+        "required": [
+          "aplicada",
+          "total",
+          "rotos"
+        ]
+      },
+      "ListadoMovimientosBancariosResponseDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "example": "2026-06-01"
+          },
+          "hasta": {
+            "type": "string",
+            "example": "2026-06-30"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number",
+            "description": "Total de movimientos que satisfacen los filtros (REQ-VMB-04)."
+          },
+          "movimientos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MovimientoVerificadorDto"
+            }
+          },
+          "totales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TotalMonedaDto"
+            }
+          },
+          "saldos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaldoCuentaBancariaDto"
+            }
+          },
+          "auditoriaVinculos": {
+            "$ref": "#/components/schemas/AuditoriaVinculosDto"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta",
+          "page",
+          "limit",
+          "total",
+          "movimientos",
+          "totales",
+          "saldos",
+          "auditoriaVinculos"
         ]
       },
       "ActualizarEstadoMovimientoDto": {

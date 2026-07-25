@@ -140,10 +140,7 @@ export abstract class MovimientoBancarioRepositoryPort {
   ): Promise<MovimientoBancario[]>;
 
   /** Total de movimientos que satisfacen los MISMOS filtros del listado (REQ-VMB-04). */
-  abstract contarCrossCuenta(
-    tenantId: string,
-    filtros: FiltrosListadoMovimientos,
-  ): Promise<number>;
+  abstract contarCrossCuenta(tenantId: string, filtros: FiltrosListadoMovimientos): Promise<number>;
 
   /**
    * Totales agrupados por (moneda, tipo) sobre los mismos filtros del listado
@@ -164,6 +161,14 @@ export abstract class MovimientoBancarioRepositoryPort {
     tenantId: string,
     filtros: Omit<FiltrosListadoMovimientos, 'estado'>,
   ): Promise<{ id: string }[]>;
+
+  /**
+   * Movimientos puntuales por id, acotados al tenant (Anti-31). Existe para
+   * hidratar la franja de vínculos rotos de REQ-VMB-07 — el caller la capa a
+   * 100 filas, así que la lista viene ACOTADA (no es un listado general).
+   * Orden de presentación (REQ-VMB-05) para display estable.
+   */
+  abstract listarPorIds(tenantId: string, ids: readonly string[]): Promise<MovimientoBancario[]>;
 
   /**
    * Último movimiento importado por cuenta bancaria con `fecha <= corte`

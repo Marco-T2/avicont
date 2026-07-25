@@ -2038,6 +2038,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/movimientos-bancarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mayor unificado cross-cuenta: movimientos de TODOS los bancos del rango con estado derivado, saldos vigentes por cuenta y totales por moneda (REQ-VMB-01).
+         * @description Herramienta de APOYO, no limitante: sin filtro `estado` nada se esconde (REQ-VMB-02). Es LECTURA PURA — nunca escribe, ni siquiera para "curar" un vínculo roto (REQ-VMB-06).
+         */
+        get: operations["MovimientosBancariosController_listar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movimientos-bancarios/{id}/estado": {
         parameters: {
             query?: never;
@@ -3923,6 +3943,108 @@ export interface components {
             confianzaSugerida: string | null;
             conciliadoPorUserId: string;
             createdAt: string;
+        };
+        MovimientoVerificadorDto: {
+            id: string;
+            /**
+             * @description Calendario puro, sin UTC (§4.6).
+             * @example 2026-06-10
+             */
+            fecha: string;
+            hora: string | null;
+            /**
+             * @description Monto como string (§4.5), siempre positivo.
+             * @example 1500.00
+             */
+            monto: string;
+            /**
+             * @description Perspectiva del BANCO.
+             * @enum {string}
+             */
+            tipo: "DEBITO" | "CREDITO";
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            referencia: string | null;
+            saldo: string | null;
+            /**
+             * @description Columna PERSISTIDA (proyección cacheada). NO es lo que se muestra.
+             * @enum {string}
+             */
+            estado: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            /**
+             * @description DERIVADO en cada lectura (REQ-CB-10/11). Esto es lo que se muestra.
+             * @enum {string}
+             */
+            estadoEfectivo: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+            vinculo: components["schemas"]["VinculoConciliacionDto"] | null;
+            /** Format: uuid */
+            cuentaBancariaId: string;
+            /** @description Índice 0-based dentro del orden cronológico del archivo importado (REQ-CB-21). null = importado antes del change o secuencia no monótona. */
+            ordenFisico: number | null;
+        };
+        TotalMonedaDto: {
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            /**
+             * @description String (§4.5). Sin conversión a BOB.
+             * @example 300.50
+             */
+            totalDebitos: string;
+            /**
+             * @description String (§4.5). Sin conversión a BOB.
+             * @example 50.00
+             */
+            totalCreditos: string;
+            cantidad: number;
+        };
+        SaldoCuentaBancariaDto: {
+            /** Format: uuid */
+            cuentaBancariaId: string;
+            alias: string;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            /** @description Saldo publicado por el banco en el último movimiento con fecha <= hasta. null honesto: sin fallback (REQ-VMB-09). */
+            saldo: string | null;
+            /** @description Fecha del último movimiento importado — SIEMPRE presente si hay movimiento (REQ-VMB-08). */
+            fechaUltimoMovimiento: string | null;
+        };
+        VinculoRotoDto: {
+            /** Format: uuid */
+            movimientoBancarioId: string;
+            /** Format: uuid */
+            cuentaBancariaId: string;
+            /** @example 2026-06-10 */
+            fecha: string;
+            /** @example 1250.50 */
+            monto: string;
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            descripcion: string;
+            /** @enum {string} */
+            motivo: "LINEA_INEXISTENTE" | "COMPROBANTE_ANULADO" | "CUENTA_CAMBIADA" | "MONTO_CAMBIADO" | "LADO_CAMBIADO" | "MONEDA_CAMBIADA" | "FECHA_CAMBIADA";
+        };
+        AuditoriaVinculosDto: {
+            /** @description true solo cuando el request trae filtro `estado` (REQ-VMB-07). */
+            aplicada: boolean;
+            /** @description Total REAL de vínculos rotos en el rango filtrado. */
+            total: number;
+            /** @description Tope 100 filas. */
+            rotos: components["schemas"]["VinculoRotoDto"][];
+        };
+        ListadoMovimientosBancariosResponseDto: {
+            /** @example 2026-06-01 */
+            desde: string;
+            /** @example 2026-06-30 */
+            hasta: string;
+            page: number;
+            limit: number;
+            /** @description Total de movimientos que satisfacen los filtros (REQ-VMB-04). */
+            total: number;
+            movimientos: components["schemas"]["MovimientoVerificadorDto"][];
+            totales: components["schemas"]["TotalMonedaDto"][];
+            saldos: components["schemas"]["SaldoCuentaBancariaDto"][];
+            auditoriaVinculos: components["schemas"]["AuditoriaVinculosDto"];
         };
         ActualizarEstadoMovimientoDto: {
             /**
@@ -7855,6 +7977,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    MovimientosBancariosController_listar: {
+        parameters: {
+            query: {
+                /** @description Inclusive. */
+                desde: string;
+                /** @description Inclusive. */
+                hasta: string;
+                cuentaBancariaId?: string;
+                /** @description Filtra por la columna cacheada. Activa la auditoría de vínculos rotos (REQ-VMB-07). Sin este parámetro se devuelve TODO (REQ-VMB-02). */
+                estado?: "PENDIENTE" | "CONCILIADO" | "IGNORADO";
+                /** @description Monto mínimo inclusive, string (§4.5). */
+                montoDesde?: string;
+                /** @description Monto máximo inclusive, string (§4.5). */
+                montoHasta?: string;
+                /** @description Substring sobre la descripción, insensible a mayúsculas y diacríticos (REQ-VMB-03). */
+                glosa?: string;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListadoMovimientosBancariosResponseDto"];
+                };
             };
         };
     };

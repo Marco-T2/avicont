@@ -168,7 +168,8 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
         organizationId: opts.tenantId ?? tenantA,
         cuentaBancariaId: opts.cuentaBancariaId ?? cuentaBancariaA,
         importacionId:
-          opts.importacionId ?? ((opts.tenantId ?? tenantA) === tenantA ? importacionA : importacionB),
+          opts.importacionId ??
+          ((opts.tenantId ?? tenantA) === tenantA ? importacionA : importacionB),
         fecha: new Date(`${opts.fecha}T00:00:00.000Z`),
         hora: opts.hora ?? null,
         monto: new Prisma.Decimal(opts.monto ?? '100.00'),
@@ -177,7 +178,8 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
         descripcion: opts.descripcion ?? `Movimiento ${seq}`,
         descripcionNormalizada: opts.descripcionNormalizada ?? `MOVIMIENTO ${seq}`,
         referencia: null,
-        saldo: opts.saldo === undefined || opts.saldo === null ? null : new Prisma.Decimal(opts.saldo),
+        saldo:
+          opts.saldo === undefined || opts.saldo === null ? null : new Prisma.Decimal(opts.saldo),
         contraparteNombre: null,
         contraparteDocumento: null,
         datosOriginales: {},
@@ -417,9 +419,24 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
 
   describe('totalesPorMoneda (REQ-VMB-11/13)', () => {
     it('agrupa por moneda y tipo con total y cantidad propios, sin mezclar monedas ni tenants', async () => {
-      await crearMovimiento({ fecha: '2026-06-10', monto: '100.00', tipo: 'DEBITO', moneda: 'BOB' });
-      await crearMovimiento({ fecha: '2026-06-11', monto: '200.50', tipo: 'DEBITO', moneda: 'BOB' });
-      await crearMovimiento({ fecha: '2026-06-12', monto: '50.00', tipo: 'CREDITO', moneda: 'BOB' });
+      await crearMovimiento({
+        fecha: '2026-06-10',
+        monto: '100.00',
+        tipo: 'DEBITO',
+        moneda: 'BOB',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-11',
+        monto: '200.50',
+        tipo: 'DEBITO',
+        moneda: 'BOB',
+      });
+      await crearMovimiento({
+        fecha: '2026-06-12',
+        monto: '50.00',
+        tipo: 'CREDITO',
+        moneda: 'BOB',
+      });
       await crearMovimiento({ fecha: '2026-06-13', monto: '10.00', tipo: 'DEBITO', moneda: 'USD' });
       await crearMovimiento({
         fecha: '2026-06-10',
@@ -481,12 +498,30 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
     });
   });
 
+  describe('listarPorIds (franja de rotos, REQ-VMB-07)', () => {
+    it('trae solo ids del tenant, en orden de presentación; lista vacía ⇒ []', async () => {
+      const propio = await crearMovimiento({ fecha: '2026-06-11' });
+      const propio2 = await crearMovimiento({ fecha: '2026-06-10' });
+      const ajeno = await crearMovimiento({ fecha: '2026-06-10', tenantId: tenantB });
+
+      const resultado = await repo.listarPorIds(tenantA, [propio.id, propio2.id, ajeno.id]);
+
+      expect(resultado.map((m) => m.id)).toEqual([propio2.id, propio.id]);
+      expect(await repo.listarPorIds(tenantA, [])).toEqual([]);
+    });
+  });
+
   describe('saldosVigentes (REQ-VMB-08/09/13)', () => {
     const CORTE_JUNIO = new Date('2026-06-30T00:00:00.000Z');
 
     it('empate intra-día con hora null: elige la MISMA fila que cierra el listado (DESC NULLS FIRST)', async () => {
       await crearMovimiento({ fecha: '2026-06-05', hora: '08:00:00', saldo: '999.00' });
-      await crearMovimiento({ id: ID_ALTO, fecha: '2026-06-10', hora: '09:00:00', saldo: '100.00' });
+      await crearMovimiento({
+        id: ID_ALTO,
+        fecha: '2026-06-10',
+        hora: '09:00:00',
+        saldo: '100.00',
+      });
       // hora null cierra el día en presentación (NULLS LAST) ⇒ su saldo es el vigente
       await crearMovimiento({ id: ID_BAJO, fecha: '2026-06-10', hora: null, saldo: '300.00' });
 

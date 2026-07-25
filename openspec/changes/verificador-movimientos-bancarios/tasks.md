@@ -50,11 +50,11 @@ Depende de: grupos 1 y 2.
 
 Depende de: grupos 4 y 5.
 
-- [ ] 6.1 RED — `dto/listar-movimientos-bancarios.dto.spec.ts`: `desde`/`hasta` obligatorios `YYYY-MM-DD`, `limit` max 200, montos `@Matches(/^\d+(\.\d{1,2})?$/)`.
-- [ ] 6.2 RED — `movimientos-bancarios.service.spec.ts` (ports mockeados): rango invertido → `CONCILIACION_LISTADO_RANGO_INVALIDO` (422); glosa normalizada con `normalizarDescripcion`; derivación `estadoEfectivo` por página (roto/sin match, sin escrituras); auditoría SOLO con filtro `estado` (chunks, cap 100 + total real); merge `saldos` con `CuentaBancariaRepositoryPort.listar` (cuenta sin movimientos ⇒ null/null); totales por moneda sin conversión BOB; montos string/fechas `YYYY-MM-DD`.
-- [ ] 6.3 GREEN — `dto/listar-movimientos-bancarios.dto.ts` (query + response), `DomainError` nueva, `movimientos-bancarios.service.listar()` (orquesta/deriva/audita), controller `@Get()` con `contabilidad.conciliacion.read` (sin permisos nuevos).
-- [ ] 6.4 Regenerar `backend/openapi.json` + `frontend/src/types/api.generated.ts` (job `contract-drift` rompe si falta).
-- [ ] 6.5 Verde backend.
+- [x] 6.1 RED — `dto/listar-movimientos-bancarios.dto.spec.ts`: `desde`/`hasta` obligatorios `YYYY-MM-DD`, `limit` max 200, montos `@Matches(/^\d+(\.\d{1,2})?$/)`.
+- [x] 6.2 RED — `movimientos-bancarios.service.spec.ts` (ports mockeados): rango invertido → `CONCILIACION_LISTADO_RANGO_INVALIDO` (422); glosa normalizada con `normalizarDescripcion`; derivación `estadoEfectivo` por página (roto/sin match, sin escrituras); auditoría SOLO con filtro `estado` (chunks, cap 100 + total real); merge `saldos` con `CuentaBancariaRepositoryPort.listar` (cuenta sin movimientos ⇒ null/null); totales por moneda sin conversión BOB; montos string/fechas `YYYY-MM-DD`.
+- [x] 6.3 GREEN — `dto/listar-movimientos-bancarios.dto.ts` (query + response), `DomainError` nueva, `movimientos-bancarios.service.listar()` (orquesta/deriva/audita), controller `@Get()` con `contabilidad.conciliacion.read` (sin permisos nuevos). DESVÍO documentado: el port ganó un 6º método `listarPorIds(tenantId, ids)` — el design tipa `listarIdsConMatch` como `{id}[]` pero la franja `rotos` de la response exige datos del movimiento (cuentaBancariaId/fecha/monto/descripcion) y ningún método existente resuelve por ids; acotado al cap 100, con JSDoc e integration test propio.
+- [x] 6.4 Regenerar `backend/openapi.json` + `frontend/src/types/api.generated.ts` (job `contract-drift` rompe si falta).
+- [x] 6.5 Verde backend.
 
 ## Grupo 7 — E2E · `test(conciliacion): e2e for movimientos bancarios verifier`
 

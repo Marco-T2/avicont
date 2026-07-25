@@ -179,6 +179,14 @@ export class PrismaMovimientoBancarioRepository extends MovimientoBancarioReposi
     });
   }
 
+  async listarPorIds(tenantId: string, ids: readonly string[]): Promise<MovimientoBancario[]> {
+    if (ids.length === 0) return [];
+    return this.prisma.movimientoBancario.findMany({
+      where: { organizationId: tenantId, id: { in: [...ids] } },
+      orderBy: ORDEN_PRESENTACION,
+    });
+  }
+
   async saldosVigentes(tenantId: string, corte: Date): Promise<SaldoVigenteRow[]> {
     // DISTINCT ON no existe en el query builder (design D2) — primer raw del
     // módulo, contra la tabla PROPIA. La inversión del orden de presentación
@@ -208,7 +216,9 @@ export class PrismaMovimientoBancarioRepository extends MovimientoBancarioReposi
    */
   private whereListado(
     tenantId: string,
-    filtros: Omit<FiltrosListadoMovimientos, 'estado'> & { estado?: FiltrosListadoMovimientos['estado'] },
+    filtros: Omit<FiltrosListadoMovimientos, 'estado'> & {
+      estado?: FiltrosListadoMovimientos['estado'];
+    },
   ): Prisma.MovimientoBancarioWhereInput {
     const montoFiltro = {
       ...(filtros.montoDesde !== undefined ? { gte: filtros.montoDesde } : {}),
