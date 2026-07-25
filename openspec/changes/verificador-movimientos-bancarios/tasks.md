@@ -16,9 +16,9 @@
 
 Depende de: nada. DEBE mergear antes del grupo 5 (primer raw del módulo).
 
-- [ ] 2.1 `src/conciliacion-bancaria/no-escribe-comprobantes.arch.spec.ts` (raíz del módulo, **no** `adapters/`): el chequeo de SQL crudo (línea ~118) pasa de `$executeRaw` a `$executeRaw || $queryRaw` contra `TABLAS_PROHIBIDAS`. La ubicación importa: el spec escanea `__dirname`, así que moverlo achicaría su alcance al subdirectorio.
-- [ ] 2.2 Validar por MUTACIÓN: meter un `$queryRaw` de prueba contra `comprobantes` → spec ROJO; sacarlo → VERDE. Documentar en el commit.
-- [ ] 2.3 Verde backend.
+- [x] 2.1 `src/conciliacion-bancaria/no-escribe-comprobantes.arch.spec.ts` (raíz del módulo, **no** `adapters/`): el chequeo de SQL crudo (línea ~118) pasa de `$executeRaw` a `$executeRaw || $queryRaw` contra `TABLAS_PROHIBIDAS`. La ubicación importa: el spec escanea `__dirname`, así que moverlo achicaría su alcance al subdirectorio.
+- [x] 2.2 Validar por MUTACIÓN: meter un `$queryRaw` de prueba contra `comprobantes` → spec ROJO; sacarlo → VERDE. Documentar en el commit.
+- [x] 2.3 Verde backend.
 
 ## Grupo 3 — Captura `ordenFisico` en importador (REQ-CB-21) · `feat(conciliacion): persist ordenFisico on import`
 

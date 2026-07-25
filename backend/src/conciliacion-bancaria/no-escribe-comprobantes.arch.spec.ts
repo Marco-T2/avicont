@@ -110,12 +110,17 @@ describe('Arquitectura: conciliacion-bancaria solo lee del núcleo contable (REQ
     expect(violaciones).toEqual([]);
   });
 
-  it('ningún archivo escribe las tablas del núcleo contable vía SQL crudo', () => {
+  it('ningún archivo toca las tablas del núcleo contable vía SQL crudo', () => {
+    // `$queryRaw` también cuenta (D9 del change `verificador-movimientos-
+    // bancarios`): un SELECT crudo contra `comprobantes` esquivaría el port
+    // de lectura y su filtro de tenant. El módulo SÍ puede usar raw contra
+    // sus propias tablas (`movimientos_bancarios`) — lo prohibido es la
+    // combinación raw + tabla del núcleo contable.
     const violaciones = archivos
       .map((f) => ({ f, contenido: fs.readFileSync(f, 'utf-8') }))
       .filter(
         ({ contenido }) =>
-          contenido.includes('$executeRaw') &&
+          (contenido.includes('$executeRaw') || contenido.includes('$queryRaw')) &&
           TABLAS_PROHIBIDAS.some((tabla) => contenido.includes(tabla)),
       )
       .map(({ f }) => relativo(f));
