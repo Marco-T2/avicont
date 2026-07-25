@@ -92,7 +92,7 @@ Migración **aditiva**, sin backfill.
 ### Frontend
 
 - [x] 3.9 `features/informe-conciliacion/`: hook TanStack Query + ruta.
-- [ ] 3.10 Vista del puente como **papel de trabajo** (no una tabla más):
+- [x] 3.10 Vista del puente como **papel de trabajo** (no una tabla más):
       ambos saldos, partidas con signo, residuo destacado y la abstención
       visible cuando corresponda.
 - [ ] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
