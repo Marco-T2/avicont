@@ -696,11 +696,11 @@ por su cuenta.
 ### REQ-CB-16: Validación del número de cuenta del extracto contra la `CuentaBancaria` destino
 
 Cuando el perfil expone el número de cuenta en la cabecera del archivo
-(confirmado para los 6 perfiles soportados: BancoSol, Económico y Unión bajo
+(confirmado para los 7 perfiles soportados: BancoSol, Económico y Unión bajo
 la misma etiqueta `Cuenta:`, BCP bajo `Nro. Cuenta:`, Fortaleza bajo `NÚMERO
-DE CUENTA:` y BMSC bajo `Nro de Cuenta:` — si un perfil futuro no
-lo expusiera, aplica el fallback de advertencia sin rechazo descrito más
-abajo), el servicio de importación DEBE extraerlo y
+DE CUENTA:`, BMSC bajo `Nro de Cuenta:` y FIE bajo `NUMERO DE CUENTA:` — si
+un perfil futuro no lo expusiera, aplica el fallback de advertencia sin
+rechazo descrito más abajo), el servicio de importación DEBE extraerlo y
 compararlo contra `CuentaBancaria.numeroCuenta` **antes de persistir
 cualquier movimiento o fila de `ImportacionExtracto`**.
 
@@ -949,8 +949,9 @@ un movimiento simultáneamente "conciliado" e "ignorado".
 Los extractos soportados publican el monto de dos formas distintas, y el
 adaptador DEBE declarar explícitamente cuál usa su perfil:
 
-- **Columna única con signo** (BancoSol, Económico, Unión, BCP): una sola
-  columna de monto; el `LadoBancario` se deriva del SIGNO (`-` → `DEBITO`).
+- **Columna única con signo** (BancoSol, Económico, Unión, BCP, FIE): una
+  sola columna de monto; el `LadoBancario` se deriva del SIGNO (`-` →
+  `DEBITO`).
 - **Débito y Crédito separados** (Fortaleza, BMSC): dos columnas; el
   `LadoBancario` lo determina **cuál de las dos trae valor**, y el signo de la
   celda se ignora — en estos formatos los montos vienen positivos en ambas
@@ -993,3 +994,57 @@ el motor de parsing.
 - WHEN una fila de movimiento no trae valor en ninguna de las dos
 - THEN el sistema rechaza el archivo por formato no reconocido, sin asumir
   un monto en cero
+
+### REQ-CB-20: Exports paginados estilo hoja impresa (paginación embebida)
+
+Algunos generadores de extractos (JasperReports en el caso de FIE) maquetan
+la planilla como una hoja IMPRESA: la cabecera de la tabla de movimientos SE
+REPITE al inicio de cada página y entre bloques aparece una fila-marcador con
+el número de página. Un perfil cuyo export tenga esa estructura DEBE
+declararlo como dato del dialecto (`paginacionEmbebida`), y el motor DEBE
+descartar esas filas por su **ESTRUCTURA, nunca por posición**:
+
+- **Cabecera repetida**: la fila re-matchea TODAS las etiquetas de la fila de
+  encabezados original en sus MISMOS índices de columna. No alcanza con mirar
+  una sola celda.
+- **Marcador de página**: la fila tiene exactamente UNA celda no-nula y su
+  texto es un número de página (acepta tanto `1` como `1.0` — la forma varía
+  según cómo el generador serializó la celda).
+
+Cuántas filas trae cada página lo decide la plantilla del generador y puede
+cambiar sin aviso: una regla posicional (ej. "7 filas la primera página, 21
+las siguientes") se comería movimientos EN SILENCIO ante cualquier retoque de
+la plantilla. Ese conocimiento solo es admisible como aserción de tests sobre
+los fixtures reales.
+
+Adicionalmente, los `.xlsx` de JasperReports pueden venir malformados (celdas
+`inlineStr` vacías sin hijo `<is>` y `<dimension>` mentiroso). El saneo que
+los vuelve legibles corre en la puerta única de lectura, UNIVERSAL para todos
+los perfiles — es idempotente y deja los archivos sanos byte a byte
+idénticos; condicionarlo por dialecto dejaría un bug silencioso si un call
+site lo olvidara.
+
+#### Scenario: Cabecera repetida entre páginas no entra como movimiento
+
+- GIVEN un perfil con paginación embebida cuyo export trae la cabecera de la
+  tabla repetida al inicio de cada página
+- WHEN se importa el archivo
+- THEN ninguna fila de cabecera repetida se importa como movimiento y los
+  movimientos de todas las páginas se importan completos
+
+#### Scenario: Marcador de página no entra como movimiento
+
+- GIVEN un export paginado cuyas filas-marcador traen solo el número de
+  página en la columna de fecha
+- WHEN se importa el archivo
+- THEN las filas-marcador se descartan y la cadena de saldos corridos entre
+  la última fila de una página y la primera de la siguiente permanece
+  coherente
+
+#### Scenario: Una fila genuinamente vacía sigue terminando la tabla
+
+- GIVEN un perfil con paginación embebida
+- WHEN aparece una fila sin valor en la columna de fecha
+- THEN el escaneo de movimientos termina ahí, como en el resto de los
+  perfiles (el descarte estructural corre DESPUÉS del corte por fila en
+  blanco)

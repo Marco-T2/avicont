@@ -147,6 +147,35 @@ function leerMontoDeFila(
   return { monto, tipo: esDebito ? 'DEBITO' : 'CREDITO' };
 }
 
+/**
+ * Cabecera de tabla REPETIDA (export paginado de Jasper — FIE): la fila
+ * re-matchea TODAS las etiquetas del header original en sus MISMOS índices
+ * de columna. El criterio es estricto a propósito — mirar solo la celda
+ * Fecha podría confundir una fila de datos por casualidad; el header
+ * completo, no.
+ */
+function esEncabezadoRepetido(fila: FilaCruda, columnas: ReadonlyMap<string, number>): boolean {
+  for (const [etiquetaNormalizada, idx] of columnas) {
+    const celda = fila[idx] ?? null;
+    if (typeof celda !== 'string') return false;
+    if (normalizarParaBusqueda(celda) !== etiquetaNormalizada) return false;
+  }
+  return true;
+}
+
+// El número de página llega como '1' cuando la hoja usa sharedStrings y como
+// '1.0' cuando es una celda numérica que `parseNumber: (s) => s` deja pasar
+// cruda (exports malformados de FIE) — la regex acepta ambas formas.
+const MARCADOR_PAGINA_RE = /^\d+(\.0+)?$/;
+
+/** Fila-marcador de página (Jasper): exactamente UNA celda no-nula en toda la fila, con el número de página. */
+function esMarcadorDePagina(fila: FilaCruda): boolean {
+  const noNulas = fila.filter((celda) => celda !== null);
+  if (noNulas.length !== 1) return false;
+  const unica = noNulas[0];
+  return typeof unica === 'string' && MARCADOR_PAGINA_RE.test(unica.trim());
+}
+
 /** Lee el valor de `etiqueta` en `fila` usando el mapa de columnas del header. Null si la etiqueta no aplica a este dialecto. */
 function valorColumna(
   fila: FilaCruda,
@@ -236,6 +265,20 @@ export class XlsxCoreExtractoParser extends ExtractoParserPort {
       // corrida hasta EOF, verificado en los 4 fixtures reales) — `break`
       // es equivalente a `continue` para ellos, cero cambio de conducta.
       if (celdaFecha === null) break;
+
+      // Export paginado estilo hoja impresa (FIE/JasperReports): entre
+      // bloques aparecen la cabecera de tabla REPETIDA y una fila-marcador
+      // con el número de página — ambas con contenido en la columna Fecha,
+      // así que el `break` de arriba no las corta. Se descartan por su
+      // ESTRUCTURA, nunca por posición: cuántas filas trae cada página lo
+      // decide la plantilla del banco y puede cambiar sin aviso — un patrón
+      // posicional se comería movimientos EN SILENCIO.
+      if (
+        d.paginacionEmbebida === true &&
+        (esEncabezadoRepetido(fila, encabezados.columnas) || esMarcadorDePagina(fila))
+      ) {
+        continue;
+      }
 
       const { fecha, hora: horaDeCeldaFecha } = leerFechaDeCelda(celdaFecha, d);
       // TEXTO_ES_DD_MMM_YYYY (Económico) no trae hora embebida en la celda
