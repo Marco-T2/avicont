@@ -30,7 +30,9 @@ export function MobileSidebar(): React.JSX.Element {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0 bg-sidebar">
-        <SheetHeader className="border-b">
+        {/* shrink-0: el SheetContent es `flex flex-col h-full`. Sin esto el
+            header se comprime en vez de dejar scrollear al <nav>. */}
+        <SheetHeader className="shrink-0 border-b">
           <SheetTitle className="text-left text-base font-semibold tracking-tight">
             Avicont
           </SheetTitle>

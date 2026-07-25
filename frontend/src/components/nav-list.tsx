@@ -1,16 +1,25 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
-import { NavLink } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
 
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useMisPacks } from '@/lib/use-packs';
 import { usePermissions } from '@/lib/use-permissions';
 import { useVerticalActivo } from '@/lib/use-vertical';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
+import { useSidebarStore } from '@/stores/sidebar-store';
 import type { SystemRole } from '@/types/api';
 
-import { NAV_SECTIONS, PANEL_ITEM, type NavItem, type NavSection } from './nav-items';
+import {
+  NAV_SECTIONS,
+  PANEL_ITEM,
+  type NavGroup,
+  type NavItem,
+  type NavSection,
+} from './nav-items';
 
 interface NavListProps {
   /** Callback opcional para cerrar el drawer mobile al clickear un item. */
@@ -53,12 +62,24 @@ export function NavList({
     return pasaPermiso && pasaVertical && pasaPack && pasaSystemRole;
   };
 
-  // Por sección, computar ítems visibles y descartar secciones vacías (no header huérfano).
+  // Por sección: ítems sueltos + grupos + sueltos finales, ya filtrados.
+  // Un GRUPO sin ítems visibles se descarta entero (no queda header huérfano) —
+  // misma regla que ya se aplicaba a las secciones. Por eso el grupo no necesita
+  // declarar gate propio: su visibilidad se DERIVA de la cascada de sus ítems.
   const seccionesVisibles = useMemo(
     () =>
-      NAV_SECTIONS.map((s) => ({ section: s, visibleItems: s.items.filter(pasaFiltro) })).filter(
-        (s) => s.visibleItems.length > 0,
-      ),
+      NAV_SECTIONS.map((s) => {
+        const looseItems = s.items.filter(pasaFiltro);
+        const groups = (s.groups ?? [])
+          .map((g) => ({ group: g, visibleItems: g.items.filter(pasaFiltro) }))
+          .filter((g) => g.visibleItems.length > 0);
+        const trailingItems = (s.trailingItems ?? []).filter(pasaFiltro);
+        const total =
+          looseItems.length +
+          groups.reduce((n, g) => n + g.visibleItems.length, 0) +
+          trailingItems.length;
+        return { section: s, looseItems, groups, trailingItems, total };
+      }).filter((s) => s.total > 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [has, verticalActivo, packsActivos, userRoles],
   );
@@ -80,11 +101,15 @@ export function NavList({
   };
 
   return (
-    <nav className="flex-1 space-y-1 p-2">
+    // `min-h-0` + `overflow-y-auto`: el shell monta la sidebar dentro de un
+    // `flex h-screen`. Sin min-h-0 un hijo flex nunca baja de su content height,
+    // el overflow no se activa y lo que sobra queda FUERA del viewport, sin
+    // scroll de página (el root es h-screen) → ítems inalcanzables.
+    <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
       {/* Ítem suelto Panel — siempre arriba, sin header (D-01). */}
       <NavItemSlot item={PANEL_ITEM} onItemClick={onItemClick} collapsed={collapsed} />
 
-      {seccionesVisibles.map(({ section, visibleItems }, idx) => (
+      {seccionesVisibles.map(({ section, looseItems, groups, trailingItems }, idx) => (
         <div key={section.id} className="space-y-1">
           {debeMostrarHeader(section) && (
             <h2 className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -95,12 +120,165 @@ export function NavList({
           {collapsed && idx > 0 && (
             <div className="mx-2 my-1 border-t border-sidebar-border" aria-hidden="true" />
           )}
-          {visibleItems.map((item) => (
+
+          {looseItems.map((item) => (
+            <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={collapsed} />
+          ))}
+
+          {groups.map(({ group, visibleItems }) =>
+            collapsed ? (
+              <NavGroupRail
+                key={group.id}
+                group={group}
+                visibleItems={visibleItems}
+                onItemClick={onItemClick}
+              />
+            ) : (
+              <NavGroupBlock
+                key={group.id}
+                group={group}
+                visibleItems={visibleItems}
+                onItemClick={onItemClick}
+              />
+            ),
+          )}
+
+          {trailingItems.map((item) => (
             <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={collapsed} />
           ))}
         </div>
       ))}
     </nav>
+  );
+}
+
+interface GroupProps {
+  group: NavGroup;
+  visibleItems: NavItem[];
+  onItemClick?: (() => void) | undefined;
+}
+
+// Prefijo, no igualdad: en /conciliacion/:id el grupo sigue contando como
+// activo aunque el NavLink (que usa `end`) ya no se pinte como tal.
+function contieneRuta(items: NavItem[], pathname: string): boolean {
+  return items.some((i) => pathname === i.to || pathname.startsWith(`${i.to}/`));
+}
+
+// Subgrupo colapsable. Solo se renderiza en modo expandido.
+//
+// Default de apertura: abierto si contiene la ruta activa, cerrado si no. Ese
+// default se pisa con la preferencia guardada del usuario — incluido el caso
+// "cerré a propósito el grupo donde estoy parado", por eso `openGroups` guarda
+// booleanos y no un set de abiertos.
+function NavGroupBlock({ group, visibleItems, onItemClick }: GroupProps): React.JSX.Element {
+  const { pathname } = useLocation();
+  const openGroups = useSidebarStore((s) => s.openGroups);
+  const toggleGroup = useSidebarStore((s) => s.toggleGroup);
+
+  const contieneRutaActiva = contieneRuta(visibleItems, pathname);
+  const abierto = openGroups[group.id] ?? contieneRutaActiva;
+  const contentId = `nav-group-${group.id}`;
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => toggleGroup(group.id, contieneRutaActiva)}
+        aria-expanded={abierto}
+        aria-controls={contentId}
+        className={cn(
+          'flex w-full items-center gap-1 rounded-md px-3 py-1.5',
+          'text-xs font-semibold uppercase tracking-wide transition-colors',
+          'hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+          // Plegado pero con la ruta activa adentro: sin esta pista el usuario
+          // pierde de vista dónde está parado.
+          !abierto && contieneRutaActiva
+            ? 'text-sidebar-accent-foreground'
+            : 'text-muted-foreground',
+        )}
+      >
+        <ChevronRight
+          className={cn(
+            'h-3.5 w-3.5 shrink-0 transition-transform duration-150',
+            abierto && 'rotate-90',
+          )}
+          aria-hidden="true"
+        />
+        <span className="flex-1 text-left">{group.label}</span>
+        <span className="text-[10px] font-normal tabular-nums opacity-60" aria-hidden="true">
+          {visibleItems.length}
+        </span>
+      </button>
+
+      {abierto && (
+        <div id={contentId} className="ml-4 space-y-1 border-l border-sidebar-border pl-1">
+          {visibleItems.map((item) => (
+            <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={false} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Versión del subgrupo para el RIEL de 64px: el grupo colapsa a UN icono que
+// abre un flyout con sus ítems.
+//
+// Por qué no aplanar los grupos a iconos sueltos: el riel quedaba con 25 iconos
+// —los mismos de antes de agrupar— desbordando el viewport, y contraído no se
+// distingue Balance General de Balance de Comprobación sin hoverear los dos.
+// Con flyout son 15 blancos y el agrupamiento sobrevive al modo riel.
+//
+// Por click y no por hover: accesible por teclado y no se abren solos mientras
+// movés el mouse por el riel. `openGroups` (plegado del modo expandido) NO se
+// consulta acá: son dos modelos de interacción distintos.
+function NavGroupRail({ group, visibleItems, onItemClick }: GroupProps): React.JSX.Element {
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+  const Icon = group.icon;
+  const contieneRutaActiva = contieneRuta(visibleItems, pathname);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={group.label}
+          // Marca dónde estás parado: en el riel el ítem activo está escondido
+          // adentro del flyout, así que la pista tiene que darla el grupo.
+          {...(contieneRutaActiva ? { 'aria-current': 'true' as const } : {})}
+          className={cn(
+            'flex w-full items-center justify-center rounded-md p-3 transition-colors md:p-2',
+            contieneRutaActiva
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        className="w-56 gap-1 p-1"
+        aria-label={group.label}
+      >
+        <p className="px-3 pt-1.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {group.label}
+        </p>
+        {visibleItems.map((item) => (
+          <NavItemRenderer
+            key={item.to}
+            item={item}
+            onItemClick={() => {
+              setOpen(false);
+              onItemClick?.();
+            }}
+            collapsed={false}
+          />
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
 

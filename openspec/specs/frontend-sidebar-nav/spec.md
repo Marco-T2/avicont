@@ -1,8 +1,8 @@
 # frontend-sidebar-nav — Especificación
 
 <!--
-Última edición: 2026-07-24
-Última revisión contra core: 2026-07-24
+Última edición: 2026-07-25
+Última revisión contra core: 2026-07-25
 Owner: frontend-lead
 -->
 
@@ -12,6 +12,7 @@ Owner: frontend-lead
 > Capability nueva: `frontend-sidebar-nav` (no existía spec previa)
 > Origen: change `sidebar-por-modulo` (archivado, PR #192)
 > Extendida por: change `conciliacion-bancaria` (PR #236) — REQ-SB-10
+> Extendida por: `sidebar-subgrupos` (2026-07-25) — REQ-SB-11 a REQ-SB-14
 > Stack: frontend (Vite + React 19 + TanStack Query)
 
 ---
@@ -36,9 +37,13 @@ y la preservación byte-equivalente del gating de permisos/vertical/pack/systemR
 
 ## Glosario
 
-- **`NavSection`**: tipo nuevo `{ id: string; label: string; kind: 'modulo' | 'transversal'; items: NavItem[] }`.
+- **`NavSection`**: tipo `{ id, label, kind, items, groups?, trailingItems? }` — ver REQ-SB-01.
+- **`NavGroup`**: subgrupo colapsable DENTRO de una sección `{ id, label, icon, items }`. Segundo y **último** nivel de jerarquía: no hay grupos dentro de grupos.
 - **`NAV_SECTIONS`**: constante que reemplaza `NAV_ITEMS` como única fuente de verdad del menú.
 - **Ítem suelto (Panel)**: el ítem `/` (Panel) se modela fuera de las secciones. No lleva header.
+- **Ítem suelto de sección**: ítem que vive directo en la sección, sin grupo y sin plegado. Arriba de los grupos (`items`) para lo de uso diario, abajo (`trailingItems`) para lo esporádico y de alto impacto.
+- **Visibilidad derivada**: un `NavGroup` NO declara gating propio. Se muestra si y solo si al menos uno de sus ítems supera la cascada de REQ-SB-05. Un grupo sin ítems visibles desaparece entero, header incluido.
+- **Flyout de riel**: en modo colapsado (`w-16`) el grupo se representa con un único botón-icono que abre un popover lateral con sus ítems.
 - **Sección `modulo`**: sección cuyo contenido pertenece a un vertical o pack (Contabilidad, Granja). Mutuamente exclusivas en runtime por el gating de vertical.
 - **Sección `transversal`**: sección cross-vertical siempre visible (Administración, Configuración).
 - **Header de módulo adaptativo**: el header de una sección `modulo` se oculta cuando hay exactamente una sección `modulo` con ítems visibles; aparece cuando hay ≥2.
@@ -61,6 +66,19 @@ export interface NavSection {
   id: string;
   label: string;
   kind: 'modulo' | 'transversal';
+  /** Ítems sueltos ARRIBA de los grupos, sin plegado. */
+  items: NavItem[];
+  /** Subgrupos colapsables, renderizados DESPUÉS de `items` (REQ-SB-11). */
+  groups?: NavGroup[];
+  /** Ítems sueltos ABAJO de los grupos, sin plegado. */
+  trailingItems?: NavItem[];
+}
+
+export interface NavGroup {
+  id: string;
+  label: string;
+  /** Icono del grupo en el riel de 64px (REQ-SB-13). Obligatorio. */
+  icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
 }
 ```
@@ -69,6 +87,10 @@ La constante `NAV_SECTIONS: NavSection[]` DEBE reemplazar `NAV_ITEMS: NavItem[]`
 única fuente de verdad del menú principal. El tipo `NavItem` NO se DEBE modificar:
 todos sus campos (`to`, `label`, `icon`, `disabled`, `requiredPermission`, `vertical`,
 `pack`, `requiredSystemRole`) se preservan sin cambios.
+
+El orden de render dentro de una sección DEBE ser: `items` → `groups` → `trailingItems`.
+El export derivado `NAV_ITEMS` DEBE aplanar en ese MISMO orden, para que los guards
+anti-drift que lo iteran vean el universo completo de ítems (REQ-SB-08).
 
 El ítem Panel (`to: '/'`) DEBE exportarse como constante separada (`PANEL_ITEM`)
 o equivalente, para que `NavList` lo renderice como ítem suelto sin header.
@@ -84,10 +106,17 @@ o equivalente, para que `NavList` lo renderice como ítem suelto sin header.
 
 #### Escenario: guard anti-drift — todo ítem no-público declara su sección
 
-- DADO el conjunto completo de ítems en `NAV_SECTIONS.flatMap(s => s.items)`
+- DADO el conjunto completo de ítems de `NAV_SECTIONS` (sueltos + de grupo + finales)
 - CUANDO se verifica que cada ítem con `requiredPermission` o `requiredSystemRole`
   pertenece a su sección esperada
 - ENTONCES no hay ítems "perdidos" fuera de las 4 secciones ni duplicados
+
+#### Escenario: guard anti-drift — todo grupo declara id, label e icono únicos
+
+- DADO el conjunto de grupos en `NAV_SECTIONS.flatMap(s => s.groups ?? [])`
+- CUANDO se inspecciona cada grupo
+- ENTONCES cada uno declara `label` no vacío, al menos un ítem, e `icon` definido
+- Y no hay dos grupos con el mismo `id` (el `id` es clave de plegado persistido)
 
 ---
 
@@ -96,9 +125,9 @@ o equivalente, para que `NavList` lo renderice como ítem suelto sin header.
 Cada ítem DEBE pertenecer a su sección según la siguiente tabla (ítem por ítem,
 en el orden en que deben aparecer dentro de la sección):
 
-| Sección (`id`) | `kind` | Ítems en orden |
+| Sección (`id`) | `kind` | Contenido en orden de render |
 |---|---|---|
-| `'contabilidad'` | `modulo` | `/comprobantes` · `/libros/diario` · `/libros/mayor` · `/eeff/balance` · `/eeff/resultados` · `/plan-cuentas` · `/contactos` · `/documentos-fisicos` |
+| `'contabilidad'` | `modulo` | **sueltos**: `/comprobantes` — **grupos**: `libros` (`/libros/diario` · `/libros/mayor`), `eeff` (`/eeff/balance` · `/eeff/balance-comprobacion` · `/eeff/hoja-trabajo` · `/eeff/resultados` · `/eeff/evolucion-patrimonio` · `/eeff/flujo-efectivo`), `bancos` (`/movimientos-bancarios` · `/conciliacion` · `/settings/cuentas-bancarias`), `maestros` (`/plan-cuentas` · `/contactos` · `/documentos-fisicos`) — **finales**: `/gestiones/cierre` |
 | `'granja'` | `modulo` | `/granja` · `/granja/lotes` · `/granja/tipos-registro` |
 | `'administracion'` | `transversal` | `/settings/empresa` · `/settings/members` · `/settings/roles` · `/settings/features` · `/settings/complementos` |
 | `'configuracion'` | `transversal` | `/periodos-fiscales` · `/tipos-documento-fisico` · `/configuracion` |
@@ -106,6 +135,14 @@ en el orden en que deben aparecer dentro de la sección):
 El orden de secciones en `NAV_SECTIONS` DEBE ser:
 secciones `modulo` (Contabilidad, Granja) → Administración → Configuración.
 Configuración DEBE ser la última sección.
+
+`/comprobantes` DEBE quedar como ítem suelto arriba de los grupos: es la pantalla de
+uso diario y esconderla tras un click de plegado sería una regresión de usabilidad.
+`/gestiones/cierre` DEBE quedar como ítem suelto final: es de uso anual y alto
+impacto — visible sin plegar, pero sin competir por el lugar de arriba.
+
+`/settings/cuentas-bancarias` NO DEBE vivir en la sección `'configuracion'`: pertenece
+al grupo `bancos` junto al resto de la superficie de su pack (REQ-SB-12).
 
 Los ítems `/periodos-fiscales` (Períodos fiscales) y `/tipos-documento-fisico`
 (Tipos de documento) DEBEN estar en la sección `'configuracion'`, NO en `'contabilidad'`.
@@ -115,13 +152,17 @@ el gating es por ítem, no por sección.
 El ítem `/configuracion` (Configuración contable) DEBE permanecer en `'configuracion'`
 con `disabled: true` y `vertical: 'CONTABILIDAD'`.
 
-#### Escenario: orden dentro de Contabilidad — Comprobantes primero
+#### Escenario: orden dentro de Contabilidad — Comprobantes primero, Cierre último
 
-- DADO el vertical activo `'CONTABILIDAD'` y permisos completos (isOwner)
-- CUANDO se renderiza `NavList` y se obtiene la lista de ítems visibles en la sección Contabilidad
+- DADO el vertical activo `'CONTABILIDAD'`, permisos completos (isOwner) y el pack
+  `'contabilidad.conciliacion'` activo
+- CUANDO se aplana la sección Contabilidad en orden de render
+  (sueltos → grupos → finales)
 - ENTONCES los ítems aparecen en este orden:
-  Comprobantes, Libro Diario, Libro Mayor, Balance General, Estado de Resultados,
-  Plan de cuentas, Contactos, Documentos físicos
+  Comprobantes, Libro Diario, Libro Mayor, Balance General, Balance de Comprobación,
+  Hoja de Trabajo, Estado de Resultados, Evolución del Patrimonio, Estado de Flujo de
+  Efectivo, Movimientos bancarios, Conciliación bancaria, Cuentas bancarias,
+  Plan de cuentas, Contactos, Documentos físicos, Cierre del ejercicio
 
 #### Escenario: Períodos fiscales y Tipos de documento aparecen bajo Configuración
 
@@ -331,6 +372,10 @@ En modo collapsed DEBE mantenerse **separación visual mínima entre grupos de �
 Los labels de los ítems ya se ocultan en modo collapsed (comportamiento existente);
 los headers de sección siguen la misma regla: sin texto visible en `w-16`.
 
+Los **subgrupos** en modo collapsed NO se aplanan a iconos sueltos: colapsan a un
+único botón-icono con flyout (REQ-SB-13). Los ítems sueltos de sección (`items` y
+`trailingItems`) sí se renderizan planos como iconos, igual que antes.
+
 #### Escenario: sidebar colapsado no muestra texto de header
 
 - DADO el sidebar desktop en modo colapsado (`collapsed: true`)
@@ -374,12 +419,13 @@ las garantías documentadas en `frontend-permission-gating`.
 - CUANDO se filtran los ítems cuyo `requiredPermission` empieza con `'contabilidad.'`
 - ENTONCES todos tienen `vertical: 'CONTABILIDAD'`
 
-#### Escenario: guard anti-drift — ningún ítem de producción declara pack
+#### ~~Escenario: guard anti-drift — ningún ítem de producción declara pack~~ (OBSOLETO)
 
-- DADO el conjunto de ítems en `NAV_SECTIONS.flatMap(s => s.items)`
-- CUANDO se verifica el campo `pack` en todos los ítems
-- ENTONCES ningún ítem de producción tiene `pack` definido
-  (el riel está listo pero ningún pack de nav existe aún)
+> **Superado por REQ-SB-10** (change `conciliacion-bancaria`, PR #236). Cuando se
+> escribió este escenario el riel de packs estaba construido pero ningún `NavItem`
+> real lo usaba. Hoy hay tres ítems de producción con `pack`, todos del pack
+> `contabilidad.conciliacion`. El guard vigente es el de REQ-SB-12 (cohesión de
+> pack), no la ausencia de packs. Se conserva tachado como registro histórico.
 
 #### Escenario: retrocompat — export NAV_ITEMS derivado si hay consumidores externos
 
@@ -468,6 +514,188 @@ REQ-SB-05, sin código nuevo en `NavList` ni en el filtrado por pack.
 
 ---
 
+### REQ-SB-11: Subgrupos colapsables dentro de una sección
+
+> Origen: `sidebar-subgrupos` (2026-07-25). Dispara la palanca "secciones
+> colapsables" que `sidebar-por-modulo` había dejado **anotada como diferida**
+> con disparador "org con ~12-15 ítems visibles / 2-3 packs". La sección
+> Contabilidad llegó a 15 ítems planos (25 filas de sidebar) y el disparador se
+> cumplió.
+
+Una `NavSection` PUEDE declarar `groups: NavGroup[]`. Cada grupo DEBE renderizarse,
+en modo expandido, como un header clickeable (`<button>` con `aria-expanded` y
+`aria-controls`) que pliega y despliega sus ítems.
+
+El grupo NO DEBE declarar campos de gating propios. Su visibilidad DEBE derivarse de
+sus ítems: si ninguno supera la cascada de REQ-SB-05, el grupo entero —header
+incluido— NO DEBE renderizarse. Un grupo con gate propio introduciría una segunda
+verdad desincronizable respecto de la cascada por ítem.
+
+El estado de plegado DEBE persistirse por `NavGroup.id` en `useSidebarStore`
+(`openGroups: Record<string, boolean>`). Una clave AUSENTE NO significa "cerrado":
+significa "sin preferencia del usuario", y en ese caso el grupo DEBE arrancar abierto
+si contiene la ruta activa, cerrado si no. La preferencia guardada DEBE ganar sobre
+ese default, incluido el caso "el usuario cerró a propósito el grupo donde está
+parado" — por eso el valor es booleano y no un conjunto de abiertos.
+
+Cuando un grupo está plegado pero contiene la ruta activa, su header DEBE recibir una
+marca visual de activo: es la única pista de dónde está parado el usuario.
+
+La coincidencia con la ruta activa DEBE ser por **prefijo** (`pathname === to ||
+pathname.startsWith(to + '/')`), no por igualdad: en `/conciliacion/:id` el grupo
+sigue siendo el activo aunque el `NavLink` (que usa `end`) ya no se pinte.
+
+#### Escenario: plegado por defecto — header visible, ítems fuera del DOM
+
+- DADO un usuario sin preferencia guardada, parado en una ruta ajena al grupo
+- CUANDO se renderiza `NavList` expandido
+- ENTONCES el header del grupo está en el DOM con `aria-expanded="false"`
+- Y ninguno de sus ítems está en el DOM
+- Y los ítems sueltos de la sección SÍ están visibles (no se pliegan nunca)
+
+#### Escenario: el grupo de la ruta activa arranca abierto
+
+- DADO un usuario sin preferencia guardada, parado en `/conciliacion`
+- CUANDO se renderiza `NavList` expandido
+- ENTONCES el grupo `bancos` tiene `aria-expanded="true"` y sus ítems están en el DOM
+- Y los demás grupos siguen con `aria-expanded="false"`
+
+#### Escenario: la preferencia guardada gana sobre el default de ruta activa
+
+- DADO `openGroups = { bancos: false }` y el usuario parado en `/conciliacion`
+- CUANDO se renderiza `NavList` expandido
+- ENTONCES el grupo `bancos` tiene `aria-expanded="false"`
+
+#### Escenario: grupo sin ítems visibles — desaparece entero
+
+- DADO un usuario cuyo gating oculta TODOS los ítems de un grupo
+- CUANDO se renderiza `NavList`
+- ENTONCES no hay header de ese grupo en el DOM (no queda header huérfano)
+- Y las demás secciones y grupos siguen renderizándose normalmente
+
+---
+
+### REQ-SB-12: Cohesión de pack — un pack, un solo grupo
+
+Todos los ítems de navegación que declaran la misma clave de `pack` DEBEN vivir en un
+único `NavGroup`, y ese grupo NO DEBE contener ítems de otro pack ni ítems sin pack.
+
+Un pack es una unidad **comercial**: el Owner lo activa y desactiva desde
+`/settings/complementos`, y su superficie de navegación debe aparecer y desaparecer
+como un bloque único. Repartir los ítems de un pack por afinidad temática rompe el
+modelo mental "activé esto → obtuve esto" y, al desactivarlo, hace desaparecer cosas
+de dos menús distintos.
+
+Concretamente, las tres pantallas de `contabilidad.conciliacion` (`/movimientos-bancarios`,
+`/conciliacion`, `/settings/cuentas-bancarias`) DEBEN estar en el grupo `bancos` de la
+sección `'contabilidad'`.
+
+Este requisito NO agrega gating: cada ítem sigue declarando su propio `pack` y pasando
+la cascada de REQ-SB-05 individualmente. Es una restricción de **ubicación**, verificada
+por guard estático.
+
+#### Escenario: guard anti-drift — todo ítem con pack de conciliación vive en `bancos`
+
+- DADO el universo completo de ítems (`NAV_ITEMS` derivado)
+- CUANDO se filtran los que declaran `pack: 'contabilidad.conciliacion'`
+- ENTONCES todos pertenecen al grupo `bancos`
+
+#### Escenario: guard anti-drift — todo ítem de `bancos` declara el pack
+
+- DADO el grupo `bancos`
+- CUANDO se inspecciona cada uno de sus ítems
+- ENTONCES todos declaran `pack: 'contabilidad.conciliacion'`
+
+#### Escenario: pack inactivo — el bloque entero desaparece
+
+- DADO un usuario con permiso `contabilidad.conciliacion.read` y vertical
+  `'CONTABILIDAD'`, pero sin el pack activo
+- CUANDO se renderiza `NavList`
+- ENTONCES el grupo `bancos` no está en el DOM, ni su header ni sus tres ítems
+- Y el resto de la sección Contabilidad sigue visible
+
+---
+
+### REQ-SB-13: Modo riel — el grupo colapsa a un icono con flyout
+
+En modo colapsado (`w-16`), cada `NavGroup` visible DEBE renderizarse como un único
+botón-icono que abre un **flyout** (popover lateral, `side="right"`) con los ítems del
+grupo y su label como encabezado. Los ítems dentro del flyout DEBEN mostrarse con su
+label visible, no como iconos.
+
+Cada `NavGroup` DEBE declarar `icon`. Es obligatorio porque en el riel es lo ÚNICO que
+representa al grupo. En modo expandido ese icono NO se usa: el header es chevron +
+label, que se lee como encabezado y no compite visualmente con los ítems.
+
+El flyout DEBE abrirse por **click**, no por hover: accesible por teclado y sin
+aperturas accidentales al mover el mouse por el riel. DEBE cerrarse al elegir un ítem.
+
+El botón del grupo DEBE marcarse con `aria-current="true"` cuando contiene la ruta
+activa: en el riel el ítem activo está escondido dentro del flyout, así que la pista
+de ubicación solo puede darla el grupo.
+
+El estado `openGroups` (plegado del modo expandido) NO DEBE consultarse en el riel:
+son dos modelos de interacción distintos y mezclarlos produce saltos al alternar
+Ctrl+B.
+
+Los grupos NO DEBEN agregar divisores en modo riel: los divisores siguen siendo uno
+por par de secciones visibles (REQ-SB-07).
+
+#### Escenario: riel — un botón por grupo, ítems fuera del DOM
+
+- DADO el sidebar colapsado con vertical `'CONTABILIDAD'` y permisos completos
+- CUANDO se renderiza `NavList` con `collapsed={true}`
+- ENTONCES hay exactamente un botón por grupo visible (Libros, Estados financieros,
+  Bancos, Maestros)
+- Y ninguno de los ítems de esos grupos está en el DOM
+- Y los ítems sueltos (Panel, Comprobantes, Cierre del ejercicio) sí están, como iconos
+
+#### Escenario: riel — el click abre el flyout con los ítems del grupo
+
+- DADO el sidebar colapsado
+- CUANDO se clickea el botón del grupo `bancos`
+- ENTONCES aparecen "Movimientos bancarios", "Conciliación bancaria" y
+  "Cuentas bancarias" con su label visible
+- Y los ítems de los demás grupos siguen fuera del DOM
+
+#### Escenario: riel — el grupo con la ruta activa queda marcado
+
+- DADO el sidebar colapsado y el usuario parado en `/conciliacion`
+- CUANDO se renderiza `NavList` con `collapsed={true}`
+- ENTONCES el botón del grupo `bancos` declara `aria-current="true"`
+- Y los botones de los demás grupos no declaran `aria-current`
+
+#### Escenario: riel — el plegado del modo expandido no lo afecta
+
+- DADO `openGroups = { bancos: true, libros: true }`
+- CUANDO se renderiza `NavList` con `collapsed={true}`
+- ENTONCES los ítems de esos grupos NO están en el DOM (mandan los flyouts, cerrados)
+
+---
+
+### REQ-SB-14: El nav DEBE scrollear por su cuenta
+
+El `<nav>` de `NavList` DEBE declarar `min-h-0` junto con `overflow-y-auto`, y los
+bloques fijos que lo rodean (header y footer del `<aside>` en desktop, `SheetHeader`
+en el drawer mobile) DEBEN declarar `shrink-0`.
+
+`min-h-0` es imprescindible y NO es opcional: un hijo flex no baja de su content
+height por default, así que `overflow-y-auto` por sí solo nunca llega a activarse.
+
+Sin esto, y dado que `dashboard-shell` monta la sidebar dentro de un contenedor
+`flex h-screen` sin scroll de página, el contenido que excede el alto del viewport
+queda FUERA de la pantalla sin barra de scroll: los ítems de abajo no quedan "más
+abajo", quedan **inalcanzables**. El drawer mobile (`SheetContent`, `flex flex-col
+h-full`) tiene la misma exposición.
+
+#### Escenario: el nav declara su propio scroll
+
+- DADO `NavList` renderizado en cualquier modo
+- CUANDO se inspecciona el elemento `<nav>`
+- ENTONCES declara `overflow-y-auto` y `min-h-0`
+
+---
+
 ## Notas de la capability
 
 - **Esta capability es UI pura, sin backend**: no hay cambios en API, migraciones, ni OpenAPI.
@@ -478,9 +706,21 @@ REQ-SB-05, sin código nuevo en `NavList` ni en el filtrado por pack.
   futuro necesite entrada en el nav, agrega su sección `modulo` a `NAV_SECTIONS` y
   la regla de header adaptativo (REQ-SB-03) la mostrará automáticamente al aparecer
   un segundo módulo visible.
+- **Sección propia vs subgrupo, para packs futuros**: `bancos` es subgrupo de
+  Contabilidad porque `contabilidad.conciliacion` está namespaceado bajo contabilidad
+  y es satélite del núcleo contable. Los packs de **área de negocio** (Ventas,
+  Compras, RRHH) van como **sección `modulo` propia**, no como subgrupo: son dominios
+  distintos, y al aparecer un segundo módulo visible REQ-SB-03 muestra los headers
+  automáticamente. La jerarquía se queda en dos niveles (sección → grupo): no hay
+  grupos anidados.
+- **Palancas anti-agobio restantes**: `sidebar-por-modulo` anotó tres. "Secciones
+  colapsables" quedó CONSUMIDA por REQ-SB-11. Siguen disponibles: (a) página índice
+  `/reportes` que saque los 6 estados financieros del sidebar detrás de un solo ítem
+  —bajaría el grupo `eeff` entero a una fila—; (b) command palette Cmd+K.
 - **OQ-1 (abierta para apply)**: verificar si hay importadores de `NAV_ITEMS` además de
   `nav-list.tsx` y `nav-list.test.tsx`. Si los hay, decidir entre export derivado o migración.
   (REQ-SB-08 cubre las dos opciones.)
-- **OQ-2 (menor, confirmar en smoke)**: en modo collapsed, ¿divider entre secciones o
-  solo espaciado? Recomendación: divider sutil `border-sidebar-border`. Marco confirma
+- **OQ-2 (CERRADA, 2026-06-14)**: en modo collapsed se usa divider sutil
+  `border-sidebar-border` entre secciones (nunca antes de la primera). Confirmado por
+  Marco en smoke. Los subgrupos NO agregan divisores (REQ-SB-13).
   en el smoke visual.

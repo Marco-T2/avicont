@@ -2,18 +2,49 @@ import { act } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as usePermissionsModule from '@/lib/use-permissions';
 import * as usePacksModule from '@/lib/use-packs';
 import * as useVerticalModule from '@/lib/use-vertical';
 import { useAuthStore } from '@/stores/auth-store';
+import { useSidebarStore } from '@/stores/sidebar-store';
 import type { VerticalActivo } from '@/types/api';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import * as navItemsModule from './nav-items';
 import { NAV_ITEMS, NAV_SECTIONS, PANEL_ITEM, type NavItem } from './nav-items';
 import { NavList } from './nav-list';
+
+/** Ítems de una sección en orden de render: sueltos → grupos → sueltos finales. */
+function itemsDeSeccion(id: string): NavItem[] {
+  const s = NAV_SECTIONS.find((x) => x.id === id);
+  if (!s) return [];
+  return [...s.items, ...(s.groups ?? []).flatMap((g) => g.items), ...(s.trailingItems ?? [])];
+}
+
+function grupo(seccionId: string, grupoId: string) {
+  return NAV_SECTIONS.find((s) => s.id === seccionId)?.groups?.find((g) => g.id === grupoId);
+}
+
+/**
+ * Abre TODOS los subgrupos. Los tests de gating (permiso/vertical/pack/rol) no
+ * deben depender del estado de plegado — expanden todo y miden solo el filtro.
+ */
+function expandAllGroups(): void {
+  const ids = NAV_SECTIONS.flatMap((s) => (s.groups ?? []).map((g) => g.id));
+  act(() => {
+    useSidebarStore.setState({ openGroups: Object.fromEntries(ids.map((id) => [id, true])) });
+  });
+}
+
+/** Deja todos los subgrupos plegados — el estado de un usuario que recién entra. */
+function collapseAllGroups(): void {
+  act(() => {
+    useSidebarStore.setState({ openGroups: {} });
+  });
+}
 
 function mockPermissions(overrides: {
   isOwner?: boolean;
@@ -58,12 +89,18 @@ function setAuthRoles(roles: string[] | undefined) {
   });
 }
 
-function Wrapper({ children }: { children: React.ReactNode }) {
+function Wrapper({
+  children,
+  initialEntries = ['/'],
+}: {
+  children: React.ReactNode;
+  initialEntries?: string[];
+}) {
   const qc = new QueryClient();
   return (
     <QueryClientProvider client={qc}>
       <TooltipProvider delayDuration={0}>
-        <MemoryRouter>{children}</MemoryRouter>
+        <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
@@ -105,15 +142,21 @@ describe('NAV_SECTIONS — estructura de datos', () => {
     expect(PANEL_ITEM.to).toBe('/');
   });
 
-  it('NAV_ITEMS derivado === [PANEL_ITEM, ...NAV_SECTIONS.flatMap(s => s.items)]', () => {
-    const expected = [PANEL_ITEM, ...NAV_SECTIONS.flatMap((s) => s.items)];
+  it('NAV_ITEMS derivado === [PANEL_ITEM, ...sueltos, ...grupos, ...sueltos finales]', () => {
+    const expected = [
+      PANEL_ITEM,
+      ...NAV_SECTIONS.flatMap((s) => [
+        ...s.items,
+        ...(s.groups ?? []).flatMap((g) => g.items),
+        ...(s.trailingItems ?? []),
+      ]),
+    ];
     expect(NAV_ITEMS).toEqual(expected);
   });
 
-  // T-02: orden interno de Contabilidad
+  // T-02: orden interno de Contabilidad (sueltos → grupos → sueltos finales)
   it('sección contabilidad tiene los ítems en el orden correcto', () => {
-    const contabilidad = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
-    expect(contabilidad?.items.map((i) => i.to)).toEqual([
+    expect(itemsDeSeccion('contabilidad').map((i) => i.to)).toEqual([
       '/comprobantes',
       '/libros/diario',
       '/libros/mayor',
@@ -123,41 +166,38 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/eeff/resultados',
       '/eeff/evolucion-patrimonio',
       '/eeff/flujo-efectivo',
-      '/gestiones/cierre',
+      '/movimientos-bancarios',
+      '/conciliacion',
+      '/settings/cuentas-bancarias',
       '/plan-cuentas',
       '/contactos',
       '/documentos-fisicos',
-      '/movimientos-bancarios',
-      '/conciliacion',
+      '/gestiones/cierre',
     ]);
   });
 
   // T-03: mapeo ítem → sección
   it('sección configuracion contiene /periodos-fiscales y /tipos-documento-fisico', () => {
-    const config = NAV_SECTIONS.find((s) => s.id === 'configuracion');
-    const tos = config?.items.map((i) => i.to) ?? [];
+    const tos = itemsDeSeccion('configuracion').map((i) => i.to);
     expect(tos).toContain('/periodos-fiscales');
     expect(tos).toContain('/tipos-documento-fisico');
   });
 
   it('sección contabilidad NO contiene /periodos-fiscales ni /tipos-documento-fisico', () => {
-    const cont = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
-    const tos = cont?.items.map((i) => i.to) ?? [];
+    const tos = itemsDeSeccion('contabilidad').map((i) => i.to);
     expect(tos).not.toContain('/periodos-fiscales');
     expect(tos).not.toContain('/tipos-documento-fisico');
   });
 
   it('sección granja contiene /granja, /granja/lotes, /granja/tipos-registro', () => {
-    const granja = NAV_SECTIONS.find((s) => s.id === 'granja');
-    const tos = granja?.items.map((i) => i.to) ?? [];
+    const tos = itemsDeSeccion('granja').map((i) => i.to);
     expect(tos).toContain('/granja');
     expect(tos).toContain('/granja/lotes');
     expect(tos).toContain('/granja/tipos-registro');
   });
 
   it('sección administracion contiene los 5 ítems de gestión de org', () => {
-    const admin = NAV_SECTIONS.find((s) => s.id === 'administracion');
-    const tos = admin?.items.map((i) => i.to) ?? [];
+    const tos = itemsDeSeccion('administracion').map((i) => i.to);
     expect(tos).toContain('/settings/empresa');
     expect(tos).toContain('/settings/members');
     expect(tos).toContain('/settings/roles');
@@ -166,8 +206,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
   });
 
   it('sección configuracion contiene /configuracion (disabled, vertical CONTABILIDAD)', () => {
-    const config = NAV_SECTIONS.find((s) => s.id === 'configuracion');
-    const item = config?.items.find((i) => i.to === '/configuracion');
+    const item = itemsDeSeccion('configuracion').find((i) => i.to === '/configuracion');
     expect(item).toBeDefined();
     expect(item?.disabled).toBe(true);
     expect(item?.vertical).toBe('CONTABILIDAD');
@@ -180,6 +219,9 @@ beforeEach(() => {
   mockPacks([]);
   // Default: sin roles de sistema (fail-closed para el filtro SystemRole).
   setAuthRoles([]);
+  // Default: todos los subgrupos ABIERTOS. Los tests de gating miden el filtro,
+  // no el plegado — el describe de subgrupos setea su propio estado.
+  expandAllGroups();
 });
 
 afterEach(() => {
@@ -861,5 +903,379 @@ describe('NAV_ITEMS — Movimientos bancarios (REQ-VMB-14, verificador)', () => 
       </Wrapper>,
     );
     expect(screen.queryByText('Movimientos bancarios')).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subgrupos colapsables dentro de una sección.
+//
+// Motivo: la sección Contabilidad creció a 15 ítems planos (25 filas de sidebar,
+// no entra en 1080p). Se parte en subgrupos plegables, y el pack de conciliación
+// —cuyas 3 pantallas estaban repartidas entre Contabilidad y Configuración— pasa
+// a vivir COMPLETO en un único grupo "Bancos": un pack es una unidad comercial,
+// aparece y desaparece como un bloque.
+//
+// El grupo NO declara gate propio: su visibilidad se DERIVA de sus ítems, igual
+// que una sección vacía se descarta. La cascada de REQ-SB-05 sigue siendo la
+// única fuente de verdad del gating.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NAV_SECTIONS — subgrupos colapsables', () => {
+  beforeEach(() => {
+    collapseAllGroups();
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+  });
+
+  // ── Estructura de datos ────────────────────────────────────────────────────
+
+  it('contabilidad declara los subgrupos en orden', () => {
+    const c = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
+    expect((c?.groups ?? []).map((g) => g.id)).toEqual(['libros', 'eeff', 'bancos', 'maestros']);
+  });
+
+  it('Comprobantes queda suelto ARRIBA y Cierre del ejercicio suelto ABAJO', () => {
+    const c = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
+    expect(c?.items.map((i) => i.to)).toEqual(['/comprobantes']);
+    expect((c?.trailingItems ?? []).map((i) => i.to)).toEqual(['/gestiones/cierre']);
+  });
+
+  it('el grupo Bancos agrupa las 3 pantallas del pack de conciliación', () => {
+    expect(grupo('contabilidad', 'bancos')?.items.map((i) => i.to)).toEqual([
+      '/movimientos-bancarios',
+      '/conciliacion',
+      '/settings/cuentas-bancarias',
+    ]);
+  });
+
+  it('Cuentas bancarias YA NO vive en la sección Configuración', () => {
+    expect(itemsDeSeccion('configuracion').map((i) => i.to)).not.toContain(
+      '/settings/cuentas-bancarias',
+    );
+  });
+
+  // Guard anti-drift bidireccional: es EXACTAMENTE la regresión que ocurrió
+  // (los ítems del pack terminaron repartidos en 2 secciones). Si alguien suma
+  // una pantalla del pack fuera de Bancos, o mete en Bancos algo sin el gate
+  // del pack, esto rompe en CI.
+  it('todo ítem con pack contabilidad.conciliacion vive dentro del grupo Bancos', () => {
+    const enBancos = new Set(grupo('contabilidad', 'bancos')?.items.map((i) => i.to) ?? []);
+    for (const item of NAV_ITEMS) {
+      if (item.pack !== 'contabilidad.conciliacion') continue;
+      expect(
+        enBancos.has(item.to),
+        `"${item.label}" (${item.to}) declara el pack de conciliación y debe estar en el grupo Bancos`,
+      ).toBe(true);
+    }
+  });
+
+  it('todo ítem del grupo Bancos declara el pack contabilidad.conciliacion', () => {
+    for (const item of grupo('contabilidad', 'bancos')?.items ?? []) {
+      expect(
+        item.pack,
+        `"${item.label}" (${item.to}) está en Bancos y debe declarar el pack`,
+      ).toBe('contabilidad.conciliacion');
+    }
+  });
+
+  it('cada grupo declara id, label e icono, y ningún id se repite', () => {
+    const ids = NAV_SECTIONS.flatMap((s) => (s.groups ?? []).map((g) => g.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const s of NAV_SECTIONS) {
+      for (const g of s.groups ?? []) {
+        expect(g.label.length).toBeGreaterThan(0);
+        expect(g.items.length).toBeGreaterThan(0);
+        // El icono es OBLIGATORIO: en modo riel es lo ÚNICO que representa al
+        // grupo. Un grupo sin icono sería un cuadrado vacío de 64px.
+        expect(g.icon, `el grupo "${g.label}" debe declarar icono para el riel`).toBeDefined();
+      }
+    }
+  });
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  it('plegado por defecto: se ve el header del grupo, NO sus ítems', () => {
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bancos' })).toBeInTheDocument();
+    expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
+    expect(screen.queryByText('Balance General')).not.toBeInTheDocument();
+    // Los sueltos NO se pliegan nunca
+    expect(screen.getAllByText('Comprobantes').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Cierre del ejercicio').length).toBeGreaterThan(0);
+  });
+
+  it('el header del grupo expone aria-expanded', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    const btn = screen.getByRole('button', { name: 'Bancos' });
+    expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await user.click(btn);
+    expect(screen.getByRole('button', { name: 'Bancos' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('click en el header despliega los ítems del grupo', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Bancos' }));
+    expect(screen.getAllByText('Conciliación bancaria').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Movimientos bancarios').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Cuentas bancarias').length).toBeGreaterThan(0);
+  });
+
+  it('un segundo click vuelve a plegar el grupo', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Libros' }));
+    expect(screen.getAllByText('Libro Diario').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Libros' }));
+    expect(screen.queryByText('Libro Diario')).not.toBeInTheDocument();
+  });
+
+  it('el grupo de la ruta activa arranca ABIERTO sin tocar nada', () => {
+    render(
+      <Wrapper initialEntries={['/conciliacion']}>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bancos' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getAllByText('Conciliación bancaria').length).toBeGreaterThan(0);
+    // Los demás siguen plegados
+    expect(screen.getByRole('button', { name: 'Libros' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('la preferencia guardada gana sobre el default de ruta activa', () => {
+    act(() => {
+      useSidebarStore.setState({ openGroups: { bancos: false } });
+    });
+    render(
+      <Wrapper initialEntries={['/conciliacion']}>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bancos' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  // ── Gating derivado (sin código de gating nuevo) ────────────────────────────
+
+  it('pack inactivo: el grupo Bancos desaparece ENTERO, header incluido', () => {
+    mockPacks([]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('button', { name: 'Bancos' })).not.toBeInTheDocument();
+    // El resto de la sección sigue en pie
+    expect(screen.getByRole('button', { name: 'Libros' })).toBeInTheDocument();
+    expect(screen.getAllByText('Comprobantes').length).toBeGreaterThan(0);
+  });
+
+  it('vertical GRANJA: ningún grupo de Contabilidad se renderiza', () => {
+    mockVertical('GRANJA');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    for (const label of ['Libros', 'Estados financieros', 'Bancos', 'Maestros']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
+    }
+  });
+
+  it('el grupo se descarta cuando sus ítems quedan gateados por permiso', () => {
+    // Solo permiso de conciliación → Bancos vive, Libros y Estados financieros no.
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bancos' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Libros' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Estados financieros' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('el grupo muestra solo los ítems que pasan el filtro, no todos', async () => {
+    const user = userEvent.setup();
+    // Permiso de conciliación pero NO de cuentas bancarias… ambos usan el mismo
+    // permiso, así que probamos con eeff parcial: solo eeff.read da los 6.
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Bancos' }));
+    expect(screen.getAllByText('Conciliación bancaria').length).toBeGreaterThan(0);
+    // Maestros entero gateado → ni siquiera existe el header
+    expect(screen.queryByRole('button', { name: 'Maestros' })).not.toBeInTheDocument();
+  });
+
+  // ── Modo riel (collapsed): un icono por grupo + flyout ─────────────────────
+  //
+  // En 64px no entran headers ni chevrons. Aplanar los grupos a iconos sueltos
+  // no servía: el riel seguía teniendo 25 iconos casi idénticos (no distinguís
+  // Balance General de Balance de Comprobación sin hoverear los dos) y se
+  // desbordaba fuera del viewport. Cada grupo colapsa a UN icono que abre un
+  // flyout con sus ítems — 15 blancos en vez de 25.
+
+  it('modo riel: un botón por grupo; sus ítems NO están en el DOM', () => {
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    for (const label of ['Libros', 'Estados financieros', 'Bancos', 'Maestros']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+    expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
+    expect(screen.queryByText('Balance General')).not.toBeInTheDocument();
+  });
+
+  it('modo riel: los ítems sueltos siguen planos, sin flyout', () => {
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    expect(screen.getAllByLabelText('Comprobantes').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Cierre del ejercicio').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Panel').length).toBeGreaterThan(0);
+    // No son grupos: no hay botón que los pliegue.
+    expect(screen.queryByRole('button', { name: 'Comprobantes' })).not.toBeInTheDocument();
+  });
+
+  it('modo riel: click en el icono del grupo abre el flyout con sus ítems', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Bancos' }));
+    expect(await screen.findByText('Movimientos bancarios')).toBeInTheDocument();
+    expect(screen.getByText('Conciliación bancaria')).toBeInTheDocument();
+    expect(screen.getByText('Cuentas bancarias')).toBeInTheDocument();
+    // Los otros grupos siguen cerrados
+    expect(screen.queryByText('Libro Diario')).not.toBeInTheDocument();
+  });
+
+  it('modo riel: el flyout se cierra al elegir un ítem', async () => {
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Bancos' }));
+    await user.click(await screen.findByText('Conciliación bancaria'));
+    expect(screen.queryByText('Conciliación bancaria')).not.toBeInTheDocument();
+  });
+
+  it('modo riel: el grupo que contiene la ruta activa queda marcado', () => {
+    render(
+      <Wrapper initialEntries={['/conciliacion']}>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: 'Bancos' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Libros' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('modo riel: el plegado guardado del modo expandido NO afecta al riel', () => {
+    // `openGroups` es del modo expandido. En el riel manda el flyout.
+    act(() => {
+      useSidebarStore.setState({ openGroups: { bancos: true, libros: true } });
+    });
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Libro Diario')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Libros' })).toBeInTheDocument();
+  });
+
+  it('modo riel: pack inactivo → no hay icono de Bancos', () => {
+    mockPacks([]);
+    render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    expect(screen.queryByRole('button', { name: 'Bancos' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Libros' })).toBeInTheDocument();
+  });
+
+  it('modo riel: sigue habiendo un divisor por par de secciones, no por grupo', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    // Secciones visibles en CONTABILIDAD: Contabilidad, Administración,
+    // Configuración → 3 secciones → 2 divisores. Los grupos no agregan ninguno.
+    expect(container.querySelectorAll('div.border-t').length).toBe(2);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regresión: el <nav> no scrolleaba por su cuenta.
+//
+// `dashboard-shell.tsx` monta la sidebar dentro de un `flex h-screen`, y el
+// <nav> es `flex-1` sin overflow ni `min-h-0`. Cuando el menú superaba el alto
+// del viewport, el sobrante se desbordaba FUERA de la pantalla sin barra de
+// scroll — y como el root es h-screen, la página tampoco scrolleaba: los ítems
+// de abajo quedaban INALCANZABLES. Mismo problema en el drawer mobile, que
+// monta NavList dentro de un SheetContent `flex flex-col h-full`.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NavList — scroll propio', () => {
+  it('el <nav> declara overflow-y-auto y min-h-0', () => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    const nav = container.querySelector('nav');
+    expect(nav).not.toBeNull();
+    // min-h-0 es imprescindible: sin él un hijo flex no baja de su content
+    // height y `overflow-y-auto` no llega a activarse nunca.
+    expect(nav?.className).toContain('overflow-y-auto');
+    expect(nav?.className).toContain('min-h-0');
   });
 });
