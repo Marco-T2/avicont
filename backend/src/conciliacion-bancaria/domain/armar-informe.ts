@@ -99,9 +99,17 @@ export type LineaParaInforme =
 export interface ArranqueParaInforme {
   readonly fecha: FechaContable;
   /**
-   * Diferencia ACEPTADA al declarar el arranque. CONVENCIÓN (fijada acá, el
-   * resto del change la sigue): `saldoExtracto − saldoLibros` a esa fecha.
-   * Su contribución al puente extracto→libros es por lo tanto `−residual`.
+   * Diferencia ACEPTADA al declarar el arranque: la parte que el usuario asume
+   * como INEXPLICABLE (REQ-ICB-04 la declara como cuarto dato, junto a la fecha
+   * y a los dos saldos). NO se calcula como `saldoExtracto − saldoLibros`: esa
+   * resta incluye las partidas en tránsito abiertas a esa fecha, que se
+   * resuelven solas cuando la otra pata llega — congelarlas acá las volvería a
+   * cobrar y produciría un residuo fantasma en el primer corte de cada cuenta
+   * recién adoptada.
+   *
+   * CONVENCIÓN DE SIGNO (fijada acá, el resto del change la sigue): positiva
+   * cuando el extracto queda por encima de los libros. Su contribución al
+   * puente extracto→libros es por lo tanto `−residual`.
    */
   readonly diferenciaResidual: Money;
 }
