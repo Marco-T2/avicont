@@ -1024,6 +1024,13 @@ los perfiles — es idempotente y deja los archivos sanos byte a byte
 idénticos; condicionarlo por dialecto dejaría un bug silencioso si un call
 site lo olvidara.
 
+La corrección del `<dimension>` solo puede AMPLIAR el rango declarado, nunca
+achicarlo: una hoja sana puede declarar filas que no tienen celdas `<c>`, y
+recalcular a ciegas desde las celdas le comería la última fila — la misma
+falla que el saneo existe para corregir, aplicada a un archivo que estaba
+bien. Cuando el rango declarado ya cubre las celdas reales, el archivo sale
+intacto y no se re-comprime.
+
 #### Scenario: Cabecera repetida entre páginas no entra como movimiento
 
 - GIVEN un perfil con paginación embebida cuyo export trae la cabecera de la
