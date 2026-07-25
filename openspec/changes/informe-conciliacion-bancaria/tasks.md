@@ -35,6 +35,11 @@ Sin migración, solo lectura. **Prerrequisito de credibilidad del PR 3.**
       discontinuidad contra el extracto siguiente **sí** lo detecta.
 - [x] 2.3 Cablear `detectarHuecos` + continuidad para una cuenta bancaria y
       exponerlos. Ninguna importación se rechaza: advierte. E2E de ambos.
+      _Cierre W1 del verify: el alcance de test prometido (caminos NO vacíos
+      por service y endpoint — hueco, discontinuidad, mixto, contigüidad,
+      tenant) quedó cerrado en `integridad-extractos.service.integration.spec.ts`
+      + `test/conciliacion-integridad.e2e-spec.ts`, validado por mutación
+      (swap `saldoInicial`/`saldoFinal` en el mapeo del service)._
 
 ---
 
