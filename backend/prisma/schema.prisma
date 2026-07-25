@@ -228,6 +228,7 @@ model Organization {
   movimientosBancarios  MovimientoBancario[]
   importacionesExtracto ImportacionExtracto[]
   matchesConciliacion   MatchConciliacion[]
+  arranquesConciliados  ArranqueConciliado[]
 
   @@map("organizations")
 }
@@ -1362,6 +1363,7 @@ model CuentaBancaria {
   cuenta       Cuenta       @relation(fields: [cuentaId],       references: [id], onDelete: Restrict)
   movimientos  MovimientoBancario[]
   importaciones ImportacionExtracto[]
+  arranquesConciliados ArranqueConciliado[]
 
   @@unique([organizationId, cuentaId])                  // 1 cuenta contable ↔ 1 cuenta bancaria
   // CRITICAL-5: identidad por `perfilExtracto` (no `banco`). El perfil ya fija el
@@ -1477,4 +1479,36 @@ model MatchConciliacion {
   @@unique([organizationId, comprobanteId, orden])    // una línea se reclama una vez
   @@index([organizationId, comprobanteId])
   @@map("matches_conciliacion")
+}
+
+// Punto de arranque conciliado de una cuenta bancaria (change
+// `informe-conciliacion-bancaria`, REQ-ICB-04, design D3/D8). Es un ACTO
+// declarado por un usuario — no un reporte congelado: fija el saldo de partida
+// sobre el que se apoyan todos los informes futuros y es la COTA de rendimiento
+// del informe (todo lo anterior al arranque está absorbido en el saldo
+// declarado; la consulta se acota a `arranque.fecha < fecha <= corte`).
+model ArranqueConciliado {
+  id                 String   @id @default(uuid())
+  organizationId     String
+  cuentaBancariaId   String
+  fecha              DateTime @db.Date            // corte del arranque (§4.6 — calendario puro)
+  saldoExtracto      Decimal  @db.Decimal(18, 2)
+  saldoLibros        Decimal  @db.Decimal(18, 2)
+  // Diferencia ACEPTADA al declarar. Se exhibe como partida nombrada del
+  // puente, con fecha y autor — jamás se absorbe (REQ-ICB-04/06).
+  diferenciaResidual Decimal  @db.Decimal(18, 2)
+  nota               String?
+  declaradoPorUserId String
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  // SIN updatedAt a propósito: append-only, una declaración nunca se edita
+  // (mismo criterio que ImportacionExtracto y MatchConciliacion).
+
+  organization   Organization   @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
+  cuentaBancaria CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+
+  // SIN @@unique([cuentaBancariaId, fecha]) a propósito (D8): declarar de
+  // nuevo sobre la misma fecha NO pisa la anterior — el historial completo
+  // queda auditable y `vigenteA` desempata por `fecha DESC, createdAt DESC`.
+  @@index([organizationId, cuentaBancariaId, fecha])
+  @@map("arranques_conciliados")
 }

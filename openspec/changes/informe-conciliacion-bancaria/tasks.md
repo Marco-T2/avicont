@@ -44,7 +44,7 @@ Migración **aditiva**, sin backfill.
 
 ### Fundación
 
-- [ ] 3.1 `schema.prisma`: modelo `ArranqueConciliado` + migración aditiva.
+- [x] 3.1 `schema.prisma`: modelo `ArranqueConciliado` + migración aditiva.
       **Sin `@@unique(cuenta, fecha)`** — append-only.
       `@@index([organizationId, cuentaBancariaId, fecha])`.
 - [ ] 3.2 `ports/arranque-conciliado.repository.port.ts` + adapter:
