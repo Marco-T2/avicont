@@ -356,6 +356,13 @@ describe('PrismaMovimientoBancarioRepository — orden y verificador (integratio
       const vistos = [...pagina1, ...pagina2].map((m) => m.id);
       expect(vistos).toHaveLength(12);
       expect(new Set(vistos)).toEqual(new Set(ids));
+
+      // Asertar el ORDEN EXACTO, no solo el conjunto: con 12 filas y un heap
+      // scan estable, "no duplica ni pierde" pasa igual SIN el `id ASC` final
+      // — el conjunto sale completo de casualidad y el test no prueba nada.
+      // Los uuid se insertan en orden aleatorio, así que exigir orden por id
+      // sí distingue: sin el desempate, el orden es el de inserción y falla.
+      expect(vistos).toEqual([...ids].sort());
     });
 
     it('filtros combinados: cuenta + rango de monto + glosa normalizada, y contar coincide', async () => {
