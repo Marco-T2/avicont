@@ -320,6 +320,77 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
     expect(res.movimientosNuevos).toBe(1); // NUNCA rechaza — decisión 3
   });
 
+  // REQ-CB-08 (modificado): la importación persiste los saldos que el checksum
+  // USÓ, en AMBAS estrategias. Antes solo se persistían los de la rama
+  // DECLARADO, dejándolos nulos en los 4 perfiles DERIVADO (BancoSol, BMSC,
+  // Unión, Fortaleza) — lo que impedía verificar la continuidad entre
+  // importaciones (REQ-CB-23) y fijar el punto de arranque del informe.
+  it('DERIVADO: persiste saldoInicial Y saldoFinal — antes quedaban nulos en 4 de 7 perfiles', async () => {
+    const cb = await crearCuentaBancaria('5799375-760-305');
+    const service = servicioReal();
+
+    const res = await service.importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(leerFixture('bancosol-20-movimientos-checksum.xlsx')),
+      { confirmarNumeroCuenta: false },
+    );
+    if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+
+    const importacion = await prisma.importacionExtracto.findUniqueOrThrow({
+      where: { id: res.importacionId },
+    });
+    expect(importacion.saldoInicial).not.toBeNull();
+    expect(importacion.saldoFinal).not.toBeNull();
+  });
+
+  it('DECLARADO: sigue persistiendo ambos saldos de la cabecera, incluso con DESCUADRE', async () => {
+    const cb = await crearCuentaBancaria(null);
+    const parser = fakeParser({
+      descriptor: { perfil: PerfilExtracto.BANCOSOL_XLSX, estrategiaChecksum: 'DECLARADO' },
+      movimientos: [movimientoFake({ tipo: 'CREDITO', monto: Money.of('100.00') })],
+      saldoInicialDeclarado: Money.of('1000.00'),
+      saldoFinalDeclarado: Money.of('5000.00'),
+      numeroCuentaDeclarado: null,
+    });
+    const service = servicioConParsers([parser]);
+
+    const res = await service.importar(tenantA, cb.id, 'user-1', archivoDe(Buffer.from('x')), {
+      confirmarNumeroCuenta: false,
+    });
+    if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+
+    const importacion = await prisma.importacionExtracto.findUniqueOrThrow({
+      where: { id: res.importacionId },
+    });
+    expect(importacion.estadoVerificacion).toBe('DESCUADRE');
+    expect(importacion.saldoInicial?.toFixed(2)).toBe('1000.00');
+    expect(importacion.saldoFinal?.toFixed(2)).toBe('5000.00');
+  });
+
+  it('DERIVADO sin columna saldo: ambos quedan NULL — jamás se inventan', async () => {
+    const cb = await crearCuentaBancaria(null);
+    const parser = fakeParser({
+      descriptor: { perfil: PerfilExtracto.BANCOSOL_XLSX, estrategiaChecksum: 'DERIVADO' },
+      movimientos: [movimientoFake({ tipo: 'CREDITO', monto: Money.of('100.00'), saldo: null })],
+      numeroCuentaDeclarado: null,
+    });
+    const service = servicioConParsers([parser]);
+
+    const res = await service.importar(tenantA, cb.id, 'user-1', archivoDe(Buffer.from('x')), {
+      confirmarNumeroCuenta: false,
+    });
+    if (res.requiereConfirmacionCuenta) throw new Error('unreachable');
+
+    const importacion = await prisma.importacionExtracto.findUniqueOrThrow({
+      where: { id: res.importacionId },
+    });
+    expect(importacion.estadoVerificacion).toBe('SIN_VERIFICAR');
+    expect(importacion.saldoInicial).toBeNull();
+    expect(importacion.saldoFinal).toBeNull();
+  });
+
   // ============================================================
   // REQ-CB-03 — perfil no coincide
   // ============================================================

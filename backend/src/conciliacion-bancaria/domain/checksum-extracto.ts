@@ -36,6 +36,23 @@ import type { EstrategiaChecksum, MovimientoParseado } from '../ports/extracto-p
 export interface ResultadoChecksum {
   readonly estadoVerificacion: EstadoVerificacionExtracto;
   readonly diferencia: Money | null;
+  /**
+   * Saldos que la verificación USÓ, devueltos para que la importación los
+   * persista (REQ-CB-08). En `DECLARADO` son los de la cabecera; en `DERIVADO`
+   * el derivado de la fila cronológicamente primera y el saldo corrido de la
+   * última. Son datos REALES observados del banco, no estimaciones.
+   *
+   * `null` cuando no se pudieron establecer (`IMPOSIBLE`, secuencia no
+   * monótona, lista vacía o el archivo no publica saldo): el sistema NUNCA
+   * inventa un saldo que no observó — misma regla que `SIN_VERIFICAR`.
+   *
+   * Sin ellos no se puede verificar la continuidad entre importaciones
+   * (REQ-CB-23) ni fijar el punto de arranque del informe de conciliación:
+   * un `DESCUADRE` los devuelve IGUAL, porque el archivo los publicó aunque
+   * su aritmética no cierre.
+   */
+  readonly saldoInicial: Money | null;
+  readonly saldoFinal: Money | null;
 }
 
 export interface DatosChecksumDeclarado {
@@ -43,7 +60,12 @@ export interface DatosChecksumDeclarado {
   readonly saldoFinalDeclarado: Money | null;
 }
 
-const SIN_VERIFICAR: ResultadoChecksum = { estadoVerificacion: 'SIN_VERIFICAR', diferencia: null };
+const SIN_VERIFICAR: ResultadoChecksum = {
+  estadoVerificacion: 'SIN_VERIFICAR',
+  diferencia: null,
+  saldoInicial: null,
+  saldoFinal: null,
+};
 
 function netoMovimientos(movimientos: readonly MovimientoParseado[]): Money {
   return movimientos.reduce(
@@ -52,11 +74,25 @@ function netoMovimientos(movimientos: readonly MovimientoParseado[]): Money {
   );
 }
 
-function compararContraEsperado(saldoEsperado: Money, saldoReal: Money): ResultadoChecksum {
+/**
+ * `saldoInicial`/`saldoFinal` son los que la estrategia USÓ y viajan en el
+ * resultado con independencia del veredicto: un descuadre no los invalida
+ * (el archivo los publicó igual), solo dice que la aritmética entre ellos
+ * no cierra.
+ */
+function compararContraEsperado(
+  saldoEsperado: Money,
+  saldoReal: Money,
+  saldos: { saldoInicial: Money; saldoFinal: Money },
+): ResultadoChecksum {
   if (saldoEsperado.igualaConTolerancia(saldoReal)) {
-    return { estadoVerificacion: 'VERIFICADO', diferencia: null };
+    return { estadoVerificacion: 'VERIFICADO', diferencia: null, ...saldos };
   }
-  return { estadoVerificacion: 'DESCUADRE', diferencia: saldoEsperado.minus(saldoReal).abs() };
+  return {
+    estadoVerificacion: 'DESCUADRE',
+    diferencia: saldoEsperado.minus(saldoReal).abs(),
+    ...saldos,
+  };
 }
 
 export function verificarChecksum(
@@ -78,7 +114,10 @@ export function verificarChecksum(
       return SIN_VERIFICAR;
     }
     const saldoEsperado = saldoInicialDeclarado.plus(netoMovimientos(movimientosOrdenados));
-    return compararContraEsperado(saldoEsperado, saldoFinalDeclarado);
+    return compararContraEsperado(saldoEsperado, saldoFinalDeclarado, {
+      saldoInicial: saldoInicialDeclarado,
+      saldoFinal: saldoFinalDeclarado,
+    });
   }
 
   // DERIVADO
@@ -92,5 +131,12 @@ export function verificarChecksum(
       ? primero.saldo.minus(primero.monto)
       : primero.saldo.plus(primero.monto);
   const saldoEsperado = saldoInicial.plus(netoMovimientos(movimientosOrdenados));
-  return compararContraEsperado(saldoEsperado, ultimo.saldo);
+  // `ultimo.saldo` es el saldo corrido de la última fila PRESENTE en el
+  // archivo — no necesariamente el cierre real del período si al archivo le
+  // faltan filas del final. Esa ceguera es justamente lo que detecta la
+  // continuidad entre importaciones (REQ-CB-23).
+  return compararContraEsperado(saldoEsperado, ultimo.saldo, {
+    saldoInicial,
+    saldoFinal: ultimo.saldo,
+  });
 }
