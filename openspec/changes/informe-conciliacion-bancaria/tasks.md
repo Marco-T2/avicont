@@ -96,7 +96,7 @@ Migración **aditiva**, sin backfill.
       ambos saldos, partidas con signo, residuo destacado y la abstención
       visible cuando corresponda.
 - [ ] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
-- [ ] 3.12 `nav-items.ts`: 4º ítem en el grupo `bancos` con
+- [x] 3.12 `nav-items.ts`: 4º ítem en el grupo `bancos` con
       `pack: 'contabilidad.conciliacion'`. Actualizar `nav-list.test.tsx`
       (guard bidireccional).
 
