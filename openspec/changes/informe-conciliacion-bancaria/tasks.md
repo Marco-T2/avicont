@@ -64,9 +64,14 @@ Migración **aditiva**, sin backfill.
       _Follow-up (D4, aprobado por Marco): el verificador también consume la
       función de dominio — copia duplicada eliminada de
       `movimientos-bancarios.service.ts`._
-- [ ] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de
+- [x] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de
       `IGNORADO` con nombre propio, residuo ≠ 0 expuesto sin absorber, y
       diferencia permanente de período cerrado.
+      _Clasificación RELATIVA AL CORTE: un CONCILIADO con asiento posterior
+      al corte sigue siendo partida en ese corte (`asentadoEl`), y la línea
+      conciliada con movimiento posterior sigue en tránsito
+      (`registradoPorBancoEl`). Convención fijada:
+      `diferenciaResidual = saldoExtracto − saldoLibros` al arranque._
 
 ### Servicio y HTTP
 
