@@ -6,11 +6,11 @@
 
 ## Grupo 1 — Migración a mano + schema (D8) · `feat(db): add ordenFisico and org+fecha index to movimientos_bancarios`
 
-- [ ] 1.1 `schema.prisma`: `ordenFisico Int?` + `@@index([organizationId, fecha])` en `MovimientoBancario`.
-- [ ] 1.2 Escribir A MANO `prisma/migrations/<ts>_verificador_orden_fisico/migration.sql`: `ALTER TABLE ... ADD COLUMN "ordenFisico" INTEGER;` + `CREATE INDEX "movimientos_bancarios_organizationId_fecha_idx" ...`. NUNCA `migrate dev` ciego.
-- [ ] 1.3 Protocolo §11.6: `grep -E '^DROP (INDEX|EXTENSION|TYPE|TABLE)' migration.sql` → cero matches (precedente: `migrate dev` llegó a generar `DROP TABLE comprobantes_audit`, 210k filas).
-- [ ] 1.4 Aplicar con `DATABASE_URL=... pnpm exec prisma migrate deploy` + `pnpm exec prisma generate`; verificar `migrate status` limpio.
-- [ ] 1.5 Verde backend (comando del header).
+- [x] 1.1 `schema.prisma`: `ordenFisico Int?` + `@@index([organizationId, fecha])` en `MovimientoBancario`.
+- [x] 1.2 Escribir A MANO `prisma/migrations/<ts>_verificador_orden_fisico/migration.sql`: `ALTER TABLE ... ADD COLUMN "ordenFisico" INTEGER;` + `CREATE INDEX "movimientos_bancarios_organizationId_fecha_idx" ...`. NUNCA `migrate dev` ciego.
+- [x] 1.3 Protocolo §11.6: `grep -E '^DROP (INDEX|EXTENSION|TYPE|TABLE)' migration.sql` → cero matches (precedente: `migrate dev` llegó a generar `DROP TABLE comprobantes_audit`, 210k filas).
+- [x] 1.4 Aplicar con `DATABASE_URL=... pnpm exec prisma migrate deploy` + `pnpm exec prisma generate`; verificar `migrate status` limpio.
+- [x] 1.5 Verde backend (comando del header).
 
 ## Grupo 2 — Endurecer arch-spec (D9) · `test(conciliacion): harden arch spec to cover $queryRaw`
 
