@@ -9,6 +9,10 @@ import type { LineasCuentaReaderPort } from '@/comprobantes/ports/lineas-cuenta-
 import type { CuentasBancariasService } from './cuentas-bancarias.service';
 import { InformeConciliacionService } from './informe-conciliacion.service';
 import type { ArranqueConciliadoRepositoryPort } from './ports/arranque-conciliado.repository.port';
+import type {
+  CoberturaImportacionRow,
+  ImportacionExtractoRepositoryPort,
+} from './ports/importacion-extracto.repository.port';
 import type { MatchConciliacionRepositoryPort } from './ports/match-conciliacion.repository.port';
 import type { MovimientoBancarioRepositoryPort } from './ports/movimiento-bancario.repository.port';
 
@@ -130,6 +134,23 @@ function suma(totalDebito: string, totalCredito: string) {
   };
 }
 
+function importacion(
+  id: string,
+  desde: string,
+  hasta: string,
+  overrides: Partial<CoberturaImportacionRow> = {},
+): CoberturaImportacionRow {
+  return {
+    id,
+    fechaDesde: new Date(`${desde}T00:00:00.000Z`),
+    fechaHasta: new Date(`${hasta}T00:00:00.000Z`),
+    saldoInicial: null,
+    saldoFinal: null,
+    estadoVerificacion: 'VERIFICADO',
+    ...overrides,
+  };
+}
+
 function saldoVigente(saldo: string | null) {
   return {
     cuentaBancariaId: CB_ID,
@@ -156,6 +177,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     listarPorAnclas: jest.Mock;
     sumarPorCuentaHasta: jest.Mock;
   };
+  let importaciones: { listarCoberturaPorCuentaBancaria: jest.Mock };
   let service: InformeConciliacionService;
 
   beforeEach(() => {
@@ -180,12 +202,15 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       sumarPorCuentaHasta: jest.fn().mockResolvedValue(suma('0', '0')),
     };
 
+    importaciones = { listarCoberturaPorCuentaBancaria: jest.fn().mockResolvedValue([]) };
+
     service = new InformeConciliacionService(
       cuentasBancarias as unknown as CuentasBancariasService,
       arranques as unknown as ArranqueConciliadoRepositoryPort,
       movRepo as unknown as MovimientoBancarioRepositoryPort,
       matchRepo as unknown as MatchConciliacionRepositoryPort,
       lineasCuenta as unknown as LineasCuentaReaderPort,
+      importaciones as unknown as ImportacionExtractoRepositoryPort,
     );
   });
 
@@ -443,5 +468,169 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     expect(informe.residuo).toBeNull();
     expect(informe.partidas).not.toBeNull();
     expect(informe.arranque).not.toBeNull();
+  });
+
+  // ==========================================================
+  // Task 3.7 — sección `confiabilidad` (REQ-ICB-05/06/08, D6)
+  // ==========================================================
+
+  describe('confiabilidad', () => {
+    /** Escenario que CIERRA: arranque en 1000=990 con residual 10, sin ventana. */
+    function armarEscenarioQueCierra() {
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1000.00')]);
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      // residuo = 990 − 1000 − 0 − 0 − 0 − (−10) = 0
+    }
+
+    it('insumos sanos e identidad cerrada → conciliado true, sin motivos', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-jul', '2026-07-01', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.residuo?.toBob()).toBe('0.00');
+      expect(informe.confiabilidad).toEqual({ conciliado: true, motivos: [] });
+    });
+
+    it('sin arranque → NO conciliado con motivo SIN_ARRANQUE, y el informe se emite igual', async () => {
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1200.00')]);
+
+      const informe = await consultar();
+
+      expect(informe.arranque).toBeNull();
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toEqual([{ tipo: 'SIN_ARRANQUE' }]);
+    });
+
+    it('sin saldo de extracto publicado → motivo SIN_SALDO_EXTRACTO', async () => {
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente(null)]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toEqual([{ tipo: 'SIN_SALDO_EXTRACTO' }]);
+    });
+
+    it('DESCUADRE en importación del rango → se nombra y NO se afirma conciliado; los números se muestran igual', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-desc', '2026-07-01', '2026-07-31', { estadoVerificacion: 'DESCUADRE' }),
+      ]);
+
+      const informe = await consultar();
+
+      // El puente y el residuo se emiten igual (REQ-ICB-05).
+      expect(informe.residuo?.toBob()).toBe('0.00');
+      expect(informe.partidas).not.toBeNull();
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toEqual([
+        { tipo: 'DESCUADRE', importacionId: 'imp-desc' },
+      ]);
+    });
+
+    it('DESCUADRE en importación TOTALMENTE anterior al arranque → absorbido, NO es motivo', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-vieja', '2026-05-01', '2026-05-31', { estadoVerificacion: 'DESCUADRE' }),
+        importacion('imp-jul', '2026-07-01', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad).toEqual({ conciliado: true, motivos: [] });
+    });
+
+    it('hueco de cobertura antes del corte → el tramo faltante se nombra explícitamente', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-a', '2026-07-01', '2026-07-10'),
+        importacion('imp-b', '2026-07-20', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toEqual([
+        {
+          tipo: 'HUECO',
+          desde: expect.objectContaining({ year: 2026, month: 7, day: 11 }),
+          hasta: expect.objectContaining({ year: 2026, month: 7, day: 19 }),
+        },
+      ]);
+    });
+
+    it('discontinuidad de saldo entre importaciones contiguas del rango → motivo con la magnitud del salto', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-a', '2026-07-01', '2026-07-15', {
+          saldoInicial: new Prisma.Decimal('100.00'),
+          saldoFinal: new Prisma.Decimal('500.00'),
+        }),
+        importacion('imp-b', '2026-07-16', '2026-07-31', {
+          saldoInicial: new Prisma.Decimal('700.00'),
+          saldoFinal: new Prisma.Decimal('900.00'),
+        }),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      const motivos = informe.confiabilidad.motivos;
+      expect(motivos).toHaveLength(1);
+      expect(motivos[0]).toMatchObject({
+        tipo: 'DISCONTINUIDAD',
+        anteriorId: 'imp-a',
+        siguienteId: 'imp-b',
+      });
+      expect(motivos[0]?.tipo === 'DISCONTINUIDAD' ? motivos[0].diferencia.toBob() : null).toBe(
+        '200.00',
+      );
+    });
+
+    it('residuo ≠ 0 → RESIDUO_NO_EXPLICADO con su importe; ninguna partida se altera', async () => {
+      // Igual que el escenario que cierra, pero el extracto trae 1050:
+      // residuo = 990 − 1050 − (−10) = −50.
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1050.00')]);
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-jul', '2026-07-01', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.residuo?.toBob()).toBe('-50.00');
+      expect(informe.partidas?.arranque.importe.toBob()).toBe('-10.00');
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      const motivos = informe.confiabilidad.motivos;
+      expect(motivos).toHaveLength(1);
+      expect(motivos[0]).toMatchObject({ tipo: 'RESIDUO_NO_EXPLICADO' });
+      expect(motivos[0]?.tipo === 'RESIDUO_NO_EXPLICADO' ? motivos[0].importe.toBob() : null).toBe(
+        '-50.00',
+      );
+    });
+
+    it('trazabilidad (REQ-ICB-08): las importaciones del rango viajan con su estado de verificación', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-vieja', '2026-05-01', '2026-05-31', { estadoVerificacion: 'DESCUADRE' }),
+        importacion('imp-jul', '2026-07-01', '2026-07-31', {
+          estadoVerificacion: 'SIN_VERIFICAR',
+        }),
+      ]);
+
+      const informe = await consultar();
+
+      // La importación absorbida por el arranque NO es insumo del rango.
+      expect(informe.insumos.importaciones).toEqual([
+        expect.objectContaining({ id: 'imp-jul', estadoVerificacion: 'SIN_VERIFICAR' }),
+      ]);
+      expect(informe.insumos.importaciones[0]?.fechaDesde.toIso()).toBe('2026-07-01');
+      expect(informe.insumos.importaciones[0]?.fechaHasta.toIso()).toBe('2026-07-31');
+    });
   });
 });

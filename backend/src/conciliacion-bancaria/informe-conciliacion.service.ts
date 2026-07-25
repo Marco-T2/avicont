@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { CuentaBancaria, MatchConciliacion, Moneda, MovimientoBancario } from '@prisma/client';
+import type {
+  CuentaBancaria,
+  EstadoVerificacionExtracto,
+  MatchConciliacion,
+  Moneda,
+  MovimientoBancario,
+} from '@prisma/client';
 
 import {
   LineaCuentaRow,
@@ -16,6 +22,8 @@ import {
   LineaParaInforme,
   MovimientoParaInforme,
 } from './domain/armar-informe';
+import { detectarHuecos } from './domain/cobertura-extracto';
+import { detectarDiscontinuidades } from './domain/continuidad-extractos';
 import {
   derivarEstadoEfectivoLinea,
   derivarEstadoEfectivoMovimiento,
@@ -27,6 +35,11 @@ import {
   ArranqueConciliadoRepositoryPort,
   ARRANQUE_CONCILIADO_REPOSITORY_PORT,
 } from './ports/arranque-conciliado.repository.port';
+import {
+  CoberturaImportacionRow,
+  ImportacionExtractoRepositoryPort,
+  IMPORTACION_EXTRACTO_REPOSITORY_PORT,
+} from './ports/importacion-extracto.repository.port';
 import {
   MatchConciliacionRepositoryPort,
   MATCH_CONCILIACION_REPOSITORY_PORT,
@@ -68,6 +81,33 @@ export interface ArranqueAplicadoView {
   declaradoEl: Date;
 }
 
+/**
+ * Motivos por los que el informe NO afirma "conciliado" (REQ-ICB-04/05/06).
+ * La confiabilidad CALIFICA el resultado, nunca lo suprime: el informe se
+ * emite siempre — lo que se retiene es la conclusión.
+ */
+export type MotivoNoConciliado =
+  | { tipo: 'SIN_ARRANQUE' }
+  | { tipo: 'SIN_SALDO_EXTRACTO' }
+  | { tipo: 'DESCUADRE'; importacionId: string }
+  | { tipo: 'HUECO'; desde: FechaContable; hasta: FechaContable }
+  | { tipo: 'DISCONTINUIDAD'; anteriorId: string; siguienteId: string; diferencia: Money }
+  | { tipo: 'RESIDUO_NO_EXPLICADO'; importe: Money };
+
+export interface ConfiabilidadInforme {
+  /** true solo con arranque, saldo publicado, insumos sanos y residuo CERO exacto. */
+  conciliado: boolean;
+  motivos: MotivoNoConciliado[];
+}
+
+/** Trazabilidad de un insumo (REQ-ICB-08): con qué se calculó el informe. */
+export interface ImportacionInsumoView {
+  id: string;
+  fechaDesde: FechaContable;
+  fechaHasta: FechaContable;
+  estadoVerificacion: EstadoVerificacionExtracto;
+}
+
 export interface InformeConciliacionResultado {
   cuentaBancaria: CuentaBancariaInformeView;
   corte: FechaContable;
@@ -80,6 +120,9 @@ export interface InformeConciliacionResultado {
   partidas: InformeConciliacion['partidas'] | null;
   /** `null` sin arranque o sin saldo de extracto: sin dato no hay veredicto. */
   residuo: Money | null;
+  confiabilidad: ConfiabilidadInforme;
+  /** REQ-ICB-08: importaciones que cubren el rango, con su estado de verificación. */
+  insumos: { importaciones: ImportacionInsumoView[] };
 }
 
 /** Vínculo verificado de un match: la línea ACTUAL resuelta + motivo de rotura. */
@@ -118,6 +161,8 @@ export class InformeConciliacionService {
     private readonly matches: MatchConciliacionRepositoryPort,
     @Inject(LINEAS_CUENTA_READER_PORT)
     private readonly lineasCuenta: LineasCuentaReaderPort,
+    @Inject(IMPORTACION_EXTRACTO_REPOSITORY_PORT)
+    private readonly importaciones: ImportacionExtractoRepositoryPort,
   ) {}
 
   async obtenerInforme(
@@ -134,9 +179,10 @@ export class InformeConciliacionService {
     const corte = FechaContable.fromDbDate(consulta.corte);
     const vista = aCuentaView(cuentaBancaria);
 
-    const [arranqueRow, saldos] = await Promise.all([
+    const [arranqueRow, saldos, cobertura] = await Promise.all([
       this.arranques.vigenteA(tenantId, cuentaBancaria.id, consulta.corte),
       this.movimientos.saldosVigentes(tenantId, consulta.corte),
+      this.importaciones.listarCoberturaPorCuentaBancaria(tenantId, cuentaBancaria.id),
     ]);
     const filaSaldo = saldos.find((s) => s.cuentaBancariaId === cuentaBancaria.id);
     const saldoExtracto =
@@ -159,6 +205,13 @@ export class InformeConciliacionService {
         arranque: null,
         partidas: null,
         residuo: null,
+        ...derivarConfiabilidad({
+          corte,
+          arranqueFecha: null,
+          saldoExtracto,
+          residuo: null,
+          cobertura,
+        }),
       };
     }
 
@@ -219,6 +272,13 @@ export class InformeConciliacionService {
       },
       partidas: informe.partidas,
       residuo: informe.residuo,
+      ...derivarConfiabilidad({
+        corte,
+        arranqueFecha,
+        saldoExtracto,
+        residuo: informe.residuo,
+        cobertura,
+      }),
     };
   }
 
@@ -387,4 +447,93 @@ function aLineaParaInforme(
   return estadoEfectivo === 'CONCILIADO' && fechaMovimientoVinculado !== null
     ? { ...base, estadoEfectivo, fechaMovimientoVinculado }
     : { ...base, estadoEfectivo: 'EN_TRANSITO' };
+}
+
+// ============================================================
+// Confiabilidad (task 3.7, REQ-ICB-05/06/08, D6)
+// ============================================================
+
+interface ParamsConfiabilidad {
+  corte: FechaContable;
+  /** `null` ⇔ sin arranque declarado. */
+  arranqueFecha: FechaContable | null;
+  saldoExtracto: Money | null;
+  residuo: Money | null;
+  cobertura: readonly CoberturaImportacionRow[];
+}
+
+/**
+ * Deriva la sección `confiabilidad` + la trazabilidad de insumos. La señal es
+ * RELATIVA al rango del informe: lo TOTALMENTE anterior al arranque está
+ * absorbido en los saldos declarados y no retiene la conclusión — pero un
+ * hueco o una discontinuidad que toque la ventana sí, aunque nazca antes.
+ * Por eso huecos y discontinuidades se detectan sobre la serie COMPLETA
+ * (REQ-CB-09/23: son propiedades del conjunto) y recién después se filtran
+ * al rango.
+ */
+function derivarConfiabilidad(p: ParamsConfiabilidad): {
+  confiabilidad: ConfiabilidadInforme;
+  insumos: { importaciones: ImportacionInsumoView[] };
+} {
+  const enRango = (desde: FechaContable, hasta: FechaContable): boolean =>
+    !desde.isAfter(p.corte) && (p.arranqueFecha === null || hasta.isAfter(p.arranqueFecha));
+
+  const filas = p.cobertura.map((f) => ({
+    id: f.id,
+    desde: FechaContable.fromDbDate(f.fechaDesde),
+    hasta: FechaContable.fromDbDate(f.fechaHasta),
+    saldoInicial: f.saldoInicial === null ? null : Money.of(f.saldoInicial),
+    saldoFinal: f.saldoFinal === null ? null : Money.of(f.saldoFinal),
+    estadoVerificacion: f.estadoVerificacion,
+  }));
+  const relevantes = filas.filter((f) => enRango(f.desde, f.hasta));
+  const desdePorId = new Map(filas.map((f) => [f.id, f.desde]));
+
+  const motivos: MotivoNoConciliado[] = [];
+  if (p.arranqueFecha === null) motivos.push({ tipo: 'SIN_ARRANQUE' });
+  if (p.saldoExtracto === null) motivos.push({ tipo: 'SIN_SALDO_EXTRACTO' });
+
+  for (const f of relevantes) {
+    if (f.estadoVerificacion === 'DESCUADRE') {
+      motivos.push({ tipo: 'DESCUADRE', importacionId: f.id });
+    }
+  }
+
+  for (const hueco of detectarHuecos(filas)) {
+    if (enRango(hueco.desde, hueco.hasta)) {
+      motivos.push({ tipo: 'HUECO', desde: hueco.desde, hasta: hueco.hasta });
+    }
+  }
+
+  for (const d of detectarDiscontinuidades(filas)) {
+    // El salto vive en la juntura: el día en que arranca la importación
+    // siguiente. Relevante si esa juntura cae dentro del rango del informe.
+    const juntura = desdePorId.get(d.siguienteId);
+    if (juntura !== undefined && enRango(juntura, juntura)) {
+      motivos.push({
+        tipo: 'DISCONTINUIDAD',
+        anteriorId: d.anteriorId,
+        siguienteId: d.siguienteId,
+        diferencia: d.diferencia,
+      });
+    }
+  }
+
+  // REQ-ICB-06: "conciliado" exige residuo CERO EXACTO — hasta el polvo de
+  // Bs 0.01 de un match tolerado se nombra en vez de absorberse.
+  if (p.residuo !== null && !p.residuo.isZero()) {
+    motivos.push({ tipo: 'RESIDUO_NO_EXPLICADO', importe: p.residuo });
+  }
+
+  return {
+    confiabilidad: { conciliado: motivos.length === 0, motivos },
+    insumos: {
+      importaciones: relevantes.map((f) => ({
+        id: f.id,
+        fechaDesde: f.desde,
+        fechaHasta: f.hasta,
+        estadoVerificacion: f.estadoVerificacion,
+      })),
+    },
+  };
 }

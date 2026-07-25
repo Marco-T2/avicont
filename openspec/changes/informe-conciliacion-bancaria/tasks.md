@@ -79,7 +79,7 @@ Migración **aditiva**, sin backfill.
       `saldosVigentes` (ya existe). Ventana acotada a
       `arranque.fecha < fecha <= corte`; **sin arranque ⇒ informe abstenido**.
       Cuenta no BOB ⇒ `CONCILIACION_MONEDA_NO_SOPORTADA`.
-- [ ] 3.7 Propagar la abstención: sección `confiabilidad` del DTO con
+- [x] 3.7 Propagar la abstención: sección `confiabilidad` del DTO con
       `conciliado: boolean` + motivos (descuadre, hueco, discontinuidad). El
       informe **siempre se emite**. Montos como STRING (§4.5).
 - [ ] 3.8 `informe-conciliacion.controller.ts`: `GET` informe (`read`) y `POST`

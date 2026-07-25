@@ -46,6 +46,13 @@ export interface CoberturaImportacionRow {
   fechaHasta: Date;
   saldoInicial: Prisma.Decimal | null;
   saldoFinal: Prisma.Decimal | null;
+  /**
+   * Agregado por el informe de conciliación (task 3.7, REQ-ICB-05/08): un
+   * DESCUADRE en una importación que cubre el rango retiene la CONCLUSIÓN del
+   * informe, y REQ-ICB-08 exige exponer el estado de cada insumo. Ampliación
+   * aditiva: los consumidores previos (integridad) lo ignoran sin costo.
+   */
+  estadoVerificacion: EstadoVerificacionExtracto;
 }
 
 export abstract class ImportacionExtractoRepositoryPort {
