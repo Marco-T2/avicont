@@ -1,5 +1,5 @@
 /**
- * Regresión de checksum sobre TODOS los extractos reales, para los 6 perfiles.
+ * Regresión de checksum sobre TODOS los extractos reales, para los 7 perfiles.
  *
  * Este es el test que faltaba. Los specs de cada dialecto verificaban conteo
  * de movimientos, lados, fechas y descripciones — nadie corría el checksum
@@ -25,6 +25,7 @@ import { DIALECTO_BCP } from './dialectos/bcp.dialecto';
 import { DIALECTO_BMSC } from './dialectos/bmsc.dialecto';
 import type { DialectoXlsx } from './dialectos/dialecto-xlsx';
 import { DIALECTO_ECONOMICO } from './dialectos/economico.dialecto';
+import { DIALECTO_FIE } from './dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './xlsx-core-extracto-parser';
@@ -46,9 +47,13 @@ const TODOS: ReadonlyArray<[string, DialectoXlsx, string]> = [
   ['Fortaleza — últimos 30', DIALECTO_FORTALEZA, 'fortaleza-ultimos-30.xlsx'],
   ['BMSC — julio/septiembre', DIALECTO_BMSC, 'bmsc-extracto.xlsx'],
   ['BMSC — marzo/mayo', DIALECTO_BMSC, 'bmsc-marzo-mayo.xlsx'],
+  ['FIE — últimas transacciones', DIALECTO_FIE, 'fie-ultimas-transacciones.xlsx'],
+  ['FIE — por rango (sharedStrings)', DIALECTO_FIE, 'fie-por-rango-sharedstrings.xlsx'],
+  ['FIE — por rango (una página)', DIALECTO_FIE, 'fie-por-rango-una-pagina.xlsx'],
+  ['FIE — por rango (tres páginas)', DIALECTO_FIE, 'fie-por-rango-tres-paginas.xlsx'],
 ];
 
-describe('Checksum contra los extractos reales — los 6 perfiles cuadran', () => {
+describe('Checksum contra los extractos reales — los 7 perfiles cuadran', () => {
   it.each(TODOS)('%s: VERIFICADO', async (_nombre, dialecto, fixture) => {
     const parseado = await new XlsxCoreExtractoParser(dialecto).parse(leerFixture(fixture));
     const cronologico = ordenarCronologico(parseado.movimientos);

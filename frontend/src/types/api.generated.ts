@@ -3666,7 +3666,7 @@ export interface components {
         };
         PerfilExtractoResponseDto: {
             /** @enum {string} */
-            perfil: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX";
+            perfil: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX" | "FIE_XLSX";
             banco: string;
             formato: string;
             extensiones: string[];
@@ -3690,7 +3690,7 @@ export interface components {
              * @description Único campo de identidad de banco+formato (REQ-CB-01). Inmutable post-creación.
              * @enum {string}
              */
-            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX";
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX" | "FIE_XLSX";
             /**
              * @description Puede quedar vacío al crear — se captura y confirma en la primera importación (REQ-CB-16).
              * @example 1191959-000-001
@@ -3708,7 +3708,7 @@ export interface components {
             cuentaId: string;
             alias: string;
             /** @enum {string} */
-            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX";
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX" | "FIE_XLSX";
             numeroCuenta: string | null;
             /** @enum {string} */
             moneda: "BOB" | "USD";
@@ -3760,7 +3760,7 @@ export interface components {
             sha256Archivo: string;
             tamanioBytes: number;
             /** @enum {string} */
-            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX";
+            perfilExtracto: "BANCOSOL_XLSX" | "ECONOMICO_XLSX" | "UNION_XLSX" | "BCP_XLSX" | "FORTALEZA_XLSX" | "BMSC_XLSX" | "FIE_XLSX";
             fechaDesde: string;
             fechaHasta: string;
             coberturaDeclarada: boolean;

@@ -1300,6 +1300,7 @@ enum PerfilExtracto {
   BCP_XLSX
   FORTALEZA_XLSX
   BMSC_XLSX
+  FIE_XLSX
 }
 
 // Perspectiva del BANCO (extracto): lo que el banco declara en cada fila.

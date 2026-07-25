@@ -11,6 +11,7 @@ import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
 import { DIALECTO_BCP } from './adapters/dialectos/bcp.dialecto';
 import { DIALECTO_BMSC } from './adapters/dialectos/bmsc.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
+import { DIALECTO_FIE } from './adapters/dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
@@ -106,6 +107,7 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
         new XlsxCoreExtractoParser(DIALECTO_BCP),
         new XlsxCoreExtractoParser(DIALECTO_FORTALEZA),
         new XlsxCoreExtractoParser(DIALECTO_BMSC),
+        new XlsxCoreExtractoParser(DIALECTO_FIE),
       ],
     },
   ],

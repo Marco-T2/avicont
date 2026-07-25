@@ -79,4 +79,16 @@ export interface DialectoXlsx {
   readonly numeroCuenta: ExtraccionNumeroCuenta;
   /** Solo para `estrategiaChecksum === 'DECLARADO'` — etiquetas de saldo inicial/final en cabecera. */
   readonly etiquetasSaldoDeclarado?: { readonly inicial: string; readonly final: string };
+
+  /**
+   * `true` cuando el generador maqueta la planilla como hoja IMPRESA (FIE,
+   * vía JasperReports): la cabecera de la tabla SE REPITE al inicio de cada
+   * página y entre bloques aparece una fila-marcador con el número de página
+   * en la columna Fecha. Con el flag activo, el motor DESCARTA esas dos
+   * clases de fila por su ESTRUCTURA (nunca por posición: cuántas filas trae
+   * cada página lo decide la plantilla del banco y puede cambiar sin aviso).
+   * Los dos descartes co-ocurren siempre en un export paginado de Jasper —
+   * un solo flag, no dos.
+   */
+  readonly paginacionEmbebida?: boolean;
 }

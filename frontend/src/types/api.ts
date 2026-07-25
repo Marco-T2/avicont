@@ -371,6 +371,7 @@ export const PerfilExtracto = {
   BCP_XLSX: 'BCP_XLSX',
   FORTALEZA_XLSX: 'FORTALEZA_XLSX',
   BMSC_XLSX: 'BMSC_XLSX',
+  FIE_XLSX: 'FIE_XLSX',
 } as const satisfies Record<Schemas['CuentaBancariaResponseDto']['perfilExtracto'], string>;
 export type PerfilExtracto = (typeof PerfilExtracto)[keyof typeof PerfilExtracto];
 

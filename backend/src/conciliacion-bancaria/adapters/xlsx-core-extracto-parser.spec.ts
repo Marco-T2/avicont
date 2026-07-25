@@ -10,10 +10,12 @@ import { DIALECTO_BCP } from './dialectos/bcp.dialecto';
 import { DIALECTO_BMSC } from './dialectos/bmsc.dialecto';
 import type { DialectoXlsx } from './dialectos/dialecto-xlsx';
 import { DIALECTO_ECONOMICO } from './dialectos/economico.dialecto';
+import { DIALECTO_FIE } from './dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './xlsx-core-extracto-parser';
 import { buscarValorDeEtiqueta } from './xlsx/escaneo-cabecera';
+import type { FilaCruda } from './xlsx/leer-matriz-xlsx';
 import { leerMatrizXlsx } from './xlsx/leer-matriz-xlsx';
 
 const FIXTURES_DIR = join(__dirname, '__fixtures__');
@@ -636,6 +638,228 @@ describe('XlsxCoreExtractoParser — anti-reuso de mapeo Fortaleza/BMSC ↔ rest
           ArchivoFormatoNoReconocidoError,
         );
       }
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// FIE XLSX: séptimo perfil. Export generado por JasperReports, maquetado como
+// hoja IMPRESA: la cabecera de la tabla se REPITE en cada página y entre
+// bloques hay una fila-marcador con el número de página. Es el único perfil
+// con `paginacionEmbebida: true` — los descartes son ESTRUCTURALES (la fila
+// re-matchea el header / fila con una sola celda numérica), nunca por
+// posición: el patrón 7/21 filas por página lo decide la plantilla del banco
+// y acá vive SOLO como aserción, no como regla del motor.
+// ---------------------------------------------------------------------------
+
+describe('XlsxCoreExtractoParser — FIE XLSX (JasperReports, paginación embebida)', () => {
+  const parser = new XlsxCoreExtractoParser(DIALECTO_FIE);
+
+  // [fixture, movimientos esperados, saldo inicial declarado]
+  const FIXTURES_FIE = [
+    ['fie-ultimas-transacciones.xlsx', 10, '296.17'],
+    ['fie-por-rango-sharedstrings.xlsx', 26, '7514.28'],
+    ['fie-por-rango-una-pagina.xlsx', 6, '79028.33'],
+    ['fie-por-rango-tres-paginas.xlsx', 37, '207.38'],
+  ] as const;
+
+  it.each(FIXTURES_FIE)('reconoce() -> true contra %s', async (fixture) => {
+    await expect(parser.reconoce(leerFixture(fixture))).resolves.toBe(true);
+  });
+
+  it.each(FIXTURES_FIE)(
+    'parse() — %s: %i movimientos, cuenta declarada y saldos DECLARADOS en cabecera',
+    async (fixture, esperados, saldoInicial) => {
+      const resultado = await parser.parse(leerFixture(fixture));
+
+      expect(resultado.movimientos).toHaveLength(esperados);
+      expect(resultado.numeroCuentaDeclarado).toBe('40-0-1816170-4');
+      expect(resultado.saldoInicialDeclarado?.toBob()).toBe(saldoInicial);
+      // Los 4 exports comparten cuenta y fecha de corte: mismo saldo final.
+      expect(resultado.saldoFinalDeclarado?.toBob()).toBe('59243.33');
+    },
+  );
+
+  it('la paginación se descarta por ESTRUCTURA: bloques de 7/21/9 registros, 3 marcadores y 2 cabeceras repetidas (fie-por-rango-tres-paginas)', async () => {
+    const matriz = await leerMatrizXlsx(leerFixture('fie-por-rango-tres-paginas.xlsx'));
+
+    const indiceHeader = matriz.findIndex((fila) => fila[1] === 'Fecha');
+    expect(indiceHeader).toBe(27); // fila 28 (1-based) — layout relevado del formato FIE
+
+    const esMarcadorDePagina = (fila: FilaCruda): boolean => {
+      const noNulas = fila.filter((celda) => celda !== null);
+      return (
+        noNulas.length === 1 &&
+        typeof noNulas[0] === 'string' &&
+        /^\d+(\.0+)?$/.test(noNulas[0].trim())
+      );
+    };
+    const esHeaderRepetido = (fila: FilaCruda): boolean => fila[1] === 'Fecha';
+
+    const filasDatos = matriz.slice(indiceHeader + 1);
+    const bloques: number[] = [];
+    let enCurso = 0;
+    let marcadores = 0;
+    let headersRepetidos = 0;
+    for (const fila of filasDatos) {
+      if (esHeaderRepetido(fila)) {
+        headersRepetidos++;
+        continue;
+      }
+      if (esMarcadorDePagina(fila)) {
+        marcadores++;
+        bloques.push(enCurso);
+        enCurso = 0;
+        continue;
+      }
+      enCurso++;
+    }
+
+    // El 7/21 va acá y SOLO acá: es conocimiento de la plantilla actual de
+    // Jasper, no una regla del motor. Si el banco la retoca, cambia este
+    // test — no se corrompen movimientos en silencio.
+    expect(bloques).toEqual([7, 21, 9]);
+    expect(marcadores).toBe(3);
+    expect(headersRepetidos).toBe(2);
+
+    const resultado = await parser.parse(leerFixture('fie-por-rango-tres-paginas.xlsx'));
+    expect(resultado.movimientos).toHaveLength(7 + 21 + 9);
+    // Una cabecera colada como movimiento tendría esta descripción exacta.
+    expect(resultado.movimientos.some((m) => m.descripcion === 'Descripción Oficina/Canal')).toBe(
+      false,
+    );
+  });
+
+  it('hora en columna propia y como STRING — si llegara como Date el motor la descartaría en silencio', async () => {
+    const resultado = await parser.parse(leerFixture('fie-ultimas-transacciones.xlsx'));
+
+    const primero = resultado.movimientos[0]!;
+    expect(primero.fecha.toIso()).toBe('2026-07-20');
+    expect(primero.hora).toBe('11:57:00');
+  });
+
+  it('signo explícito del monto → tipo: "+50,450.00" → CREDITO, "-31,000.00" → DEBITO', async () => {
+    const resultado = await parser.parse(leerFixture('fie-ultimas-transacciones.xlsx'));
+
+    const credito = resultado.movimientos[0]!;
+    expect(credito.monto.toBob()).toBe('50450.00');
+    expect(credito.tipo).toBe('CREDITO');
+    expect(credito.saldo?.toBob()).toBe('59243.33');
+
+    const debito = resultado.movimientos[1]!;
+    expect(debito.monto.toBob()).toBe('31000.00');
+    expect(debito.tipo).toBe('DEBITO');
+    expect(debito.saldo?.toBob()).toBe('8793.33');
+  });
+
+  it('renglón dorado: descripcion = Descripción + " " + Oficina/Canal (Sucursal excluida a propósito)', async () => {
+    const resultado = await parser.parse(leerFixture('fie-ultimas-transacciones.xlsx'));
+
+    expect(resultado.movimientos[0]!.descripcion).toBe(
+      'DEPOSITO AHORROS S/L ( - COMPRA DE POLLO VIVO) AGENCIA QUILLACOLLO',
+    );
+    expect(resultado.movimientos[0]!.referencia).toBe('214095378');
+    // `Sucursal` es un código de 2 letras función 1:1 de `Oficina/Canal`
+    // ('AGENCIA QUILLACOLLO'→'CB'): no discrimina y ensuciaría el hash.
+    expect(resultado.movimientos[0]!.descripcion.endsWith(' CB')).toBe(false);
+  });
+
+  it('el export de suma NEGATIVA cuadra contra los saldos declarados: 79.028,33 + (−19.785,00) = 59.243,33', async () => {
+    const resultado = await parser.parse(leerFixture('fie-por-rango-una-pagina.xlsx'));
+
+    const neto = resultado.movimientos.reduce(
+      (acc, m) => (m.tipo === 'CREDITO' ? acc.plus(m.monto) : acc.minus(m.monto)),
+      Money.ZERO,
+    );
+    expect(neto.toBob()).toBe('-19785.00');
+    expect(resultado.saldoInicialDeclarado!.plus(neto).toBob()).toBe('59243.33');
+  });
+
+  it.each(FIXTURES_FIE)(
+    'REQ-CB-08 checksum DECLARADO end-to-end — %s: VERIFICADO con diferencia null',
+    async (fixture) => {
+      const resultado = await parser.parse(leerFixture(fixture));
+
+      const checksum = verificarChecksum('DECLARADO', resultado.movimientos, {
+        saldoInicialDeclarado: resultado.saldoInicialDeclarado,
+        saldoFinalDeclarado: resultado.saldoFinalDeclarado,
+      });
+      expect(checksum.estadoVerificacion).toBe('VERIFICADO');
+      expect(checksum.diferencia).toBeNull();
+    },
+  );
+
+  it.each(FIXTURES_FIE)(
+    'saldo corrido coherente fila a fila (orden DESC) — %s: también a través de los cortes de página',
+    async (fixture) => {
+      const resultado = await parser.parse(leerFixture(fixture));
+
+      // Orden DESC del export: la fila i−1 es MÁS reciente que la i, así que
+      // saldo(i−1) = saldo(i) ± monto(i−1). Cruza los cortes de página, o sea
+      // que una fila comida o colada por la paginación rompería la cadena.
+      for (let i = 1; i < resultado.movimientos.length; i++) {
+        const masReciente = resultado.movimientos[i - 1]!;
+        const anterior = resultado.movimientos[i]!;
+        const esperado =
+          masReciente.tipo === 'CREDITO'
+            ? anterior.saldo!.plus(masReciente.monto)
+            : anterior.saldo!.minus(masReciente.monto);
+        expect(esperado.igualaConTolerancia(masReciente.saldo!)).toBe(true);
+      }
+    },
+  );
+});
+
+describe('XlsxCoreExtractoParser — anti-reuso de mapeo FIE ↔ resto de perfiles', () => {
+  const previos: ReadonlyArray<[string, DialectoXlsx, string]> = [
+    ['BancoSol', DIALECTO_BANCOSOL, 'bancosol-a-mayo-junio.xlsx'],
+    ['Económico', DIALECTO_ECONOMICO, 'economico-extracto.xlsx'],
+    ['Unión', DIALECTO_UNION_XLSX, 'union-extracto-por-rango.xlsx'],
+    ['BCP', DIALECTO_BCP, 'bcp-extracto.xlsx'],
+    ['Fortaleza', DIALECTO_FORTALEZA, 'fortaleza-por-rango.xlsx'],
+    ['BMSC', DIALECTO_BMSC, 'bmsc-extracto.xlsx'],
+  ];
+  const fixturesFie = [
+    'fie-ultimas-transacciones.xlsx',
+    'fie-por-rango-sharedstrings.xlsx',
+    'fie-por-rango-una-pagina.xlsx',
+    'fie-por-rango-tres-paginas.xlsx',
+  ] as const;
+
+  it.each(previos)('el dialecto %s NO reconoce los fixtures de FIE', async (_nombre, dialecto) => {
+    const parser = new XlsxCoreExtractoParser(dialecto);
+    for (const fixture of fixturesFie) {
+      await expect(parser.reconoce(leerFixture(fixture))).resolves.toBe(false);
+    }
+  });
+
+  it.each(previos)(
+    'el dialecto FIE NO reconoce el fixture de %s',
+    async (_nombre, _dialecto, fixture) => {
+      const parser = new XlsxCoreExtractoParser(DIALECTO_FIE);
+      await expect(parser.reconoce(leerFixture(fixture))).resolves.toBe(false);
+    },
+  );
+
+  it.each(previos)(
+    'parse(): los fixtures de FIE con el dialecto de %s FALLAN — nunca devuelven datos corridos',
+    async (_nombre, dialecto) => {
+      const parser = new XlsxCoreExtractoParser(dialecto);
+      for (const fixture of fixturesFie) {
+        await expect(parser.parse(leerFixture(fixture))).rejects.toThrow(
+          ArchivoFormatoNoReconocidoError,
+        );
+      }
+    },
+  );
+
+  it.each(previos)(
+    'parse(): el fixture de %s con el dialecto FIE FALLA — nunca devuelve datos corridos',
+    async (_nombre, _dialecto, fixture) => {
+      const parser = new XlsxCoreExtractoParser(DIALECTO_FIE);
+      await expect(parser.parse(leerFixture(fixture))).rejects.toThrow(
+        ArchivoFormatoNoReconocidoError,
+      );
     },
   );
 });

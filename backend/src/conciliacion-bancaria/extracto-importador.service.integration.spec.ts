@@ -14,6 +14,7 @@ import { DIALECTO_BANCOSOL } from './adapters/dialectos/bancosol.dialecto';
 import { DIALECTO_BCP } from './adapters/dialectos/bcp.dialecto';
 import { DIALECTO_BMSC } from './adapters/dialectos/bmsc.dialecto';
 import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
+import { DIALECTO_FIE } from './adapters/dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
 import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
@@ -161,7 +162,7 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
 
   const servicioReal = () =>
     servicioConParsers([
-      // Los 6 perfiles, igual que `conciliacion-bancaria.module.ts`. Esta lista
+      // Los 7 perfiles, igual que `conciliacion-bancaria.module.ts`. Esta lista
       // se había quedado en 3 al sumar BCP/Fortaleza/BMSC, así que el servicio
       // no podía ejercitarse con esos perfiles en integración.
       new XlsxCoreExtractoParser(DIALECTO_BANCOSOL),
@@ -170,6 +171,7 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
       new XlsxCoreExtractoParser(DIALECTO_BCP),
       new XlsxCoreExtractoParser(DIALECTO_FORTALEZA),
       new XlsxCoreExtractoParser(DIALECTO_BMSC),
+      new XlsxCoreExtractoParser(DIALECTO_FIE),
     ]);
 
   async function crearCuentaBancaria(numeroCuenta: string | null) {
