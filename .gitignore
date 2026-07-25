@@ -11,3 +11,6 @@ package-lock.json
 # conciliación). Contienen números de cuenta, nombres y montos reales.
 # Los fixtures anonimizados viven junto a los adaptadores que los usan.
 docs/extractosBancos/
+
+# PIDs y logs de los dev servers (scripts/dev-up.sh)
+.dev/
