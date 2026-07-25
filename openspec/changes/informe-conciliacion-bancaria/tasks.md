@@ -104,5 +104,5 @@ Migración **aditiva**, sin backfill.
 
 ## Cierre
 
-- [ ] 4.1 Fila de changelog en `CLAUDE.md`; revisar si corresponde tocar
+- [x] 4.1 Fila de changelog en `CLAUDE.md`; revisar si corresponde tocar
       `docs/deudas-arquitecturales.md`.
