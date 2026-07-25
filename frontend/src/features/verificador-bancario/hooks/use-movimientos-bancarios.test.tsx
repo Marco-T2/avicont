@@ -21,6 +21,7 @@ const RESPUESTA: ListadoMovimientosBancarios = {
   movimientos: [],
   totales: [],
   saldos: [],
+  saldosPorMoneda: [],
   auditoriaVinculos: { aplicada: false, total: 0, rotos: [] },
 };
 

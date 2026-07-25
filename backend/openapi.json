@@ -11721,6 +11721,38 @@
           "fechaUltimoMovimiento"
         ]
       },
+      "ResumenSaldosMonedaDto": {
+        "type": "object",
+        "properties": {
+          "moneda": {
+            "type": "string",
+            "enum": [
+              "BOB",
+              "USD"
+            ]
+          },
+          "suma": {
+            "type": "string",
+            "nullable": true,
+            "example": "1750.50",
+            "description": "Suma de saldos de la moneda, string (§4.5). null cuando NINGUNA cuenta de la moneda publica saldo — nunca \"0.00\" (REQ-VMB-10)."
+          },
+          "cuentasSumadas": {
+            "type": "number",
+            "description": "Cuentas con saldo publicado incluidas en la suma."
+          },
+          "cuentasSinSaldo": {
+            "type": "number",
+            "description": "Cuentas con saldo=null: EXCLUIDAS de la suma, jamás contadas como 0."
+          }
+        },
+        "required": [
+          "moneda",
+          "suma",
+          "cuentasSumadas",
+          "cuentasSinSaldo"
+        ]
+      },
       "VinculoRotoDto": {
         "type": "object",
         "properties": {
@@ -11837,6 +11869,13 @@
               "$ref": "#/components/schemas/SaldoCuentaBancariaDto"
             }
           },
+          "saldosPorMoneda": {
+            "description": "Agregado de la franja `saldos` POR MONEDA, calculado en el backend con Money/decimal.js — el frontend lo presenta sin recalcular. Orden: primera aparición en `saldos` (REQ-VMB-10).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumenSaldosMonedaDto"
+            }
+          },
           "auditoriaVinculos": {
             "$ref": "#/components/schemas/AuditoriaVinculosDto"
           }
@@ -11850,6 +11889,7 @@
           "movimientos",
           "totales",
           "saldos",
+          "saldosPorMoneda",
           "auditoriaVinculos"
         ]
       },

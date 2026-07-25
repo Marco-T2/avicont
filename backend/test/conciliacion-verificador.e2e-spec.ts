@@ -11,6 +11,7 @@
  *   - REQ-VMB-06/07: vínculo roto ⇒ `estadoEfectivo=PENDIENTE` en la página
  *     (sin escribir nada) y franja `auditoriaVinculos` solo con filtro `estado`.
  *   - REQ-VMB-08/09: franja de saldos vigentes con null honesto.
+ *   - REQ-VMB-10: agregado `saldosPorMoneda` calculado en el backend.
  *   - REQ-VMB-11: totales por moneda sin conversión a BOB.
  *   - REQ-VMB-12: asimetría de permisos — `.read` 200 / sin `.read` 403 /
  *     sin pack 404.
@@ -660,6 +661,13 @@ describe('Conciliación — Verificador de movimientos bancarios (e2e)', () => {
       saldo: null,
       fechaUltimoMovimiento: null,
     });
+
+    // REQ-VMB-10 — agregado por moneda calculado en el backend: solo la
+    // cuenta con saldo publicado suma; las 2 con null quedan EXCLUIDAS,
+    // jamás contadas como 0.
+    expect(res.body.saldosPorMoneda).toEqual([
+      { moneda: 'BOB', suma: '1500.00', cuentasSumadas: 1, cuentasSinSaldo: 2 },
+    ]);
   });
 
   // ==========================================================
@@ -688,6 +696,9 @@ describe('Conciliación — Verificador de movimientos bancarios (e2e)', () => {
     );
     expect(cuentasEnSaldos).toEqual([a.cuentaBancariaId]);
     expect(res.body.saldos[0].saldo).toBe('900.00');
+    expect(res.body.saldosPorMoneda).toEqual([
+      { moneda: 'BOB', suma: '900.00', cuentasSumadas: 1, cuentasSinSaldo: 0 },
+    ]);
 
     // Filtrar por una cuenta de OTRO tenant ⇒ vacío, sin revelar su existencia.
     const cuentaAjena = await getVerificador(a.token, { cuentaBancariaId: b.cuentaBancariaId });

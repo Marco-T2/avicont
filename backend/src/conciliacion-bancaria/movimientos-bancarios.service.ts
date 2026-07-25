@@ -88,6 +88,15 @@ export interface SaldoCuentaView {
   fechaUltimoMovimiento: string | null;
 }
 
+export interface ResumenSaldosMonedaView {
+  moneda: Moneda;
+  /** `null` cuando NINGUNA cuenta de la moneda publica saldo — nunca "0.00". */
+  suma: string | null;
+  cuentasSumadas: number;
+  /** Cuentas con `saldo=null`: EXCLUIDAS de la suma, jamás contadas como 0 (REQ-VMB-09/10). */
+  cuentasSinSaldo: number;
+}
+
 export interface VinculoRotoView {
   movimientoBancarioId: string;
   cuentaBancariaId: string;
@@ -113,6 +122,7 @@ export interface ListadoMovimientosBancarios {
   movimientos: MovimientoVerificadorView[];
   totales: TotalMonedaView[];
   saldos: SaldoCuentaView[];
+  saldosPorMoneda: ResumenSaldosMonedaView[];
   auditoriaVinculos: AuditoriaVinculosView;
 }
 
@@ -223,6 +233,8 @@ export class MovimientosBancariosService {
         ? await this.auditarVinculos(tenantId, filtros)
         : { aplicada: false, total: 0, rotos: [] };
 
+    const saldos = mergeSaldos(cuentas.items, saldosVigentes);
+
     return {
       desde: desde.toIso(),
       hasta: hasta.toIso(),
@@ -231,7 +243,8 @@ export class MovimientosBancariosService {
       total,
       movimientos: movimientosView,
       totales: agruparTotalesPorMoneda(totalesCrudos),
-      saldos: mergeSaldos(cuentas.items, saldosVigentes),
+      saldos,
+      saldosPorMoneda: resumirSaldosPorMoneda(saldos),
       auditoriaVinculos,
     };
   }
@@ -443,4 +456,44 @@ function mergeSaldos(
         vigente === undefined ? null : FechaContable.fromDbDate(vigente.fecha).toIso(),
     };
   });
+}
+
+/**
+ * REQ-VMB-10: subtotales de saldos SOLO entre cuentas de la MISMA moneda — no
+ * existe conversión ni total combinado. El orden de las monedas respeta la
+ * primera aparición en la franja `saldos` (a diferencia de `totales`, que
+ * ordena alfabético). La suma va por `Money`/decimal.js (§4.5): este agregado
+ * vivía en el frontend y se movió acá porque el frontend NO hace aritmética
+ * de dinero (convención anti-recálculo del repo).
+ */
+function resumirSaldosPorMoneda(saldos: readonly SaldoCuentaView[]): ResumenSaldosMonedaView[] {
+  const porMoneda = new Map<
+    Moneda,
+    { suma: Money; cuentasSumadas: number; cuentasSinSaldo: number }
+  >();
+  for (const s of saldos) {
+    const acumulado = porMoneda.get(s.moneda) ?? {
+      suma: Money.ZERO,
+      cuentasSumadas: 0,
+      cuentasSinSaldo: 0,
+    };
+    porMoneda.set(
+      s.moneda,
+      s.saldo === null
+        ? { ...acumulado, cuentasSinSaldo: acumulado.cuentasSinSaldo + 1 }
+        : {
+            ...acumulado,
+            suma: acumulado.suma.plus(s.saldo),
+            cuentasSumadas: acumulado.cuentasSumadas + 1,
+          },
+    );
+  }
+  // Map preserva orden de inserción ⇒ primera aparición en la franja.
+  return [...porMoneda.entries()].map(([moneda, acumulado]) => ({
+    moneda,
+    // null honesto: ninguna cuenta publica saldo ⇒ no hay suma que mostrar.
+    suma: acumulado.cuentasSumadas > 0 ? acumulado.suma.toBob() : null,
+    cuentasSumadas: acumulado.cuentasSumadas,
+    cuentasSinSaldo: acumulado.cuentasSinSaldo,
+  }));
 }

@@ -71,3 +71,13 @@ Depende de: grupos 1–7 verdes (backend completo primero).
 - [x] 8.2 GREEN — `frontend/src/features/verificador-bancario/` (`api/ hooks/ components/ pages/`, molde conciliación; badges reusados de `features/conciliacion`); ruta `/movimientos-bancarios`. Suma de saldos en centavos enteros (`sumarMontos`) — el backend no manda ese agregado y un `parseFloat` naive driftea (0.10+0.20). Aliases nuevos en `types/api.ts` (fachada): `ListadoMovimientosBancarios`, `MovimientoVerificador`, `TotalMoneda`, `SaldoCuentaBancaria`, `AuditoriaVinculos`, `VinculoRoto`, `EstadoMovimientoBancario`, `ListarMovimientosBancariosParams`.
 - [x] 8.3 GREEN — `nav-items.ts`: ítem "Movimientos bancarios" en Contabilidad con `conciliacion.read` + `pack` (molde línea 189, icono `ArrowLeftRight` — `Landmark` ya lo usa Evolución del Patrimonio).
 - [x] 8.4 Verde: `cd frontend && pnpm exec tsc --noEmit && pnpm exec vitest run` → 234 suites / 1829 tests (baseline pre-grupo: 228 / 1793). Lint limpio sobre los archivos tocados.
+
+## Grupo 9 — Agregado de saldos por moneda al backend · `refactor(conciliacion): move per-currency balance aggregate to backend`
+
+Corrección sobre el grupo 8: `sumarMontos`/`resumirSaldosPorMoneda` sumaban dinero en el cliente, contradiciendo la convención anti-recálculo del repo (el frontend NO hace aritmética de dinero; `Money`/`decimal.js` viven en el backend). REQ-VMB-10 corregido en la spec.
+
+- [x] 9.1 RED — port de los casos de `lib/saldos.test.ts` (drift 0.10+0.20, null ≠ 0, todas-null → `null`, orden por primera aparición) a `movimientos-bancarios.service.spec.ts` (9 tests nuevos).
+- [x] 9.2 GREEN — `resumirSaldosPorMoneda` en `movimientos-bancarios.service.ts` con `Money` sobre la franja `saldos` ya en memoria (cero métodos nuevos de port, cero queries). Campo `saldosPorMoneda` (`ResumenSaldosMonedaDto`) en la response.
+- [x] 9.3 Contrato: `openapi.json` + `api.generated.ts` regenerados; alias `ResumenSaldosMoneda` en `types/api.ts`.
+- [x] 9.4 Frontend: borradas `sumarMontos`/`resumirSaldosPorMoneda`/`aCentavos`/`deCentavos` y sus tests; `estaSaldoDesactualizado` se conserva (presentación pura). `SaldosPorCuenta` recibe `resumen` del backend y lo presenta sin recalcular.
+- [x] 9.5 e2e `test/conciliacion-verificador.e2e-spec.ts` actualizado con aserciones de `saldosPorMoneda` (pendiente de correr — vacía la base local).

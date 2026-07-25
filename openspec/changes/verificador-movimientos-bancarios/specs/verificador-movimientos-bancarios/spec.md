@@ -224,15 +224,28 @@ familia que `SIN_VERIFICAR` (REQ-CB-08): no inventar.
 - WHEN se consulta la franja de saldos
 - THEN esa cuenta viene con `saldo=null`, no `500.00` ni `0`
 
-### REQ-VMB-10: Presentación dual del saldo (frontend)
+### REQ-VMB-10: Presentación dual del saldo y agregado por moneda
 
 Con una `cuentaBancariaId` seleccionada, la tabla DEBE mostrar la columna
 `saldo` que publica el banco por fila. En modo cross-cuenta esa columna
 DEBE ocultarse (no se promete cronología intra-día entre bancos) y DEBE
 mostrarse la franja de saldos por cuenta con `fechaUltimoMovimiento` y una
-marca de desactualización cuando es anterior a `hasta`. La suma de saldos
-PUEDE mostrarse solo entre cuentas de la MISMA moneda; una cuenta con
-`saldo=null` DEBE excluirse de la suma con un indicador visible.
+marca de desactualización cuando es anterior a `hasta`.
+
+El agregado de saldos por moneda lo calcula el BACKEND: la respuesta DEBE
+incluir `saldosPorMoneda` con una entrada por moneda — `suma` (string),
+`cuentasSumadas` y `cuentasSinSaldo` — sumando SOLO cuentas de la misma
+moneda, sin conversión ni total combinado, en orden de primera aparición
+en la franja `saldos`. Una cuenta con `saldo=null` DEBE excluirse de la
+suma (contada en `cuentasSinSaldo`, jamás como 0); si NINGUNA cuenta de la
+moneda publica saldo, `suma` DEBE ser `null`, nunca `"0.00"`. El frontend
+DEBE presentar el agregado tal cual, sin recalcular, con un indicador
+visible para las cuentas excluidas.
+
+> Nota: este agregado estaba originalmente asignado a la presentación. Se
+> movió al backend porque el frontend NO hace aritmética de dinero
+> (convención anti-recálculo del repo, misma que `lib/export-excel`);
+> `Money`/`decimal.js` viven en el backend (§4.5).
 
 #### Scenario: Cross-cuenta oculta la columna saldo y marca desactualización
 
@@ -245,9 +258,17 @@ PUEDE mostrarse solo entre cuentas de la MISMA moneda; una cuenta con
 #### Scenario: Cuenta con saldo null excluida de la suma, con indicador
 
 - GIVEN dos cuentas BOB con saldo y una BOB con `saldo=null`
-- WHEN se muestra la suma de saldos BOB
-- THEN la suma cubre solo las dos primeras y la tercera exhibe un indicador
-  de saldo no disponible
+- WHEN se consulta el listado
+- THEN `saldosPorMoneda` trae para BOB la suma de las dos primeras con
+  `cuentasSumadas=2` y `cuentasSinSaldo=1`
+- AND el frontend muestra esa suma sin recalcular y la tercera cuenta
+  exhibe un indicador de saldo no disponible
+
+#### Scenario: Ninguna cuenta de la moneda publica saldo — suma null
+
+- GIVEN cuentas BOB todas con `saldo=null`
+- WHEN se consulta el listado
+- THEN `saldosPorMoneda` trae para BOB `suma=null` — nunca `"0.00"`
 
 ### REQ-VMB-11: Totales por moneda, sin conversión a BOB
 

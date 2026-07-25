@@ -3,12 +3,14 @@ import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
-import type { SaldoCuentaBancaria } from '@/types/api';
+import type { ResumenSaldosMoneda, SaldoCuentaBancaria } from '@/types/api';
 
-import { estaSaldoDesactualizado, resumirSaldosPorMoneda } from '../lib/saldos';
+import { estaSaldoDesactualizado } from '../lib/saldos';
 
 interface SaldosPorCuentaProps {
   saldos: SaldoCuentaBancaria[];
+  /** Agregado por moneda calculado por el BACKEND — se presenta tal cual, sin recalcular. */
+  resumen: ResumenSaldosMoneda[];
   /** Corte del rango consultado (`YYYY-MM-DD`) — contra él se marca la desactualización. */
   hasta: string;
 }
@@ -22,12 +24,17 @@ interface SaldosPorCuentaProps {
  * presentado como saldo de hoy es una respuesta incorrecta.
  *
  * `saldo=null` es null HONESTO (perfil que no publica saldo o cuenta sin
- * movimientos): se excluye de la suma con indicador, jamás se cuenta como 0.
+ * movimientos): el backend lo excluye de la suma, acá solo se le da indicador.
+ * Los subtotales por moneda llegan en `resumen` (`saldosPorMoneda`) y se
+ * muestran SIN sumar nada en el cliente — mismo criterio anti-recálculo que
+ * `lib/export-excel`.
  */
-export function SaldosPorCuenta({ saldos, hasta }: SaldosPorCuentaProps): React.JSX.Element | null {
+export function SaldosPorCuenta({
+  saldos,
+  resumen,
+  hasta,
+}: SaldosPorCuentaProps): React.JSX.Element | null {
   if (saldos.length === 0) return null;
-
-  const resumen = resumirSaldosPorMoneda(saldos);
 
   return (
     <section aria-label="Saldos por cuenta" className="rounded-lg border bg-card p-4 space-y-3">

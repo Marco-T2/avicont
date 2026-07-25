@@ -82,7 +82,11 @@ export function MovimientosBancariosPage(): React.JSX.Element {
 
       {hayFiltros && !isError && data !== undefined && (
         <>
-          <SaldosPorCuenta saldos={data.saldos} hasta={data.hasta} />
+          <SaldosPorCuenta
+            saldos={data.saldos}
+            resumen={data.saldosPorMoneda}
+            hasta={data.hasta}
+          />
 
           <AuditoriaVinculosBanner
             auditoria={data.auditoriaVinculos}

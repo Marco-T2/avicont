@@ -126,6 +126,24 @@ export class SaldoCuentaBancariaDto {
   fechaUltimoMovimiento!: string | null;
 }
 
+export class ResumenSaldosMonedaDto {
+  @ApiProperty({ enum: Moneda }) moneda!: Moneda;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '1750.50',
+    description:
+      'Suma de saldos de la moneda, string (§4.5). null cuando NINGUNA cuenta de la moneda publica saldo — nunca "0.00" (REQ-VMB-10).',
+  })
+  suma!: string | null;
+  @ApiProperty({ description: 'Cuentas con saldo publicado incluidas en la suma.' })
+  cuentasSumadas!: number;
+  @ApiProperty({
+    description: 'Cuentas con saldo=null: EXCLUIDAS de la suma, jamás contadas como 0.',
+  })
+  cuentasSinSaldo!: number;
+}
+
 export class VinculoRotoDto {
   @ApiProperty({ format: 'uuid' }) movimientoBancarioId!: string;
   @ApiProperty({ format: 'uuid' }) cuentaBancariaId!: string;
@@ -161,6 +179,12 @@ export class ListadoMovimientosBancariosResponseDto {
   totales!: TotalMonedaDto[];
   @ApiProperty({ type: () => [SaldoCuentaBancariaDto] })
   saldos!: SaldoCuentaBancariaDto[];
+  @ApiProperty({
+    type: () => [ResumenSaldosMonedaDto],
+    description:
+      'Agregado de la franja `saldos` POR MONEDA, calculado en el backend con Money/decimal.js — el frontend lo presenta sin recalcular. Orden: primera aparición en `saldos` (REQ-VMB-10).',
+  })
+  saldosPorMoneda!: ResumenSaldosMonedaDto[];
   @ApiProperty({ type: () => AuditoriaVinculosDto })
   auditoriaVinculos!: AuditoriaVinculosDto;
 }

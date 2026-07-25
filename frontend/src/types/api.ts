@@ -452,6 +452,12 @@ export type TotalMoneda = Schemas['TotalMonedaDto'];
 /** Saldo vigente por cuenta: `null` honesto, sin fallback (REQ-VMB-08/09). */
 export type SaldoCuentaBancaria = Schemas['SaldoCuentaBancariaDto'];
 
+/**
+ * Agregado POR MONEDA de la franja `saldos`, calculado por el BACKEND con
+ * Money/decimal.js — el frontend lo presenta sin recalcular (REQ-VMB-10).
+ */
+export type ResumenSaldosMoneda = Schemas['ResumenSaldosMonedaDto'];
+
 export type AuditoriaVinculos = Schemas['AuditoriaVinculosDto'];
 
 export type VinculoRoto = Schemas['VinculoRotoDto'];

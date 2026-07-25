@@ -342,4 +342,169 @@ describe('MovimientosBancariosService.listar (REQ-VMB-01..09/11/13)', () => {
     expect(resultado.page).toBe(2);
     expect(resultado.limit).toBe(25);
   });
+
+  // ============================================================
+  // Agregado de saldos por moneda (REQ-VMB-10) — el backend suma
+  // con Money/decimal.js; el frontend presenta sin recalcular.
+  // ============================================================
+
+  describe('saldosPorMoneda — agregado por moneda de la franja de saldos (REQ-VMB-10)', () => {
+    function vigente(cuentaBancariaId: string, saldo: string | null, dia = 10) {
+      return {
+        cuentaBancariaId,
+        fecha: new Date(`2026-06-${String(dia).padStart(2, '0')}T00:00:00.000Z`),
+        saldo: saldo === null ? null : new Prisma.Decimal(saldo),
+      };
+    }
+
+    it('suma solo cuentas de la MISMA moneda, en subtotales separados — sin conversión ni total combinado', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-b', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-c', moneda: 'USD' }),
+        ],
+        total: 3,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([
+        vigente('cb-a', '1500.00'),
+        vigente('cb-b', '250.50'),
+        vigente('cb-c', '100.00'),
+      ]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '1750.50', cuentasSumadas: 2, cuentasSinSaldo: 0 },
+        { moneda: 'USD', suma: '100.00', cuentasSumadas: 1, cuentasSinSaldo: 0 },
+      ]);
+    });
+
+    it('cuenta con saldo null se EXCLUYE de la suma (nunca cuenta como 0) y se contabiliza aparte', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-b', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      // cb-b tiene movimiento pero el banco no publica saldo (null honesto).
+      movRepo.saldosVigentes.mockResolvedValue([
+        vigente('cb-a', '1500.00'),
+        vigente('cb-b', null, 20),
+      ]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '1500.00', cuentasSumadas: 1, cuentasSinSaldo: 1 },
+      ]);
+    });
+
+    it('cuenta sin movimientos (fuera de saldosVigentes) también cuenta como sin saldo', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-n', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([vigente('cb-a', '900.00')]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '900.00', cuentasSumadas: 1, cuentasSinSaldo: 1 },
+      ]);
+    });
+
+    it('todas las cuentas de una moneda sin saldo → suma null, JAMÁS "0.00"', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-b', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([vigente('cb-a', null)]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: null, cuentasSumadas: 0, cuentasSinSaldo: 2 },
+      ]);
+    });
+
+    it('sin cuentas → sin subtotales', async () => {
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([]);
+    });
+
+    it('0.10 + 0.20 = 0.30 exacto — la suma va por decimal.js, nunca float IEEE-754 (§4.5)', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-b', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([vigente('cb-a', '0.10'), vigente('cb-b', '0.20')]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '0.30', cuentasSumadas: 2, cuentasSinSaldo: 0 },
+      ]);
+    });
+
+    it('normaliza saldos sin decimales o con 1 decimal a 2 decimales', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' }),
+          cuentaBancariaRow({ id: 'cb-b', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([vigente('cb-a', '1000'), vigente('cb-b', '0.5')]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '1000.50', cuentasSumadas: 2, cuentasSinSaldo: 0 },
+      ]);
+    });
+
+    it('una sola cuenta vuelve con el saldo normalizado a 2 decimales', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [cuentaBancariaRow({ id: 'cb-a', moneda: 'BOB' })],
+        total: 1,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([vigente('cb-a', '99.9')]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda).toEqual([
+        { moneda: 'BOB', suma: '99.90', cuentasSumadas: 1, cuentasSinSaldo: 0 },
+      ]);
+    });
+
+    it('el orden de las monedas respeta la primera aparición en la franja saldos (no alfabético)', async () => {
+      cuentasBancarias.listar.mockResolvedValue({
+        items: [
+          cuentaBancariaRow({ id: 'cb-usd', moneda: 'USD' }),
+          cuentaBancariaRow({ id: 'cb-bob', moneda: 'BOB' }),
+        ],
+        total: 2,
+      });
+      movRepo.saldosVigentes.mockResolvedValue([
+        vigente('cb-usd', '200.00'),
+        vigente('cb-bob', '1000.00'),
+      ]);
+
+      const resultado = await service.listar(TENANT, CONSULTA_BASE);
+
+      expect(resultado.saldosPorMoneda.map((r) => r.moneda)).toEqual(['USD', 'BOB']);
+    });
+  });
 });

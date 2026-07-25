@@ -4009,6 +4009,19 @@ export interface components {
             /** @description Fecha del último movimiento importado — SIEMPRE presente si hay movimiento (REQ-VMB-08). */
             fechaUltimoMovimiento: string | null;
         };
+        ResumenSaldosMonedaDto: {
+            /** @enum {string} */
+            moneda: "BOB" | "USD";
+            /**
+             * @description Suma de saldos de la moneda, string (§4.5). null cuando NINGUNA cuenta de la moneda publica saldo — nunca "0.00" (REQ-VMB-10).
+             * @example 1750.50
+             */
+            suma: string | null;
+            /** @description Cuentas con saldo publicado incluidas en la suma. */
+            cuentasSumadas: number;
+            /** @description Cuentas con saldo=null: EXCLUIDAS de la suma, jamás contadas como 0. */
+            cuentasSinSaldo: number;
+        };
         VinculoRotoDto: {
             /** Format: uuid */
             movimientoBancarioId: string;
@@ -4044,6 +4057,8 @@ export interface components {
             movimientos: components["schemas"]["MovimientoVerificadorDto"][];
             totales: components["schemas"]["TotalMonedaDto"][];
             saldos: components["schemas"]["SaldoCuentaBancariaDto"][];
+            /** @description Agregado de la franja `saldos` POR MONEDA, calculado en el backend con Money/decimal.js — el frontend lo presenta sin recalcular. Orden: primera aparición en `saldos` (REQ-VMB-10). */
+            saldosPorMoneda: components["schemas"]["ResumenSaldosMonedaDto"][];
             auditoriaVinculos: components["schemas"]["AuditoriaVinculosDto"];
         };
         ActualizarEstadoMovimientoDto: {

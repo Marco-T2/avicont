@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import type { SaldoCuentaBancaria } from '@/types/api';
+import type { ResumenSaldosMoneda, SaldoCuentaBancaria } from '@/types/api';
 
 import { SaldosPorCuenta } from './saldos-por-cuenta';
 
@@ -12,6 +12,16 @@ function saldo(overrides: Partial<SaldoCuentaBancaria>): SaldoCuentaBancaria {
     moneda: 'BOB',
     saldo: null,
     fechaUltimoMovimiento: null,
+    ...overrides,
+  };
+}
+
+function resumen(overrides: Partial<ResumenSaldosMoneda>): ResumenSaldosMoneda {
+  return {
+    moneda: 'BOB',
+    suma: null,
+    cuentasSumadas: 0,
+    cuentasSinSaldo: 0,
     ...overrides,
   };
 }
@@ -28,6 +38,7 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
             fechaUltimoMovimiento: '2026-06-30',
           }),
         ]}
+        resumen={[resumen({ suma: '1500.00', cuentasSumadas: 1 })]}
         hasta="2026-06-30"
       />,
     );
@@ -55,6 +66,7 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
             fechaUltimoMovimiento: '2026-06-30',
           }),
         ]}
+        resumen={[resumen({ suma: '1000.00', cuentasSumadas: 2 })]}
         hasta="2026-06-30"
       />,
     );
@@ -66,7 +78,7 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
     expect(within(alDia).queryByText(/desactualizado/i)).not.toBeInTheDocument();
   });
 
-  it('cuenta con saldo null se excluye de la suma con indicador visible — nunca cuenta como 0', () => {
+  it('presenta la suma del backend TAL CUAL (anti-recálculo) con la nota de cuentas excluidas', () => {
     render(
       <SaldosPorCuenta
         saldos={[
@@ -89,11 +101,12 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
             fechaUltimoMovimiento: '2026-06-20',
           }),
         ]}
+        resumen={[resumen({ suma: '1750.50', cuentasSumadas: 2, cuentasSinSaldo: 1 })]}
         hasta="2026-06-30"
       />,
     );
 
-    // Suma BOB = solo las dos primeras (1750.50), la tercera excluida.
+    // Suma BOB = el valor recibido del backend, sin sumar nada acá.
     expect(screen.getByText('1.750,50')).toBeInTheDocument();
     // Indicador en la cuenta excluida.
     const sinSaldo = screen.getByText('Cuenta FIE').closest('li') as HTMLElement;
@@ -120,6 +133,10 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
             fechaUltimoMovimiento: '2026-06-30',
           }),
         ]}
+        resumen={[
+          resumen({ moneda: 'BOB', suma: '1000.00', cuentasSumadas: 1 }),
+          resumen({ moneda: 'USD', suma: '200.00', cuentasSumadas: 1 }),
+        ]}
         hasta="2026-06-30"
       />,
     );
@@ -130,10 +147,24 @@ describe('SaldosPorCuenta — franja de saldos vigentes (REQ-VMB-08/09/10)', () 
     expect(screen.queryByText('1.200,00')).not.toBeInTheDocument();
   });
 
+  it('moneda con suma null (ninguna cuenta publica saldo) muestra el guión, nunca "0,00"', () => {
+    render(
+      <SaldosPorCuenta
+        saldos={[saldo({ cuentaBancariaId: 'a', alias: 'Sin saldo' })]}
+        resumen={[resumen({ suma: null, cuentasSinSaldo: 1 })]}
+        hasta="2026-06-30"
+      />,
+    );
+
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('0,00')).not.toBeInTheDocument();
+  });
+
   it('cuenta sin movimientos (null/null) aparece igual, con su indicador', () => {
     render(
       <SaldosPorCuenta
         saldos={[saldo({ cuentaBancariaId: 'n', alias: 'Cuenta nueva' })]}
+        resumen={[resumen({ cuentasSinSaldo: 1 })]}
         hasta="2026-06-30"
       />,
     );
