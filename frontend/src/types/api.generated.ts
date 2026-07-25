@@ -1984,6 +1984,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cuentas-bancarias/{id}/integridad": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Huecos de cobertura y discontinuidades de saldo de la serie de extractos.
+         * @description Evalúa la SERIE COMPLETA de importaciones (sin paginar): ambas señales son propiedades del conjunto y sobre una página darían un veredicto falso. Informativo — nunca rechaza una importación (REQ-CB-09/23).
+         */
+        get: operations["CuentasBancariasController_integridad"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/conciliacion": {
         parameters: {
             query?: never;
@@ -3773,6 +3793,43 @@ export interface components {
             estadoVerificacion?: "VERIFICADO" | "SIN_VERIFICAR" | "DESCUADRE";
             diferencia?: string | null;
             advertencias?: components["schemas"]["AdvertenciaImportacionDto"][];
+        };
+        HuecoCoberturaDto: {
+            /**
+             * @description Inclusive, `YYYY-MM-DD` (§4.6).
+             * @example 2026-07-01
+             */
+            desde: string;
+            /**
+             * @description Inclusive.
+             * @example 2026-07-31
+             */
+            hasta: string;
+        };
+        DiscontinuidadSaldoDto: {
+            /** Format: uuid */
+            anteriorId: string;
+            /** Format: uuid */
+            siguienteId: string;
+            /**
+             * @description Monto como STRING (§4.5).
+             * @example 700.00
+             */
+            saldoFinalAnterior: string;
+            /** @example 900.00 */
+            saldoInicialSiguiente: string;
+            /**
+             * @description Magnitud del salto, siempre positiva.
+             * @example 200.00
+             */
+            diferencia: string;
+        };
+        IntegridadExtractosResponseDto: {
+            huecos: components["schemas"]["HuecoCoberturaDto"][];
+            /** @description Saltos de saldo entre importaciones contiguas. Detectan la mutilación de un extracto por los extremos, que el checksum DERIVADO no puede ver (REQ-CB-23). */
+            discontinuidades: components["schemas"]["DiscontinuidadSaldoDto"][];
+            /** @description true cuando no hay huecos NI discontinuidades. Informativo: nunca bloquea una importación — lo que se retiene aguas abajo es la conclusión del informe. */
+            serieIntegra: boolean;
         };
         ImportacionExtractoListItemDto: {
             id: string;
@@ -7924,6 +7981,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportarExtractoResponseDto"];
+                };
+            };
+        };
+    };
+    CuentasBancariasController_integridad: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegridadExtractosResponseDto"];
                 };
             };
         };

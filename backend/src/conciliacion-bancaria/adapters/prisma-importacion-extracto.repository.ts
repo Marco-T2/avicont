@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/common/prisma.service';
 
 import {
+  CoberturaImportacionRow,
   ImportacionExtractoCreateData,
   ImportacionExtractoRepositoryPort,
   ListarImportacionesPagination,
@@ -52,6 +53,26 @@ export class PrismaImportacionExtractoRepository extends ImportacionExtractoRepo
   ): Promise<ImportacionExtracto | null> {
     const client = tx ?? this.prisma;
     return client.importacionExtracto.findFirst({ where: { id, organizationId: tenantId } });
+  }
+
+  async listarCoberturaPorCuentaBancaria(
+    tenantId: string,
+    cuentaBancariaId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<CoberturaImportacionRow[]> {
+    const client = tx ?? this.prisma;
+    return client.importacionExtracto.findMany({
+      // organizationId PRIMER predicado (§4.2 Anti-31).
+      where: { organizationId: tenantId, cuentaBancariaId },
+      select: {
+        id: true,
+        fechaDesde: true,
+        fechaHasta: true,
+        saldoInicial: true,
+        saldoFinal: true,
+      },
+      orderBy: { fechaDesde: 'asc' },
+    });
   }
 
   async listarPorCuentaBancaria(

@@ -34,6 +34,20 @@ export interface ListarImportacionesPagination {
   limit: number;
 }
 
+/**
+ * Proyección MÍNIMA para evaluar la integridad de la serie de extractos
+ * (REQ-CB-09/23). Deliberadamente SIN paginar: los huecos de cobertura y la
+ * continuidad de saldo son propiedades del CONJUNTO — evaluarlas sobre una
+ * página daría un veredicto falso.
+ */
+export interface CoberturaImportacionRow {
+  id: string;
+  fechaDesde: Date;
+  fechaHasta: Date;
+  saldoInicial: Prisma.Decimal | null;
+  saldoFinal: Prisma.Decimal | null;
+}
+
 export abstract class ImportacionExtractoRepositoryPort {
   abstract crear(
     tenantId: string,
@@ -70,6 +84,16 @@ export abstract class ImportacionExtractoRepositoryPort {
   ): Promise<ImportacionExtracto>;
 
   /** design §10 — "ya existe para la cuenta → aviso, NO error". */
+  /**
+   * TODAS las importaciones de una cuenta bancaria, proyectadas a lo mínimo
+   * para evaluar cobertura y continuidad (REQ-CB-09/23). Sin paginación a
+   * propósito — ver `CoberturaImportacionRow`.
+   */
+  abstract listarCoberturaPorCuentaBancaria(
+    tenantId: string,
+    cuentaBancariaId: string,
+  ): Promise<CoberturaImportacionRow[]>;
+
   abstract existePorSha256(
     tenantId: string,
     cuentaBancariaId: string,
