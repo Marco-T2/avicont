@@ -8,6 +8,8 @@ import {
   LineaCuentaRow,
   LineasCuentaFiltros,
   LineasCuentaReaderPort,
+  SumaLineasCuentaFiltros,
+  SumaLineasCuentaRow,
 } from '../ports/lineas-cuenta-reader.port';
 
 // Estados que representan plata efectivamente movida (design §3): un BORRADOR
@@ -103,6 +105,42 @@ export class PrismaLineasCuentaReaderAdapter extends LineasCuentaReaderPort {
     });
 
     return filas.map(toLineaCuentaRow);
+  }
+
+  async sumarPorCuentaHasta(
+    tenantId: string,
+    filtros: SumaLineasCuentaFiltros,
+  ): Promise<SumaLineasCuentaRow> {
+    // `aggregate({_sum})`, NO `$queryRaw` (design informe-conciliacion-bancaria
+    // D1): el builder conserva el filtro de tenant estáticamente visible y
+    // devuelve `Decimal` tipado sin el remapeo `string → Decimal` del raw.
+    const agregado = await this.prisma.lineaComprobante.aggregate({
+      _sum: { debito: true, credito: true, debitoBob: true, creditoBob: true },
+      where: {
+        organizationId: tenantId,
+        cuentaId: filtros.cuentaId,
+        comprobante: {
+          organizationId: tenantId, // defense in depth (Anti-31)
+          estado: { in: ESTADOS_CONCILIABLES },
+          anulado: false,
+          fechaContable: {
+            lte: filtros.hasta,
+            // `desde` EXCLUSIVO — ventana D3 `arranque.fecha < fecha <= corte`.
+            ...(filtros.desde !== undefined ? { gt: filtros.desde } : {}),
+          },
+        },
+      },
+    });
+
+    // Sin filas, `_sum` viene con null en cada campo — el contrato promete
+    // ceros Decimal, nunca null.
+    const CERO = new Prisma.Decimal(0);
+    return {
+      totalDebito: agregado._sum.debito ?? CERO,
+      totalCredito: agregado._sum.credito ?? CERO,
+      totalDebitoBob: agregado._sum.debitoBob ?? CERO,
+      totalCreditoBob: agregado._sum.creditoBob ?? CERO,
+    };
   }
 }
 

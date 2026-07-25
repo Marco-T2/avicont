@@ -51,7 +51,7 @@ Migración **aditiva**, sin backfill.
       `vigenteA(corte)` (`fecha <= corte ORDER BY fecha DESC, createdAt DESC
       LIMIT 1`), `listarHistorial`, `crear`. Integración: aislamiento por
       tenant; una declaración posterior no borra la anterior.
-- [ ] 3.3 `lineas-cuenta-reader.port.ts`: `sumarPorCuentaHasta` + adapter con
+- [x] 3.3 `lineas-cuenta-reader.port.ts`: `sumarPorCuentaHasta` + adapter con
       `aggregate({_sum})` (**no** `$queryRaw`). `organizationId` en la línea Y
       en el comprobante. Documentar por qué se amplía la "superficie mínima".
       Integración: `BORRADOR` y anulados excluidos.

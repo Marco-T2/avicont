@@ -9,9 +9,12 @@
  * que el consumidor lo importe sin tirar del require de
  * `comprobantes.module.ts` (ciclo de carga CJS).
  *
- * Superficie MÍNIMA: dos métodos. No hay `contar`, no hay `incluirAnulados`
- * en el listado por rango, no hay filtro por comprobante — nada de eso lo
- * necesita el workspace de conciliación.
+ * Superficie mínima PARA SUS CONSUMERS: el comentario original decía "dos
+ * métodos" porque describía las necesidades del workspace de conciliación v1.
+ * El change `informe-conciliacion-bancaria` la amplía DELIBERADAMENTE a tres
+ * (ver `sumarPorCuentaHasta`) — sigue sin haber `contar`, `incluirAnulados`
+ * en el listado por rango ni filtro por comprobante, porque ningún consumer
+ * los necesita.
  */
 
 import type { EstadoComprobante, Moneda, Prisma } from '@prisma/client';
@@ -57,6 +60,32 @@ export interface AnclaLinea {
   orden: number;
 }
 
+/**
+ * Totales agregados de las líneas conciliables de una cuenta del plan
+ * (design `informe-conciliacion-bancaria` D1). Nunca null: sin líneas en la
+ * ventana, los cuatro totales vienen en `Decimal(0)`.
+ */
+export interface SumaLineasCuentaRow {
+  /** MONEDA ORIGINAL — el lado libros del informe compara en BOB v1, pero el shape no hipoteca USD. */
+  totalDebito: Prisma.Decimal;
+  totalCredito: Prisma.Decimal;
+  /** Equivalente en BOB. */
+  totalDebitoBob: Prisma.Decimal;
+  totalCreditoBob: Prisma.Decimal;
+}
+
+export interface SumaLineasCuentaFiltros {
+  cuentaId: string;
+  /** INCLUSIVE — acumulado a la fecha de corte (REQ-ICB-01). */
+  hasta: Date;
+  /**
+   * EXCLUSIVO (`fechaContable > desde`) — es la ventana D3
+   * `arranque.fecha < fecha <= corte`: lo del día del arranque ya está
+   * absorbido en el saldo declarado. Omitido ⇒ acumulado desde el origen.
+   */
+  desde?: Date;
+}
+
 export abstract class LineasCuentaReaderPort {
   /**
    * Líneas de UNA cuenta del plan en un rango de `fechaContable`, en moneda original.
@@ -92,4 +121,28 @@ export abstract class LineasCuentaReaderPort {
     tenantId: string,
     anclas: ReadonlyArray<AnclaLinea>,
   ): Promise<LineaCuentaRow[]>;
+
+  /**
+   * Totales agregados de una cuenta del plan hasta `hasta` inclusive
+   * (REQ-ICB-03): el saldo según libros del informe de conciliación. Mismos
+   * filtros de conciliabilidad que `listarPorCuentaEnRango` — solo
+   * `CONTABILIZADO`/`BLOQUEADO` con `anulado = false`.
+   *
+   * POR QUÉ un tercer método en un port que se declaró de "superficie
+   * mínima" (design `informe-conciliacion-bancaria` D1): esa mínima
+   * describía al workspace v1, y las alternativas eran peores —
+   * `EeffSaldosReaderPort.obtenerSaldosHasta` solo agrega en BOB, trae el
+   * plan ENTERO y abre una dependencia nueva hacia `reportes/`; sumar
+   * `listarPorCuentaEnRango` en Node acarrea todas las líneas desde el
+   * origen de la organización solo para colapsarlas en cuatro números. La
+   * suma pertenece a Postgres; el dueño del dominio (§3.7) expone el
+   * agregado y el consumer no toca entidades.
+   *
+   * Multi-tenant: filtra `organizationId` en la línea Y en el comprobante
+   * (defense in depth, §4.2 core / Anti-31).
+   */
+  abstract sumarPorCuentaHasta(
+    tenantId: string,
+    filtros: SumaLineasCuentaFiltros,
+  ): Promise<SumaLineasCuentaRow>;
 }

@@ -411,4 +411,131 @@ describe('PrismaLineasCuentaReaderAdapter (integration vs Postgres)', () => {
   it('listarPorAnclas con lista vacía no consulta y devuelve []', async () => {
     expect(await adapter.listarPorAnclas(tenantA, [])).toEqual([]);
   });
+
+  // ==========================================================
+  // sumarPorCuentaHasta — task 3.3 del change informe-conciliacion-bancaria
+  // (REQ-ICB-03, design D1): agregado en Postgres, mismos filtros de
+  // conciliabilidad que el listado por rango.
+  // ==========================================================
+
+  describe('sumarPorCuentaHasta', () => {
+    it('excluye BORRADOR y anulados de la suma — un borrador no movió plata y un anulado dejó de moverla', async () => {
+      await crearComprobante(tenantA, periodoA, {
+        dia: 10,
+        numero: 'D2606-000001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '100.00' }],
+      });
+      await crearComprobante(tenantA, periodoA, {
+        dia: 11,
+        numero: 'D2606-000002',
+        estado: EstadoComprobante.BLOQUEADO,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, credito: '40.00' }],
+      });
+      await crearComprobante(tenantA, periodoA, {
+        dia: 12,
+        numero: null,
+        estado: EstadoComprobante.BORRADOR,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '999.00' }],
+      });
+      await crearComprobante(tenantA, periodoA, {
+        dia: 13,
+        numero: 'D2606-000003',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: true,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '888.00' }],
+      });
+
+      const suma = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoA,
+        hasta: new Date(Date.UTC(2026, 5, 30)),
+      });
+
+      expect(suma.totalDebito.toFixed(2)).toBe('100.00');
+      expect(suma.totalCredito.toFixed(2)).toBe('40.00');
+      expect(suma.totalDebitoBob.toFixed(2)).toBe('100.00');
+      expect(suma.totalCreditoBob.toFixed(2)).toBe('40.00');
+    });
+
+    it('acota la ventana D3: `hasta` INCLUSIVE y `desde` EXCLUSIVO (arranque.fecha < fecha <= corte)', async () => {
+      await crearComprobante(tenantA, periodoA, {
+        dia: 5,
+        numero: 'D2606-000001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '10.00' }],
+      });
+      await crearComprobante(tenantA, periodoA, {
+        dia: 10,
+        numero: 'D2606-000002',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '20.00' }],
+      });
+      await crearComprobante(tenantA, periodoA, {
+        dia: 20,
+        numero: 'D2606-000003',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [{ cuentaId: cuentaBancoA, orden: 1, debito: '40.00' }],
+      });
+
+      // Acumulado a corte: el día del corte (10) INCLUYE.
+      const hastaEl10 = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoA,
+        hasta: new Date(Date.UTC(2026, 5, 10)),
+      });
+      expect(hastaEl10.totalDebito.toFixed(2)).toBe('30.00');
+
+      // Ventana post-arranque: el día del arranque (5) queda FUERA — su
+      // línea ya está absorbida en el saldo declarado.
+      const ventana = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoA,
+        desde: new Date(Date.UTC(2026, 5, 5)),
+        hasta: new Date(Date.UTC(2026, 5, 30)),
+      });
+      expect(ventana.totalDebito.toFixed(2)).toBe('60.00');
+    });
+
+    it('suma solo la cuenta pedida y solo el tenant pedido (Anti-31)', async () => {
+      await crearComprobante(tenantA, periodoA, {
+        dia: 10,
+        numero: 'D2606-000001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [
+          { cuentaId: cuentaBancoA, orden: 1, debito: '100.00' },
+          { cuentaId: cuentaOtraA, orden: 2, credito: '100.00' },
+        ],
+      });
+      await crearComprobante(tenantB, periodoB, {
+        dia: 10,
+        numero: 'D2606-000001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        lineas: [{ cuentaId: cuentaBancoB, orden: 1, debito: '777.00' }],
+      });
+
+      const suma = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoA,
+        hasta: new Date(Date.UTC(2026, 5, 30)),
+      });
+      expect(suma.totalDebito.toFixed(2)).toBe('100.00');
+      expect(suma.totalCredito.toFixed(2)).toBe('0.00');
+
+      // Con la cuenta de OTRO tenant no viene nada — ni con su id en la mano.
+      const ajena = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoB,
+        hasta: new Date(Date.UTC(2026, 5, 30)),
+      });
+      expect(ajena.totalDebito.toFixed(2)).toBe('0.00');
+    });
+
+    it('sin líneas conciliables devuelve ceros Decimal, nunca null', async () => {
+      const suma = await adapter.sumarPorCuentaHasta(tenantA, {
+        cuentaId: cuentaBancoA,
+        hasta: new Date(Date.UTC(2026, 5, 30)),
+      });
+
+      expect(suma.totalDebito.toFixed(2)).toBe('0.00');
+      expect(suma.totalCredito.toFixed(2)).toBe('0.00');
+      expect(suma.totalDebitoBob.toFixed(2)).toBe('0.00');
+      expect(suma.totalCreditoBob.toFixed(2)).toBe('0.00');
+    });
+  });
 });
