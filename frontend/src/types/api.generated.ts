@@ -2085,7 +2085,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Historial COMPLETO de declaraciones de arranque de una cuenta bancaria, más reciente primero.
+         * @description Mirar el historial es LECTURA (D7: `.read`; declarar exige `.conciliar`). Orden `fecha DESC, createdAt DESC` — el MISMO desempate de `vigenteA` — así la UI señala cuál declaración aplica a un corte sin re-ordenar: es la primera fila con `fecha <= corte` (design D8). Sin paginar: REQ-ICB-04 exige mostrarlo entero, ninguna declaración se oculta.
+         */
+        get: operations["InformeConciliacionController_listarArranques"];
         put?: never;
         /**
          * Declara un punto de arranque conciliado: fecha, ambos saldos y la diferencia residual ACEPTADA — los cuatro datos declarados por el usuario.
@@ -8312,6 +8316,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InformeConciliacionResponseDto"];
+                };
+            };
+        };
+    };
+    InformeConciliacionController_listarArranques: {
+        parameters: {
+            query: {
+                cuentaBancariaId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArranqueAplicadoDto"][];
                 };
             };
         };

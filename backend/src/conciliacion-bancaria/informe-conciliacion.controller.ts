@@ -17,6 +17,7 @@ import { RequirePermissions } from '@/rbac/decorators/require-permissions.decora
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
 import { DeclararArranqueDto } from './dto/declarar-arranque.dto';
+import { HistorialArranquesQueryDto } from './dto/historial-arranques-query.dto';
 import { InformeConciliacionQueryDto } from './dto/informe-conciliacion-query.dto';
 import {
   ArranqueAplicadoDto,
@@ -68,6 +69,30 @@ export class InformeConciliacionController {
       corte: new Date(`${query.corte}T00:00:00.000Z`),
     });
     return toInformeConciliacionResponse(resultado);
+  }
+
+  @Get('arranques')
+  @RequirePermissions('contabilidad.conciliacion.read')
+  @ApiOperation({
+    summary:
+      'Historial COMPLETO de declaraciones de arranque de una cuenta bancaria, más reciente primero.',
+    description:
+      'Mirar el historial es LECTURA (D7: `.read`; declarar exige `.conciliar`). ' +
+      'Orden `fecha DESC, createdAt DESC` — el MISMO desempate de `vigenteA` — así ' +
+      'la UI señala cuál declaración aplica a un corte sin re-ordenar: es la ' +
+      'primera fila con `fecha <= corte` (design D8). Sin paginar: REQ-ICB-04 ' +
+      'exige mostrarlo entero, ninguna declaración se oculta.',
+  })
+  @ApiOkResponse({ type: ArranqueAplicadoDto, isArray: true })
+  async listarArranques(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: HistorialArranquesQueryDto,
+  ): Promise<ArranqueAplicadoDto[]> {
+    const historial = await this.informe.listarHistorial(
+      resolveTenantId(req),
+      query.cuentaBancariaId,
+    );
+    return historial.map(toArranqueAplicadoResponse);
   }
 
   @Post('arranques')

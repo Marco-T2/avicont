@@ -85,6 +85,9 @@ Migración **aditiva**, sin backfill.
 - [x] 3.8 `informe-conciliacion.controller.ts`: `GET` informe (`read`) y `POST`
       arranque (`conciliar`). E2E: 404 cross-tenant; `read` sin `conciliar` ve
       el informe y no puede declarar; **el `GET` no crea arranque**.
+      _Alcance agregado (omisión del desglose, habilita 3.11): `GET
+      /conciliacion/arranques` (`read`) expone `listarHistorial` — orden
+      `fecha DESC, createdAt DESC`, el mismo desempate que `vigenteA`._
 
 ### Frontend
 

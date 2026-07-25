@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type {
+  ArranqueConciliado,
   CuentaBancaria,
   EstadoVerificacionExtracto,
   MatchConciliacion,
@@ -275,16 +276,7 @@ export class InformeConciliacionService {
       corte,
       saldoExtracto: informe.saldoExtracto,
       saldoLibros: informe.saldoLibros,
-      arranque: {
-        id: arranqueRow.id,
-        fecha: arranqueFecha,
-        saldoExtracto: Money.of(arranqueRow.saldoExtracto),
-        saldoLibros: Money.of(arranqueRow.saldoLibros),
-        diferenciaResidual: Money.of(arranqueRow.diferenciaResidual),
-        nota: arranqueRow.nota,
-        declaradoPorUserId: arranqueRow.declaradoPorUserId,
-        declaradoEl: arranqueRow.createdAt,
-      },
+      arranque: aArranqueAplicadoView(arranqueRow),
       partidas: informe.partidas,
       residuo: informe.residuo,
       ...derivarConfiabilidad({
@@ -332,16 +324,27 @@ export class InformeConciliacionService {
       declaradoPorUserId: userId,
     });
 
-    return {
-      id: creado.id,
-      fecha: FechaContable.fromDbDate(creado.fecha),
-      saldoExtracto: Money.of(creado.saldoExtracto),
-      saldoLibros: Money.of(creado.saldoLibros),
-      diferenciaResidual: Money.of(creado.diferenciaResidual),
-      nota: creado.nota,
-      declaradoPorUserId: creado.declaradoPorUserId,
-      declaradoEl: creado.createdAt,
-    };
+    return aArranqueAplicadoView(creado);
+  }
+
+  /**
+   * Historial COMPLETO de declaraciones de una cuenta bancaria (REQ-ICB-04,
+   * D8): la UI muestra todas y señala cuál aplica a un corte — como el orden
+   * del repo es `fecha DESC, createdAt DESC` (el MISMO desempate que
+   * `vigenteA`), la vigente a un corte es la PRIMERA fila con `fecha <= corte`,
+   * sin re-ordenar.
+   *
+   * Lectura pura: 404 si la cuenta no existe o es de otro tenant (REQ-ICB-09).
+   * No exige moneda BOB — listar actos ya declarados no computa la identidad,
+   * a diferencia del informe.
+   */
+  async listarHistorial(
+    tenantId: string,
+    cuentaBancariaId: string,
+  ): Promise<ArranqueAplicadoView[]> {
+    const cuentaBancaria = await this.cuentasBancarias.findById(tenantId, cuentaBancariaId);
+    const filas = await this.arranques.listarHistorial(tenantId, cuentaBancaria.id);
+    return filas.map(aArranqueAplicadoView);
   }
 
   // ============================================================
@@ -452,6 +455,20 @@ export class InformeConciliacionService {
 // ============================================================
 // Mapeos de boundary → insumos del dominio
 // ============================================================
+
+/** Fila persistida → view de dominio del acto declarado (Money/FechaContable). */
+function aArranqueAplicadoView(row: ArranqueConciliado): ArranqueAplicadoView {
+  return {
+    id: row.id,
+    fecha: FechaContable.fromDbDate(row.fecha),
+    saldoExtracto: Money.of(row.saldoExtracto),
+    saldoLibros: Money.of(row.saldoLibros),
+    diferenciaResidual: Money.of(row.diferenciaResidual),
+    nota: row.nota,
+    declaradoPorUserId: row.declaradoPorUserId,
+    declaradoEl: row.createdAt,
+  };
+}
 
 function aCuentaView(cuentaBancaria: CuentaBancaria): CuentaBancariaInformeView {
   return {

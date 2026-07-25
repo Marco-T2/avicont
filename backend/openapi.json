@@ -6159,6 +6159,45 @@
       }
     },
     "/api/conciliacion/arranques": {
+      "get": {
+        "description": "Mirar el historial es LECTURA (D7: `.read`; declarar exige `.conciliar`). Orden `fecha DESC, createdAt DESC` — el MISMO desempate de `vigenteA` — así la UI señala cuál declaración aplica a un corte sin re-ordenar: es la primera fila con `fecha <= corte` (design D8). Sin paginar: REQ-ICB-04 exige mostrarlo entero, ninguna declaración se oculta.",
+        "operationId": "InformeConciliacionController_listarArranques",
+        "parameters": [
+          {
+            "name": "cuentaBancariaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArranqueAplicadoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Historial COMPLETO de declaraciones de arranque de una cuenta bancaria, más reciente primero.",
+        "tags": [
+          "Conciliación bancaria — Informe"
+        ]
+      },
       "post": {
         "description": "Append-only (REQ-ICB-04): una declaración posterior nunca borra ni sobrescribe las anteriores; `vigenteA` decide cuál aplica a cada corte. La diferencia residual NO se calcula como extracto − libros: el usuario declara solo la parte que asume como inexplicable.",
         "operationId": "InformeConciliacionController_declararArranque",
