@@ -47,7 +47,7 @@ Migración **aditiva**, sin backfill.
 - [x] 3.1 `schema.prisma`: modelo `ArranqueConciliado` + migración aditiva.
       **Sin `@@unique(cuenta, fecha)`** — append-only.
       `@@index([organizationId, cuentaBancariaId, fecha])`.
-- [ ] 3.2 `ports/arranque-conciliado.repository.port.ts` + adapter:
+- [x] 3.2 `ports/arranque-conciliado.repository.port.ts` + adapter:
       `vigenteA(corte)` (`fecha <= corte ORDER BY fecha DESC, createdAt DESC
       LIMIT 1`), `listarHistorial`, `crear`. Integración: aislamiento por
       tenant; una declaración posterior no borra la anterior.

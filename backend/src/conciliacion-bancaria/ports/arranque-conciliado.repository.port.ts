@@ -1,0 +1,66 @@
+// Puerto del repositorio de `ArranqueConciliado` (REQ-ICB-04, design D3/D8).
+// Multi-tenancy defense in depth (CLAUDE.md §4.2): toda query filtra por
+// tenantId.
+//
+// El arranque es un ACTO append-only: se declara, jamás se edita ni se borra.
+// Por eso la superficie es crear + dos lecturas — no hay update ni delete a
+// propósito. Una "corrección" es una declaración NUEVA que gana por el
+// desempate de `vigenteA`, con la anterior intacta y auditable.
+
+import type { ArranqueConciliado, Prisma } from '@prisma/client';
+
+export const ARRANQUE_CONCILIADO_REPOSITORY_PORT = Symbol('ARRANQUE_CONCILIADO_REPOSITORY_PORT');
+
+export interface ArranqueConciliadoCreateData {
+  cuentaBancariaId: string;
+  /** Corte del arranque — `@db.Date`, calendario puro (§4.6). */
+  fecha: Date;
+  saldoExtracto: Prisma.Decimal;
+  saldoLibros: Prisma.Decimal;
+  /** Diferencia ACEPTADA al declarar. Se exhibe como partida nombrada (REQ-ICB-04/06). */
+  diferenciaResidual: Prisma.Decimal;
+  nota: string | null;
+  declaradoPorUserId: string;
+}
+
+export abstract class ArranqueConciliadoRepositoryPort {
+  /**
+   * Registra una declaración de arranque. Append-only: NUNCA pisa una
+   * anterior — ni siquiera sobre la misma fecha (D8, sin UNIQUE en BD a
+   * propósito). El caller pre-valida (cuenta del tenant, moneda BOB); acá
+   * solo se persiste el acto atribuido.
+   */
+  abstract crear(
+    tenantId: string,
+    data: ArranqueConciliadoCreateData,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranqueConciliado>;
+
+  /**
+   * La declaración que APLICA a un corte: la más reciente con
+   * `fecha <= corte`, desempatada por `fecha DESC, createdAt DESC` (D8 —
+   * ante dos declaraciones sobre la misma fecha gana la última declarada).
+   * Es la consulta central del informe: fija la ventana
+   * `arranque.fecha < fecha <= corte` y el residuo de partida (D3).
+   * `null` si ninguna declaración aplica ⇒ el informe se emite abstenido.
+   */
+  abstract vigenteA(
+    tenantId: string,
+    cuentaBancariaId: string,
+    corte: Date,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranqueConciliado | null>;
+
+  /**
+   * Historial COMPLETO de declaraciones de una cuenta bancaria, orden
+   * `fecha DESC, createdAt DESC` (el mismo desempate que `vigenteA`, para
+   * que la UI señale cuál aplica sin re-ordenar). Sin paginar a propósito:
+   * es un registro de actos puntuales, no un listado masivo, y REQ-ICB-04
+   * exige mostrarlo entero — la declaración anterior nunca se oculta.
+   */
+  abstract listarHistorial(
+    tenantId: string,
+    cuentaBancariaId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranqueConciliado[]>;
+}

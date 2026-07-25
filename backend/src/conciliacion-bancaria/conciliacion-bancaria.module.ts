@@ -14,6 +14,7 @@ import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
 import { DIALECTO_FIE } from './adapters/dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
+import { PrismaArranqueConciliadoRepository } from './adapters/prisma-arranque-conciliado.repository';
 import { PrismaCuentaBancariaRepository } from './adapters/prisma-cuenta-bancaria.repository';
 import { PrismaImportacionExtractoRepository } from './adapters/prisma-importacion-extracto.repository';
 import { PrismaMatchConciliacionRepository } from './adapters/prisma-match-conciliacion.repository';
@@ -29,6 +30,7 @@ import { ExtractoParserLookupService } from './extracto-parser-lookup.service';
 import { MatchConciliacionService } from './match-conciliacion.service';
 import { MovimientosBancariosController } from './movimientos-bancarios.controller';
 import { MovimientosBancariosService } from './movimientos-bancarios.service';
+import { ARRANQUE_CONCILIADO_REPOSITORY_PORT } from './ports/arranque-conciliado.repository.port';
 import { CUENTA_BANCARIA_REPOSITORY_PORT } from './ports/cuenta-bancaria.repository.port';
 import { EXTRACTO_PARSERS, ExtractoParserRegistry } from './ports/extracto-parser.registry';
 import { IMPORTACION_EXTRACTO_REPOSITORY_PORT } from './ports/importacion-extracto.repository.port';
@@ -98,6 +100,14 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
     {
       provide: MATCH_CONCILIACION_REPOSITORY_PORT,
       useExisting: PrismaMatchConciliacionRepository,
+    },
+
+    // Task 3.2 (informe-conciliacion-bancaria): el arranque conciliado
+    // (REQ-ICB-04). Lo consumirá `InformeConciliacionService` (task 3.6).
+    PrismaArranqueConciliadoRepository,
+    {
+      provide: ARRANQUE_CONCILIADO_REPOSITORY_PORT,
+      useExisting: PrismaArranqueConciliadoRepository,
     },
 
     {
