@@ -75,7 +75,7 @@ Migración **aditiva**, sin backfill.
 
 ### Servicio y HTTP
 
-- [ ] 3.6 `informe-conciliacion.service.ts`: orquesta reutilizando
+- [x] 3.6 `informe-conciliacion.service.ts`: orquesta reutilizando
       `saldosVigentes` (ya existe). Ventana acotada a
       `arranque.fecha < fecha <= corte`; **sin arranque ⇒ informe abstenido**.
       Cuenta no BOB ⇒ `CONCILIACION_MONEDA_NO_SOPORTADA`.
