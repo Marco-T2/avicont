@@ -60,8 +60,8 @@ Depende de: grupos 4 y 5.
 
 Depende de: grupo 6.
 
-- [ ] 7.1 `test/conciliacion-verificador.e2e-spec.ts`: filtros combinados; default sin `estado` muestra todo; asimetría `.read` 200 / sin `.read` 403; sin pack 404; vínculo roto en franja de auditoría; paginación con `total`.
-- [ ] 7.2 Correr: `NODE_OPTIONS="--experimental-vm-modules" DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit`. ⚠️ **VACÍA la base local** (`cleanupTestData()` sin `WHERE`): recuperar con `pnpm run seed` + `pnpm run seed:packs`.
+- [x] 7.1 `test/conciliacion-verificador.e2e-spec.ts`: filtros combinados; default sin `estado` muestra todo; asimetría `.read` 200 / sin `.read` 403; sin pack 404; vínculo roto en franja de auditoría; paginación con `total`. 9 tests (incluye además saldos null-honesto REQ-VMB-08/09, totales por moneda REQ-VMB-11 y multi-tenant REQ-VMB-13 en página/totales/saldos).
+- [x] 7.2 Correr: `NODE_OPTIONS="--experimental-vm-modules" DATABASE_URL=... JWT_ACCESS_SECRET=test-secret JWT_REFRESH_SECRET=test-refresh pnpm exec jest test/ --runInBand --forceExit`. ⚠️ **VACÍA la base local** (`cleanupTestData()` sin `WHERE`): recuperar con `pnpm run seed` + `pnpm run seed:packs`. Resultado: 46 suites / 603 tests verdes — ningún e2e ajeno rojo (el orden nuevo del workspace no rompió nada).
 
 ## Grupo 8 — Frontend (REQ-VMB-10, 14) · `feat(conciliacion): verificador bancario frontend`
 
