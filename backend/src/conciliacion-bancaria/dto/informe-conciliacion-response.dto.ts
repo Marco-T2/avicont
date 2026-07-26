@@ -1,0 +1,335 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EstadoVerificacionExtracto, Moneda } from '@prisma/client';
+
+import type {
+  ArranqueAplicadoView,
+  InformeConciliacionResultado,
+  MotivoNoConciliado,
+} from '../informe-conciliacion.service';
+
+// Todos los montos viajan como STRING (§4.5) y todas las fechas contables
+// como `YYYY-MM-DD` (§4.6). Cada importe de partida es la contribución
+// FIRMADA extracto→libros que fija `armarInforme` — el DTO NO recalcula ni
+// re-firma nada, solo serializa.
+
+export const MOTIVOS_NO_CONCILIADO = [
+  'SIN_ARRANQUE',
+  'SIN_SALDO_EXTRACTO',
+  'ARRANQUE_EXTRACTO_NO_COINCIDE',
+  'DESCUADRE',
+  'HUECO',
+  'DISCONTINUIDAD',
+  'RESIDUO_NO_EXPLICADO',
+] as const;
+
+export class CuentaBancariaInformeDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() alias!: string;
+  @ApiProperty() cuentaId!: string;
+  @ApiProperty({ enum: Moneda }) moneda!: Moneda;
+  @ApiProperty({ type: String, nullable: true }) numeroCuenta!: string | null;
+}
+
+export class ArranqueAplicadoDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ example: '2026-06-30' }) fecha!: string;
+  @ApiProperty({ example: '1000.00' }) saldoExtracto!: string;
+  @ApiProperty({ example: '990.00' }) saldoLibros!: string;
+  @ApiProperty({
+    example: '10.00',
+    description:
+      'DECLARADA por el usuario al fijar el arranque — jamás calculada como ' +
+      'extracto − libros. Positiva cuando el extracto queda por encima de los libros.',
+  })
+  diferenciaResidual!: string;
+  @ApiProperty({ type: String, nullable: true }) nota!: string | null;
+  @ApiProperty() declaradoPorUserId!: string;
+  @ApiProperty({ example: '2026-07-01T12:00:00.000Z' }) declaradoEl!: string;
+}
+
+export class DetalleMovimientoPendienteDto {
+  @ApiProperty() movimientoId!: string;
+  @ApiProperty({ example: '2026-07-10' }) fecha!: string;
+  @ApiProperty({ example: '-200.00', description: 'Contribución FIRMADA extracto→libros.' })
+  importe!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'No-nulo ⇒ el asiento existe pero es POSTERIOR al corte: la diferencia de ' +
+      'este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada.',
+  })
+  asentadoEl!: string | null;
+}
+
+export class DetalleMovimientoIgnoradoDto {
+  @ApiProperty() movimientoId!: string;
+  @ApiProperty({ example: '2026-07-12' }) fecha!: string;
+  @ApiProperty({ example: '-10.00' }) importe!: string;
+}
+
+export class DetalleLineaEnTransitoDto {
+  @ApiProperty() comprobanteId!: string;
+  @ApiProperty() orden!: number;
+  @ApiProperty({ example: '2026-07-20' }) fecha!: string;
+  @ApiProperty({ example: '-400.00' }) importe!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl).',
+  })
+  registradoPorBancoEl!: string | null;
+}
+
+export class PartidaPendientesDto {
+  @ApiProperty({ example: '-200.00', description: 'Suma firmada del detalle.' })
+  importe!: string;
+  @ApiProperty({ type: () => [DetalleMovimientoPendienteDto] })
+  detalle!: DetalleMovimientoPendienteDto[];
+}
+
+export class PartidaIgnoradosDto {
+  @ApiProperty({ example: '-10.00' }) importe!: string;
+  @ApiProperty({ type: () => [DetalleMovimientoIgnoradoDto] })
+  detalle!: DetalleMovimientoIgnoradoDto[];
+}
+
+export class PartidaEnTransitoDto {
+  @ApiProperty({ example: '-400.00' }) importe!: string;
+  @ApiProperty({ type: () => [DetalleLineaEnTransitoDto] })
+  detalle!: DetalleLineaEnTransitoDto[];
+}
+
+export class PartidaArranqueDto {
+  @ApiProperty({ example: '2026-06-30' }) fecha!: string;
+  @ApiProperty({
+    example: '-10.00',
+    description: 'Contribución al puente: −diferenciaResidual declarada.',
+  })
+  importe!: string;
+}
+
+export class PartidasInformeDto {
+  @ApiProperty({
+    type: () => PartidaPendientesDto,
+    description: 'El banco lo registró; los libros, al corte, no.',
+  })
+  pendientes!: PartidaPendientesDto;
+  @ApiProperty({
+    type: () => PartidaIgnoradosDto,
+    description: 'Partida con NOMBRE PROPIO (REQ-ICB-02): los libros nunca lo registrarán.',
+  })
+  ignorados!: PartidaIgnoradosDto;
+  @ApiProperty({
+    type: () => PartidaEnTransitoDto,
+    description: 'Los libros lo registraron; el banco, al corte, no.',
+  })
+  enTransito!: PartidaEnTransitoDto;
+  @ApiProperty({ type: () => PartidaArranqueDto })
+  arranque!: PartidaArranqueDto;
+}
+
+export class MotivoNoConciliadoDto {
+  @ApiProperty({ enum: MOTIVOS_NO_CONCILIADO })
+  tipo!: (typeof MOTIVOS_NO_CONCILIADO)[number];
+  @ApiPropertyOptional({ description: 'Solo DESCUADRE.' }) importacionId?: string;
+  @ApiPropertyOptional({ example: '2026-07-11', description: 'Solo HUECO.' }) desde?: string;
+  @ApiPropertyOptional({ example: '2026-07-19', description: 'Solo HUECO.' }) hasta?: string;
+  @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) anteriorId?: string;
+  @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) siguienteId?: string;
+  @ApiPropertyOptional({
+    example: '200.00',
+    description: 'Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva.',
+  })
+  diferencia?: string;
+  @ApiPropertyOptional({ example: '-0.01', description: 'Solo RESIDUO_NO_EXPLICADO. Firmado.' })
+  importe?: string;
+  @ApiPropertyOptional({
+    example: '2026-06-05',
+    description: 'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado.',
+  })
+  fecha?: string;
+  @ApiPropertyOptional({
+    example: '15.99',
+    description:
+      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente.',
+  })
+  declarado?: string;
+  @ApiPropertyOptional({
+    example: '714.99',
+    description:
+      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque.',
+  })
+  real?: string;
+}
+
+export class ConfiabilidadInformeDto {
+  @ApiProperty({
+    description:
+      'true SOLO con arranque declarado, saldo de extracto publicado, insumos ' +
+      'sanos y residuo cero exacto. La confiabilidad CALIFICA el informe, nunca ' +
+      'lo suprime (REQ-ICB-05).',
+  })
+  conciliado!: boolean;
+  @ApiProperty({ type: () => [MotivoNoConciliadoDto] })
+  motivos!: MotivoNoConciliadoDto[];
+}
+
+export class ImportacionInsumoDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ example: '2026-07-01' }) fechaDesde!: string;
+  @ApiProperty({ example: '2026-07-31' }) fechaHasta!: string;
+  @ApiProperty({ enum: EstadoVerificacionExtracto })
+  estadoVerificacion!: EstadoVerificacionExtracto;
+}
+
+export class InsumosInformeDto {
+  @ApiProperty({
+    type: () => [ImportacionInsumoDto],
+    description: 'Importaciones que cubren el rango del informe (REQ-ICB-08).',
+  })
+  importaciones!: ImportacionInsumoDto[];
+}
+
+export class InformeConciliacionResponseDto {
+  @ApiProperty({ type: () => CuentaBancariaInformeDto })
+  cuentaBancaria!: CuentaBancariaInformeDto;
+  @ApiProperty({ example: '2026-07-31' }) corte!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Saldo del último movimiento ≤ corte. null si ninguno publica saldo (REQ-ICB-03).',
+  })
+  saldoExtracto!: string | null;
+  @ApiProperty({ example: '990.00' }) saldoLibros!: string;
+  @ApiProperty({
+    type: () => ArranqueAplicadoDto,
+    nullable: true,
+    description: 'null ⇔ sin arranque declarado: el informe se emite ABSTENIDO (REQ-ICB-04).',
+  })
+  arranque!: ArranqueAplicadoDto | null;
+  @ApiProperty({ type: () => PartidasInformeDto, nullable: true })
+  partidas!: PartidasInformeDto | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Lo que las partidas NO explican. Se expone tal cual, jamás se ajusta ni ' +
+      'se reparte (REQ-ICB-06). null sin arranque o sin saldo de extracto.',
+  })
+  residuo!: string | null;
+  @ApiProperty({ type: () => ConfiabilidadInformeDto })
+  confiabilidad!: ConfiabilidadInformeDto;
+  @ApiProperty({ type: () => InsumosInformeDto })
+  insumos!: InsumosInformeDto;
+}
+
+// ============================================================
+// Mapper — boundary Money/FechaContable → string
+// ============================================================
+
+function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
+  switch (motivo.tipo) {
+    case 'SIN_ARRANQUE':
+    case 'SIN_SALDO_EXTRACTO':
+      return { tipo: motivo.tipo };
+    case 'ARRANQUE_EXTRACTO_NO_COINCIDE':
+      return {
+        tipo: motivo.tipo,
+        fecha: motivo.fecha.toIso(),
+        declarado: motivo.declarado.toBob(),
+        real: motivo.real.toBob(),
+        diferencia: motivo.diferencia.toBob(),
+      };
+    case 'DESCUADRE':
+      return { tipo: motivo.tipo, importacionId: motivo.importacionId };
+    case 'HUECO':
+      return { tipo: motivo.tipo, desde: motivo.desde.toIso(), hasta: motivo.hasta.toIso() };
+    case 'DISCONTINUIDAD':
+      return {
+        tipo: motivo.tipo,
+        anteriorId: motivo.anteriorId,
+        siguienteId: motivo.siguienteId,
+        diferencia: motivo.diferencia.toBob(),
+      };
+    case 'RESIDUO_NO_EXPLICADO':
+      return { tipo: motivo.tipo, importe: motivo.importe.toBob() };
+  }
+}
+
+/** También es la respuesta del `POST` de arranque (task 3.8): mismo acto, mismo shape. */
+export function toArranqueAplicadoResponse(arranque: ArranqueAplicadoView): ArranqueAplicadoDto {
+  return {
+    id: arranque.id,
+    fecha: arranque.fecha.toIso(),
+    saldoExtracto: arranque.saldoExtracto.toBob(),
+    saldoLibros: arranque.saldoLibros.toBob(),
+    diferenciaResidual: arranque.diferenciaResidual.toBob(),
+    nota: arranque.nota,
+    declaradoPorUserId: arranque.declaradoPorUserId,
+    declaradoEl: arranque.declaradoEl.toISOString(),
+  };
+}
+
+export function toInformeConciliacionResponse(
+  r: InformeConciliacionResultado,
+): InformeConciliacionResponseDto {
+  return {
+    cuentaBancaria: r.cuentaBancaria,
+    corte: r.corte.toIso(),
+    saldoExtracto: r.saldoExtracto === null ? null : r.saldoExtracto.toBob(),
+    saldoLibros: r.saldoLibros.toBob(),
+    arranque: r.arranque === null ? null : toArranqueAplicadoResponse(r.arranque),
+    partidas:
+      r.partidas === null
+        ? null
+        : {
+            pendientes: {
+              importe: r.partidas.pendientes.importe.toBob(),
+              detalle: r.partidas.pendientes.detalle.map((d) => ({
+                movimientoId: d.movimientoId,
+                fecha: d.fecha.toIso(),
+                importe: d.importe.toBob(),
+                asentadoEl: d.asentadoEl === null ? null : d.asentadoEl.toIso(),
+              })),
+            },
+            ignorados: {
+              importe: r.partidas.ignorados.importe.toBob(),
+              detalle: r.partidas.ignorados.detalle.map((d) => ({
+                movimientoId: d.movimientoId,
+                fecha: d.fecha.toIso(),
+                importe: d.importe.toBob(),
+              })),
+            },
+            enTransito: {
+              importe: r.partidas.enTransito.importe.toBob(),
+              detalle: r.partidas.enTransito.detalle.map((d) => ({
+                comprobanteId: d.comprobanteId,
+                orden: d.orden,
+                fecha: d.fecha.toIso(),
+                importe: d.importe.toBob(),
+                registradoPorBancoEl:
+                  d.registradoPorBancoEl === null ? null : d.registradoPorBancoEl.toIso(),
+              })),
+            },
+            arranque: {
+              fecha: r.partidas.arranque.fecha.toIso(),
+              importe: r.partidas.arranque.importe.toBob(),
+            },
+          },
+    residuo: r.residuo === null ? null : r.residuo.toBob(),
+    confiabilidad: {
+      conciliado: r.confiabilidad.conciliado,
+      motivos: r.confiabilidad.motivos.map(aMotivoDto),
+    },
+    insumos: {
+      importaciones: r.insumos.importaciones.map((i) => ({
+        id: i.id,
+        fechaDesde: i.fechaDesde.toIso(),
+        fechaHasta: i.fechaHasta.toIso(),
+        estadoVerificacion: i.estadoVerificacion,
+      })),
+    },
+  };
+}

@@ -472,6 +472,20 @@ es `OWNER | ADMIN` por membership, no a nivel de `User`.
 
 ---
 
+### 3.7 Huecos de borde en la integridad de extractos (change `informe-conciliacion-bancaria`)
+
+**Abierto por este change:**
+- **`detectarHuecos` solo ve huecos ENTRE importaciones.** Un tramo sin cubrir **entre el punto de arranque declarado y la primera importación** no se nombra: no hay una importación "anterior" contra la cual detectar la discontinuidad, así que el hueco inicial es invisible para la sección `confiabilidad` del informe. El mismo razonamiento aplica al borde final (entre la última importación y el corte pedido). Es comportamiento **heredado** del PR 2 de integridad, no introducido por el informe — ampliarlo habría metido scope a un PR que ya era grande.
+- **Por qué importa**: el informe se emite igual y la aritmética cierra o expone residuo, así que no hay resultado incorrecto. Lo que falta es la ADVERTENCIA: el usuario no recibe la señal de que el período que está mirando arranca sobre datos que ningún extracto cubrió. Es exactamente la clase de ceguera que el PR 2 existió para eliminar, aplicada a los bordes en vez del medio.
+- **Forma probable del fix**: comparar la cobertura agregada contra la ventana `arranque.fecha < fecha <= corte` y emitir un motivo nuevo (`HUECO_INICIAL` / `HUECO_FINAL`) cuando los extremos no queden cubiertos. La pieza de dominio (`cobertura-extracto.ts`, `detectarHuecos`) ya tiene los insumos; es un cálculo de bordes, no un modelo nuevo.
+- **Trigger**: primer reporte de un contador que declara un arranque y consulta un corte sin haber importado el tramo inicial — o antes, si se decide cerrar la ceguera completa de una vez.
+
+**Menor, del mismo change:**
+- La atribución del historial de arranques muestra `declaradoPorUserId` **crudo**: el DTO no trae el nombre y resolverlo exigiría un cruce hacia `members` con permisos propios. Funcional pero poco amigable. **Trigger**: si el historial se vuelve una pantalla de auditoría de uso frecuente.
+- `vigenteA` desempata por `createdAt` con precisión de milisegundos: dos declaraciones dentro del mismo ms serían ambiguas. Irrelevante para actos humanos; si algún día se declara por lote, sumar `id` al orden.
+
+---
+
 ## 4. Explícitamente fuera de scope
 
 - **permissions**: es un stub intencional (catálogo read-only que expone `common/permisos/catalogo.ts`). No hexagonizar — está bien así.

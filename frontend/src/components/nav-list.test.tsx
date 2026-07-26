@@ -169,6 +169,7 @@ describe('NAV_SECTIONS — estructura de datos', () => {
       '/movimientos-bancarios',
       '/conciliacion',
       '/settings/cuentas-bancarias',
+      '/conciliacion/informe',
       '/plan-cuentas',
       '/contactos',
       '/documentos-fisicos',
@@ -856,6 +857,56 @@ describe('NAV_ITEMS — primer ítem de pack de dominio (REQ-SB-10, conciliació
   });
 });
 
+// Task 3.12 (change informe-conciliacion-bancaria): "Informe de conciliación"
+// es la 4ª pantalla del pack en el grupo Bancos — misma cascada AND fail-closed
+// permiso ∧ vertical ∧ pack que el resto del grupo, sin código nuevo en NavList.
+describe('NAV_ITEMS — Informe de conciliación (task 3.12, informe)', () => {
+  it('el ítem "Informe de conciliación" declara pack, requiredPermission y vertical', () => {
+    const item = NAV_ITEMS.find((i) => i.to === '/conciliacion/informe');
+    expect(item).toBeDefined();
+    expect(item?.label).toBe('Informe de conciliación');
+    expect(item?.pack).toBe('contabilidad.conciliacion');
+    expect(item?.requiredPermission).toBe('contabilidad.conciliacion.read');
+    expect(item?.vertical).toBe('CONTABILIDAD');
+  });
+
+  it('pack activo + permiso + vertical CONTABILIDAD: el ítem está visible', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getAllByText('Informe de conciliación').length).toBeGreaterThan(0);
+  });
+
+  it('sin el pack activo: el ítem está oculto', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.conciliacion.read'] });
+    mockVertical('CONTABILIDAD');
+    mockPacks([]);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Informe de conciliación')).not.toBeInTheDocument();
+  });
+
+  it('sin el permiso .read (con pack activo): el ítem está oculto', () => {
+    mockPermissions({ allowedPermissions: [] });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Informe de conciliación')).not.toBeInTheDocument();
+  });
+});
+
 // REQ-VMB-14 (change verificador-movimientos-bancarios): "Movimientos
 // bancarios" vive en Contabilidad con la MISMA cascada permiso ∧ pack que
 // Conciliación bancaria — sin cualquiera de los dos, oculto (fail-closed).
@@ -940,11 +991,12 @@ describe('NAV_SECTIONS — subgrupos colapsables', () => {
     expect((c?.trailingItems ?? []).map((i) => i.to)).toEqual(['/gestiones/cierre']);
   });
 
-  it('el grupo Bancos agrupa las 3 pantallas del pack de conciliación', () => {
+  it('el grupo Bancos agrupa las 4 pantallas del pack de conciliación', () => {
     expect(grupo('contabilidad', 'bancos')?.items.map((i) => i.to)).toEqual([
       '/movimientos-bancarios',
       '/conciliacion',
       '/settings/cuentas-bancarias',
+      '/conciliacion/informe',
     ]);
   });
 

@@ -86,6 +86,21 @@ export class PrismaMatchConciliacionRepository extends MatchConciliacionReposito
     });
   }
 
+  async listarPorAnclas(
+    tenantId: string,
+    anclas: ReadonlyArray<{ comprobanteId: string; orden: number }>,
+    tx?: Prisma.TransactionClient,
+  ): Promise<MatchConciliacion[]> {
+    if (anclas.length === 0) return [];
+    const client = tx ?? this.prisma;
+    return client.matchConciliacion.findMany({
+      where: {
+        organizationId: tenantId,
+        OR: anclas.map((a) => ({ comprobanteId: a.comprobanteId, orden: a.orden })),
+      },
+    });
+  }
+
   async eliminar(tenantId: string, id: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx ?? this.prisma;
     // deleteMany (no delete) para que el filtro de tenant viaje en el WHERE:

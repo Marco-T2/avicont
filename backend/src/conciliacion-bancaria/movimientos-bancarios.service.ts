@@ -19,6 +19,7 @@ import {
   MovimientoBancarioNoEncontradoError,
   MovimientoYaConciliadoError,
 } from './domain/conciliacion-errors';
+import { derivarEstadoEfectivoMovimiento } from './domain/estado-efectivo';
 import { normalizarDescripcion } from './domain/normalizar-descripcion';
 import type { MotivoVinculoRoto } from './domain/verificar-anclas';
 import { verificarAnclas } from './domain/verificar-anclas';
@@ -371,15 +372,6 @@ export class MovimientosBancariosService {
     mov: MovimientoBancario,
     vinculo: VinculoView | null,
   ): MovimientoVerificadorView {
-    // Misma regla que el workspace (REQ-VMB-06): un vínculo VÁLIDO manda; roto
-    // o sin match ⇒ IGNORADO si la columna lo dice, si no PENDIENTE.
-    const estadoEfectivo =
-      vinculo !== null && vinculo.roto === null
-        ? ('CONCILIADO' as const)
-        : mov.estado === 'IGNORADO'
-          ? ('IGNORADO' as const)
-          : ('PENDIENTE' as const);
-
     return {
       id: mov.id,
       fecha: FechaContable.fromDbDate(mov.fecha).toIso(),
@@ -391,7 +383,9 @@ export class MovimientosBancariosService {
       referencia: mov.referencia,
       saldo: mov.saldo === null ? null : Money.of(mov.saldo).toBob(),
       estado: mov.estado,
-      estadoEfectivo,
+      // REQ-VMB-06: misma función de dominio que el workspace (design D4) —
+      // divergencia imposible por construcción, no por disciplina.
+      estadoEfectivo: derivarEstadoEfectivoMovimiento(mov.estado, vinculo),
       vinculo,
       cuentaBancariaId: mov.cuentaBancariaId,
       ordenFisico: mov.ordenFisico,

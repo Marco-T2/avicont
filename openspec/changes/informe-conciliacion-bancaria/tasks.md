@@ -35,6 +35,11 @@ Sin migración, solo lectura. **Prerrequisito de credibilidad del PR 3.**
       discontinuidad contra el extracto siguiente **sí** lo detecta.
 - [x] 2.3 Cablear `detectarHuecos` + continuidad para una cuenta bancaria y
       exponerlos. Ninguna importación se rechaza: advierte. E2E de ambos.
+      _Cierre W1 del verify: el alcance de test prometido (caminos NO vacíos
+      por service y endpoint — hueco, discontinuidad, mixto, contigüidad,
+      tenant) quedó cerrado en `integridad-extractos.service.integration.spec.ts`
+      + `test/conciliacion-integridad.e2e-spec.ts`, validado por mutación
+      (swap `saldoInicial`/`saldoFinal` en el mapeo del service)._
 
 ---
 
@@ -44,48 +49,69 @@ Migración **aditiva**, sin backfill.
 
 ### Fundación
 
-- [ ] 3.1 `schema.prisma`: modelo `ArranqueConciliado` + migración aditiva.
+- [x] 3.1 `schema.prisma`: modelo `ArranqueConciliado` + migración aditiva.
       **Sin `@@unique(cuenta, fecha)`** — append-only.
       `@@index([organizationId, cuentaBancariaId, fecha])`.
-- [ ] 3.2 `ports/arranque-conciliado.repository.port.ts` + adapter:
+- [x] 3.2 `ports/arranque-conciliado.repository.port.ts` + adapter:
       `vigenteA(corte)` (`fecha <= corte ORDER BY fecha DESC, createdAt DESC
       LIMIT 1`), `listarHistorial`, `crear`. Integración: aislamiento por
       tenant; una declaración posterior no borra la anterior.
-- [ ] 3.3 `lineas-cuenta-reader.port.ts`: `sumarPorCuentaHasta` + adapter con
+- [x] 3.3 `lineas-cuenta-reader.port.ts`: `sumarPorCuentaHasta` + adapter con
       `aggregate({_sum})` (**no** `$queryRaw`). `organizationId` en la línea Y
       en el comprobante. Documentar por qué se amplía la "superficie mínima".
       Integración: `BORRADOR` y anulados excluidos.
 
 ### Dominio
 
-- [ ] 3.4 Extraer `domain/estado-efectivo.ts` desde `conciliacion.service.ts`
+- [x] 3.4 Extraer `domain/estado-efectivo.ts` desde `conciliacion.service.ts`
       y hacer que el workspace lo consuma. **Refactor puro: la suite existente
       debe quedar intacta, sin cambiar comportamiento observable.**
-- [ ] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de
+      _Follow-up (D4, aprobado por Marco): el verificador también consume la
+      función de dominio — copia duplicada eliminada de
+      `movimientos-bancarios.service.ts`._
+- [x] 3.5 `domain/armar-informe.ts`: la identidad, pura y sin I/O. Tests de
       `IGNORADO` con nombre propio, residuo ≠ 0 expuesto sin absorber, y
       diferencia permanente de período cerrado.
+      _Clasificación RELATIVA AL CORTE: un CONCILIADO con asiento posterior
+      al corte sigue siendo partida en ese corte (`asentadoEl`), y la línea
+      conciliada con movimiento posterior sigue en tránsito
+      (`registradoPorBancoEl`). Convención fijada:
+      `diferenciaResidual = saldoExtracto − saldoLibros` al arranque._
 
 ### Servicio y HTTP
 
-- [ ] 3.6 `informe-conciliacion.service.ts`: orquesta reutilizando
+- [x] 3.6 `informe-conciliacion.service.ts`: orquesta reutilizando
       `saldosVigentes` (ya existe). Ventana acotada a
       `arranque.fecha < fecha <= corte`; **sin arranque ⇒ informe abstenido**.
       Cuenta no BOB ⇒ `CONCILIACION_MONEDA_NO_SOPORTADA`.
-- [ ] 3.7 Propagar la abstención: sección `confiabilidad` del DTO con
+- [x] 3.7 Propagar la abstención: sección `confiabilidad` del DTO con
       `conciliado: boolean` + motivos (descuadre, hueco, discontinuidad). El
       informe **siempre se emite**. Montos como STRING (§4.5).
-- [ ] 3.8 `informe-conciliacion.controller.ts`: `GET` informe (`read`) y `POST`
+      _Alcance agregado tras el primer smoke (hallazgo W3, lado BANCO): motivo
+      `ARRANQUE_EXTRACTO_NO_COINCIDE` — el `saldoExtracto` DECLARADO en el
+      arranque vigente se contrasta contra el saldo REAL del extracto a la
+      fecha del arranque (`saldosVigentes` con esa fecha; la MISMA tolerancia
+      que la continuidad entre extractos). Lleva `fecha`, `declarado`, `real`
+      y `diferencia` (siempre positiva) y hace `conciliado: false` aun con
+      residuo 0.00. Sin saldo real (`null`) no se emite — un null nunca
+      acusa. Pendiente al archivar: reflejar este motivo en la spec viva
+      (REQ-ICB-05/06). El lado LIBROS (`arranque.saldoLibros`) sigue SIN
+      contraste — queda para su change propio._
+- [x] 3.8 `informe-conciliacion.controller.ts`: `GET` informe (`read`) y `POST`
       arranque (`conciliar`). E2E: 404 cross-tenant; `read` sin `conciliar` ve
       el informe y no puede declarar; **el `GET` no crea arranque**.
+      _Alcance agregado (omisión del desglose, habilita 3.11): `GET
+      /conciliacion/arranques` (`read`) expone `listarHistorial` — orden
+      `fecha DESC, createdAt DESC`, el mismo desempate que `vigenteA`._
 
 ### Frontend
 
-- [ ] 3.9 `features/informe-conciliacion/`: hook TanStack Query + ruta.
-- [ ] 3.10 Vista del puente como **papel de trabajo** (no una tabla más):
+- [x] 3.9 `features/informe-conciliacion/`: hook TanStack Query + ruta.
+- [x] 3.10 Vista del puente como **papel de trabajo** (no una tabla más):
       ambos saldos, partidas con signo, residuo destacado y la abstención
       visible cuando corresponda.
-- [ ] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
-- [ ] 3.12 `nav-items.ts`: 4º ítem en el grupo `bancos` con
+- [x] 3.11 Declaración de arranque + historial completo señalando cuál aplica.
+- [x] 3.12 `nav-items.ts`: 4º ítem en el grupo `bancos` con
       `pack: 'contabilidad.conciliacion'`. Actualizar `nav-list.test.tsx`
       (guard bidireccional).
 
@@ -93,5 +119,5 @@ Migración **aditiva**, sin backfill.
 
 ## Cierre
 
-- [ ] 4.1 Fila de changelog en `CLAUDE.md`; revisar si corresponde tocar
+- [x] 4.1 Fila de changelog en `CLAUDE.md`; revisar si corresponde tocar
       `docs/deudas-arquitecturales.md`.

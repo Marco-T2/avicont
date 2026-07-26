@@ -10,6 +10,7 @@ import {
   Boxes,
   Building2,
   CalendarRange,
+  ClipboardCheck,
   ClipboardList,
   Columns3,
   Contact,
@@ -251,6 +252,17 @@ export const NAV_SECTIONS: NavSection[] = [
             to: '/settings/cuentas-bancarias',
             label: 'Cuentas bancarias',
             icon: Wallet,
+            requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
+            vertical: 'CONTABILIDAD',
+            pack: 'contabilidad.conciliacion',
+          },
+          // REQ-ICB-01..09: el puente saldo extracto ± partidas = saldo libros
+          // como papel de trabajo. Consultar es lectura (D7) — misma cascada
+          // permiso ∧ vertical ∧ pack que el resto del grupo.
+          {
+            to: '/conciliacion/informe',
+            label: 'Informe de conciliación',
+            icon: ClipboardCheck,
             requiredPermission: PERMISSIONS.contabilidad.conciliacion.read,
             vertical: 'CONTABILIDAD',
             pack: 'contabilidad.conciliacion',

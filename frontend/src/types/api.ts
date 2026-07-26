@@ -497,6 +497,46 @@ export type AdvertenciaImportacion = Schemas['AdvertenciaImportacionDto'];
 export type EstadoVerificacionExtracto = ImportacionExtracto['estadoVerificacion'];
 
 // ============================================================
+// Conciliación bancaria — Informe (informe-conciliacion-bancaria)
+// ============================================================
+
+/**
+ * REQ-ICB-04/05: la ABSTENCIÓN es una respuesta VÁLIDA (200), no un error —
+ * sin arranque declarado `arranque`, `partidas` y `residuo` vienen `null`,
+ * los saldos vienen igual y `confiabilidad.motivos` incluye `SIN_ARRANQUE`.
+ */
+export type InformeConciliacion = Schemas['InformeConciliacionResponseDto'];
+
+export type CuentaBancariaInforme = Schemas['CuentaBancariaInformeDto'];
+
+/** Declaración de arranque (REQ-ICB-04): también es la respuesta del POST. */
+export type ArranqueAplicado = Schemas['ArranqueAplicadoDto'];
+
+export type PartidasInforme = Schemas['PartidasInformeDto'];
+
+/**
+ * Clase APLANADA con opcionales por tipo (swagger no soporta uniones
+ * discriminadas): el consumidor DEBE discriminar por `tipo` — p. ej. `desde`/
+ * `hasta` solo viajan en `HUECO`, `importe` solo en `RESIDUO_NO_EXPLICADO`.
+ */
+export type MotivoNoConciliado = Schemas['MotivoNoConciliadoDto'];
+
+export type TipoMotivoNoConciliado = MotivoNoConciliado['tipo'];
+
+export type ConfiabilidadInforme = Schemas['ConfiabilidadInformeDto'];
+
+export type InsumosInforme = Schemas['InsumosInformeDto'];
+
+export type DeclararArranqueRequest = Schemas['DeclararArranqueDto'];
+
+// Query params de GET /api/conciliacion/informe (client-only).
+export interface InformeConciliacionParams {
+  cuentaBancariaId: string;
+  /** `YYYY-MM-DD`, inclusive (§4.6). */
+  corte: string;
+}
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

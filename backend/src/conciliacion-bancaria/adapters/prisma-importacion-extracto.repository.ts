@@ -70,6 +70,7 @@ export class PrismaImportacionExtractoRepository extends ImportacionExtractoRepo
         fechaHasta: true,
         saldoInicial: true,
         saldoFinal: true,
+        estadoVerificacion: true,
       },
       orderBy: { fechaDesde: 'asc' },
     });

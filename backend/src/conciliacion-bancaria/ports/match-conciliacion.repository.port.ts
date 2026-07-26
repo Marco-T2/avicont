@@ -4,6 +4,8 @@
 
 import type { LadoContable, MatchConciliacion, Moneda, Prisma } from '@prisma/client';
 
+import type { AnclaLinea } from '@/comprobantes/ports/lineas-cuenta-reader.port';
+
 export const MATCH_CONCILIACION_REPOSITORY_PORT = Symbol('MATCH_CONCILIACION_REPOSITORY_PORT');
 
 /**
@@ -72,6 +74,20 @@ export abstract class MatchConciliacionRepositoryPort {
   abstract listarPorMovimientos(
     tenantId: string,
     movimientoBancarioIds: readonly string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<MatchConciliacion[]>;
+
+  /**
+   * Matches que reclaman un conjunto de anclas `(comprobanteId, orden)` — una
+   * sola query; `[]` si la lista viene vacía. Existe para el INFORME de
+   * conciliación (task 3.6): una línea de la ventana puede estar reclamada por
+   * un movimiento FUERA de ella (posterior al corte, o absorbido en el
+   * arranque) y `listarPorMovimientos` jamás traería ese match — sin él la
+   * línea se clasificaría EN_TRANSITO y la identidad mentiría.
+   */
+  abstract listarPorAnclas(
+    tenantId: string,
+    anclas: ReadonlyArray<AnclaLinea>,
     tx?: Prisma.TransactionClient,
   ): Promise<MatchConciliacion[]>;
 

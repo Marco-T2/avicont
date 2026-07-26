@@ -112,6 +112,9 @@ export async function cleanupTestData() {
   await prisma.matchConciliacion.deleteMany({});
   await prisma.movimientoBancario.deleteMany({});
   await prisma.importacionExtracto.deleteMany({});
+  // ArranqueConciliado (informe-conciliacion-bancaria, task 3.8): FK Restrict
+  // hacia CuentaBancaria — debe borrarse ANTES de `cuentaBancaria.deleteMany`.
+  await prisma.arranqueConciliado.deleteMany({});
   await prisma.cuentaBancaria.deleteMany({});
   await prisma.cuenta.deleteMany({});
   // Granja (v1): los 4 modelos cascadean desde Organization, así que borrar la
