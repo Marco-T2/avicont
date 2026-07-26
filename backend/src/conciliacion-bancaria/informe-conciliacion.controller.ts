@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -16,6 +26,7 @@ import { PackEnabledGuard } from '@/common/guards/pack-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
+import { AnularArranqueDto } from './dto/anular-arranque.dto';
 import { CandidatosArranqueQueryDto } from './dto/candidatos-arranque-query.dto';
 import { DeclararArranqueDto } from './dto/declarar-arranque.dto';
 import { HistorialArranquesQueryDto } from './dto/historial-arranques-query.dto';
@@ -152,5 +163,33 @@ export class InformeConciliacionController {
       referenciasPartidas: dto.referenciasPartidas,
     });
     return toArranqueAplicadoResponse(declarado);
+  }
+
+  @Post('arranques/:id/anular')
+  @RequirePermissions('contabilidad.conciliacion.conciliar')
+  @ApiOperation({
+    summary: 'Anula una declaración de arranque: deja de aplicar, pero no se borra ni se oculta.',
+    description:
+      'Marca, jamás DELETE (§4.7): el acto anulado sigue en el historial con su motivo y su ' +
+      'autor. El informe pasa a usar la declaración anterior, o se emite ABSTENIDO si no ' +
+      'queda ninguna. Es la salida que faltaba: "corregir declarando otra" solo funciona si ' +
+      'el error NO fue la fecha — declarada una al 31/12 por equivocación, ninguna anterior ' +
+      'puede ganarle a `vigenteA`. Mismo permiso que declarar: deshacer el punto de partida ' +
+      'pesa tanto como fijarlo.',
+  })
+  @ApiOkResponse({ type: ArranqueAplicadoDto })
+  async anularArranque(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AnularArranqueDto,
+  ): Promise<ArranqueAplicadoDto> {
+    const anulado = await this.informe.anularArranque(
+      resolveTenantId(req),
+      req.user.sub,
+      dto.cuentaBancariaId,
+      id,
+      dto.motivo,
+    );
+    return toArranqueAplicadoResponse(anulado);
   }
 }

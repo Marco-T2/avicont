@@ -3,9 +3,13 @@
 // tenantId.
 //
 // El arranque es un ACTO append-only: se declara, jamás se edita ni se borra.
-// Por eso la superficie es crear + dos lecturas — no hay update ni delete a
-// propósito. Una "corrección" es una declaración NUEVA que gana por el
-// desempate de `vigenteA`, con la anterior intacta y auditable.
+// La única mutación es ANULAR, y no borra nada — marca (§4.7): el acto se
+// conserva y sigue visible en el historial.
+//
+// Por qué hizo falta: "corregir declarando otra" solo funciona si el error NO
+// fue la fecha. Declarada una al 31/12 por error, ninguna anterior puede
+// ganarle a `vigenteA`, y la cuenta se queda con un punto de partida falso
+// para siempre.
 
 import type {
   ArranqueConciliado,
@@ -95,6 +99,23 @@ export abstract class ArranqueConciliadoRepositoryPort {
    * lo decide el caller contra los matches actuales: acá solo se devuelve lo
    * que se declaró, sin interpretarlo.
    */
+  /**
+   * Marca una declaración como ANULADA (§4.7: flag, nunca DELETE). Deja de
+   * aplicar en `vigenteA` y sigue apareciendo en el historial con su marca,
+   * su motivo y su autor.
+   *
+   * Devuelve `null` si la declaración no existe, es de otro tenant o YA estaba
+   * anulada — el caller decide si eso es 404 o conflicto. Anular es idempotente
+   * en el dato pero NO en la auditoría: re-anular pisaría el motivo y el autor
+   * originales, así que se rechaza.
+   */
+  abstract anular(
+    tenantId: string,
+    arranqueId: string,
+    data: { motivo: string; anuladoPorUserId: string; fechaAnulacion: Date },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranqueConciliado | null>;
+
   abstract listarPartidasAbiertas(
     tenantId: string,
     arranqueId: string,

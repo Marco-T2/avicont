@@ -6286,6 +6286,53 @@
         ]
       }
     },
+    "/api/conciliacion/arranques/{id}/anular": {
+      "post": {
+        "description": "Marca, jamás DELETE (§4.7): el acto anulado sigue en el historial con su motivo y su autor. El informe pasa a usar la declaración anterior, o se emite ABSTENIDO si no queda ninguna. Es la salida que faltaba: \"corregir declarando otra\" solo funciona si el error NO fue la fecha — declarada una al 31/12 por equivocación, ninguna anterior puede ganarle a `vigenteA`. Mismo permiso que declarar: deshacer el punto de partida pesa tanto como fijarlo.",
+        "operationId": "InformeConciliacionController_anularArranque",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularArranqueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArranqueAplicadoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Anula una declaración de arranque: deja de aplicar, pero no se borra ni se oculta.",
+        "tags": [
+          "Conciliación bancaria — Informe"
+        ]
+      }
+    },
     "/api/movimientos-bancarios": {
       "get": {
         "description": "Herramienta de APOYO, no limitante: sin filtro `estado` nada se esconde (REQ-VMB-02). Es LECTURA PURA — nunca escribe, ni siquiera para \"curar\" un vínculo roto (REQ-VMB-06).",
@@ -11919,6 +11966,28 @@
           "declaradoEl": {
             "type": "string",
             "example": "2026-07-01T12:00:00.000Z"
+          },
+          "anulado": {
+            "type": "boolean",
+            "description": "true ⇒ la declaración fue ANULADA: dejó de aplicar, pero no se borró ni se oculta (§4.7). Que alguien haya fijado mal el punto de partida es parte del rastro."
+          },
+          "motivoAnulacion": {
+            "type": "string",
+            "nullable": true
+          },
+          "anuladoPorUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "anuladoPorNombre": {
+            "type": "string",
+            "nullable": true,
+            "example": "Marco Tarqui"
+          },
+          "anuladoEl": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-07-26T18:00:00.000Z"
           }
         },
         "required": [
@@ -11930,7 +11999,12 @@
           "nota",
           "declaradoPorUserId",
           "declaradoPorNombre",
-          "declaradoEl"
+          "declaradoEl",
+          "anulado",
+          "motivoAnulacion",
+          "anuladoPorUserId",
+          "anuladoPorNombre",
+          "anuladoEl"
         ]
       },
       "DetalleMovimientoPendienteDto": {
@@ -12435,6 +12509,25 @@
           "saldoLibros",
           "diferenciaResidual",
           "referenciasPartidas"
+        ]
+      },
+      "AnularArranqueDto": {
+        "type": "object",
+        "properties": {
+          "cuentaBancariaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 500,
+            "example": "Se declaró con la fecha del cierre siguiente por error de carga"
+          }
+        },
+        "required": [
+          "cuentaBancariaId",
+          "motivo"
         ]
       },
       "MovimientoVerificadorDto": {

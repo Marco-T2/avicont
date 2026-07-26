@@ -29,6 +29,11 @@ function resultadoCompleto(): InformeConciliacionResultado {
       declaradoPorNombre: 'Marco Tarqui',
       declaradoPorUserId: 'user-1',
       declaradoEl: new Date('2026-07-01T12:00:00.000Z'),
+      anulado: false,
+      motivoAnulacion: null,
+      anuladoPorUserId: null,
+      anuladoPorNombre: null,
+      anuladoEl: null,
     },
     partidas: {
       pendientes: {
@@ -120,6 +125,11 @@ describe('toInformeConciliacionResponse (§4.5: montos como STRING)', () => {
       // El acto viaja ATRIBUIDO a una persona (REQ-ICB-04), no a un UUID.
       declaradoPorNombre: 'Marco Tarqui',
       declaradoEl: '2026-07-01T12:00:00.000Z',
+      anulado: false,
+      motivoAnulacion: null,
+      anuladoPorUserId: null,
+      anuladoPorNombre: null,
+      anuladoEl: null,
     });
 
     // La partida de arranque conserva la contribución −residual: si el DTO

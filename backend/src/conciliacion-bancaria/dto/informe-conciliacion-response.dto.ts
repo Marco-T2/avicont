@@ -56,6 +56,18 @@ export class ArranqueAplicadoDto {
   })
   declaradoPorNombre!: string | null;
   @ApiProperty({ example: '2026-07-01T12:00:00.000Z' }) declaradoEl!: string;
+  @ApiProperty({
+    description:
+      'true ⇒ la declaración fue ANULADA: dejó de aplicar, pero no se borró ni se oculta ' +
+      '(§4.7). Que alguien haya fijado mal el punto de partida es parte del rastro.',
+  })
+  anulado!: boolean;
+  @ApiProperty({ type: String, nullable: true }) motivoAnulacion!: string | null;
+  @ApiProperty({ type: String, nullable: true }) anuladoPorUserId!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: 'Marco Tarqui' })
+  anuladoPorNombre!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '2026-07-26T18:00:00.000Z' })
+  anuladoEl!: string | null;
 }
 
 export class DetalleMovimientoPendienteDto {
@@ -348,6 +360,11 @@ export function toArranqueAplicadoResponse(arranque: ArranqueAplicadoView): Arra
     declaradoPorUserId: arranque.declaradoPorUserId,
     declaradoPorNombre: arranque.declaradoPorNombre,
     declaradoEl: arranque.declaradoEl.toISOString(),
+    anulado: arranque.anulado,
+    motivoAnulacion: arranque.motivoAnulacion,
+    anuladoPorUserId: arranque.anuladoPorUserId,
+    anuladoPorNombre: arranque.anuladoPorNombre,
+    anuladoEl: arranque.anuladoEl === null ? null : arranque.anuladoEl.toISOString(),
   };
 }
 

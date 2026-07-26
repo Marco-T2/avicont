@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { nombreDelDeclarante } from '../lib/declarante';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
@@ -7,12 +10,16 @@ import { cn } from '@/lib/utils';
 import type { ArranqueAplicado } from '@/types/api';
 
 import { idArranqueVigente } from '../lib/arranque-vigente';
+import { AnularArranqueDialog } from './anular-arranque-dialog';
 
 interface HistorialArranquesProps {
   /** Ya ordenado por el backend (`fecha DESC, createdAt DESC`) — no re-ordenar. */
   historial: ArranqueAplicado[];
   corte: string;
   isLoading: boolean;
+  cuentaBancariaId: string;
+  /** Sin `conciliar` se ve el historial completo pero no se anula nada (D7). */
+  puedeConciliar: boolean;
 }
 
 /**
@@ -26,7 +33,10 @@ export function HistorialArranques({
   historial,
   corte,
   isLoading,
+  cuentaBancariaId,
+  puedeConciliar,
 }: HistorialArranquesProps): React.JSX.Element {
+  const [aAnular, setAAnular] = useState<ArranqueAplicado | null>(null);
   if (isLoading && historial.length === 0) {
     return (
       <div className="space-y-2">
@@ -60,11 +70,41 @@ export function HistorialArranques({
         {historial.map((a) => {
           const aplica = a.id === vigenteId;
           return (
-            <li key={a.id} className={cn('space-y-1 px-4 py-3', aplica && 'bg-accent/50')}>
+            <li
+              key={a.id}
+              className={cn(
+                'space-y-1 px-4 py-3',
+                aplica && 'bg-accent/50',
+                // Anulada: se atenúa pero NO se esconde (§4.7) — que alguien
+                // haya fijado mal el punto de partida es parte del rastro.
+                a.anulado && 'opacity-60',
+              )}
+            >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium tabular-nums">
+                <span
+                  className={cn(
+                    'text-sm font-medium tabular-nums',
+                    a.anulado && 'line-through',
+                  )}
+                >
                   {formatearFechaContable(a.fecha)}
                 </span>
+                {a.anulado && (
+                  <Badge variant="outline" className="font-normal text-destructive">
+                    Anulada
+                  </Badge>
+                )}
+                {puedeConciliar && !a.anulado && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 px-2 text-xs"
+                    onClick={() => setAAnular(a)}
+                  >
+                    Anular
+                  </Button>
+                )}
                 {aplica && (
                   <Badge
                     variant="outline"
@@ -101,10 +141,29 @@ export function HistorialArranques({
                 Declarada el {formatearFechaContable(a.declaradoEl.slice(0, 10))} por{' '}
                 {nombreDelDeclarante(a.declaradoPorNombre)}.
               </p>
+              {a.anulado && (
+                <p className="text-xs text-destructive">
+                  Anulada
+                  {a.anuladoEl !== null
+                    ? ` el ${formatearFechaContable(a.anuladoEl.slice(0, 10))}`
+                    : ''}{' '}
+                  por {nombreDelDeclarante(a.anuladoPorNombre)}
+                  {a.motivoAnulacion !== null ? `: ${a.motivoAnulacion}` : ''}.
+                </p>
+              )}
             </li>
           );
         })}
       </ul>
+
+      {/* `key` por declaración: remonta el diálogo, así el motivo arranca en
+          blanco sin sincronizar estado en un efecto. */}
+      <AnularArranqueDialog
+        key={aAnular?.id ?? 'ninguna'}
+        arranque={aAnular}
+        cuentaBancariaId={cuentaBancariaId}
+        onClose={() => setAAnular(null)}
+      />
     </div>
   );
 }

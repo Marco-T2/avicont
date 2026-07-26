@@ -18,6 +18,9 @@ vi.mock('../hooks/use-historial-arranques', () => ({
   useHistorialArranques: vi.fn(),
 }));
 
+vi.mock('../hooks/use-anular-arranque', () => ({
+  useAnularArranque: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 vi.mock('../hooks/use-candidatos-arranque', () => ({
   useCandidatosArranque: vi.fn(() => ({ data: [], isPending: false, isError: false })),
 }));
@@ -81,6 +84,11 @@ const INFORME: InformeConciliacion = {
     nota: null,
     declaradoPorUserId: 'user-9',
     declaradoPorNombre: 'Marco Tarqui',
+    anulado: false,
+    motivoAnulacion: null,
+    anuladoPorUserId: null,
+    anuladoPorNombre: null,
+    anuladoEl: null,
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
   partidas: {
@@ -163,6 +171,11 @@ const HISTORIAL: ArranqueAplicado[] = [
     nota: null,
     declaradoPorUserId: 'user-1',
     declaradoPorNombre: 'Ana Quispe',
+    anulado: false,
+    motivoAnulacion: null,
+    anuladoPorUserId: null,
+    anuladoPorNombre: null,
+    anuladoEl: null,
     declaradoEl: '2027-01-05T10:00:00.000Z',
   },
   {
@@ -174,6 +187,11 @@ const HISTORIAL: ArranqueAplicado[] = [
     nota: null,
     declaradoPorUserId: 'user-9',
     declaradoPorNombre: 'Marco Tarqui',
+    anulado: false,
+    motivoAnulacion: null,
+    anuladoPorUserId: null,
+    anuladoPorNombre: null,
+    anuladoEl: null,
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
 ];

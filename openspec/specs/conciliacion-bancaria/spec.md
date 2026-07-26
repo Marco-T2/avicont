@@ -249,6 +249,10 @@ mismo orden canónico, regenera los mismos ordinales).
 
 ### REQ-CB-08: Checksum por perfil (3 estrategias)
 
+(Previously: el checksum solo devolvía `estadoVerificacion` y `diferencia`;
+los saldos inicial y final se persistían únicamente en la rama `DECLARADO`,
+quedando nulos en los cuatro perfiles `DERIVADO`.)
+
 Cada perfil DEBE declarar su estrategia de verificación de saldo:
 **declarado** (el archivo trae saldo inicial/final en su cabecera — BCP, FIE,
 Económico), **derivado** (se calcula acumulando desde la columna saldo de la
@@ -283,6 +287,19 @@ NO DEBE adivinar el ancla: el checksum queda `SIN_VERIFICAR`. Un "no pude
 verificar" honesto es preferible a un descuadre inventado — la señal de
 descuadre solo sirve si el contador puede confiar en ella.
 
+**La verificación DEBE devolver, además del veredicto, el saldo inicial y el
+saldo final que utilizó**, y la importación DEBE persistir ambos en las **dos**
+estrategias. En `DECLARADO` provienen de la cabecera; en `DERIVADO` son el
+saldo derivado de la fila cronológicamente primera y el saldo corrido de la
+última. Son datos REALES observados del banco, no estimaciones: hoy la rama
+`DERIVADO` los calcula y los descarta, dejándolos nulos en cuatro de siete
+perfiles e impidiendo verificar la continuidad entre importaciones
+(REQ-CB-23) y fijar el punto de arranque del informe de conciliación.
+
+Cuando la estrategia sea `IMPOSIBLE`, cuando la secuencia no sea monótona o
+cuando el dato no exista en el archivo, ambos saldos DEBEN quedar **nulos**.
+El sistema NUNCA DEBE inventar un saldo que no observó.
+
 #### Scenario: Día más antiguo con varios movimientos — el ancla es el cronológicamente primero
 
 - GIVEN un extracto `DERIVADO` cuyo día más antiguo trae tres movimientos, y
@@ -307,6 +324,7 @@ descuadre solo sirve si el contador puede confiar en ella.
 - WHEN se verifica el checksum con estrategia `DERIVADO`
 - THEN el resultado es `SIN_VERIFICAR`
 - AND el sistema NO reporta `DESCUADRE`
+- AND `saldoInicial` y `saldoFinal` quedan nulos
 
 **Un perfil PUEDE declarar verificaciones adicionales más allá de su
 estrategia primaria**, sin que eso cambie su clasificación DECLARADO /
@@ -327,6 +345,7 @@ importación (decisión 3: nada bloqueante).
 - WHEN la suma de movimientos importados reconcilia con el saldo
   inicial/final declarado en el archivo
 - THEN `estadoVerificacion = VERIFICADO`
+- AND `saldoInicial` y `saldoFinal` quedan persistidos
 
 #### Scenario: Perfil con saldo declarado — no cuadra
 
@@ -342,6 +361,15 @@ importación (decisión 3: nada bloqueante).
 - THEN el saldo base se toma de la columna saldo de la fila más antigua del
   rango, y el checksum se deriva acumulando los movimientos desde ahí
 
+#### Scenario: Perfil derivado — ambos saldos quedan persistidos
+
+- GIVEN un perfil con estrategia `DERIVADO` (ej. BMSC) con secuencia monótona
+- WHEN se importa el archivo
+- THEN `saldoInicial` persiste el valor derivado de la fila cronológicamente
+  primera
+- AND `saldoFinal` persiste el saldo corrido de la última fila
+- AND ninguno de los dos queda nulo
+
 #### Scenario: Perfil sin columna de saldo — sin verificar, visible
 
 - GIVEN un perfil con estrategia `IMPOSIBLE` (ningún perfil de v1 cae acá;
@@ -350,23 +378,28 @@ importación (decisión 3: nada bloqueante).
 - THEN `estadoVerificacion = SIN_VERIFICAR`
 - AND la pantalla de importaciones muestra ese estado explícitamente (nunca
   se omite ni se muestra como si hubiera verificado)
+- AND `saldoInicial` y `saldoFinal` quedan nulos
 
-### REQ-CB-09: Detección de huecos de cobertura (capacidad de dominio, DIFERIDA sin endpoint en v1)
+### REQ-CB-09: Detección de huecos de cobertura
 
-**Alcance v1**: esta es una capacidad de **dominio puro**, no una feature
-expuesta. `proposal.md` la deja explícitamente fuera de alcance ("no se
-expone en v1") — v1 NO tiene endpoint ni pantalla que la sirva. El
-requisito normativo es sobre la **función de dominio**, no sobre un
-comportamiento observable por HTTP: no hay nada que un cliente pueda
-"consultar" en v1.
+(Previously: capacidad de dominio DIFERIDA, con prohibición explícita de
+cablearla a ningún endpoint o pantalla en v1.)
 
 A partir de una lista de rangos `(fechaDesde, fechaHasta)` — el mismo dato
-que expone cada `ImportacionExtracto` — el sistema DEBE proveer una
-función de dominio pura (`detectarHuecos`) que identifique los tramos de
-calendario NO cubiertos por ningún rango de la lista. Esta función queda
-lista para ser expuesta en un slice posterior (drawer de historial,
-alertas de importación incompleta), pero **NO DEBE** cablearse a ningún
-endpoint ni pantalla en v1.
+que expone cada `ImportacionExtracto` — el sistema DEBE proveer una función
+de dominio pura (`detectarHuecos`) que identifique los tramos de calendario
+NO cubiertos por ningún rango de la lista.
+
+**Esta capacidad DEBE exponerse.** La versión anterior del requisito la
+dejaba deliberadamente diferida "para un slice posterior (drawer de
+historial, alertas de importación incompleta)"; este change **es** ese slice.
+Los huecos de cobertura de una cuenta bancaria DEBEN quedar disponibles para
+el informe de conciliación, que los usa para abstenerse de afirmar que la
+cuenta está conciliada cuando el calendario tiene tramos sin extracto
+(REQ-ICB-05).
+
+Un hueco de cobertura NO DEBE rechazar ninguna importación: advierte, no
+bloquea.
 
 #### Scenario: Dos rangos dejan un hueco entre ellos
 
@@ -380,6 +413,13 @@ endpoint ni pantalla en v1.
   entre ellos
 - WHEN se invoca `detectarHuecos(rangos)`
 - THEN devuelve una lista vacía de tramos no cubiertos
+
+#### Scenario: Los huecos de una cuenta quedan consultables
+
+- GIVEN una cuenta bancaria con importaciones que dejan un tramo sin cubrir
+- WHEN el informe de conciliación evalúa la cobertura hasta su fecha de corte
+- THEN el tramo faltante está disponible y se nombra en la respuesta
+- AND ninguna importación fue rechazada por ese hueco
 
 ### REQ-CB-10: Verificación del ancla obligatoria en cada lectura
 
@@ -1152,3 +1192,47 @@ deben actualizarse.
   `09:15`, `14:02` y `21:40`, cuyos `id` no siguen ese orden
 - WHEN se consulta el workspace
 - THEN salen ordenados `09:15`, `14:02`, `21:40`
+
+### REQ-CB-23: Continuidad de saldo entre importaciones consecutivas
+
+El sistema DEBE verificar, para importaciones consecutivas de una misma
+cuenta bancaria ordenadas por cobertura, que
+`saldoFinal(n) ≟ saldoInicial(n+1)`. Una discrepancia DEBE registrarse como
+advertencia visible; NO DEBE rechazar la importación.
+
+**Por qué este chequeo es necesario y no redundante con REQ-CB-08:** el
+checksum `DERIVADO` es **ciego a filas borradas de los EXTREMOS** del
+archivo. Deriva el saldo inicial de la primera fila presente y lo compara
+contra el saldo de la última fila presente; si alguien elimina filas del
+comienzo o del final, el subconjunto restante sigue siendo un prefijo o
+sufijo internamente coherente del saldo corrido del banco y la aritmética
+cierra igual — devolviendo `VERIFICADO` sobre un archivo mutilado. Solo el
+borrado del MEDIO produce descuadre. Afecta a los cuatro perfiles `DERIVADO`
+(BancoSol, BMSC, Unión, Fortaleza); los tres `DECLARADO` (BCP, FIE,
+Económico) son inmunes porque la cabecera declara el inicial y el final
+verdaderos. **La continuidad entre importaciones es el único mecanismo que
+detecta esta manipulación.**
+
+Cuando alguno de los dos saldos comparados sea nulo, el sistema NO DEBE
+reportar discontinuidad: sin dato no hay veredicto.
+
+#### Scenario: Se borran las últimas filas de un extracto
+
+- GIVEN una importación `DERIVADO` de julio a la que se le eliminaron las
+  últimas filas antes de subirla, con `estadoVerificacion = VERIFICADO`
+- WHEN se importa el extracto de agosto de la misma cuenta
+- THEN el sistema detecta que `saldoFinal(julio) ≠ saldoInicial(agosto)`
+- AND registra la discontinuidad como advertencia
+- AND la importación de agosto se completa igual
+
+#### Scenario: Importaciones consecutivas que empalman
+
+- GIVEN dos importaciones consecutivas cuyo saldo final e inicial coinciden
+- WHEN se verifica la continuidad
+- THEN no se reporta discontinuidad
+
+#### Scenario: Saldo nulo — sin veredicto
+
+- GIVEN una importación cuyo `saldoFinal` quedó nulo
+- WHEN se verifica la continuidad contra la siguiente
+- THEN NO se reporta discontinuidad

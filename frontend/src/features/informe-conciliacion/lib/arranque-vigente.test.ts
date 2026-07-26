@@ -12,6 +12,11 @@ function arranque(overrides: Partial<ArranqueAplicado> & Pick<ArranqueAplicado, 
     nota: null,
     declaradoPorUserId: 'user-1',
     declaradoPorNombre: 'Ana Quispe',
+    anulado: false,
+    motivoAnulacion: null,
+    anuladoPorUserId: null,
+    anuladoPorNombre: null,
+    anuladoEl: null,
     declaradoEl: '2026-07-01T12:00:00.000Z',
     ...overrides,
   };
@@ -50,5 +55,23 @@ describe('idArranqueVigente — señala cuál declaración aplica (REQ-ICB-04, D
 
   it('sin historial no hay vigente', () => {
     expect(idArranqueVigente([], '2026-07-31')).toBeNull();
+  });
+
+  it('una declaración ANULADA no puede ser la vigente: se saltea, igual que en vigenteA', () => {
+    // Sin este filtro la pantalla marcaría "aplica a este corte" sobre una
+    // declaración que el informe ya no usa, y el usuario leería los números
+    // contra un punto de partida equivocado.
+    const historial = [
+      arranque({ id: 'anulada', fecha: '2026-07-31', anulado: true }),
+      arranque({ id: 'buena', fecha: '2026-06-30' }),
+    ];
+
+    expect(idArranqueVigente(historial, '2026-07-31')).toBe('buena');
+  });
+
+  it('si TODAS las aplicables están anuladas no hay vigente', () => {
+    const historial = [arranque({ id: 'a', fecha: '2026-06-30', anulado: true })];
+
+    expect(idArranqueVigente(historial, '2026-07-31')).toBeNull();
   });
 });

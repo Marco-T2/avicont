@@ -43,3 +43,19 @@ export class PartidasDeArranqueDesconocidasError extends InvalidStateError {
     );
   }
 }
+
+/**
+ * REQ-ICB-04: anular una declaración de arranque es un acto que se registra
+ * UNA vez, con su motivo y su autor. Re-anular pisaría ese rastro, así que el
+ * segundo intento se rechaza en vez de pasar como idempotente.
+ *
+ * Cubre también la carrera: dos anulaciones simultáneas resuelven en el
+ * `updateMany` con predicado `anulado = false`, y la que pierde llega acá.
+ */
+export class ArranqueYaAnuladoError extends InvalidStateError {
+  constructor(arranqueId: string) {
+    super('CONCILIACION_ARRANQUE_YA_ANULADO', 'Esa declaración de arranque ya está anulada', {
+      arranqueId,
+    });
+  }
+}

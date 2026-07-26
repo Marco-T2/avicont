@@ -47,6 +47,32 @@ export class PrismaArranqueConciliadoRepository extends ArranqueConciliadoReposi
     });
   }
 
+  async anular(
+    tenantId: string,
+    arranqueId: string,
+    data: { motivo: string; anuladoPorUserId: string; fechaAnulacion: Date },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranqueConciliado | null> {
+    const client = tx ?? this.prisma;
+    // `updateMany` con el predicado completo —tenant, id y `anulado: false`—
+    // resuelve en UNA sentencia lo que un find+update haría en dos con una
+    // carrera en el medio: dos anulaciones simultáneas no pueden pisarse el
+    // motivo ni el autor.
+    const { count } = await client.arranqueConciliado.updateMany({
+      where: { id: arranqueId, organizationId: tenantId, anulado: false },
+      data: {
+        anulado: true,
+        motivoAnulacion: data.motivo,
+        anuladoPorUserId: data.anuladoPorUserId,
+        fechaAnulacion: data.fechaAnulacion,
+      },
+    });
+    if (count === 0) return null;
+    return client.arranqueConciliado.findFirst({
+      where: { id: arranqueId, organizationId: tenantId },
+    });
+  }
+
   async listarPartidasAbiertas(
     tenantId: string,
     arranqueId: string,
@@ -68,7 +94,14 @@ export class PrismaArranqueConciliadoRepository extends ArranqueConciliadoReposi
     const client = tx ?? this.prisma;
     // `fecha <= corte ORDER BY fecha DESC, createdAt DESC LIMIT 1` (D3/D8).
     return client.arranqueConciliado.findFirst({
-      where: { organizationId: tenantId, cuentaBancariaId, fecha: { lte: corte } },
+      // `anulado: false` — una declaración anulada deja de aplicar, pero NO
+      // desaparece: `listarHistorial` la sigue trayendo con su marca.
+      where: {
+        organizationId: tenantId,
+        cuentaBancariaId,
+        fecha: { lte: corte },
+        anulado: false,
+      },
       orderBy: [{ fecha: 'desc' }, { createdAt: 'desc' }],
     });
   }

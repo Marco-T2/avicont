@@ -237,3 +237,69 @@ todos los casos que intenté romper, la residual se declara y jamás se calcula,
 califica sin suprimir, y las 3 suites + typecheck + lint están en verde medidos acá. Los
 warnings son de cobertura del cableado de integridad (W1), protocolo TDD (W2) y una base
 declarada sin contraste (W3) — ninguno bloquea el PR.
+
+---
+
+## Addendum — auditoría posterior al merge (2026-07-26)
+
+El change se mergeó con este verify-report en verde. Una auditoría completa
+posterior encontró **dos defectos críticos** que esta verificación no vio, y el
+motivo de por qué no los vio importa más que los defectos.
+
+### CRÍTICO 1 — Partidas abiertas anteriores al arranque salían como residuo
+
+La ventana `arranque.fecha < fecha ≤ corte` excluye lo anterior al punto de
+partida. Correcto para lo CERRADO, falso para lo ABIERTO: un cheque girado
+antes del arranque y no cobrado sigue estando en un lado y no en el otro, y
+salía como `RESIDUO_NO_EXPLICADO` — el caso más común de una conciliación
+bancaria, reportado como "no sé qué es esto".
+
+Resuelto en REQ-ICB-10: las partidas abiertas se PROPONEN al declarar y el
+usuario confirma cuáles arrastrar, con verificación aritmética.
+
+### CRÍTICO 2 — El informe violaba REQ-ICB-03, que ya estaba bien escrita
+
+REQ-ICB-03 dice, textual: *"El saldo según libros DEBE obtenerse agregando las
+líneas contables de la cuenta del plan vinculada, en moneda original, hasta la
+fecha de corte"*.
+
+La implementación hacía `arranque.saldoLibros + delta de la ventana`: un número
+tipeado por el usuario más un delta. El e2e insignia lo enshrinaba — con un
+mayor de Bs 420,00 asertaba que el informe dijera Bs 1.420,00.
+
+**Esto no fue un hueco de la spec. La spec estaba bien y el código no la
+cumplía.** Y esta verificación, cuyo trabajo es exactamente contrastar
+implementación contra spec, la dio por cumplida.
+
+### Por qué la verificación no los vio
+
+Los dos defectos viven en la FRONTERA del dominio puro, no adentro. La
+aritmética de `armarInforme` era —y sigue siendo— correcta para los insumos que
+recibe. Lo que estaba mal era qué se le pasaba.
+
+Y ahí ninguna prueba podía verlo, por una razón que conviene dejar escrita:
+
+- Los unit tests **mockean el port**, así que nunca contrastan el saldo
+  declarado contra el mayor.
+- El e2e, que sí podía, **sembró los datos de forma consistente con la
+  declaración** en vez de independiente.
+
+**Un test que construye sus insumos desde la misma premisa que el código no
+puede refutar esa premisa. Puede confirmarla mil veces.**
+
+Regla que queda para los próximos verify: cuando un valor se puede obtener por
+dos caminos (declarado vs. derivado), el test DEBE construir uno y verificar el
+otro. Si los dos salen de la misma fuente, la prueba no prueba nada.
+
+### Hallazgos de producto — del smoke visual, no de la suite
+
+Ninguno era falla de cálculo; los tres son de cómo el sistema le pide las cosas
+a una persona y qué le permite hacer cuando se equivoca:
+
+1. Un campo se guardaba y no se leía nunca (`saldoLibros` declarado).
+2. Las etiquetas pedían un inicio cuando la semántica es un cierre.
+3. No había forma de deshacer una declaración equivocada → REQ-ICB-11.
+
+Un cuarto salió del smoke de esta ronda: la lista de candidatos pide decidir
+sobre un asiento que no se podía ver — el número es ahora un link al
+comprobante.

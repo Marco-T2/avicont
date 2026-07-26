@@ -787,4 +787,123 @@ describe('Conciliación — Informe (e2e)', () => {
     // Nada persistido: o entra el acto entero o no entra.
     expect(await prisma.arranqueConciliado.count()).toBe(0);
   });
+
+  // ==========================================================
+  // REQ-ICB-04 / §4.7 — anular una declaración
+  // ==========================================================
+
+  function anularArranque(token: string, id: string, body: Record<string, unknown>) {
+    return request(app.getHttpServer())
+      .post(`/api/conciliacion/arranques/${id}/anular`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+  }
+
+  it('anular la declaración vigente → el informe vuelve a la anterior y el historial conserva ambas', async () => {
+    const e = await seed();
+
+    // Dos declaraciones: la buena al 30/06 y una equivocada al 31/07 — el caso
+    // que NO tenía salida, porque ninguna anterior puede ganarle a `vigenteA`.
+    await postArranque(e.token, { cuentaBancariaId: e.cuentaBancariaId }).expect(201);
+    const mala = await postArranque(e.token, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      fecha: '2026-07-31',
+      saldoExtracto: '99999.00',
+      saldoLibros: '99999.00',
+    }).expect(201);
+
+    const conMala = await getInforme(e.token, e.cuentaBancariaId);
+    expect(conMala.body.arranque.fecha).toBe('2026-07-31');
+
+    const res = await anularArranque(e.token, mala.body.id, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      motivo: 'Se cargó con la fecha del cierre siguiente por error',
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.anulado).toBe(true);
+    expect(res.body.anuladoPorNombre).not.toBeNull();
+
+    // El informe vuelve a apoyarse en la del 30/06.
+    const despues = await getInforme(e.token, e.cuentaBancariaId);
+    expect(despues.body.arranque.fecha).toBe('2026-06-30');
+
+    // Y NADA se borró: el historial trae las dos, la anulada con su marca.
+    const hist = await request(app.getHttpServer())
+      .get('/api/conciliacion/arranques')
+      .query({ cuentaBancariaId: e.cuentaBancariaId })
+      .set('Authorization', `Bearer ${e.token}`);
+    expect(hist.body).toHaveLength(2);
+    expect(hist.body.find((a: { id: string }) => a.id === mala.body.id)).toMatchObject({
+      anulado: true,
+      motivoAnulacion: 'Se cargó con la fecha del cierre siguiente por error',
+    });
+    expect(await prisma.arranqueConciliado.count()).toBe(2);
+  });
+
+  it('anular la ÚNICA declaración → el informe se emite ABSTENIDO, no rompe', async () => {
+    const e = await seed();
+    const arr = await postArranque(e.token, { cuentaBancariaId: e.cuentaBancariaId }).expect(201);
+
+    await anularArranque(e.token, arr.body.id, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      motivo: 'Punto de partida mal calculado, se rehará',
+    }).expect(201);
+
+    const res = await getInforme(e.token, e.cuentaBancariaId);
+    expect(res.status).toBe(200);
+    expect(res.body.arranque).toBeNull();
+    expect(res.body.confiabilidad.motivos.map((m: { tipo: string }) => m.tipo)).toContain(
+      'SIN_ARRANQUE',
+    );
+  });
+
+  it('re-anular se rechaza: el motivo y el autor originales no se pisan', async () => {
+    const e = await seed();
+    const arr = await postArranque(e.token, { cuentaBancariaId: e.cuentaBancariaId }).expect(201);
+    const body = {
+      cuentaBancariaId: e.cuentaBancariaId,
+      motivo: 'Primera anulación con su motivo real',
+    };
+
+    await anularArranque(e.token, arr.body.id, body).expect(201);
+    const segunda = await anularArranque(e.token, arr.body.id, {
+      ...body,
+      motivo: 'Motivo distinto que NO debe pisar al primero',
+    });
+
+    expect(segunda.status).toBe(422);
+    expect(segunda.body.error.code).toBe('CONCILIACION_ARRANQUE_YA_ANULADO');
+
+    const fila = await prisma.arranqueConciliado.findUniqueOrThrow({ where: { id: arr.body.id } });
+    expect(fila.motivoAnulacion).toBe('Primera anulación con su motivo real');
+  });
+
+  it('un motivo corto o en blanco no alcanza: el rastro sin porqué no sirve', async () => {
+    const e = await seed();
+    const arr = await postArranque(e.token, { cuentaBancariaId: e.cuentaBancariaId }).expect(201);
+
+    for (const motivo of ['error', '              ']) {
+      const res = await anularArranque(e.token, arr.body.id, {
+        cuentaBancariaId: e.cuentaBancariaId,
+        motivo,
+      });
+      expect(res.status).toBe(400);
+    }
+    const fila = await prisma.arranqueConciliado.findUniqueOrThrow({ where: { id: arr.body.id } });
+    expect(fila.anulado).toBe(false);
+  });
+
+  it('read sin conciliar NO puede anular', async () => {
+    const e = await seed();
+    const arr = await postArranque(e.token, { cuentaBancariaId: e.cuentaBancariaId }).expect(201);
+    const lector = await seedMiembro(e.orgId, 'lector-anular', ['contabilidad.conciliacion.read']);
+
+    const res = await anularArranque(lector, arr.body.id, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      motivo: 'Intento sin permiso de conciliar',
+    });
+
+    expect(res.status).toBe(403);
+  });
 });
