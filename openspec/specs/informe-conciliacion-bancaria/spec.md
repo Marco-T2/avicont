@@ -148,6 +148,56 @@ un "no puedo afirmarlo" honesto vale más que una certificación inventada.
 - THEN el tramo faltante se nombra explícitamente
 - AND el informe NO afirma "conciliado"
 
+### REQ-ICB-05c: Los BORDES de la ventana también se nombran
+
+Un hueco se detecta comparando importaciones entre sí, así que los extremos de
+la ventana `arranque.fecha < fecha ≤ corte` son invisibles para esa
+comparación: un tramo sin cubrir antes de la primera importación —o después de
+la última— no tiene un rango "anterior" del cual ser el hueco. El sistema DEBE
+evaluar la cobertura contra la ventana pedida y nombrar cada extremo
+descubierto:
+
+| Motivo | Qué nombra |
+|---|---|
+| `HUECO_INICIAL` | El informe compara sobre días posteriores al arranque que ningún extracto cubrió |
+| `HUECO_FINAL` | La cobertura termina antes del corte: el saldo bancario comparado es anterior a la fecha pedida |
+
+El borde final DEBE advertirse **sin consultar el reloj**: que el tramo todavía
+no haya ocurrido no lo vuelve conciliable, y el saldo mostrado sigue sin ser el
+del día que se pidió.
+
+Sin arranque declarado NO DEBE emitirse ningún motivo de borde: no hay ventana
+que evaluar, y `SIN_ARRANQUE` ya retiene la conclusión.
+
+#### Scenario: La cobertura empieza después del punto de partida
+
+- GIVEN un arranque declarado al 30/06 y un corte al 31/07
+- AND la primera importación arranca el 10/07
+- WHEN se pide el informe
+- THEN aparece `HUECO_INICIAL` del 01/07 al 09/07
+- AND el informe NO afirma "conciliado"
+
+#### Scenario: Solo hay importaciones anteriores al arranque
+
+- GIVEN un arranque al 30/06, un corte al 31/07 y cobertura únicamente de mayo
+- WHEN se pide el informe
+- THEN el saldo según extracto NO es nulo, así que no se emite `SIN_SALDO_EXTRACTO`
+- AND aparece `HUECO_INICIAL` cubriendo la ventana entera — la única señal de
+  que el saldo mostrado es de mayo y no del corte pedido
+
+#### Scenario: La cobertura no llega al corte
+
+- GIVEN cobertura del 01/07 al 25/07 y un corte al 31/07
+- WHEN se pide el informe
+- THEN aparece `HUECO_FINAL` del 26/07 al 31/07
+
+#### Scenario: Sin arranque no se reclama cobertura
+
+- GIVEN una cuenta sin ninguna declaración de arranque vigente
+- WHEN se pide el informe
+- THEN se emite `SIN_ARRANQUE`
+- AND NO se emite `HUECO_INICIAL` ni `HUECO_FINAL`
+
 ### REQ-ICB-05b: El punto de partida declarado se contrasta contra la realidad
 
 Ambos saldos del arranque son DECLARADOS, así que ambos pueden estar mal. El

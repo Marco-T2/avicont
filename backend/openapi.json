@@ -12228,6 +12228,8 @@
               "ARRANQUE_LIBROS_NO_COINCIDE",
               "DESCUADRE",
               "HUECO",
+              "HUECO_INICIAL",
+              "HUECO_FINAL",
               "DISCONTINUIDAD",
               "RESIDUO_NO_EXPLICADO"
             ]
@@ -12239,12 +12241,12 @@
           "desde": {
             "type": "string",
             "example": "2026-07-11",
-            "description": "Solo HUECO."
+            "description": "Solo HUECO, HUECO_INICIAL y HUECO_FINAL."
           },
           "hasta": {
             "type": "string",
             "example": "2026-07-19",
-            "description": "Solo HUECO."
+            "description": "Solo HUECO, HUECO_INICIAL y HUECO_FINAL."
           },
           "anteriorId": {
             "type": "string",

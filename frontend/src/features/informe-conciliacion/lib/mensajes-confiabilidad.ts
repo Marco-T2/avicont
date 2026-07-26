@@ -48,6 +48,18 @@ export function mensajeMotivo(motivo: MotivoNoConciliado): string {
       }
       return 'Falta extracto: hay días sin cobertura antes del corte.';
     }
+    case 'HUECO_INICIAL': {
+      if (motivo.desde !== undefined && motivo.hasta !== undefined) {
+        return `Falta extracto entre el ${formatearFechaContable(motivo.desde)} y el ${formatearFechaContable(motivo.hasta)}: el informe arranca sobre días que ningún extracto cubrió.`;
+      }
+      return 'Falta extracto al inicio: el informe arranca sobre días que ningún extracto cubrió.';
+    }
+    case 'HUECO_FINAL': {
+      if (motivo.desde !== undefined && motivo.hasta !== undefined) {
+        return `Falta extracto entre el ${formatearFechaContable(motivo.desde)} y el ${formatearFechaContable(motivo.hasta)}: la cobertura no llega al corte, así que el saldo bancario que se compara es anterior a la fecha pedida.`;
+      }
+      return 'Falta extracto al cierre: la cobertura no llega al corte, así que el saldo bancario que se compara es anterior a la fecha pedida.';
+    }
     case 'DISCONTINUIDAD': {
       const diferencia =
         motivo.diferencia !== undefined ? ` de Bs ${formatearMontoBob(motivo.diferencia)}` : '';
