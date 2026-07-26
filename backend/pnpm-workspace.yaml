@@ -65,18 +65,16 @@ overrides:
   'fast-uri': '^3.1.4'
   '@opentelemetry/propagator-jaeger': '^2.9.0'
 
-# Excepciones del audit gate (pnpm audit --audit-level high). Time-boxed: solo
-# para advisories cuyo PARCHE existe pero aún no es instalable por nuestro propio
-# minimumReleaseAge (72h). Remover en cuanto el parche madure y bumpear la dep.
-# - nodemailer GHSA-p6gq-j5cr-w38f (HIGH): la opción `raw` a nivel de mensaje bypassa
-#   disableFileAccess/disableUrlAccess (arbitrary file read / SSRF). NO la usamos
-#   (smtp.adapter solo pasa from/to/subject/text/html/replyTo/attachments). Parche 9.0.1
-#   publicado 2026-06-17, bloqueado por el cooldown hasta ~2026-06-20. ACCIÓN: al madurar,
-#   bumpear nodemailer ^7→^9.0.1 (+ @types/nodemailer) y BORRAR este ignore.
-#   ⚠️ VENCIDO: el parche maduró el 2026-06-20 y este ignore sigue acá. Es un major de
-#   una dep de RUNTIME que manda mails, así que va en su propio PR con verificación del
-#   smtp.adapter — no se cuela en un bump de lockfile. Detectado 2026-07-26.
-# - brace-expansion GHSA-mh99-v99m-4gvg (HIGH): DoS por expansión sin límite de longitud
+# Excepciones del audit gate (pnpm audit --audit-level high). Cada entrada declara
+# de qué TIPO es, porque no se resuelven igual:
+#   (a) time-boxed — el parche existe pero todavía no es instalable por nuestro propio
+#       minimumReleaseAge (72h). Lleva fecha de maduración y se remueve al bumpear.
+#   (b) bloqueo upstream — no hay parche instalable para el camino que nos afecta.
+#       NO lleva fecha: inventarla la disfraza de (a) y la vuelve una promesa que nadie
+#       cumple. Lleva un TRIGGER verificable y la fecha de la última verificación.
+# (nodemailer GHSA-p6gq-j5cr-w38f estuvo acá hasta 2026-07-26: era del tipo (a) y se
+#  cerró bumpeando nodemailer ^7 → ^9.0.3, que es donde vive el parche.)
+# - brace-expansion GHSA-mh99-v99m-4gvg (HIGH) — tipo (b): DoS por expansión sin límite de longitud
 #   → crash por out-of-memory. Distinto del GHSA-3jxr-9vmj-r5cp ya cubierto por los
 #   overrides de arriba.
 #   ⚠️ NO es time-boxed, aunque su versión anterior de este comentario decía que sí.
@@ -95,5 +93,4 @@ overrides:
 #   Verificado 2026-07-26.
 auditConfig:
   ignoreGhsas:
-    - GHSA-p6gq-j5cr-w38f
     - GHSA-mh99-v99m-4gvg
