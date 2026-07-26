@@ -20,6 +20,8 @@ export const MOTIVOS_NO_CONCILIADO = [
   'ARRANQUE_LIBROS_NO_COINCIDE',
   'DESCUADRE',
   'HUECO',
+  'HUECO_INICIAL',
+  'HUECO_FINAL',
   'DISCONTINUIDAD',
   'RESIDUO_NO_EXPLICADO',
 ] as const;
@@ -178,8 +180,16 @@ export class MotivoNoConciliadoDto {
   @ApiProperty({ enum: MOTIVOS_NO_CONCILIADO })
   tipo!: (typeof MOTIVOS_NO_CONCILIADO)[number];
   @ApiPropertyOptional({ description: 'Solo DESCUADRE.' }) importacionId?: string;
-  @ApiPropertyOptional({ example: '2026-07-11', description: 'Solo HUECO.' }) desde?: string;
-  @ApiPropertyOptional({ example: '2026-07-19', description: 'Solo HUECO.' }) hasta?: string;
+  @ApiPropertyOptional({
+    example: '2026-07-11',
+    description: 'Solo HUECO, HUECO_INICIAL y HUECO_FINAL.',
+  })
+  desde?: string;
+  @ApiPropertyOptional({
+    example: '2026-07-19',
+    description: 'Solo HUECO, HUECO_INICIAL y HUECO_FINAL.',
+  })
+  hasta?: string;
   @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) anteriorId?: string;
   @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) siguienteId?: string;
   @ApiPropertyOptional({
@@ -321,6 +331,8 @@ function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
     case 'DESCUADRE':
       return { tipo: motivo.tipo, importacionId: motivo.importacionId };
     case 'HUECO':
+    case 'HUECO_INICIAL':
+    case 'HUECO_FINAL':
       return { tipo: motivo.tipo, desde: motivo.desde.toIso(), hasta: motivo.hasta.toIso() };
     case 'DISCONTINUIDAD':
       return {

@@ -102,4 +102,43 @@ describe('mensajeMotivo — cada motivo en lenguaje de contador, nunca el enum c
       'Falta extracto: hay días sin cobertura antes del corte.',
     );
   });
+
+  it('HUECO_INICIAL dice que el informe arranca sobre días sin cubrir', () => {
+    const motivo: MotivoNoConciliado = {
+      tipo: 'HUECO_INICIAL',
+      desde: '2026-07-01',
+      hasta: '2026-07-09',
+    };
+    expect(mensajeMotivo(motivo)).toBe(
+      'Falta extracto entre el 01/07/2026 y el 09/07/2026: el informe arranca sobre días que ningún extracto cubrió.',
+    );
+  });
+
+  it('HUECO_FINAL advierte que el saldo comparado es anterior al corte', () => {
+    const motivo: MotivoNoConciliado = {
+      tipo: 'HUECO_FINAL',
+      desde: '2026-07-26',
+      hasta: '2026-07-31',
+    };
+    expect(mensajeMotivo(motivo)).toBe(
+      'Falta extracto entre el 26/07/2026 y el 31/07/2026: la cobertura no llega al corte, así que el saldo bancario que se compara es anterior a la fecha pedida.',
+    );
+  });
+
+  it('los tres HUECO* dicen cosas DISTINTAS: el tramo solo no basta para saber qué pasó', () => {
+    const rango = { desde: '2026-07-01', hasta: '2026-07-09' } as const;
+    const frases = (['HUECO', 'HUECO_INICIAL', 'HUECO_FINAL'] as const).map((tipo) =>
+      mensajeMotivo({ tipo, ...rango }),
+    );
+    expect(new Set(frases).size).toBe(3);
+  });
+
+  it('HUECO_INICIAL y HUECO_FINAL sin fechas (contrato degradado) no inventan un tramo', () => {
+    expect(mensajeMotivo({ tipo: 'HUECO_INICIAL' })).toBe(
+      'Falta extracto al inicio: el informe arranca sobre días que ningún extracto cubrió.',
+    );
+    expect(mensajeMotivo({ tipo: 'HUECO_FINAL' })).toBe(
+      'Falta extracto al cierre: la cobertura no llega al corte, así que el saldo bancario que se compara es anterior a la fecha pedida.',
+    );
+  });
 });

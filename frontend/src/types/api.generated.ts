@@ -4197,16 +4197,16 @@ export interface components {
         };
         MotivoNoConciliadoDto: {
             /** @enum {string} */
-            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "ARRANQUE_EXTRACTO_NO_COINCIDE" | "ARRANQUE_LIBROS_NO_COINCIDE" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
+            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "ARRANQUE_EXTRACTO_NO_COINCIDE" | "ARRANQUE_LIBROS_NO_COINCIDE" | "DESCUADRE" | "HUECO" | "HUECO_INICIAL" | "HUECO_FINAL" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
             /** @description Solo DESCUADRE. */
             importacionId?: string;
             /**
-             * @description Solo HUECO.
+             * @description Solo HUECO, HUECO_INICIAL y HUECO_FINAL.
              * @example 2026-07-11
              */
             desde?: string;
             /**
-             * @description Solo HUECO.
+             * @description Solo HUECO, HUECO_INICIAL y HUECO_FINAL.
              * @example 2026-07-19
              */
             hasta?: string;

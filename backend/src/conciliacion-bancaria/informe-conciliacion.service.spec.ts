@@ -829,6 +829,12 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     it('sin saldo de extracto publicado → motivo SIN_SALDO_EXTRACTO', async () => {
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       movRepo.saldosVigentes.mockResolvedValue([saldoVigente(null)]);
+      // La ventana SÍ está cubierta: la importación existe y simplemente no
+      // publica saldo. Sin esta fila el escenario sería otro (nunca se importó
+      // nada) y arrastraría además un HUECO_INICIAL ajeno a lo que se afirma acá.
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-sin-saldo', '2026-07-01', '2026-07-31'),
+      ]);
 
       const informe = await consultar();
 
@@ -882,6 +888,94 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
           hasta: expect.objectContaining({ year: 2026, month: 7, day: 19 }),
         },
       ]);
+    });
+
+    // §3.7 — los BORDES de la ventana. `HUECO` compara importaciones entre sí,
+    // así que un tramo sin cubrir en los extremos no tiene contra qué serlo:
+    // antes de esto, los tres escenarios de abajo se emitían SIN una sola señal.
+    it('la cobertura arranca después del punto de partida → HUECO_INICIAL', async () => {
+      armarEscenarioQueCierra();
+      // Arranque el 30/06 ⇒ ventana 01/07–31/07. El extracto recién arranca el 10.
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-tarde', '2026-07-10', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toEqual([
+        {
+          tipo: 'HUECO_INICIAL',
+          desde: expect.objectContaining({ year: 2026, month: 7, day: 1 }),
+          hasta: expect.objectContaining({ year: 2026, month: 7, day: 9 }),
+        },
+      ]);
+    });
+
+    it('la cobertura termina antes del corte → HUECO_FINAL (el saldo contra el que se concilia es viejo)', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-corta', '2026-07-01', '2026-07-25'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.motivos).toEqual([
+        {
+          tipo: 'HUECO_FINAL',
+          desde: expect.objectContaining({ year: 2026, month: 7, day: 26 }),
+          hasta: expect.objectContaining({ year: 2026, month: 7, day: 31 }),
+        },
+      ]);
+    });
+
+    it('CASO PELIGROSO: cobertura sólo ANTERIOR al arranque → hay saldo de extracto, y sin este motivo no habría ninguna señal', async () => {
+      // Con importaciones viejas el saldo existe, así que `SIN_SALDO_EXTRACTO`
+      // NO se dispara: el informe cerraría mostrando un saldo de mayo como si
+      // fuera el del 31/07. Éste es el único motivo que lo nombra.
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-vieja', '2026-05-01', '2026-05-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.motivos).toEqual([
+        {
+          tipo: 'HUECO_INICIAL',
+          desde: expect.objectContaining({ year: 2026, month: 7, day: 1 }),
+          hasta: expect.objectContaining({ year: 2026, month: 7, day: 31 }),
+        },
+      ]);
+      expect(informe.confiabilidad.motivos).not.toContainEqual(
+        expect.objectContaining({ tipo: 'SIN_SALDO_EXTRACTO' }),
+      );
+    });
+
+    it('cobertura exacta de la ventana → ningún motivo de borde', async () => {
+      armarEscenarioQueCierra();
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-exacta', '2026-07-01', '2026-07-31'),
+      ]);
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(true);
+      expect(informe.confiabilidad.motivos).toEqual([]);
+    });
+
+    it('sin arranque no se acusa falta de cobertura: no hay ventana que evaluar', async () => {
+      // La abstención emite lo suyo (SIN_ARRANQUE + SIN_SALDO_EXTRACTO); lo que
+      // NO puede aparecer es un motivo de borde: reclamar cobertura sería
+      // exigírsela a quien todavía no declaró desde dónde mirar.
+      arranques.vigenteA.mockResolvedValue(null);
+
+      const informe = await consultar();
+
+      const tipos = informe.confiabilidad.motivos.map((m) => m.tipo);
+      expect(tipos).toContain('SIN_ARRANQUE');
+      expect(tipos).not.toContain('HUECO_INICIAL');
+      expect(tipos).not.toContain('HUECO_FINAL');
     });
 
     it('discontinuidad de saldo entre importaciones contiguas del rango → motivo con la magnitud del salto', async () => {
@@ -969,6 +1063,16 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
   // ==========================================================
 
   describe('contraste del arranque contra el extracto real (ARRANQUE_EXTRACTO_NO_COINCIDE)', () => {
+    // Estos tests van sobre el contraste del arranque, no sobre los bordes de
+    // cobertura. Se les da cobertura HOLGADA —desde antes del arranque más
+    // viejo que usa el bloque (05/06) hasta el corte— para que ninguno arrastre
+    // un HUECO_* cierto pero ajeno a lo que afirma.
+    beforeEach(() => {
+      importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
+        importacion('imp-ventana', '2026-01-01', '2026-07-31'),
+      ]);
+    });
+
     /** Mock de `saldosVigentes` sensible a la FECHA consultada (clave ISO). */
     function saldosPorFecha(porIso: Record<string, string | null>) {
       movRepo.saldosVigentes.mockImplementation((_tenant: string, fecha: Date) => {

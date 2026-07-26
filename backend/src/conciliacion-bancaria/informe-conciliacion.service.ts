@@ -28,7 +28,7 @@ import {
   LineaParaInforme,
   MovimientoParaInforme,
 } from './domain/armar-informe';
-import { detectarHuecos } from './domain/cobertura-extracto';
+import { detectarHuecos, detectarHuecosDeBorde } from './domain/cobertura-extracto';
 import { detectarDiscontinuidades } from './domain/continuidad-extractos';
 import {
   derivarEstadoEfectivoLinea,
@@ -157,6 +157,20 @@ export type MotivoNoConciliado =
     }
   | { tipo: 'DESCUADRE'; importacionId: string }
   | { tipo: 'HUECO'; desde: FechaContable; hasta: FechaContable }
+  /**
+   * El tramo entre el arranque y la primera importación que lo sigue: el
+   * informe compara sobre datos que NINGÚN extracto cubrió. `HUECO` no puede
+   * verlo —no hay importación anterior contra la cual sea un hueco— y su
+   * ausencia se lee como "todo cubierto", que es peor que no preguntar.
+   */
+  | { tipo: 'HUECO_INICIAL'; desde: FechaContable; hasta: FechaContable }
+  /**
+   * Simétrico al cierre: la cobertura termina antes del corte pedido. El
+   * `saldoExtracto` contra el que se concilia es entonces el del último
+   * movimiento importado, VIEJO respecto del corte — la identidad cierra igual
+   * y el número no es el del día que se pidió.
+   */
+  | { tipo: 'HUECO_FINAL'; desde: FechaContable; hasta: FechaContable }
   | { tipo: 'DISCONTINUIDAD'; anteriorId: string; siguienteId: string; diferencia: Money }
   | { tipo: 'RESIDUO_NO_EXPLICADO'; importe: Money };
 
@@ -1111,6 +1125,26 @@ function derivarConfiabilidad(p: ParamsConfiabilidad): {
   for (const hueco of detectarHuecos(filas)) {
     if (enRango(hueco.desde, hueco.hasta)) {
       motivos.push({ tipo: 'HUECO', desde: hueco.desde, hasta: hueco.hasta });
+    }
+  }
+
+  // Los BORDES de la ventana (§3.7). Sin arranque no hay ventana que evaluar y
+  // `SIN_ARRANQUE` ya retuvo la conclusión: emitir además un hueco sería
+  // acusar de falta de cobertura a quien todavía no declaró desde dónde mirar.
+  if (p.arranqueFecha !== null) {
+    const bordes = detectarHuecosDeBorde(filas, {
+      desde: p.arranqueFecha.sumarDias(1),
+      hasta: p.corte,
+    });
+    if (bordes.inicial !== null) {
+      motivos.push({
+        tipo: 'HUECO_INICIAL',
+        desde: bordes.inicial.desde,
+        hasta: bordes.inicial.hasta,
+      });
+    }
+    if (bordes.final !== null) {
+      motivos.push({ tipo: 'HUECO_FINAL', desde: bordes.final.desde, hasta: bordes.final.hasta });
     }
   }
 

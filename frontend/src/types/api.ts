@@ -525,7 +525,8 @@ export type CandidatoPartidaArranque = Schemas['CandidatoPartidaArranqueDto'];
 /**
  * Clase APLANADA con opcionales por tipo (swagger no soporta uniones
  * discriminadas): el consumidor DEBE discriminar por `tipo` — p. ej. `desde`/
- * `hasta` solo viajan en `HUECO`, `importe` solo en `RESIDUO_NO_EXPLICADO`.
+ * `hasta` solo viajan en los tres `HUECO*`, `importe` solo en
+ * `RESIDUO_NO_EXPLICADO`.
  */
 export type MotivoNoConciliado = Schemas['MotivoNoConciliadoDto'];
 
