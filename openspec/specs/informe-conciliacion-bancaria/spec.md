@@ -148,6 +148,32 @@ un "no puedo afirmarlo" honesto vale más que una certificación inventada.
 - THEN el tramo faltante se nombra explícitamente
 - AND el informe NO afirma "conciliado"
 
+### REQ-ICB-05b: El punto de partida declarado se contrasta contra la realidad
+
+Ambos saldos del arranque son DECLARADOS, así que ambos pueden estar mal. El
+informe DEBE contrastar cada uno contra su fuente a la fecha del arranque y
+nombrar la discrepancia sin suprimir el informe:
+
+| Motivo | Contraste |
+|---|---|
+| `ARRANQUE_EXTRACTO_NO_COINCIDE` | `saldoExtracto` declarado vs. el saldo real del extracto a esa fecha |
+| `ARRANQUE_LIBROS_NO_COINCIDE` | `saldoLibros` declarado vs. el agregado real del mayor a esa fecha |
+
+El contraste es INDEPENDIENTE del residuo: un residual "correcto" puede cerrar
+la identidad en 0.00 sobre saldos declarados falsos.
+
+A diferencia del extracto —que puede no publicar saldo y entonces no se
+acusa— el mayor SIEMPRE agrega: sin líneas da cero. Ese cero contra un saldo
+declarado NO es ausencia de dato, es el hallazgo: la organización nunca cargó
+su asiento de apertura.
+
+#### Scenario: Saldo de libros declarado sobre un mayor vacío
+
+- GIVEN un arranque que declara `saldoLibros` 1.000,00
+- AND la cuenta del plan no tiene ninguna línea a esa fecha
+- WHEN se pide el informe
+- THEN aparece `ARRANQUE_LIBROS_NO_COINCIDE` con declarado 1.000,00 y real 0,00
+
 ### REQ-ICB-06: Residuo no explicado — se muestra, jamás se absorbe
 
 Si la identidad no cierra, el sistema DEBE exponer la diferencia sobrante
@@ -218,3 +244,93 @@ existencia de recursos ajenos no se revela.
 - WHEN intenta declarar un punto de arranque
 - THEN la operación es rechazada por permisos
 - AND ese mismo usuario SÍ puede consultar el informe
+
+### REQ-ICB-10: Partidas ya abiertas al declarar el arranque
+
+La ventana del puente (`arranque.fecha < fecha ≤ corte`) excluye lo anterior al
+punto de partida. Eso es correcto para lo que ya estaba CERRADO —absorbido en
+los saldos declarados— y FALSO para lo que estaba ABIERTO: un cheque girado
+antes del arranque y no cobrado sigue estando en un lado y no en el otro
+después. Sin arrastrarlo, la identidad no cierra y la diferencia sale
+disfrazada de residuo no explicado.
+
+El sistema DEBE, al declarar un arranque, PROPONER las partidas abiertas a esa
+fecha, y el usuario DEBE confirmar cuáles se arrastran. La derivación
+automática NO alcanza: una línea anterior al arranque sin movimiento que la
+reclame puede ser un cheque en circulación —que sí es partida— o el asiento de
+apertura, cuyo saldo YA está dentro del extracto declarado. Con los datos
+disponibles son indistinguibles; si la organización importó extractos recién
+desde el arranque, TODA línea anterior parece en tránsito.
+
+Las confirmadas DEBEN congelarse junto a la declaración. El cliente confirma
+por REFERENCIA, nunca por importe: los montos salen del dato.
+
+El sistema DEBE exponer la verificación aritmética que resuelve la ambigüedad:
+`Σ partidas confirmadas = saldoLibros − saldoExtracto + diferenciaResidual`.
+
+Una partida congelada cuya contraparte llegó dentro de la ventana YA está en
+ambos saldos y NO DEBE sumarse: contarla la cobraría dos veces.
+
+Un movimiento `IGNORADO` anterior al arranque es partida PARA SIEMPRE y con
+nombre propio (REQ-ICB-02): está dentro del saldo publicado y los libros nunca
+lo registrarán.
+
+#### Scenario: Cheque anterior al arranque y aún sin cobrar
+
+- GIVEN un cheque girado antes del arranque, confirmado como partida abierta
+- AND el banco no lo cobró al corte
+- WHEN se pide el informe
+- THEN figura como partida en tránsito marcada como anterior al arranque
+- AND NO aparece como residuo no explicado
+
+#### Scenario: El asiento de apertura no se confirma
+
+- GIVEN un asiento de apertura anterior al arranque entre los candidatos
+- WHEN el usuario NO lo confirma
+- THEN no se congela ni se arrastra al informe
+
+#### Scenario: Una partida congelada se resuelve dentro de la ventana
+
+- GIVEN una partida abierta confirmada al declarar el arranque
+- WHEN su contraparte llega con fecha ≤ corte
+- THEN deja de sumarse al puente
+
+### REQ-ICB-11: Anulación de una declaración de arranque
+
+Declarar es append-only, pero una declaración equivocada DEBE poder deshacerse.
+Declarar otra NO alcanza cuando el error fue la FECHA: fijada una posterior,
+ninguna anterior puede ganarle al desempate de `vigenteA`, y la cuenta queda
+con un punto de partida falso para siempre.
+
+El sistema DEBE permitir ANULAR una declaración. La anulación es por MARCA,
+jamás borrado (§4.7): el acto se conserva y DEBE seguir visible en el historial
+con su motivo, su autor y su fecha. Una declaración anulada NO DEBE aplicar en
+`vigenteA` — ni ser señalada como vigente en la UI.
+
+El motivo DEBE ser obligatorio y significativo: el acto queda para siempre en
+el historial y sin el porqué el rastro no explica nada.
+
+Anular DEBE exigir `contabilidad.conciliacion.conciliar`, igual que declarar:
+deshacer el punto de partida pesa tanto como fijarlo.
+
+Re-anular DEBE rechazarse en vez de pasar como idempotente: pisaría el motivo y
+el autor originales.
+
+#### Scenario: Se anula la declaración vigente
+
+- GIVEN dos declaraciones, y la más reciente fue declarada por error
+- WHEN se anula la más reciente con su motivo
+- THEN el informe vuelve a aplicar la anterior
+- AND el historial conserva ambas, la anulada con su marca y su motivo
+
+#### Scenario: Se anula la única declaración
+
+- GIVEN una cuenta con una sola declaración
+- WHEN se anula
+- THEN el informe se emite ABSTENIDO y no falla
+
+#### Scenario: Segundo intento de anulación
+
+- GIVEN una declaración ya anulada
+- WHEN se intenta anularla de nuevo
+- THEN la operación se rechaza y el motivo original se conserva
