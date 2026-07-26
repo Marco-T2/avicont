@@ -73,17 +73,26 @@ overrides:
 #   (smtp.adapter solo pasa from/to/subject/text/html/replyTo/attachments). Parche 9.0.1
 #   publicado 2026-06-17, bloqueado por el cooldown hasta ~2026-06-20. ACCIÓN: al madurar,
 #   bumpear nodemailer ^7→^9.0.1 (+ @types/nodemailer) y BORRAR este ignore.
+#   ⚠️ VENCIDO: el parche maduró el 2026-06-20 y este ignore sigue acá. Es un major de
+#   una dep de RUNTIME que manda mails, así que va en su propio PR con verificación del
+#   smtp.adapter — no se cuela en un bump de lockfile. Detectado 2026-07-26.
 # - brace-expansion GHSA-mh99-v99m-4gvg (HIGH): DoS por expansión sin límite de longitud
 #   → crash por out-of-memory. Distinto del GHSA-3jxr-9vmj-r5cp ya cubierto por los
-#   overrides de arriba; este afecta a TODA la línea 5.x hasta 5.0.7 inclusive, o sea a
-#   la versión a la que nos pinea `'brace-expansion@5': '^5.0.7'`.
-#   Superficie real: solo toolchain de build/test (@nestjs/cli, eslint, jest). Un DoS por expansión de llaves exige
-#   un patrón glob hostil; los patrones acá son literales del repo, no input de terceros.
-#   Nada de esto llega al runtime.
-#   Parche: 5.0.8, publicado 2026-07-23 11:39 UTC → madura 2026-07-26 ~11:39 UTC
-#   (07:39 La Paz). ACCIÓN al madurar: el override `^5.0.7` YA admite 5.0.8 — alcanza con
-#   `pnpm update brace-expansion` para mover el lockfile, sin tocar este archivo. Después
-#   BORRAR este ignore.
+#   overrides de arriba.
+#   ⚠️ NO es time-boxed, aunque su versión anterior de este comentario decía que sí.
+#   El rango del advisory es `<=5.0.7` SIN acotar por major y el único parche es `>=5.0.8`:
+#   las líneas 1.x y 2.x caen adentro y NO tienen parche propio. Bumpear el pin de 5.x
+#   (hecho: 5.0.7 → 5.0.8) cierra los caminos que SÍ se podían cerrar —eran los 130 que
+#   reportaba el audit— pero no alcanza.
+#   Un override global `brace-expansion: '>=5.0.8'` NO es viable: la v2 exporta la función
+#   como DEFAULT (`module.exports = expandTop`) y la v5 la exporta NOMBRADA
+#   (`exports.expand`). `minimatch@3.1.5` la consume por default y tiraría TypeError en
+#   runtime. Por eso los pines por major de arriba, y por eso esto no se puede forzar.
+#   Camino restante: brace-expansion@1.1.16 ← minimatch@3.1.5 ← eslint@9 / @nestjs/cli@11 /
+#   test-exclude (jest). Todo devDependency de toolchain, nada llega al runtime del server.
+#   Un DoS por expansión de llaves exige un patrón glob hostil; acá son literales del repo.
+#   TRIGGER de revisión: que eslint, @nestjs/cli y jest dejen de arrastrar minimatch@3.
+#   Verificado 2026-07-26.
 auditConfig:
   ignoreGhsas:
     - GHSA-p6gq-j5cr-w38f
