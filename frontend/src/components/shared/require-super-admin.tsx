@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEsSuperAdmin } from '@/features/platform-admin/hooks/use-es-super-admin';

@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 // Cross-feature: mismas etiquetas de motivo que el workspace de conciliación
 // (mismo módulo/pack) — el design del change manda reusarlas, no duplicarlas.

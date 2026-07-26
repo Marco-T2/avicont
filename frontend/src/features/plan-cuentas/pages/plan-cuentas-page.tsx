@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { PaginationBar } from '@/components/shared/pagination-bar';

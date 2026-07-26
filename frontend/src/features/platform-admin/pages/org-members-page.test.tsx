@@ -10,7 +10,7 @@ vi.mock('../hooks/use-org-members', () => ({
 }));
 
 // Router param mock
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router', () => ({
   useParams: vi.fn(() => ({ id: 'org-1' })),
   useNavigate: vi.fn(() => vi.fn()),
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => (

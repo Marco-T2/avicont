@@ -1,6 +1,6 @@
 import { Bird, Calendar, Home, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import { Can } from '@/components/shared/can';

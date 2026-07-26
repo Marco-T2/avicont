@@ -1,5 +1,5 @@
 import { Users } from 'lucide-react';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PlatformOrgMember } from '@/types/api';

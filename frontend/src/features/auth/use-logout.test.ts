@@ -7,7 +7,7 @@ const apiPostMock = vi.fn().mockResolvedValue({});
 const broadcastLogoutMock = vi.fn();
 const toastSuccessMock = vi.fn();
 
-vi.mock('react-router-dom', () => ({
+vi.mock('react-router', () => ({
   useNavigate: () => navigateMock,
 }));
 

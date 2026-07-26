@@ -1,5 +1,5 @@
 import { Shield } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 

@@ -53,22 +53,8 @@ overrides:
 # Excepciones del audit gate (pnpm audit --audit-level high). Time-boxed: solo para
 # advisories cuyo PARCHE existe pero aún no es instalable por nuestro propio
 # minimumReleaseAge (72h). Remover en cuanto el parche madure y bumpear la dep.
-# - react-router >=7.12.0 <8.3.0 GHSA-qwww-vcr4-c8h2 (HIGH): en RSC Mode una action se
-#   ejecuta ANTES de devolver el 400 del chequeo CSRF. Avicont usa Data Mode
-#   (createBrowserRouter + RouterProvider), NO RSC Mode: el código vulnerable no se
-#   alcanza. `pnpm audit` no distingue modos, solo lee la versión.
-#   Parche: react-router 8.3.0, publicado 2026-07-22 15:04 UTC → madura 2026-07-25
-#   ~15:04 UTC (11:04 La Paz).
-#   ACCIÓN al madurar: NO alcanza con bumpear. `react-router-dom` no tiene v8 (quedó en
-#   7.18.1: desde v7 el paquete principal es `react-router` y el -dom era una cáscara de
-#   compatibilidad, eliminada en v8). Hay que migrar los 66 imports de 64 archivos de
-#   'react-router-dom' a 'react-router', pasar la dep directa a react-router@^8.3.0 y
-#   subir react/react-dom de ^19.2.5 a >=19.2.7 (peer que exige v8). Verificado: los 13
-#   símbolos que usa el proyecto (Link, NavLink, Navigate, Outlet, Route, Routes,
-#   RouterProvider, createBrowserRouter, MemoryRouter, useLocation, useNavigate,
-#   useParams, useSearchParams) siguen exportados desde la entrada principal de v8.
-#   Al ser un major puede haber cambios de comportamiento que solo revelan tsc + la
-#   suite; por eso va como change propio y no como bump acá. BORRAR este ignore ahí.
+# (react-router GHSA-qwww-vcr4-c8h2 estuvo acá hasta 2026-07-26: se cerró migrando
+#  react-router-dom@7 → react-router@8.3.0, que es donde vive el parche.)
 # - brace-expansion GHSA-mh99-v99m-4gvg (HIGH): DoS por expansión sin límite de longitud
 #   → crash por out-of-memory. Distinto del GHSA-3jxr-9vmj-r5cp ya cubierto por los
 #   overrides de arriba.
@@ -89,5 +75,4 @@ overrides:
 #   `@redocly/openapi-core` a >=2.x, que se movió a un minimatch nuevo. Verificado 2026-07-26.
 auditConfig:
   ignoreGhsas:
-    - GHSA-qwww-vcr4-c8h2
     - GHSA-mh99-v99m-4gvg

@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 // Layout usado por rutas de autenticación (/login y futuros /register,
 // /forgot-password). Card centrada sobre fondo muted, sin sidebar ni topbar.

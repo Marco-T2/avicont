@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ----------------------------------------------------------------
@@ -15,13 +15,13 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('react-router-dom', async (importOriginal) => {
-  const original = await importOriginal<typeof import('react-router-dom')>();
+vi.mock('react-router', async (importOriginal) => {
+  const original = await importOriginal<typeof import('react-router')>();
   return { ...original, useNavigate: vi.fn() };
 });
 
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useStartImpersonation } from '../../../features/impersonation/hooks/use-impersonation';
 import { PlatformImpersonateDialog } from './platform-impersonate-dialog';
 

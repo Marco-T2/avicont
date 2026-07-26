@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router';
 
 import { RequirePermission } from '@/components/shared/require-permission';
 import { RequireSystemRole } from '@/components/shared/require-system-role';

@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import type { EstadoComprobante, TipoComprobante } from '@/types/api';
 
