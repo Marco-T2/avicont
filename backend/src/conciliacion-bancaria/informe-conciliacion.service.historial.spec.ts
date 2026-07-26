@@ -18,6 +18,7 @@ import type { ArranqueConciliadoRepositoryPort } from './ports/arranque-concilia
 import type { ImportacionExtractoRepositoryPort } from './ports/importacion-extracto.repository.port';
 import type { MatchConciliacionRepositoryPort } from './ports/match-conciliacion.repository.port';
 import type { MovimientoBancarioRepositoryPort } from './ports/movimiento-bancario.repository.port';
+import type { UsuarioReaderPort } from '@/users/ports/usuario-reader.port';
 
 const TENANT = 'tenant-1';
 const CB_ID = 'cb-1';
@@ -57,6 +58,7 @@ function arranqueRow(overrides: Partial<ArranqueConciliado> = {}): ArranqueConci
 describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
   let cuentasBancarias: { findById: jest.Mock };
   let arranques: { vigenteA: jest.Mock; crear: jest.Mock; listarHistorial: jest.Mock };
+  let usuarios: { listarPorIds: jest.Mock };
   let service: InformeConciliacionService;
 
   beforeEach(() => {
@@ -67,6 +69,14 @@ describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
       listarHistorial: jest.fn().mockResolvedValue([]),
     };
     // Los demás ports no participan del historial: stubs vacíos.
+    usuarios = {
+      listarPorIds: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'user-1', displayName: 'Marco Tarqui', email: 'marco@avicont.bo' },
+        ]),
+    };
+
     service = new InformeConciliacionService(
       cuentasBancarias as unknown as CuentasBancariasService,
       arranques as unknown as ArranqueConciliadoRepositoryPort,
@@ -74,6 +84,7 @@ describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
       {} as unknown as MatchConciliacionRepositoryPort,
       {} as unknown as LineasCuentaReaderPort,
       {} as unknown as ImportacionExtractoRepositoryPort,
+      usuarios as unknown as UsuarioReaderPort,
     );
   });
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { LineasCuentaReaderModule } from '@/comprobantes/lineas-cuenta-reader.module';
+import { UsuarioReaderModule } from '@/users/usuario-reader.module';
 import { PrismaService } from '@/common/prisma.service';
 import { TenantContextService } from '@/common/tenant-context/tenant-context.service';
 import { CuentasModule } from '@/cuentas/cuentas.module';
@@ -69,7 +70,7 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
 // NO `ComprobantesModule`: el leaf no importa nada, así que es estructuralmente
 // imposible cerrar un ciclo de carga CJS (precedente `PeriodosReaderModule`).
 @Module({
-  imports: [RbacModule, CuentasModule, PacksModule, LineasCuentaReaderModule],
+  imports: [RbacModule, CuentasModule, PacksModule, LineasCuentaReaderModule, UsuarioReaderModule],
   controllers: [
     CuentasBancariasController,
     ConciliacionController,

@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { nombreDelDeclarante } from '../lib/declarante';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import { cn } from '@/lib/utils';
@@ -98,7 +99,7 @@ export function HistorialArranques({
               )}
               <p className="text-xs text-muted-foreground">
                 Declarada el {formatearFechaContable(a.declaradoEl.slice(0, 10))} por{' '}
-                {a.declaradoPorUserId}.
+                {nombreDelDeclarante(a.declaradoPorNombre)}.
               </p>
             </li>
           );

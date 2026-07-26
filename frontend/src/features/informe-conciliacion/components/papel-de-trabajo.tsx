@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { nombreDelDeclarante } from '../lib/declarante';
 import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import { formatearMontoBob } from '@/lib/formatear-monto-bob';
 import { cn } from '@/lib/utils';
@@ -114,7 +115,7 @@ export function PapelDeTrabajo({ informe }: PapelDeTrabajoProps): React.JSX.Elem
       >
         <p className="text-xs text-muted-foreground">
           Declarada el {formatearFechaContable(arranque.declaradoEl.slice(0, 10))} por{' '}
-          {arranque.declaradoPorUserId}.
+          {nombreDelDeclarante(arranque.declaradoPorNombre)}.
         </p>
       </PartidaBloque>
 
