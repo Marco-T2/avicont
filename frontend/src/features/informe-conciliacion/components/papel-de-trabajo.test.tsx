@@ -27,6 +27,11 @@ const INFORME: InformeConciliacion = {
     nota: null,
     declaradoPorUserId: 'user-9',
     declaradoPorNombre: 'Marco Tarqui',
+    anulado: false,
+    motivoAnulacion: null,
+    anuladoPorUserId: null,
+    anuladoPorNombre: null,
+    anuladoEl: null,
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
   partidas: {
