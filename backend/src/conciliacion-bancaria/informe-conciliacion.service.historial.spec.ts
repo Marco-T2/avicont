@@ -62,6 +62,7 @@ describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
     crear: jest.Mock;
     listarHistorial: jest.Mock;
     listarPartidasAbiertas: jest.Mock;
+    anular: jest.Mock;
   };
   let usuarios: { listarPorIds: jest.Mock };
   let service: InformeConciliacionService;
@@ -75,6 +76,7 @@ describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
       // Sin partidas congeladas por defecto: el caso de un arranque declarado
       // sobre una cuenta sin nada abierto antes.
       listarPartidasAbiertas: jest.fn().mockResolvedValue([]),
+      anular: jest.fn(),
     };
     // Los demás ports no participan del historial: stubs vacíos.
     usuarios = {

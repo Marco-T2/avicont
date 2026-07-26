@@ -172,6 +172,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     crear: jest.Mock;
     listarHistorial: jest.Mock;
     listarPartidasAbiertas: jest.Mock;
+    anular: jest.Mock;
   };
   let movRepo: {
     listarPorCuentaBancariaEnRango: jest.Mock;
@@ -197,6 +198,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       // Sin partidas congeladas por defecto: el caso de un arranque declarado
       // sobre una cuenta sin nada abierto antes.
       listarPartidasAbiertas: jest.fn().mockResolvedValue([]),
+      anular: jest.fn(),
     };
     movRepo = {
       listarPorCuentaBancariaEnRango: jest.fn().mockResolvedValue([]),
@@ -566,6 +568,63 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       expect(data.partidasAbiertas.find((p) => p.origen === 'LINEA')?.importe.toFixed(2)).toBe(
         '-1000.00',
       );
+    });
+  });
+
+  // ----------------------------------------------------------
+  // REQ-ICB-04 / §4.7: anular una declaración
+  // ----------------------------------------------------------
+
+  describe('anularArranque', () => {
+    it('resuelve la cuenta por tenant ANTES de anular: cuenta ajena ⇒ 404 sin tocar el repo', async () => {
+      const notFound = new Error('CUENTA_BANCARIA_NOT_FOUND');
+      cuentasBancarias.findById.mockRejectedValue(notFound);
+
+      await expect(
+        service.anularArranque(TENANT, 'user-1', 'cb-ajena', 'arr-1', 'motivo suficiente'),
+      ).rejects.toThrow(notFound);
+
+      expect(arranques.anular).not.toHaveBeenCalled();
+    });
+
+    it('marca la declaración con motivo y autor — jamás la borra', async () => {
+      arranques.anular.mockResolvedValue(
+        arranqueRow({
+          anulado: true,
+          motivoAnulacion: 'Se cargó con la fecha del cierre siguiente',
+          anuladoPorUserId: 'user-1',
+          fechaAnulacion: new Date('2026-07-26T18:00:00.000Z'),
+        }),
+      );
+
+      const vista = await service.anularArranque(
+        TENANT,
+        'user-1',
+        CB_ID,
+        'arr-1',
+        'Se cargó con la fecha del cierre siguiente',
+      );
+
+      expect(arranques.anular).toHaveBeenCalledWith(
+        TENANT,
+        'arr-1',
+        expect.objectContaining({ motivo: expect.any(String), anuladoPorUserId: 'user-1' }),
+      );
+      expect(vista.anulado).toBe(true);
+      expect(vista.motivoAnulacion).toBe('Se cargó con la fecha del cierre siguiente');
+      // El acto de anular también queda ATRIBUIDO a una persona, no a un UUID.
+      expect(vista.anuladoPorNombre).toBe('Marco Tarqui');
+      expect(vista.anuladoEl?.toISOString()).toBe('2026-07-26T18:00:00.000Z');
+    });
+
+    it('re-anular se rechaza: pisaría el motivo y el autor originales', async () => {
+      // El repo devuelve null cuando el predicado `anulado = false` no matchea
+      // — no existe, es de otro tenant, o ya estaba anulada.
+      arranques.anular.mockResolvedValue(null);
+
+      await expect(
+        service.anularArranque(TENANT, 'user-1', CB_ID, 'arr-1', 'motivo suficiente'),
+      ).rejects.toMatchObject({ code: 'CONCILIACION_ARRANQUE_YA_ANULADO' });
     });
   });
 

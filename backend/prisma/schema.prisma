@@ -1552,6 +1552,20 @@ model ArranqueConciliado {
   // SIN updatedAt a propósito: append-only, una declaración nunca se edita
   // (mismo criterio que ImportacionExtracto y MatchConciliacion).
 
+  // ANULACIÓN por flag, jamás borrado — el mismo modelo que §4.7 usa para
+  // comprobantes. Declarar un arranque equivocado tenía UNA salida: declarar
+  // otro posterior. No alcanzaba: si el error fue la FECHA y se declaró
+  // adelante, ninguna declaración anterior puede ganarle a `vigenteA`, y la
+  // cuenta quedaba con un punto de partida falso para siempre.
+  //
+  // El acto anulado se CONSERVA y sigue visible en el historial con su marca:
+  // que alguien haya fijado mal el saldo de partida es parte del rastro, no
+  // algo a esconder (REQ-ICB-04 — ninguna declaración se borra ni se oculta).
+  anulado          Boolean   @default(false)
+  fechaAnulacion   DateTime? @db.Timestamptz(3)
+  motivoAnulacion  String?
+  anuladoPorUserId String?
+
   organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   cuentaBancaria   CuentaBancaria           @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
   partidasAbiertas ArranquePartidaAbierta[]

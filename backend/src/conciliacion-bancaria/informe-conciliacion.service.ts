@@ -35,6 +35,7 @@ import {
   derivarEstadoEfectivoMovimiento,
 } from './domain/estado-efectivo';
 import {
+  ArranqueYaAnuladoError,
   ConciliacionMonedaNoSoportadaError,
   PartidasDeArranqueDesconocidasError,
 } from './domain/informe-errors';
@@ -104,6 +105,16 @@ export interface ArranqueAplicadoView {
    */
   declaradoPorNombre: string | null;
   declaradoEl: Date;
+  /**
+   * Anulada ⇒ deja de aplicar en `vigenteA`, pero NO desaparece: sigue en el
+   * historial con su marca, su motivo y su autor (§4.7). Que alguien haya
+   * fijado mal el punto de partida es parte del rastro.
+   */
+  anulado: boolean;
+  motivoAnulacion: string | null;
+  anuladoPorUserId: string | null;
+  anuladoPorNombre: string | null;
+  anuladoEl: Date | null;
 }
 
 /**
@@ -484,6 +495,47 @@ export class InformeConciliacionService {
   }
 
   /**
+   * Anula una declaración de arranque (REQ-ICB-04, §4.7).
+   *
+   * Marca, jamás borra: el acto se conserva y sigue visible en el historial.
+   * Deja de aplicar en `vigenteA`, así que el informe pasa a usar la
+   * declaración anterior — o se emite ABSTENIDO si no queda ninguna.
+   *
+   * Es la salida que faltaba. "Corregir declarando otra" solo sirve cuando el
+   * error NO fue la fecha: declarada una al 31/12 por equivocación, ninguna
+   * anterior puede ganarle al desempate, y la cuenta quedaba con un punto de
+   * partida falso para siempre.
+   *
+   * Exige el mismo permiso que declarar (`conciliar`, D7): deshacer el saldo
+   * de partida pesa tanto como fijarlo.
+   */
+  async anularArranque(
+    tenantId: string,
+    userId: string,
+    cuentaBancariaId: string,
+    arranqueId: string,
+    motivo: string,
+  ): Promise<ArranqueAplicadoView> {
+    // 404 si la cuenta no existe o es de otro tenant (REQ-ICB-09). La cuenta
+    // se resuelve ANTES para que un id de arranque ajeno no revele nada.
+    await this.cuentasBancarias.findById(tenantId, cuentaBancariaId);
+
+    const anulado = await this.arranques.anular(tenantId, arranqueId, {
+      motivo,
+      anuladoPorUserId: userId,
+      fechaAnulacion: new Date(),
+    });
+    if (anulado === null) throw new ArranqueYaAnuladoError(arranqueId);
+
+    const nombres = await this.nombresPorUserId(tenantId, [anulado.declaradoPorUserId, userId]);
+    return aArranqueAplicadoView(
+      anulado,
+      nombres.get(anulado.declaradoPorUserId) ?? null,
+      nombres.get(userId) ?? null,
+    );
+  }
+
+  /**
    * Historial COMPLETO de declaraciones de una cuenta bancaria (REQ-ICB-04,
    * D8): la UI muestra todas y señala cuál aplica a un corte — como el orden
    * del repo es `fecha DESC, createdAt DESC` (el MISMO desempate que
@@ -500,11 +552,17 @@ export class InformeConciliacionService {
   ): Promise<ArranqueAplicadoView[]> {
     const cuentaBancaria = await this.cuentasBancarias.findById(tenantId, cuentaBancariaId);
     const filas = await this.arranques.listarHistorial(tenantId, cuentaBancaria.id);
-    const nombres = await this.nombresPorUserId(
-      tenantId,
-      filas.map((f) => f.declaradoPorUserId),
+    const nombres = await this.nombresPorUserId(tenantId, [
+      ...filas.map((f) => f.declaradoPorUserId),
+      ...filas.map((f) => f.anuladoPorUserId).filter((id): id is string => id !== null),
+    ]);
+    return filas.map((f) =>
+      aArranqueAplicadoView(
+        f,
+        nombres.get(f.declaradoPorUserId) ?? null,
+        f.anuladoPorUserId === null ? null : (nombres.get(f.anuladoPorUserId) ?? null),
+      ),
     );
-    return filas.map((f) => aArranqueAplicadoView(f, nombres.get(f.declaradoPorUserId) ?? null));
   }
 
   // ============================================================
@@ -870,6 +928,7 @@ function saldoDeCuenta(saldos: readonly SaldoVigenteRow[], cuentaBancariaId: str
 function aArranqueAplicadoView(
   row: ArranqueConciliado,
   declaradoPorNombre: string | null = null,
+  anuladoPorNombre: string | null = null,
 ): ArranqueAplicadoView {
   return {
     id: row.id,
@@ -881,6 +940,11 @@ function aArranqueAplicadoView(
     declaradoPorUserId: row.declaradoPorUserId,
     declaradoPorNombre,
     declaradoEl: row.createdAt,
+    anulado: row.anulado,
+    motivoAnulacion: row.motivoAnulacion,
+    anuladoPorUserId: row.anuladoPorUserId,
+    anuladoPorNombre,
+    anuladoEl: row.fechaAnulacion,
   };
 }
 

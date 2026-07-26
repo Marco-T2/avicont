@@ -18,6 +18,9 @@ vi.mock('../hooks/use-historial-arranques', () => ({
   useHistorialArranques: vi.fn(),
 }));
 
+vi.mock('../hooks/use-anular-arranque', () => ({
+  useAnularArranque: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 vi.mock('../hooks/use-candidatos-arranque', () => ({
   useCandidatosArranque: vi.fn(() => ({ data: [], isPending: false, isError: false })),
 }));

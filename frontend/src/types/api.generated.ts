@@ -2122,6 +2122,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conciliacion/arranques/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Anula una declaración de arranque: deja de aplicar, pero no se borra ni se oculta.
+         * @description Marca, jamás DELETE (§4.7): el acto anulado sigue en el historial con su motivo y su autor. El informe pasa a usar la declaración anterior, o se emite ABSTENIDO si no queda ninguna. Es la salida que faltaba: "corregir declarando otra" solo funciona si el error NO fue la fecha — declarada una al 31/12 por equivocación, ninguna anterior puede ganarle a `vigenteA`. Mismo permiso que declarar: deshacer el punto de partida pesa tanto como fijarlo.
+         */
+        post: operations["InformeConciliacionController_anularArranque"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movimientos-bancarios": {
         parameters: {
             query?: never;
@@ -4095,6 +4115,14 @@ export interface components {
             declaradoPorNombre: string | null;
             /** @example 2026-07-01T12:00:00.000Z */
             declaradoEl: string;
+            /** @description true ⇒ la declaración fue ANULADA: dejó de aplicar, pero no se borró ni se oculta (§4.7). Que alguien haya fijado mal el punto de partida es parte del rastro. */
+            anulado: boolean;
+            motivoAnulacion: string | null;
+            anuladoPorUserId: string | null;
+            /** @example Marco Tarqui */
+            anuladoPorNombre: string | null;
+            /** @example 2026-07-26T18:00:00.000Z */
+            anuladoEl: string | null;
         };
         DetalleMovimientoPendienteDto: {
             movimientoId: string;
@@ -4299,6 +4327,12 @@ export interface components {
              */
             referenciasPartidas: string[];
             nota?: string;
+        };
+        AnularArranqueDto: {
+            /** Format: uuid */
+            cuentaBancariaId: string;
+            /** @example Se declaró con la fecha del cierre siguiente por error de carga */
+            motivo: string;
         };
         MovimientoVerificadorDto: {
             id: string;
@@ -8458,6 +8492,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidatoPartidaArranqueDto"][];
+                };
+            };
+        };
+    };
+    InformeConciliacionController_anularArranque: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnularArranqueDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArranqueAplicadoDto"];
                 };
             };
         };

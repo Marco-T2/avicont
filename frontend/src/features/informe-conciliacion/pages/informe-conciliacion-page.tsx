@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { PermissionButton } from '@/components/shared/permission-button';
+import { usePermissions } from '@/lib/use-permissions';
 import { PERMISSIONS } from '@/lib/permissions';
 import type { InformeConciliacionParams } from '@/types/api';
 
@@ -35,11 +36,15 @@ export function InformeConciliacionPage(): React.JSX.Element {
   const [params, setParams] = useState<InformeConciliacionParams | null>(null);
   const [declararOpen, setDeclararOpen] = useState(false);
 
+  const { has } = usePermissions();
   const { data, isError, isFetching } = useInformeConciliacion(params);
   const historial = useHistorialArranques(params?.cuentaBancariaId ?? null);
 
   // Derivado en render, sin estado espejo (Anti-F-02).
   const abstenido = data !== undefined && data.arranque === null;
+  // Anular pesa lo mismo que declarar (D7): con solo `read` el historial se ve
+  // entero pero sin la acción. fail-closed lo garantiza `has`.
+  const puedeConciliar = has(PERMISSIONS.contabilidad.conciliacion.conciliar);
 
   const botonDeclarar = (
     <PermissionButton
@@ -122,6 +127,8 @@ export function InformeConciliacionPage(): React.JSX.Element {
               historial={historial.data ?? []}
               corte={params.corte}
               isLoading={historial.isLoading}
+              cuentaBancariaId={params.cuentaBancariaId}
+              puedeConciliar={puedeConciliar}
             />
           </section>
 
