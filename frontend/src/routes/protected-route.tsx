@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 
 import { useAuthStore } from '@/stores/auth-store';
 import { usePermissions } from '@/lib/use-permissions';

@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 
 import { useHasSystemRole } from '@/lib/use-permissions';
 import type { SystemRole } from '@/types/api';

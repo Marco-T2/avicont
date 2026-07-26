@@ -1,6 +1,6 @@
 import { AlertTriangle, ChevronLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 
 import { Can } from '@/components/shared/can';

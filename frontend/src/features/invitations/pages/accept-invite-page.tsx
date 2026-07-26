@@ -7,7 +7,7 @@ import {
   Navigate,
   useNavigate,
   useSearchParams,
-} from 'react-router-dom';
+} from 'react-router';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';

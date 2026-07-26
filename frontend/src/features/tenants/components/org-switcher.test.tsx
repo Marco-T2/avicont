@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as authStoreModule from '@/stores/auth-store';
@@ -12,8 +12,8 @@ import { OrgSwitcher } from './org-switcher';
 // Mock de useNavigate para verificar la redirección post-switch sin montar el
 // router completo (mismo patrón que comprobantes-page.test.tsx).
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-router-dom')>();
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>();
   return {
     ...actual,
     useNavigate: () => mockNavigate,

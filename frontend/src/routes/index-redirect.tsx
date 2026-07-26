@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 
 import { DashboardPage } from '@/features/dashboard/dashboard-page';
 import { Skeleton } from '@/components/ui/skeleton';

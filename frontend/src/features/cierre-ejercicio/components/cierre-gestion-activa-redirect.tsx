@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 // Cross-feature: lista de gestiones fiscales para derivar la gestión activa más reciente.
 // Misma lógica que periodos-fiscales-page.tsx:25-30 (year desc).
