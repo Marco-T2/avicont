@@ -76,6 +76,26 @@ describe('mensajeMotivo — cada motivo en lenguaje de contador, nunca el enum c
     );
   });
 
+  it('ARRANQUE_LIBROS_NO_COINCIDE apunta al mayor y sugiere el asiento de apertura', () => {
+    const motivo: MotivoNoConciliado = {
+      tipo: 'ARRANQUE_LIBROS_NO_COINCIDE',
+      fecha: '2026-06-30',
+      declarado: '250.00',
+      real: '1000.00',
+      diferencia: '750.00',
+    };
+    expect(mensajeMotivo(motivo)).toBe(
+      'El arranque del 30/06/2026 declara un saldo según libros de Bs 250,00, pero el mayor de la cuenta a esa fecha suma Bs 1.000,00 (diferencia de Bs 750,00): puede faltar el asiento de apertura, o el punto de partida está mal declarado.',
+    );
+  });
+
+  it('ARRANQUE_LIBROS_NO_COINCIDE sin montos (contrato degradado) no inventa números', () => {
+    const motivo: MotivoNoConciliado = { tipo: 'ARRANQUE_LIBROS_NO_COINCIDE' };
+    expect(mensajeMotivo(motivo)).toBe(
+      'El saldo según libros declarado en el arranque no coincide con el mayor de la cuenta a esa fecha: revisá la declaración del punto de partida.',
+    );
+  });
+
   it('HUECO sin fechas (contrato degradado) no inventa un tramo', () => {
     const motivo: MotivoNoConciliado = { tipo: 'HUECO' };
     expect(mensajeMotivo(motivo)).toBe(

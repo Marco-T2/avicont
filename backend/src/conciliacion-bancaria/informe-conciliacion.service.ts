@@ -105,6 +105,22 @@ export type MotivoNoConciliado =
       real: Money;
       diferencia: Money;
     }
+  /**
+   * Simétrico del anterior sobre el lado LIBROS: el `saldoLibros` DECLARADO en
+   * el arranque no coincide con el agregado real del mayor a esa fecha. El
+   * residual que el usuario declaró se apoya en ese saldo — si el saldo es
+   * otro, el residual razona sobre una premisa falsa. A diferencia del
+   * extracto, el mayor SIEMPRE tiene valor (sin líneas agrega cero), así que
+   * `real` nunca es nulo: cuando la organización arranca sin asiento de
+   * apertura, este motivo es precisamente el que lo dice.
+   */
+  | {
+      tipo: 'ARRANQUE_LIBROS_NO_COINCIDE';
+      fecha: FechaContable;
+      declarado: Money;
+      real: Money;
+      diferencia: Money;
+    }
   | { tipo: 'DESCUADRE'; importacionId: string }
   | { tipo: 'HUECO'; desde: FechaContable; hasta: FechaContable }
   | { tipo: 'DISCONTINUIDAD'; anteriorId: string; siguienteId: string; diferencia: Money }
@@ -169,9 +185,10 @@ interface VinculoVerificado {
  * cargan y clasifican datos.
  *
  * - Lado banco: `saldosVigentes` (REQ-VMB-08/09) filtrado a la cuenta (D2).
- * - Lado libros: `arranque.saldoLibros` + el agregado de la ventana
- *   `arranque.fecha < fechaContable ≤ corte` (D1/D3) — todo lo anterior al
- *   arranque ya está absorbido en el saldo declarado.
+ * - Lado libros: el agregado REAL del mayor acumulado al corte (D1) — nunca
+ *   el saldo declarado en el arranque. El declarado se usa SOLO para
+ *   contrastarlo contra el mayor a su fecha (`ARRANQUE_LIBROS_NO_COINCIDE`),
+ *   simétrico al contraste del lado banco.
  * - Estados: `domain/estado-efectivo.ts`, el MISMO código que el workspace
  *   (D4) — un match roto se interpreta igual en ambas superficies.
  *
@@ -238,6 +255,7 @@ export class InformeConciliacionService {
           corte,
           arranqueFecha: null,
           arranqueExtracto: null,
+          arranqueLibros: null,
           saldoExtracto,
           residuo: null,
           cobertura,
@@ -250,7 +268,7 @@ export class InformeConciliacionService {
     // inclusivos ⇒ arrancan el día SIGUIENTE al arranque.
     const desdeVentana = arranqueFecha.sumarDias(1).toDbDate();
 
-    const [movs, lineas, suma, saldosAlArranque] = await Promise.all([
+    const [movs, lineas, sumaAlCorte, sumaAlArranque, saldosAlArranque] = await Promise.all([
       this.movimientos.listarPorCuentaBancariaEnRango(tenantId, cuentaBancaria.id, {
         fechaDesde: desdeVentana,
         fechaHasta: consulta.corte,
@@ -260,10 +278,21 @@ export class InformeConciliacionService {
         fechaDesde: desdeVentana,
         fechaHasta: consulta.corte,
       }),
+      // El saldo según libros es el del MAYOR, acumulado desde el origen — NO
+      // `arranque.saldoLibros + delta`. El informe existe para justificar el
+      // saldo de Bancos ante un auditor (proposal §Intent) y un número
+      // declarado no respalda un asiento. La cota de rendimiento del arranque
+      // (D3) aplica al LISTADO del puente, no a este agregado: es una sola
+      // fila de Postgres, la misma consulta que ya usa la rama abstenida.
       this.lineasCuenta.sumarPorCuentaHasta(tenantId, {
         cuentaId: cuentaBancaria.cuentaId,
         hasta: consulta.corte,
-        desde: arranqueRow.fecha,
+      }),
+      // Contraste del lado libros: el mayor real A LA FECHA DEL ARRANQUE,
+      // contra el `saldoLibros` DECLARADO.
+      this.lineasCuenta.sumarPorCuentaHasta(tenantId, {
+        cuentaId: cuentaBancaria.cuentaId,
+        hasta: arranqueRow.fecha,
       }),
       // Contraste del arranque: el saldo REAL del extracto A LA FECHA DEL
       // ARRANQUE (no al corte) — la misma consulta `saldosVigentes` con otra
@@ -281,10 +310,7 @@ export class InformeConciliacionService {
         diferenciaResidual: Money.of(arranqueRow.diferenciaResidual),
       },
       saldoExtracto,
-      // El saldo declarado es la base; la ventana aporta el delta (D1/D3).
-      saldoLibros: Money.of(arranqueRow.saldoLibros)
-        .plus(suma.totalDebito)
-        .minus(suma.totalCredito),
+      saldoLibros: Money.of(sumaAlCorte.totalDebito).minus(sumaAlCorte.totalCredito),
       movimientos: movs.map((mov) => aMovimientoParaInforme(mov, vinculos.get(mov.id) ?? null)),
       lineas: lineas.map((fila) => aLineaParaInforme(fila, reclamos)),
     });
@@ -303,6 +329,10 @@ export class InformeConciliacionService {
         arranqueExtracto: {
           declarado: Money.of(arranqueRow.saldoExtracto),
           real: saldoDeCuenta(saldosAlArranque, cuentaBancaria.id),
+        },
+        arranqueLibros: {
+          declarado: Money.of(arranqueRow.saldoLibros),
+          real: Money.of(sumaAlArranque.totalDebito).minus(sumaAlArranque.totalCredito),
         },
         saldoExtracto,
         residuo: informe.residuo,
@@ -575,6 +605,12 @@ interface ParamsConfiabilidad {
    * veredicto (misma regla que `SIN_SALDO_EXTRACTO`).
    */
   arranqueExtracto: { declarado: Money; real: Money | null } | null;
+  /**
+   * Contraste del lado LIBROS: el `saldoLibros` declarado vs el agregado real
+   * del mayor a la fecha del arranque. `null` sin arranque. `real` NUNCA es
+   * nulo — el agregado devuelve cero sin líneas, y ese cero es información.
+   */
+  arranqueLibros: { declarado: Money; real: Money } | null;
   saldoExtracto: Money | null;
   residuo: Money | null;
   cobertura: readonly CoberturaImportacionRow[];
@@ -629,6 +665,24 @@ function derivarConfiabilidad(p: ParamsConfiabilidad): {
       declarado: p.arranqueExtracto.declarado,
       real: p.arranqueExtracto.real,
       diferencia: p.arranqueExtracto.declarado.minus(p.arranqueExtracto.real).abs(),
+    });
+  }
+
+  // Simétrico sobre el lado libros. No hay caso `null`: el mayor siempre
+  // agrega — sin líneas da cero, y un cero contra un saldo declarado de
+  // Bs 1.000 es exactamente la organización que nunca cargó su asiento de
+  // apertura. Nombrarlo vale más que callarlo.
+  if (
+    p.arranqueFecha !== null &&
+    p.arranqueLibros !== null &&
+    !p.arranqueLibros.declarado.igualaConTolerancia(p.arranqueLibros.real)
+  ) {
+    motivos.push({
+      tipo: 'ARRANQUE_LIBROS_NO_COINCIDE',
+      fecha: p.arranqueFecha,
+      declarado: p.arranqueLibros.declarado,
+      real: p.arranqueLibros.real,
+      diferencia: p.arranqueLibros.declarado.minus(p.arranqueLibros.real).abs(),
     });
   }
 

@@ -12078,6 +12078,7 @@
               "SIN_ARRANQUE",
               "SIN_SALDO_EXTRACTO",
               "ARRANQUE_EXTRACTO_NO_COINCIDE",
+              "ARRANQUE_LIBROS_NO_COINCIDE",
               "DESCUADRE",
               "HUECO",
               "DISCONTINUIDAD",
@@ -12109,7 +12110,7 @@
           "diferencia": {
             "type": "string",
             "example": "200.00",
-            "description": "Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva."
+            "description": "Solo DISCONTINUIDAD y los dos ARRANQUE_*_NO_COINCIDE. Siempre positiva."
           },
           "importe": {
             "type": "string",
@@ -12119,17 +12120,17 @@
           "fecha": {
             "type": "string",
             "example": "2026-06-05",
-            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado."
+            "description": "Solo los dos ARRANQUE_*_NO_COINCIDE: la fecha del arranque contrastado."
           },
           "declarado": {
             "type": "string",
             "example": "15.99",
-            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente."
+            "description": "Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo DECLARADO en el arranque vigente — de extracto o de libros según el motivo."
           },
           "real": {
             "type": "string",
             "example": "714.99",
-            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque."
+            "description": "Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo REAL a la fecha del arranque — del extracto o del mayor según el motivo."
           }
         },
         "required": [
