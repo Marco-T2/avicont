@@ -16,6 +16,7 @@ export const MOTIVOS_NO_CONCILIADO = [
   'SIN_ARRANQUE',
   'SIN_SALDO_EXTRACTO',
   'ARRANQUE_EXTRACTO_NO_COINCIDE',
+  'ARRANQUE_LIBROS_NO_COINCIDE',
   'DESCUADRE',
   'HUECO',
   'DISCONTINUIDAD',
@@ -140,26 +141,28 @@ export class MotivoNoConciliadoDto {
   @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) siguienteId?: string;
   @ApiPropertyOptional({
     example: '200.00',
-    description: 'Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva.',
+    description: 'Solo DISCONTINUIDAD y los dos ARRANQUE_*_NO_COINCIDE. Siempre positiva.',
   })
   diferencia?: string;
   @ApiPropertyOptional({ example: '-0.01', description: 'Solo RESIDUO_NO_EXPLICADO. Firmado.' })
   importe?: string;
   @ApiPropertyOptional({
     example: '2026-06-05',
-    description: 'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado.',
+    description: 'Solo los dos ARRANQUE_*_NO_COINCIDE: la fecha del arranque contrastado.',
   })
   fecha?: string;
   @ApiPropertyOptional({
     example: '15.99',
     description:
-      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente.',
+      'Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo DECLARADO en el arranque ' +
+      'vigente — de extracto o de libros según el motivo.',
   })
   declarado?: string;
   @ApiPropertyOptional({
     example: '714.99',
     description:
-      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque.',
+      'Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo REAL a la fecha del arranque ' +
+      '— del extracto o del mayor según el motivo.',
   })
   real?: string;
 }
@@ -235,6 +238,7 @@ function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
     case 'SIN_SALDO_EXTRACTO':
       return { tipo: motivo.tipo };
     case 'ARRANQUE_EXTRACTO_NO_COINCIDE':
+    case 'ARRANQUE_LIBROS_NO_COINCIDE':
       return {
         tipo: motivo.tipo,
         fecha: motivo.fecha.toIso(),

@@ -29,6 +29,17 @@ export function mensajeMotivo(motivo: MotivoNoConciliado): string {
       }
       return `El saldo de extracto declarado en el arranque${fecha} no coincide con el extracto real a esa fecha: revisá la declaración del punto de partida.`;
     }
+    case 'ARRANQUE_LIBROS_NO_COINCIDE': {
+      const fecha = motivo.fecha !== undefined ? ` del ${formatearFechaContable(motivo.fecha)}` : '';
+      if (motivo.declarado !== undefined && motivo.real !== undefined) {
+        const diferencia =
+          motivo.diferencia !== undefined
+            ? ` (diferencia de Bs ${formatearMontoBob(motivo.diferencia)})`
+            : '';
+        return `El arranque${fecha} declara un saldo según libros de Bs ${formatearMontoBob(motivo.declarado)}, pero el mayor de la cuenta a esa fecha suma Bs ${formatearMontoBob(motivo.real)}${diferencia}: puede faltar el asiento de apertura, o el punto de partida está mal declarado.`;
+      }
+      return `El saldo según libros declarado en el arranque${fecha} no coincide con el mayor de la cuenta a esa fecha: revisá la declaración del punto de partida.`;
+    }
     case 'DESCUADRE':
       return 'Una importación del rango tiene descuadre de verificación: sus movimientos no reproducen el saldo que declara el extracto.';
     case 'HUECO': {

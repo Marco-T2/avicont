@@ -172,7 +172,7 @@ describe('Conciliación — Informe (e2e)', () => {
       .post('/api/auth/login')
       .send({ email: `owner+${slug}@inf.bo`, password: PASSWORD });
 
-    return {
+    const escenario: Escenario = {
       token: loginRes.body.accessToken as string,
       orgId: org.id,
       ownerId: owner.id,
@@ -182,6 +182,22 @@ describe('Conciliación — Informe (e2e)', () => {
       periodoJulioId: periodoJulio.id,
       importacionJulioId: importacionJulio,
     };
+
+    // Asiento de APERTURA al 30/06 por Bs 1.000,00 — el mismo saldo que
+    // `postArranque` declara por defecto.
+    //
+    // No es decoración del fixture: el informe exhibe el saldo del MAYOR, no
+    // el declarado en el arranque. Sin este asiento la organización declararía
+    // un punto de partida de 1.000 sobre un mayor vacío, y eso ya no pasa
+    // callado — dispara ARRANQUE_LIBROS_NO_COINCIDE, que es exactamente la
+    // situación que el motivo existe para nombrar.
+    await crearComprobante(escenario, {
+      fecha: '2026-06-30',
+      monto: '1000.00',
+      tipoBanco: 'DEBITO',
+    });
+
+    return escenario;
   }
 
   async function crearCuenta(
@@ -598,14 +614,20 @@ describe('Conciliación — Informe (e2e)', () => {
     });
 
     // Se declara el arranque al 05/07 con el saldo de APERTURA del día (15.99)
-    // en vez del de cierre — pero con la residual que hace cerrar la identidad:
-    // el caso que NADA detectaba antes de este contraste.
+    // en vez del de cierre — pero con la residual CORRECTA, que hace cerrar la
+    // identidad igual: el caso que NADA detectaba antes de este contraste.
+    //
+    // El lado libros va sano a propósito (1.000,00 = el asiento de apertura,
+    // que es el mayor real a esa fecha) para que el único motivo que pueda
+    // aparecer sea el del extracto. La residual verdadera es
+    // 714,99 − 1.000,00 = −285,01: negativa porque el extracto queda POR
+    // DEBAJO de los libros.
     await postArranque(e.token, {
       cuentaBancariaId: e.cuentaBancariaId,
       fecha: '2026-07-05',
       saldoExtracto: '15.99',
-      saldoLibros: '15.99',
-      diferenciaResidual: '699.00',
+      saldoLibros: '1000.00',
+      diferenciaResidual: '-285.01',
     }).expect(201);
 
     const res = await getInforme(e.token, e.cuentaBancariaId);
@@ -625,5 +647,41 @@ describe('Conciliación — Informe (e2e)', () => {
         diferencia: '699.00',
       },
     ]);
+  });
+
+  it('saldo según libros declarado ≠ mayor real → ARRANQUE_LIBROS_NO_COINCIDE, y el informe exhibe el MAYOR', async () => {
+    const e = await seed();
+
+    // El mayor tiene 1.000,00 (apertura al 30/06) + 200,00 de julio = 1.200,00.
+    // Nada de esto lo declara el usuario: sale de los asientos.
+    await crearComprobante(e, { fecha: '2026-07-10', monto: '200.00', tipoBanco: 'DEBITO' });
+    await crearMovimiento(e, {
+      fecha: '2026-07-10',
+      monto: '200.00',
+      tipo: 'CREDITO',
+      saldo: '1200.00',
+    });
+
+    // Se declara un punto de partida de 250,00 sobre un mayor que dice 1.000,00.
+    await postArranque(e.token, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      saldoLibros: '250.00',
+    }).expect(201);
+
+    const res = await getInforme(e.token, e.cuentaBancariaId);
+
+    expect(res.status).toBe(200);
+    // El informe exhibe el MAYOR, no el declarado: 1.000 + 200 = 1.200,00.
+    // Con el comportamiento anterior habría dicho 250 + 200 = 450,00, un
+    // número que ningún asiento respalda.
+    expect(res.body.saldoLibros).toBe('1200.00');
+    expect(res.body.confiabilidad.conciliado).toBe(false);
+    expect(res.body.confiabilidad.motivos).toContainEqual({
+      tipo: 'ARRANQUE_LIBROS_NO_COINCIDE',
+      fecha: '2026-06-30',
+      declarado: '250.00',
+      real: '1000.00',
+      diferencia: '750.00',
+    });
   });
 });

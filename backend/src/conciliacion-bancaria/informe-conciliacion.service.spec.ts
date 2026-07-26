@@ -200,7 +200,10 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     lineasCuenta = {
       listarPorCuentaEnRango: jest.fn().mockResolvedValue([]),
       listarPorAnclas: jest.fn().mockResolvedValue([]),
-      sumarPorCuentaHasta: jest.fn().mockResolvedValue(suma('0', '0')),
+      // El agregado es el TOTAL del mayor, no un delta: por defecto coincide
+      // con el `saldoLibros` declarado en `arranqueRow()` (990.00), que es el
+      // caso sano — declarado == mayor real, sin motivo de arranque.
+      sumarPorCuentaHasta: jest.fn().mockResolvedValue(suma('990.00', '0')),
     };
 
     importaciones = { listarCoberturaPorCuentaBancaria: jest.fn().mockResolvedValue([]) };
@@ -217,6 +220,27 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
 
   function consultar() {
     return service.obtenerInforme(TENANT, { cuentaBancariaId: CB_ID, corte: CORTE });
+  }
+
+  /**
+   * Mayor REAL: total acumulado al CORTE y total a la fecha del ARRANQUE.
+   * El agregado dejó de ser el delta de la ventana — es el saldo que el
+   * informe EXHIBE — así que cada test declara ambos cortes. Por defecto el
+   * total al arranque iguala al del corte (sin movimiento de libros en la
+   * ventana), y debe igualar al `saldoLibros` declarado para no disparar
+   * `ARRANQUE_LIBROS_NO_COINCIDE`.
+   */
+  function mockMayor(
+    alCorte: { d: string; c?: string },
+    alArranque: { d: string; c?: string } = alCorte,
+  ) {
+    lineasCuenta.sumarPorCuentaHasta.mockImplementation((_t: string, f: { hasta: Date }) =>
+      Promise.resolve(
+        f.hasta.getTime() === CORTE.getTime()
+          ? suma(alCorte.d, alCorte.c ?? '0')
+          : suma(alArranque.d, alArranque.c ?? '0'),
+      ),
+    );
   }
 
   // ----------------------------------------------------------
@@ -266,21 +290,31 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
   // D3: la ventana es `arranque.fecha < fecha <= corte`
   // ----------------------------------------------------------
 
-  it('con arranque → ventana acotada: movimientos desde el día SIGUIENTE al arranque, suma con desde exclusivo', async () => {
+  it('con arranque → el LISTADO del puente se acota a la ventana; los agregados del mayor NO', async () => {
     arranques.vigenteA.mockResolvedValue(arranqueRow());
     movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1200.00')]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
 
     await consultar();
 
+    // La cota D3 aplica al detalle del puente: desde el día SIGUIENTE al arranque.
     expect(movRepo.listarPorCuentaBancariaEnRango).toHaveBeenCalledWith(TENANT, CB_ID, {
       fechaDesde: new Date('2026-07-01T00:00:00.000Z'),
       fechaHasta: CORTE,
     });
+    expect(lineasCuenta.listarPorCuentaEnRango).toHaveBeenCalledWith(TENANT, {
+      cuentaId: CUENTA_PLAN_ID,
+      fechaDesde: new Date('2026-07-01T00:00:00.000Z'),
+      fechaHasta: CORTE,
+    });
+    // Los agregados son ACUMULADOS desde el origen — ninguno lleva `desde`:
+    // uno da el saldo según libros al corte, el otro el contraste del arranque.
     expect(lineasCuenta.sumarPorCuentaHasta).toHaveBeenCalledWith(TENANT, {
       cuentaId: CUENTA_PLAN_ID,
       hasta: CORTE,
-      desde: new Date('2026-06-30T00:00:00.000Z'),
+    });
+    expect(lineasCuenta.sumarPorCuentaHasta).toHaveBeenCalledWith(TENANT, {
+      cuentaId: CUENTA_PLAN_ID,
+      hasta: new Date('2026-06-30T00:00:00.000Z'),
     });
   });
 
@@ -298,7 +332,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     movRepo.listarPorCuentaBancariaEnRango.mockResolvedValue([
       movRow({ id: 'm-pend', monto: new Prisma.Decimal('200.00'), tipo: 'CREDITO' }),
     ]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+    mockMayor({ d: '990.00' });
 
     const informe = await consultar();
 
@@ -309,6 +343,79 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     expect(informe.partidas?.arranque.fecha.toIso()).toBe('2026-06-30');
     expect(informe.partidas?.pendientes.importe.toBob()).toBe('-200.00');
     expect(informe.residuo?.toBob()).toBe('0.00');
+  });
+
+  // ----------------------------------------------------------
+  // REQ-ICB-03: el saldo según libros es el del MAYOR, jamás el declarado
+  // ----------------------------------------------------------
+
+  it('saldo según libros = agregado REAL del mayor al corte, NO el declarado en el arranque', async () => {
+    // El arranque declara libros 990.00. El mayor, en cambio, acumula
+    // 420.00 al corte. El informe debe exhibir 420.00: es el número que el
+    // papel de trabajo tiene que justificar ante un auditor. Un saldo
+    // declarado no respalda un asiento.
+    arranques.vigenteA.mockResolvedValue(arranqueRow());
+    movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1200.00')]);
+    lineasCuenta.sumarPorCuentaHasta.mockImplementation((_t: string, f: { hasta: Date }) =>
+      Promise.resolve(
+        f.hasta.getTime() === CORTE.getTime() ? suma('500.00', '80.00') : suma('990.00', '0'),
+      ),
+    );
+
+    const informe = await consultar();
+
+    expect(informe.saldoLibros.toBob()).toBe('420.00');
+    // Acumulado desde el ORIGEN: el agregado del corte NO lleva `desde`.
+    expect(lineasCuenta.sumarPorCuentaHasta).toHaveBeenCalledWith(TENANT, {
+      cuentaId: CUENTA_PLAN_ID,
+      hasta: CORTE,
+    });
+  });
+
+  it('libros declarado ≠ mayor a la fecha del arranque → ARRANQUE_LIBROS_NO_COINCIDE', async () => {
+    // Simétrico de ARRANQUE_EXTRACTO_NO_COINCIDE: el punto de partida
+    // declarado se contrasta contra el mayor real a esa fecha. El residual
+    // que el usuario declaró se apoya en ese saldo — si el saldo es otro, el
+    // residual razona sobre una premisa falsa.
+    arranques.vigenteA.mockResolvedValue(arranqueRow());
+    movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1200.00')]);
+    lineasCuenta.sumarPorCuentaHasta.mockImplementation((_t: string, f: { hasta: Date }) =>
+      Promise.resolve(
+        f.hasta.getTime() === CORTE.getTime() ? suma('500.00', '0') : suma('500.00', '0'),
+      ),
+    );
+
+    const informe = await consultar();
+
+    expect(informe.confiabilidad.conciliado).toBe(false);
+    expect(informe.confiabilidad.motivos).toContainEqual(
+      expect.objectContaining({
+        tipo: 'ARRANQUE_LIBROS_NO_COINCIDE',
+        declarado: expect.objectContaining({}),
+      }),
+    );
+    const motivo = informe.confiabilidad.motivos.find(
+      (m) => m.tipo === 'ARRANQUE_LIBROS_NO_COINCIDE',
+    );
+    expect(motivo).toBeDefined();
+    if (motivo?.tipo === 'ARRANQUE_LIBROS_NO_COINCIDE') {
+      expect(motivo.declarado.toBob()).toBe('990.00');
+      expect(motivo.real.toBob()).toBe('500.00');
+      expect(motivo.diferencia.toBob()).toBe('490.00');
+      expect(motivo.fecha.toIso()).toBe('2026-06-30');
+    }
+  });
+
+  it('libros declarado que SÍ coincide con el mayor → sin motivo de arranque', async () => {
+    arranques.vigenteA.mockResolvedValue(arranqueRow());
+    movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1000.00')]);
+    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('990.00', '0'));
+
+    const informe = await consultar();
+
+    expect(informe.confiabilidad.motivos.map((m) => m.tipo)).not.toContain(
+      'ARRANQUE_LIBROS_NO_COINCIDE',
+    );
   });
 
   // ----------------------------------------------------------
@@ -345,7 +452,8 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     movRepo.listarPorCuentaBancariaEnRango.mockResolvedValue([mov]);
     matchRepo.listarPorMovimientos.mockResolvedValue([matchSano('m-cargo', lineaAgosto)]);
     lineasCuenta.listarPorAnclas.mockResolvedValue([lineaAgosto]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+    // El asiento es de agosto: al corte el mayor sigue en 1000, igual al declarado.
+    mockMayor({ d: '1000.00' });
 
     const informe = await consultar();
 
@@ -395,7 +503,8 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
         tipo: 'DEBITO',
       }),
     ]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '400.00'));
+    // Mayor: 1000 al arranque, 600 al corte (el cheque de julio por 400).
+    mockMayor({ d: '1000.00', c: '400.00' }, { d: '1000.00' });
 
     const informe = await consultar();
 
@@ -445,7 +554,8 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
         tipo: 'CREDITO',
       }),
     ]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('500.00', '0'));
+    // Mayor: 1000 al arranque, 1500 al corte (el asiento de julio por 500).
+    mockMayor({ d: '1500.00' }, { d: '1000.00' });
 
     const informe = await consultar();
 
@@ -461,7 +571,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
   it('el banco no publica saldo ≤ corte → saldoExtracto y residuo nulos, el informe se emite igual', async () => {
     arranques.vigenteA.mockResolvedValue(arranqueRow());
     movRepo.saldosVigentes.mockResolvedValue([saldoVigente(null)]);
-    lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+    mockMayor({ d: '990.00' });
 
     const informe = await consultar();
 
@@ -480,7 +590,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     function armarEscenarioQueCierra() {
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1000.00')]);
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
       // residuo = 990 − 1000 − 0 − 0 − 0 − (−10) = 0
     }
 
@@ -603,7 +713,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
           saldoVigente(fecha.toISOString().startsWith('2026-06-30') ? '1000.00' : '1050.00'),
         ]),
       );
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
       importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
         importacion('imp-jul', '2026-07-01', '2026-07-31'),
       ]);
@@ -664,7 +774,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       // corte, el motivo dispararía SIEMPRE que hubiera movimiento posterior.
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       saldosPorFecha({ '2026-06-30': '1000.00', '2026-07-31': '1200.00' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
 
       const informe = await consultar();
 
@@ -683,7 +793,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       // distintas y cada una se nombra por separado.
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       saldosPorFecha({ '2026-06-30': '1699.00', '2026-07-31': '1050.00' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
 
       const informe = await consultar();
 
@@ -717,7 +827,10 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
         }),
       );
       saldosPorFecha({ '2026-06-05': '714.99', '2026-07-31': '714.99' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      // El lado libros SÍ está sano: el mayor vale 15.99 al arranque y al
+      // corte. Lo único podrido es el saldo de extracto declarado — así el
+      // test aísla el motivo del banco de su simétrico de libros.
+      mockMayor({ d: '15.99' });
 
       const informe = await consultar();
 
@@ -738,7 +851,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     it('sin saldo publicado a la fecha del arranque (fila con saldo null) → sin motivo: sin dato no hay veredicto', async () => {
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       saldosPorFecha({ '2026-06-30': null, '2026-07-31': '1000.00' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
 
       const informe = await consultar();
 
@@ -749,7 +862,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     it('sin NINGÚN movimiento hasta la fecha del arranque (sin fila) → sin motivo, sin acusación', async () => {
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       saldosPorFecha({ '2026-07-31': '1000.00' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
 
       const informe = await consultar();
 
@@ -759,7 +872,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     it('diferencia dentro de la tolerancia (0.01, la MISMA de la continuidad) → sin motivo', async () => {
       arranques.vigenteA.mockResolvedValue(arranqueRow());
       saldosPorFecha({ '2026-06-30': '1000.01', '2026-07-31': '1000.00' });
-      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+      mockMayor({ d: '990.00' });
 
       const informe = await consultar();
 

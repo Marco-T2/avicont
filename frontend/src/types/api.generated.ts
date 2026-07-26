@@ -4138,7 +4138,7 @@ export interface components {
         };
         MotivoNoConciliadoDto: {
             /** @enum {string} */
-            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "ARRANQUE_EXTRACTO_NO_COINCIDE" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
+            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "ARRANQUE_EXTRACTO_NO_COINCIDE" | "ARRANQUE_LIBROS_NO_COINCIDE" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
             /** @description Solo DESCUADRE. */
             importacionId?: string;
             /**
@@ -4156,7 +4156,7 @@ export interface components {
             /** @description Solo DISCONTINUIDAD. */
             siguienteId?: string;
             /**
-             * @description Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva.
+             * @description Solo DISCONTINUIDAD y los dos ARRANQUE_*_NO_COINCIDE. Siempre positiva.
              * @example 200.00
              */
             diferencia?: string;
@@ -4166,17 +4166,17 @@ export interface components {
              */
             importe?: string;
             /**
-             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado.
+             * @description Solo los dos ARRANQUE_*_NO_COINCIDE: la fecha del arranque contrastado.
              * @example 2026-06-05
              */
             fecha?: string;
             /**
-             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente.
+             * @description Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo DECLARADO en el arranque vigente — de extracto o de libros según el motivo.
              * @example 15.99
              */
             declarado?: string;
             /**
-             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque.
+             * @description Solo los dos ARRANQUE_*_NO_COINCIDE: el saldo REAL a la fecha del arranque — del extracto o del mayor según el motivo.
              * @example 714.99
              */
             real?: string;
