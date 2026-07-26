@@ -6,6 +6,7 @@ import type {
   MatchConciliacion,
   Moneda,
   MovimientoBancario,
+  OrigenPartidaArranque,
 } from '@prisma/client';
 
 import {
@@ -20,6 +21,9 @@ import { UsuarioReaderPort, USUARIO_READER_PORT } from '@/users/ports/usuario-re
 import { CuentasBancariasService } from './cuentas-bancarias.service';
 import {
   armarInforme,
+  DetalleLineaEnTransito,
+  DetalleMovimientoIgnorado,
+  DetalleMovimientoPendiente,
   InformeConciliacion,
   LineaParaInforme,
   MovimientoParaInforme,
@@ -30,12 +34,16 @@ import {
   derivarEstadoEfectivoLinea,
   derivarEstadoEfectivoMovimiento,
 } from './domain/estado-efectivo';
-import { ConciliacionMonedaNoSoportadaError } from './domain/informe-errors';
+import {
+  ConciliacionMonedaNoSoportadaError,
+  PartidasDeArranqueDesconocidasError,
+} from './domain/informe-errors';
 import { verificarAnclas } from './domain/verificar-anclas';
 import { aLineaContableActual, aSnapshot, claveAncla, ladoYMonto } from './mapeo-linea-contable';
 import {
   ArranqueConciliadoRepositoryPort,
   ARRANQUE_CONCILIADO_REPOSITORY_PORT,
+  PartidaAbiertaCreateData,
 } from './ports/arranque-conciliado.repository.port';
 import {
   CoberturaImportacionRow,
@@ -51,6 +59,13 @@ import {
   MOVIMIENTO_BANCARIO_REPOSITORY_PORT,
   SaldoVigenteRow,
 } from './ports/movimiento-bancario.repository.port';
+
+/**
+ * Piso del escaneo que congela las partidas abiertas: `@db.Date`, así que
+ * medianoche UTC (§4.6). No hay "sin fecha desde" en el port de rango, y una
+ * organización boliviana no tiene asientos anteriores a esto.
+ */
+const ORIGEN_DE_LOS_TIEMPOS = new Date('1900-01-01T00:00:00.000Z');
 
 // ============================================================
 // Consulta y resultado — dominio en Money/FechaContable; el DTO
@@ -165,6 +180,31 @@ export interface InformeConciliacionResultado {
   insumos: { importaciones: ImportacionInsumoView[] };
 }
 
+/**
+ * Una partida que el sistema PROPONE arrastrar al declarar el arranque.
+ *
+ * Es una propuesta, no un veredicto: una línea contable anterior al arranque
+ * sin movimiento que la reclame puede ser un cheque en circulación —que SÍ hay
+ * que arrastrar— o el asiento de apertura, cuyo saldo YA está dentro del
+ * extracto declarado. Con los datos disponibles esas dos cosas son
+ * indistinguibles: si la organización importó extractos recién desde el
+ * arranque, TODA línea anterior parece en tránsito.
+ *
+ * Por eso decide el contador. El sistema aporta lo que sabe (la lista y los
+ * importes exactos) y la aritmética que lo verifica: la suma de lo que se
+ * confirme debe dar `saldoLibros − saldoExtracto + diferenciaResidual`.
+ */
+export interface CandidatoPartidaArranque {
+  /** Id estable con el que el cliente confirma: `MOV:<id>` o `LIN:<comprobanteId>:<orden>`. */
+  referencia: string;
+  origen: OrigenPartidaArranque;
+  fecha: FechaContable;
+  /** Contribución FIRMADA extracto→libros. Sale del dato, nunca del cliente. */
+  importe: Money;
+  /** Glosa o descripción — con esto una persona reconoce cuál es cuál. */
+  descripcion: string;
+}
+
 /** Los CUATRO datos del arranque, DECLARADOS por el usuario (REQ-ICB-04). */
 export interface DeclaracionArranque {
   cuentaBancariaId: string;
@@ -178,6 +218,12 @@ export interface DeclaracionArranque {
    */
   diferenciaResidual: Money;
   nota: string | null;
+  /**
+   * Las partidas abiertas que el usuario CONFIRMÓ arrastrar, por referencia.
+   * El servidor re-deriva los candidatos y se queda con estas: el cliente
+   * elige cuáles, nunca cuánto — los importes salen del dato.
+   */
+  referenciasPartidas: readonly string[];
 }
 
 /** Vínculo verificado de un match: la línea ACTUAL resuelta + motivo de rotura. */
@@ -326,6 +372,7 @@ export class InformeConciliacionService {
     const vinculos = await this.verificarVinculos(tenantId, movs, lineas);
     const reclamos = await this.resolverReclamosDeLineas(tenantId, movs, vinculos);
     const nombres = await this.nombresPorUserId(tenantId, [arranqueRow.declaradoPorUserId]);
+    const delArranque = await this.partidasDelArranqueAunAbiertas(tenantId, arranqueRow.id, corte);
 
     const informe = armarInforme({
       corte,
@@ -337,6 +384,9 @@ export class InformeConciliacionService {
       saldoLibros: Money.of(sumaAlCorte.totalDebito).minus(sumaAlCorte.totalCredito),
       movimientos: movs.map((mov) => aMovimientoParaInforme(mov, vinculos.get(mov.id) ?? null)),
       lineas: lineas.map((fila) => aLineaParaInforme(fila, reclamos)),
+      pendientesDelArranque: delArranque.pendientes,
+      ignoradosDelArranque: delArranque.ignorados,
+      enTransitoDelArranque: delArranque.enTransito,
     });
 
     return {
@@ -393,9 +443,27 @@ export class InformeConciliacionService {
     // que ningún informe podrá usar (v1 = BOB).
     this.exigirMonedaSoportada(cuentaBancaria);
 
+    // Se re-derivan los candidatos y se conservan SOLO los confirmados. El
+    // cliente manda referencias, no importes: así no puede inventar una
+    // partida ni torcer un monto para hacer cerrar la identidad.
+    const candidatos = await this.calcularCandidatosA(tenantId, cuentaBancaria, declaracion.fecha);
+    const porReferencia = new Map(candidatos.map((c) => [c.referencia, c]));
+    const desconocidas = declaracion.referenciasPartidas.filter((r) => !porReferencia.has(r));
+    if (desconocidas.length > 0) {
+      // Falla fuerte en vez de descartar en silencio: una referencia que no
+      // resuelve significa que el cliente vio otra foto de la cuenta que la
+      // que hay ahora, y declarar sobre una foto vieja es justamente lo que
+      // este acto no puede permitirse.
+      throw new PartidasDeArranqueDesconocidasError(desconocidas);
+    }
+    const partidasAbiertas = declaracion.referenciasPartidas.map((r) =>
+      this.aPartidaCreate(porReferencia.get(r) as CandidatoPartidaArranque),
+    );
+
     const creado = await this.arranques.crear(tenantId, {
       cuentaBancariaId: cuentaBancaria.id,
       fecha: declaracion.fecha,
+      partidasAbiertas,
       saldoExtracto: declaracion.saldoExtracto.toPrismaDecimal(),
       saldoLibros: declaracion.saldoLibros.toPrismaDecimal(),
       diferenciaResidual: declaracion.diferenciaResidual.toPrismaDecimal(),
@@ -485,6 +553,245 @@ export class InformeConciliacionService {
       );
       resultado.set(match.movimientoBancarioId, { match, lineaActual, roto: motivo });
     }
+    return resultado;
+  }
+
+  /**
+   * Las partidas ABIERTAS a la fecha del arranque, en el momento de declararlo.
+   *
+   * Este es el ÚNICO lugar donde se paga el escaneo desde el origen de la
+   * cuenta, y se paga una vez por declaración en vez de una vez por informe.
+   * Es también el único momento en que se puede: el ancla `(comprobanteId,
+   * orden)` no tiene FK, así que "líneas sin match" no se puede preguntar en
+   * una query — hay que traerlas y cruzarlas, y eso solo es tolerable acá.
+   *
+   * Abierta = su contraparte no existe, o existe pero es POSTERIOR a la fecha
+   * del arranque. La derivación usa `estado-efectivo.ts`, el MISMO código que
+   * el workspace y el informe (D4).
+   */
+  async listarCandidatosDeArranque(
+    tenantId: string,
+    cuentaBancariaId: string,
+    fecha: Date,
+  ): Promise<CandidatoPartidaArranque[]> {
+    const cuentaBancaria = await this.cuentasBancarias.findById(tenantId, cuentaBancariaId);
+    this.exigirMonedaSoportada(cuentaBancaria);
+    return this.calcularCandidatosA(tenantId, cuentaBancaria, fecha);
+  }
+
+  private async calcularCandidatosA(
+    tenantId: string,
+    cuentaBancaria: CuentaBancaria,
+    fecha: Date,
+  ): Promise<CandidatoPartidaArranque[]> {
+    const corteArranque = FechaContable.fromDbDate(fecha);
+    const [movs, lineas] = await Promise.all([
+      this.movimientos.listarPorCuentaBancariaEnRango(tenantId, cuentaBancaria.id, {
+        fechaDesde: ORIGEN_DE_LOS_TIEMPOS,
+        fechaHasta: fecha,
+      }),
+      this.lineasCuenta.listarPorCuentaEnRango(tenantId, {
+        cuentaId: cuentaBancaria.cuentaId,
+        fechaDesde: ORIGEN_DE_LOS_TIEMPOS,
+        fechaHasta: fecha,
+      }),
+    ]);
+
+    const vinculos = await this.verificarVinculos(tenantId, movs, lineas);
+    const reclamos = await this.resolverReclamosDeLineas(tenantId, movs, vinculos);
+
+    const candidatos: CandidatoPartidaArranque[] = [];
+
+    for (const mov of movs) {
+      const estado = derivarEstadoEfectivoMovimiento(
+        mov.estado,
+        (() => {
+          const v = vinculos.get(mov.id);
+          return v === undefined ? null : { roto: v.roto };
+        })(),
+      );
+      if (estado === 'CONCILIADO') {
+        const lineaActual = vinculos.get(mov.id)?.lineaActual ?? null;
+        // Con el asiento ≤ arranque el par ya está en ambos saldos declarados:
+        // cerrado, no es partida. Con el asiento posterior, sigue abierto.
+        if (
+          lineaActual !== null &&
+          !FechaContable.fromDbDate(lineaActual.fechaContable).isAfter(corteArranque)
+        ) {
+          continue;
+        }
+      }
+      // Mismo signo que `armarInforme`: un CREDITO bancario ya está en el
+      // extracto y falta en libros ⇒ para llegar a libros se RESTA.
+      const monto = Money.of(mov.monto);
+      candidatos.push({
+        referencia: `MOV:${mov.id}`,
+        origen: estado === 'IGNORADO' ? 'MOVIMIENTO_IGNORADO' : 'MOVIMIENTO_PENDIENTE',
+        fecha: FechaContable.fromDbDate(mov.fecha),
+        importe: mov.tipo === 'CREDITO' ? Money.ZERO.minus(monto) : monto,
+        descripcion: mov.descripcion,
+      });
+    }
+
+    for (const fila of lineas) {
+      const reclamadaEl = reclamos.get(claveAncla(fila.comprobanteId, fila.orden)) ?? null;
+      if (reclamadaEl !== null && !reclamadaEl.isAfter(corteArranque)) continue;
+      const { tipo, monto } = ladoYMonto(fila);
+      candidatos.push({
+        referencia: `LIN:${fila.comprobanteId}:${fila.orden}`,
+        origen: 'LINEA',
+        fecha: FechaContable.fromDbDate(fila.fechaContable),
+        importe: tipo === 'DEBITO' ? monto : Money.ZERO.minus(monto),
+        // Con qué el contador reconoce un cheque frente a un asiento de
+        // apertura: la glosa y el número del comprobante.
+        descripcion:
+          fila.numeroComprobante === null
+            ? fila.glosa
+            : `${fila.numeroComprobante} — ${fila.glosa}`,
+      });
+    }
+
+    return candidatos;
+  }
+
+  /** `referencia` → fila persistible. El importe sale del dato, no del cliente. */
+  private aPartidaCreate(c: CandidatoPartidaArranque): PartidaAbiertaCreateData {
+    const [prefijo, ...resto] = c.referencia.split(':');
+    return prefijo === 'MOV'
+      ? {
+          origen: c.origen,
+          movimientoBancarioId: resto[0] ?? '',
+          comprobanteId: null,
+          orden: null,
+          fecha: c.fecha.toDbDate(),
+          importe: c.importe.toPrismaDecimal(),
+        }
+      : {
+          origen: 'LINEA',
+          movimientoBancarioId: null,
+          comprobanteId: resto[0] ?? '',
+          orden: Number(resto[1] ?? 0),
+          fecha: c.fecha.toDbDate(),
+          importe: c.importe.toPrismaDecimal(),
+        };
+  }
+
+  /**
+   * Las partidas congeladas al declarar el arranque que SIGUEN abiertas al
+   * corte, ya en forma de detalle.
+   *
+   * Congelarlas resolvió el problema de encontrarlas (el ancla no tiene FK y
+   * el SQL crudo contra el núcleo contable está vedado); saber si se cerraron
+   * DESPUÉS es otra pregunta, y esta sí es barata: la lista es chica, así que
+   * se verifica con los mismos ports acotados que usa la ventana. Una partida
+   * cuya contraparte llegó dentro de `(arranque, corte]` YA está en ambos
+   * saldos y sumarla la cobraría dos veces.
+   */
+  private async partidasDelArranqueAunAbiertas(
+    tenantId: string,
+    arranqueId: string,
+    corte: FechaContable,
+  ): Promise<{
+    pendientes: DetalleMovimientoPendiente[];
+    ignorados: DetalleMovimientoIgnorado[];
+    enTransito: DetalleLineaEnTransito[];
+  }> {
+    const congeladas = await this.arranques.listarPartidasAbiertas(tenantId, arranqueId);
+    const vacio = { pendientes: [], ignorados: [], enTransito: [] };
+    if (congeladas.length === 0) return vacio;
+
+    const movIds = congeladas
+      .map((p) => p.movimientoBancarioId)
+      .filter((id): id is string => id !== null);
+    const anclas = congeladas
+      .filter((p) => p.comprobanteId !== null && p.orden !== null)
+      .map((p) => ({ comprobanteId: p.comprobanteId as string, orden: p.orden as number }));
+
+    // Contraparte de los movimientos congelados: el asiento que los reclama.
+    const movs = movIds.length > 0 ? await this.movimientos.listarPorIds(tenantId, movIds) : [];
+    const vinculos = await this.verificarVinculos(tenantId, movs, []);
+
+    // Contraparte de las líneas congeladas: el movimiento que las reclama.
+    const matchesPorAncla =
+      anclas.length > 0 ? await this.matches.listarPorAnclas(tenantId, anclas) : [];
+    const lineasActuales =
+      anclas.length > 0 ? await this.lineasCuenta.listarPorAnclas(tenantId, anclas) : [];
+    const lineaPorAncla = new Map(
+      lineasActuales.map((l) => [claveAncla(l.comprobanteId, l.orden), l]),
+    );
+    const movsDeAnclas =
+      matchesPorAncla.length > 0
+        ? await this.movimientos.listarPorIds(
+            tenantId,
+            matchesPorAncla.map((m) => m.movimientoBancarioId),
+          )
+        : [];
+    const fechaMovPorId = new Map(
+      movsDeAnclas.map((m) => [m.id, FechaContable.fromDbDate(m.fecha)]),
+    );
+    const cierrePorAncla = new Map<string, FechaContable>();
+    for (const match of matchesPorAncla) {
+      const clave = claveAncla(match.comprobanteId, match.orden);
+      const lineaActual = lineaPorAncla.get(clave) ?? null;
+      // Un vínculo ROTO no cierra nada: la línea vuelve al pool, igual que en
+      // el workspace (REQ-CB-11). El MISMO criterio que la ventana.
+      const { motivo } = verificarAnclas(
+        aSnapshot(match),
+        lineaActual === null ? null : aLineaContableActual(lineaActual),
+      );
+      if (motivo !== null) continue;
+      const fechaMov = fechaMovPorId.get(match.movimientoBancarioId);
+      if (fechaMov !== undefined) cierrePorAncla.set(clave, fechaMov);
+    }
+
+    const resultado = {
+      pendientes: [] as DetalleMovimientoPendiente[],
+      ignorados: [] as DetalleMovimientoIgnorado[],
+      enTransito: [] as DetalleLineaEnTransito[],
+    };
+
+    for (const partida of congeladas) {
+      const fecha = FechaContable.fromDbDate(partida.fecha);
+      const importe = Money.of(partida.importe);
+
+      if (partida.origen === 'LINEA') {
+        const clave = claveAncla(partida.comprobanteId ?? '', partida.orden ?? 0);
+        const cerradaEl = cierrePorAncla.get(clave);
+        if (cerradaEl !== undefined && !cerradaEl.isAfter(corte)) continue;
+        resultado.enTransito.push({
+          comprobanteId: partida.comprobanteId ?? '',
+          orden: partida.orden ?? 0,
+          fecha,
+          importe,
+          registradoPorBancoEl: cerradaEl ?? null,
+          anteriorAlArranque: true,
+        });
+        continue;
+      }
+
+      const movimientoId = partida.movimientoBancarioId ?? '';
+      if (partida.origen === 'MOVIMIENTO_IGNORADO') {
+        // No se re-evalúa contra los matches: ignorar es una decisión manual y
+        // un IGNORADO no tiene contraparte que pueda llegar (REQ-CB-11).
+        resultado.ignorados.push({ movimientoId, fecha, importe, anteriorAlArranque: true });
+        continue;
+      }
+
+      const vinculo = vinculos.get(movimientoId) ?? null;
+      const asentadoEl =
+        vinculo !== null && vinculo.roto === null && vinculo.lineaActual !== null
+          ? FechaContable.fromDbDate(vinculo.lineaActual.fechaContable)
+          : null;
+      if (asentadoEl !== null && !asentadoEl.isAfter(corte)) continue;
+      resultado.pendientes.push({
+        movimientoId,
+        fecha,
+        importe,
+        asentadoEl,
+        anteriorAlArranque: true,
+      });
+    }
+
     return resultado;
   }
 

@@ -167,7 +167,12 @@ function saldoVigente(saldo: string | null) {
 
 describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
   let cuentasBancarias: { findById: jest.Mock };
-  let arranques: { vigenteA: jest.Mock; crear: jest.Mock; listarHistorial: jest.Mock };
+  let arranques: {
+    vigenteA: jest.Mock;
+    crear: jest.Mock;
+    listarHistorial: jest.Mock;
+    listarPartidasAbiertas: jest.Mock;
+  };
   let movRepo: {
     listarPorCuentaBancariaEnRango: jest.Mock;
     saldosVigentes: jest.Mock;
@@ -189,6 +194,9 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       vigenteA: jest.fn().mockResolvedValue(null),
       crear: jest.fn(),
       listarHistorial: jest.fn().mockResolvedValue([]),
+      // Sin partidas congeladas por defecto: el caso de un arranque declarado
+      // sobre una cuenta sin nada abierto antes.
+      listarPartidasAbiertas: jest.fn().mockResolvedValue([]),
     };
     movRepo = {
       listarPorCuentaBancariaEnRango: jest.fn().mockResolvedValue([]),
@@ -427,6 +435,138 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     expect(informe.confiabilidad.motivos.map((m) => m.tipo)).not.toContain(
       'ARRANQUE_LIBROS_NO_COINCIDE',
     );
+  });
+
+  // ----------------------------------------------------------
+  // Partidas ya abiertas al declarar el arranque (auditoría, CRÍTICO 1)
+  // ----------------------------------------------------------
+
+  describe('partidas congeladas al declarar el arranque', () => {
+    function partidaCongelada(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'pa-1',
+        organizationId: TENANT,
+        arranqueId: 'arr-1',
+        origen: 'LINEA',
+        movimientoBancarioId: null,
+        comprobanteId: 'comp-jun',
+        orden: 1,
+        fecha: new Date('2026-06-20T00:00:00.000Z'),
+        importe: new Prisma.Decimal('-1000.00'),
+        ...overrides,
+      };
+    }
+
+    // El cheque girado el 20/06, arranque al 30/06, sin cobrar al corte.
+    // Antes de congelar las partidas esto salía como RESIDUO_NO_EXPLICADO.
+    it('la que sigue abierta al corte entra al puente y la identidad cierra', async () => {
+      arranques.vigenteA.mockResolvedValue(
+        arranqueRow({
+          saldoExtracto: new Prisma.Decimal('10000.00'),
+          saldoLibros: new Prisma.Decimal('9000.00'),
+          diferenciaResidual: new Prisma.Decimal('0'),
+        }),
+      );
+      arranques.listarPartidasAbiertas.mockResolvedValue([partidaCongelada()]);
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('10000.00')]);
+      mockMayor({ d: '9000.00' });
+
+      const informe = await consultar();
+
+      expect(informe.partidas?.enTransito.detalle).toHaveLength(1);
+      expect(informe.partidas?.enTransito.detalle[0]?.anteriorAlArranque).toBe(true);
+      expect(informe.residuo?.toBob()).toBe('0.00');
+      expect(informe.confiabilidad.motivos.map((m) => m.tipo)).not.toContain(
+        'RESIDUO_NO_EXPLICADO',
+      );
+    });
+
+    // Si el banco cobró el cheque DENTRO de la ventana, la partida ya está en
+    // ambos saldos: volver a sumarla la cobraría dos veces.
+    it('la que se cerró dentro de la ventana NO se suma', async () => {
+      arranques.vigenteA.mockResolvedValue(
+        arranqueRow({
+          saldoExtracto: new Prisma.Decimal('10000.00'),
+          saldoLibros: new Prisma.Decimal('9000.00'),
+          diferenciaResidual: new Prisma.Decimal('0'),
+        }),
+      );
+      arranques.listarPartidasAbiertas.mockResolvedValue([partidaCongelada()]);
+      const lineaJunio = lineaRow({
+        comprobanteId: 'comp-jun',
+        orden: 1,
+        fechaContable: new Date('2026-06-20T00:00:00.000Z'),
+        debito: new Prisma.Decimal(0),
+        credito: new Prisma.Decimal('1000.00'),
+        debitoBob: new Prisma.Decimal(0),
+        creditoBob: new Prisma.Decimal('1000.00'),
+      });
+      // El banco lo cobró el 10/07: dentro de la ventana.
+      matchRepo.listarPorAnclas.mockResolvedValue([matchSano('m-jul', lineaJunio)]);
+      lineasCuenta.listarPorAnclas.mockResolvedValue([lineaJunio]);
+      movRepo.listarPorIds.mockResolvedValue([
+        movRow({
+          id: 'm-jul',
+          fecha: new Date('2026-07-10T00:00:00.000Z'),
+          monto: new Prisma.Decimal('1000.00'),
+          tipo: 'DEBITO',
+        }),
+      ]);
+      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('9000.00')]);
+      mockMayor({ d: '9000.00' });
+
+      const informe = await consultar();
+
+      expect(informe.partidas?.enTransito.detalle).toEqual([]);
+      expect(informe.residuo?.toBob()).toBe('0.00');
+    });
+
+    it('declarar un arranque congela lo que estaba abierto a esa fecha', async () => {
+      // Un movimiento de junio sin asentar y una línea de junio sin cobrar.
+      movRepo.listarPorCuentaBancariaEnRango.mockResolvedValue([
+        movRow({
+          id: 'm-jun',
+          fecha: new Date('2026-06-15T00:00:00.000Z'),
+          monto: new Prisma.Decimal('300.00'),
+          tipo: 'CREDITO',
+        }),
+      ]);
+      lineasCuenta.listarPorCuentaEnRango.mockResolvedValue([
+        lineaRow({
+          comprobanteId: 'comp-jun',
+          fechaContable: new Date('2026-06-20T00:00:00.000Z'),
+          debito: new Prisma.Decimal(0),
+          credito: new Prisma.Decimal('1000.00'),
+          debitoBob: new Prisma.Decimal(0),
+          creditoBob: new Prisma.Decimal('1000.00'),
+        }),
+      ]);
+      arranques.crear.mockResolvedValue(arranqueRow());
+
+      await service.declararArranque(TENANT, 'user-1', {
+        cuentaBancariaId: CB_ID,
+        fecha: new Date('2026-06-30T00:00:00.000Z'),
+        saldoExtracto: Money.of('10000'),
+        saldoLibros: Money.of('9000'),
+        diferenciaResidual: Money.of('0'),
+        nota: null,
+        // Se confirman las dos partidas propuestas.
+        referenciasPartidas: ['MOV:m-jun', 'LIN:comp-jun:1'],
+      });
+
+      const data = arranques.crear.mock.calls[0][1] as {
+        partidasAbiertas: { origen: string; importe: Prisma.Decimal }[];
+      };
+      expect(data.partidasAbiertas).toHaveLength(2);
+      // CREDITO bancario ⇒ contribución NEGATIVA hacia libros.
+      expect(
+        data.partidasAbiertas.find((p) => p.origen === 'MOVIMIENTO_PENDIENTE')?.importe.toFixed(2),
+      ).toBe('-300.00');
+      // CREDITO contable (cheque girado) ⇒ también negativa.
+      expect(data.partidasAbiertas.find((p) => p.origen === 'LINEA')?.importe.toFixed(2)).toBe(
+        '-1000.00',
+      );
+    });
   });
 
   // ----------------------------------------------------------
@@ -903,6 +1043,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       saldoLibros: Money.of('990.00'),
       diferenciaResidual: Money.of('10.00'),
       nota: null,
+      referenciasPartidas: [],
     };
 
     it('cuenta en USD → CONCILIACION_MONEDA_NO_SOPORTADA y NO se persiste nada', async () => {

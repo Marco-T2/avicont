@@ -402,6 +402,7 @@ describe('Conciliación — Informe (e2e)', () => {
       saldoLibros?: string;
       diferenciaResidual?: string;
       nota?: string;
+      referenciasPartidas?: string[];
     },
   ) {
     return request(app.getHttpServer())
@@ -412,8 +413,20 @@ describe('Conciliación — Informe (e2e)', () => {
         saldoExtracto: '1000.00',
         saldoLibros: '1000.00',
         diferenciaResidual: '0.00',
+        // Por defecto NO se arrastra nada: el asiento de apertura del seed
+        // figura entre los candidatos y NO es una partida conciliatoria — su
+        // saldo ya está dentro del extracto declarado. Confirmarlo sería el
+        // error que este endpoint existe para evitar.
+        referenciasPartidas: [],
         ...body,
       });
+  }
+
+  function getCandidatos(token: string, cuentaBancariaId: string, fecha: string) {
+    return request(app.getHttpServer())
+      .get('/api/conciliacion/arranques/candidatos')
+      .query({ cuentaBancariaId, fecha })
+      .set('Authorization', `Bearer ${token}`);
   }
 
   // ==========================================================
@@ -683,5 +696,95 @@ describe('Conciliación — Informe (e2e)', () => {
       real: '1000.00',
       diferencia: '750.00',
     });
+  });
+
+  it('cheque girado ANTES del arranque y aún sin cobrar → partida nombrada, no residuo', async () => {
+    const e = await seed();
+
+    // Libros: apertura 1.000 (del seed) menos un cheque de 400 girado el 20/06
+    // que el banco nunca cobró ⇒ mayor al 30/06 = 600.
+    await crearComprobante(e, { fecha: '2026-06-20', monto: '400.00', tipoBanco: 'CREDITO' });
+
+    // El sistema PROPONE las partidas abiertas al 30/06. Hay dos, y solo una
+    // es conciliatoria: el cheque. La otra es el asiento de apertura, cuyo
+    // saldo ya está dentro del extracto declarado — indistinguibles para el
+    // sistema, obvias para quien concilia.
+    const candidatos = await getCandidatos(e.token, e.cuentaBancariaId, '2026-06-30');
+    expect(candidatos.status).toBe(200);
+    expect(candidatos.body).toHaveLength(2);
+
+    const cheque = (candidatos.body as { referencia: string; importe: string }[]).find(
+      (c) => c.importe === '-400.00',
+    );
+    expect(cheque).toBeDefined();
+
+    // Arranque al 30/06 coherente con el mayor. La residual va en 0 porque los
+    // 400 NO son inexplicables: son un cheque en circulación, y el usuario lo
+    // sabe. Verificación aritmética: Σ confirmadas debe dar
+    // saldoLibros − saldoExtracto + residual = 600 − 1000 + 0 = −400. ✓
+    await postArranque(e.token, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      saldoExtracto: '1000.00',
+      saldoLibros: '600.00',
+      diferenciaResidual: '0.00',
+      referenciasPartidas: [cheque!.referencia],
+    }).expect(201);
+
+    // Julio: un depósito de 200 que sí quedó conciliado contra su asiento.
+    const movJulio = await crearMovimiento(e, {
+      fecha: '2026-07-10',
+      monto: '200.00',
+      tipo: 'CREDITO',
+      saldo: '1200.00',
+    });
+    const compJulio = await crearComprobante(e, {
+      fecha: '2026-07-10',
+      monto: '200.00',
+      tipoBanco: 'DEBITO',
+    });
+    await crearMatch(e, movJulio.id, compJulio, {
+      fecha: '2026-07-10',
+      monto: '200.00',
+      tipoBanco: 'DEBITO',
+    });
+
+    const res = await getInforme(e.token, e.cuentaBancariaId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.saldoLibros).toBe('800.00');
+    expect(res.body.saldoExtracto).toBe('1200.00');
+
+    // El cheque de junio figura como partida EN TRÁNSITO, marcada como
+    // anterior al arranque — no como un residuo sin nombre.
+    expect(res.body.partidas.enTransito.detalle).toHaveLength(1);
+    expect(res.body.partidas.enTransito.detalle[0]).toMatchObject({
+      fecha: '2026-06-20',
+      importe: '-400.00',
+      anteriorAlArranque: true,
+    });
+
+    // La identidad cierra: 800 − 1200 − (−400) = 0.
+    expect(res.body.residuo).toBe('0.00');
+    expect(res.body.confiabilidad.motivos.map((m: { tipo: string }) => m.tipo)).not.toContain(
+      'RESIDUO_NO_EXPLICADO',
+    );
+    expect(res.body.confiabilidad.conciliado).toBe(true);
+  });
+
+  it('confirmar una partida que ya no figura entre las abiertas → falla fuerte, no descarta en silencio', async () => {
+    const e = await seed();
+
+    const res = await postArranque(e.token, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      referenciasPartidas: ['LIN:comprobante-que-no-existe:1'],
+    });
+
+    // 422 — el mapeo de `InvalidStateError`, el mismo que ya usa
+    // CONCILIACION_MONEDA_NO_SOPORTADA.
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('CONCILIACION_ARRANQUE_PARTIDAS_DESCONOCIDAS');
+    expect(res.body.error.details.referencias).toEqual(['LIN:comprobante-que-no-existe:1']);
+    // Nada persistido: o entra el acto entero o no entra.
+    expect(await prisma.arranqueConciliado.count()).toBe(0);
   });
 });

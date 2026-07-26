@@ -515,6 +515,14 @@ export type ArranqueAplicado = Schemas['ArranqueAplicadoDto'];
 export type PartidasInforme = Schemas['PartidasInformeDto'];
 
 /**
+ * Partida abierta que el sistema PROPONE arrastrar al declarar un arranque.
+ * Es una propuesta: una línea anterior al arranque sin movimiento que la
+ * reclame puede ser un cheque en circulación o el asiento de apertura, y el
+ * backend no puede distinguirlas — confirma quien concilia.
+ */
+export type CandidatoPartidaArranque = Schemas['CandidatoPartidaArranqueDto'];
+
+/**
  * Clase APLANADA con opcionales por tipo (swagger no soporta uniones
  * discriminadas): el consumidor DEBE discriminar por `tipo` — p. ej. `desde`/
  * `hasta` solo viajan en `HUECO`, `importe` solo en `RESIDUO_NO_EXPLICADO`.

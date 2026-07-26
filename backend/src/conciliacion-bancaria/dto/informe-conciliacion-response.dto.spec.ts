@@ -39,6 +39,7 @@ function resultadoCompleto(): InformeConciliacionResultado {
             fecha: FechaContable.fromIso('2026-07-10'),
             importe: Money.of('-200'),
             asentadoEl: FechaContable.fromIso('2026-08-15'),
+            anteriorAlArranque: false,
           },
         ],
       },
@@ -49,6 +50,7 @@ function resultadoCompleto(): InformeConciliacionResultado {
             movimientoId: 'm-2',
             fecha: FechaContable.fromIso('2026-07-12'),
             importe: Money.of('-10'),
+            anteriorAlArranque: false,
           },
         ],
       },
@@ -61,6 +63,7 @@ function resultadoCompleto(): InformeConciliacionResultado {
             fecha: FechaContable.fromIso('2026-07-20'),
             importe: Money.of('-400'),
             registradoPorBancoEl: null,
+            anteriorAlArranque: false,
           },
         ],
       },
@@ -124,10 +127,16 @@ describe('toInformeConciliacionResponse (§4.5: montos como STRING)', () => {
     expect(dto.partidas?.arranque).toEqual({ fecha: '2026-06-30', importe: '-10.00' });
     expect(dto.partidas?.pendientes.importe).toBe('-200.00');
     expect(dto.partidas?.pendientes.detalle).toEqual([
-      { movimientoId: 'm-1', fecha: '2026-07-10', importe: '-200.00', asentadoEl: '2026-08-15' },
+      {
+        movimientoId: 'm-1',
+        fecha: '2026-07-10',
+        importe: '-200.00',
+        asentadoEl: '2026-08-15',
+        anteriorAlArranque: false,
+      },
     ]);
     expect(dto.partidas?.ignorados.detalle).toEqual([
-      { movimientoId: 'm-2', fecha: '2026-07-12', importe: '-10.00' },
+      { movimientoId: 'm-2', fecha: '2026-07-12', importe: '-10.00', anteriorAlArranque: false },
     ]);
     expect(dto.partidas?.enTransito.detalle).toEqual([
       {
@@ -136,6 +145,7 @@ describe('toInformeConciliacionResponse (§4.5: montos como STRING)', () => {
         fecha: '2026-07-20',
         importe: '-400.00',
         registradoPorBancoEl: null,
+        anteriorAlArranque: false,
       },
     ]);
 

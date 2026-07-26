@@ -16,13 +16,16 @@ import { PackEnabledGuard } from '@/common/guards/pack-enabled.guard';
 import { RequirePermissions } from '@/rbac/decorators/require-permissions.decorator';
 import { PermissionsGuard } from '@/rbac/guards/permissions.guard';
 
+import { CandidatosArranqueQueryDto } from './dto/candidatos-arranque-query.dto';
 import { DeclararArranqueDto } from './dto/declarar-arranque.dto';
 import { HistorialArranquesQueryDto } from './dto/historial-arranques-query.dto';
 import { InformeConciliacionQueryDto } from './dto/informe-conciliacion-query.dto';
 import {
   ArranqueAplicadoDto,
+  CandidatoPartidaArranqueDto,
   InformeConciliacionResponseDto,
   toArranqueAplicadoResponse,
+  toCandidatoPartidaResponse,
   toInformeConciliacionResponse,
 } from './dto/informe-conciliacion-response.dto';
 import { InformeConciliacionService } from './informe-conciliacion.service';
@@ -95,6 +98,34 @@ export class InformeConciliacionController {
     return historial.map(toArranqueAplicadoResponse);
   }
 
+  @Get('arranques/candidatos')
+  @RequirePermissions('contabilidad.conciliacion.conciliar')
+  @ApiOperation({
+    summary:
+      'Partidas que quedarían ABIERTAS a una fecha: la propuesta que el usuario confirma antes de declarar el arranque.',
+    description:
+      'LECTURA PURA: no declara nada. Una línea anterior al arranque sin movimiento que ' +
+      'la reclame puede ser un cheque en circulación (se arrastra) o el asiento de ' +
+      'apertura (su saldo YA está dentro del extracto declarado), y con los datos ' +
+      'disponibles son indistinguibles — si la organización importó extractos recién ' +
+      'desde el arranque, TODA línea anterior parece en tránsito. Por eso decide quien ' +
+      'concilia. Pide `.conciliar` y no `.read`: es un paso de la declaración. ' +
+      'Verificación aritmética: la suma de lo confirmado debe dar ' +
+      '`saldoLibros − saldoExtracto + diferenciaResidual`.',
+  })
+  @ApiOkResponse({ type: CandidatoPartidaArranqueDto, isArray: true })
+  async listarCandidatos(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: CandidatosArranqueQueryDto,
+  ): Promise<CandidatoPartidaArranqueDto[]> {
+    const candidatos = await this.informe.listarCandidatosDeArranque(
+      resolveTenantId(req),
+      query.cuentaBancariaId,
+      new Date(`${query.fecha}T00:00:00.000Z`),
+    );
+    return candidatos.map(toCandidatoPartidaResponse);
+  }
+
   @Post('arranques')
   @RequirePermissions('contabilidad.conciliacion.conciliar')
   @ApiOperation({
@@ -118,6 +149,7 @@ export class InformeConciliacionController {
       saldoLibros: Money.of(dto.saldoLibros),
       diferenciaResidual: Money.of(dto.diferenciaResidual),
       nota: dto.nota ?? null,
+      referenciasPartidas: dto.referenciasPartidas,
     });
     return toArranqueAplicadoResponse(declarado);
   }

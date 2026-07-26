@@ -22,3 +22,24 @@ export class ConciliacionMonedaNoSoportadaError extends InvalidStateError {
     );
   }
 }
+
+/**
+ * REQ-ICB-04: al declarar un arranque el cliente confirma cuáles de las
+ * partidas abiertas propuestas se arrastran, por referencia. Una referencia
+ * que ya no existe entre los candidatos significa que la pantalla estaba
+ * mirando una foto anterior de la cuenta —llegó un extracto, se concilió un
+ * movimiento, se editó un asiento— y declarar el punto de partida sobre datos
+ * vencidos es exactamente lo que este acto no puede permitirse.
+ *
+ * Se falla fuerte en vez de descartar en silencio: un arranque con partidas
+ * de menos produce informes que cierran de mentira.
+ */
+export class PartidasDeArranqueDesconocidasError extends InvalidStateError {
+  constructor(referencias: readonly string[]) {
+    super(
+      'CONCILIACION_ARRANQUE_PARTIDAS_DESCONOCIDAS',
+      'Algunas partidas confirmadas ya no figuran entre las abiertas a esa fecha: volvé a abrir la declaración para ver la lista actualizada',
+      { referencias: [...referencias] },
+    );
+  }
+}

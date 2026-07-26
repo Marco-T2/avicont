@@ -189,6 +189,7 @@ describe('Conciliación — Historial de arranques (e2e)', () => {
         saldoExtracto: '1000.00',
         saldoLibros: '990.00',
         diferenciaResidual: '10.00',
+        referenciasPartidas: [],
         ...(opts.nota === undefined ? {} : { nota: opts.nota }),
       });
   }

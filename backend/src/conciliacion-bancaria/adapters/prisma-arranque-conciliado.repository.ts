@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { ArranqueConciliado, Prisma } from '@prisma/client';
+import type { ArranqueConciliado, ArranquePartidaAbierta, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -27,9 +27,35 @@ export class PrismaArranqueConciliadoRepository extends ArranqueConciliadoReposi
     data: ArranqueConciliadoCreateData,
     tx?: Prisma.TransactionClient,
   ): Promise<ArranqueConciliado> {
+    const { partidasAbiertas, ...acto } = data;
     const client = tx ?? this.prisma;
     return client.arranqueConciliado.create({
-      data: { organizationId: tenantId, ...data },
+      data: {
+        organizationId: tenantId,
+        ...acto,
+        // Nested create: el acto y sus partidas congeladas entran en la MISMA
+        // sentencia. Un arranque persistido a medias daría informes que
+        // cierran de mentira — el `organizationId` se repite en la hija para
+        // que el filtro de tenant no dependa del join (Anti-31).
+        partidasAbiertas: {
+          create: partidasAbiertas.map((partida) => ({
+            organizationId: tenantId,
+            ...partida,
+          })),
+        },
+      },
+    });
+  }
+
+  async listarPartidasAbiertas(
+    tenantId: string,
+    arranqueId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranquePartidaAbierta[]> {
+    const client = tx ?? this.prisma;
+    return client.arranquePartidaAbierta.findMany({
+      where: { organizationId: tenantId, arranqueId },
+      orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
     });
   }
 

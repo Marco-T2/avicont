@@ -7,7 +7,12 @@
 // propósito. Una "corrección" es una declaración NUEVA que gana por el
 // desempate de `vigenteA`, con la anterior intacta y auditable.
 
-import type { ArranqueConciliado, Prisma } from '@prisma/client';
+import type {
+  ArranqueConciliado,
+  ArranquePartidaAbierta,
+  OrigenPartidaArranque,
+  Prisma,
+} from '@prisma/client';
 
 export const ARRANQUE_CONCILIADO_REPOSITORY_PORT = Symbol('ARRANQUE_CONCILIADO_REPOSITORY_PORT');
 
@@ -21,6 +26,27 @@ export interface ArranqueConciliadoCreateData {
   diferenciaResidual: Prisma.Decimal;
   nota: string | null;
   declaradoPorUserId: string;
+  /**
+   * Partidas que ya estaban ABIERTAS a `fecha`, congeladas junto al acto.
+   *
+   * Son parte de la declaración, no un cálculo posterior: se persisten en la
+   * MISMA transacción que el arranque. Un arranque con la lista a medias
+   * produciría informes que cierran de mentira, así que o entran las dos
+   * cosas o no entra ninguna.
+   */
+  partidasAbiertas: readonly PartidaAbiertaCreateData[];
+}
+
+export interface PartidaAbiertaCreateData {
+  origen: OrigenPartidaArranque;
+  /** Presente ⇔ `origen` empieza con `MOVIMIENTO_`. */
+  movimientoBancarioId: string | null;
+  /** Presentes ⇔ `origen` es `LINEA`. */
+  comprobanteId: string | null;
+  orden: number | null;
+  fecha: Date;
+  /** Contribución FIRMADA extracto→libros, ya calculada. */
+  importe: Prisma.Decimal;
 }
 
 export abstract class ArranqueConciliadoRepositoryPort {
@@ -63,4 +89,15 @@ export abstract class ArranqueConciliadoRepositoryPort {
     cuentaBancariaId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ArranqueConciliado[]>;
+
+  /**
+   * Las partidas congeladas de UNA declaración. Que sigan abiertas AL CORTE
+   * lo decide el caller contra los matches actuales: acá solo se devuelve lo
+   * que se declaró, sin interpretarlo.
+   */
+  abstract listarPartidasAbiertas(
+    tenantId: string,
+    arranqueId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ArranquePartidaAbierta[]>;
 }
