@@ -77,6 +77,7 @@ const INFORME: InformeConciliacion = {
     diferenciaResidual: '25.00',
     nota: null,
     declaradoPorUserId: 'user-9',
+    declaradoPorNombre: 'Marco Tarqui',
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
   partidas: {
@@ -144,6 +145,7 @@ const HISTORIAL: ArranqueAplicado[] = [
     diferenciaResidual: '0.00',
     nota: null,
     declaradoPorUserId: 'user-1',
+    declaradoPorNombre: 'Ana Quispe',
     declaradoEl: '2027-01-05T10:00:00.000Z',
   },
   {
@@ -154,6 +156,7 @@ const HISTORIAL: ArranqueAplicado[] = [
     diferenciaResidual: '25.00',
     nota: null,
     declaradoPorUserId: 'user-9',
+    declaradoPorNombre: 'Marco Tarqui',
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
 ];

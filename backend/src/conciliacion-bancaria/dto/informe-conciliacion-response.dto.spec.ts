@@ -26,6 +26,7 @@ function resultadoCompleto(): InformeConciliacionResultado {
       saldoLibros: Money.of('990'),
       diferenciaResidual: Money.of('10'),
       nota: 'migración inicial',
+      declaradoPorNombre: 'Marco Tarqui',
       declaradoPorUserId: 'user-1',
       declaradoEl: new Date('2026-07-01T12:00:00.000Z'),
     },
@@ -113,6 +114,8 @@ describe('toInformeConciliacionResponse (§4.5: montos como STRING)', () => {
       diferenciaResidual: '10.00',
       nota: 'migración inicial',
       declaradoPorUserId: 'user-1',
+      // El acto viaja ATRIBUIDO a una persona (REQ-ICB-04), no a un UUID.
+      declaradoPorNombre: 'Marco Tarqui',
       declaradoEl: '2026-07-01T12:00:00.000Z',
     });
 

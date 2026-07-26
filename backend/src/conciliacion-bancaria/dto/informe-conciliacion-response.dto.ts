@@ -45,6 +45,15 @@ export class ArranqueAplicadoDto {
   diferenciaResidual!: string;
   @ApiProperty({ type: String, nullable: true }) nota!: string | null;
   @ApiProperty() declaradoPorUserId!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Marco Tarqui',
+    description:
+      'Quién declaró el arranque. null si el id ya no resuelve dentro de la ' +
+      'organización — el acto se muestra sin nombre, nunca con el UUID crudo.',
+  })
+  declaradoPorNombre!: string | null;
   @ApiProperty({ example: '2026-07-01T12:00:00.000Z' }) declaradoEl!: string;
 }
 
@@ -272,6 +281,7 @@ export function toArranqueAplicadoResponse(arranque: ArranqueAplicadoView): Arra
     diferenciaResidual: arranque.diferenciaResidual.toBob(),
     nota: arranque.nota,
     declaradoPorUserId: arranque.declaradoPorUserId,
+    declaradoPorNombre: arranque.declaradoPorNombre,
     declaradoEl: arranque.declaradoEl.toISOString(),
   };
 }

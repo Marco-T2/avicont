@@ -4068,6 +4068,11 @@ export interface components {
             diferenciaResidual: string;
             nota: string | null;
             declaradoPorUserId: string;
+            /**
+             * @description Quién declaró el arranque. null si el id ya no resuelve dentro de la organización — el acto se muestra sin nombre, nunca con el UUID crudo.
+             * @example Marco Tarqui
+             */
+            declaradoPorNombre: string | null;
             /** @example 2026-07-01T12:00:00.000Z */
             declaradoEl: string;
         };

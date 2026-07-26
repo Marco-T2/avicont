@@ -16,6 +16,7 @@ import type {
 } from './ports/importacion-extracto.repository.port';
 import type { MatchConciliacionRepositoryPort } from './ports/match-conciliacion.repository.port';
 import type { MovimientoBancarioRepositoryPort } from './ports/movimiento-bancario.repository.port';
+import type { UsuarioReaderPort } from '@/users/ports/usuario-reader.port';
 
 const TENANT = 'tenant-1';
 const CB_ID = 'cb-1';
@@ -179,6 +180,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     sumarPorCuentaHasta: jest.Mock;
   };
   let importaciones: { listarCoberturaPorCuentaBancaria: jest.Mock };
+  let usuarios: { listarPorIds: jest.Mock };
   let service: InformeConciliacionService;
 
   beforeEach(() => {
@@ -208,6 +210,14 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
 
     importaciones = { listarCoberturaPorCuentaBancaria: jest.fn().mockResolvedValue([]) };
 
+    usuarios = {
+      listarPorIds: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'user-1', displayName: 'Marco Tarqui', email: 'marco@avicont.bo' },
+        ]),
+    };
+
     service = new InformeConciliacionService(
       cuentasBancarias as unknown as CuentasBancariasService,
       arranques as unknown as ArranqueConciliadoRepositoryPort,
@@ -215,6 +225,7 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       matchRepo as unknown as MatchConciliacionRepositoryPort,
       lineasCuenta as unknown as LineasCuentaReaderPort,
       importaciones as unknown as ImportacionExtractoRepositoryPort,
+      usuarios as unknown as UsuarioReaderPort,
     );
   });
 

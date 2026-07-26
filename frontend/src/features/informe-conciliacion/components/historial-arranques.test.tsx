@@ -16,6 +16,7 @@ const HISTORIAL: ArranqueAplicado[] = [
     diferenciaResidual: '0.00',
     nota: null,
     declaradoPorUserId: 'user-1',
+    declaradoPorNombre: 'Ana Quispe',
     declaradoEl: '2027-01-05T10:00:00.000Z',
   },
   {
@@ -26,6 +27,7 @@ const HISTORIAL: ArranqueAplicado[] = [
     diferenciaResidual: '500.00',
     nota: 'Adopción del sistema',
     declaradoPorUserId: 'user-9',
+    declaradoPorNombre: 'Marco Tarqui',
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
 ];
@@ -60,7 +62,7 @@ describe('HistorialArranques — el historial completo, señalando cuál aplica 
     expect(within(junio).getByText('1.000,00')).toBeInTheDocument();
     expect(within(junio).getByText('500,00')).toBeInTheDocument(); // residual DECLARADA
     expect(within(junio).getByText('Adopción del sistema')).toBeInTheDocument();
-    expect(within(junio).getByText(/por user-9/i)).toBeInTheDocument();
+    expect(within(junio).getByText(/por Marco Tarqui/i)).toBeInTheDocument();
     expect(within(junio).getByText(/01\/07\/2026/)).toBeInTheDocument();
   });
 

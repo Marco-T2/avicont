@@ -11859,6 +11859,12 @@
           "declaradoPorUserId": {
             "type": "string"
           },
+          "declaradoPorNombre": {
+            "type": "string",
+            "nullable": true,
+            "example": "Marco Tarqui",
+            "description": "Quién declaró el arranque. null si el id ya no resuelve dentro de la organización — el acto se muestra sin nombre, nunca con el UUID crudo."
+          },
           "declaradoEl": {
             "type": "string",
             "example": "2026-07-01T12:00:00.000Z"
@@ -11872,6 +11878,7 @@
           "diferenciaResidual",
           "nota",
           "declaradoPorUserId",
+          "declaradoPorNombre",
           "declaradoEl"
         ]
       },

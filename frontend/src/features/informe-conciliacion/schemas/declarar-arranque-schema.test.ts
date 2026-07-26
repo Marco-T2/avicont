@@ -50,6 +50,23 @@ describe('declararArranqueSchema — los CUATRO datos los declara el usuario', (
     ).toBe(false);
   });
 
+  it('rechaza más de 2 decimales — el MISMO tope que el backend, para no prometer un 400', () => {
+    expect(
+      declararArranqueSchema.safeParse({ ...VALIDO, saldoExtracto: '1000.123' }).success,
+    ).toBe(false);
+    expect(
+      declararArranqueSchema.safeParse({ ...VALIDO, diferenciaResidual: '-10.505' }).success,
+    ).toBe(false);
+  });
+
+  it('acepta cero, uno o dos decimales', () => {
+    for (const monto of ['1000', '1000.5', '1000.50']) {
+      expect(declararArranqueSchema.safeParse({ ...VALIDO, saldoLibros: monto }).success).toBe(
+        true,
+      );
+    }
+  });
+
   it('rechaza separador de miles o coma decimal (§4.5: punto decimal, sin miles)', () => {
     expect(
       declararArranqueSchema.safeParse({ ...VALIDO, saldoLibros: '1.000,00' }).success,

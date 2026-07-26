@@ -26,6 +26,7 @@ const INFORME: InformeConciliacion = {
     diferenciaResidual: '25.00',
     nota: null,
     declaradoPorUserId: 'user-9',
+    declaradoPorNombre: 'Marco Tarqui',
     declaradoEl: '2026-07-01T12:00:00.000Z',
   },
   partidas: {
@@ -151,7 +152,7 @@ describe('PapelDeTrabajo — las cuatro partidas con signo (REQ-ICB-02)', () => 
     const bloque = partida(/diferencia de arranque/i);
     expect(within(bloque).getByText('-25,00')).toBeInTheDocument();
     expect(within(bloque).getByText(/30\/06\/2026/)).toBeInTheDocument();
-    expect(within(bloque).getByText(/por user-9/i)).toBeInTheDocument();
+    expect(within(bloque).getByText(/por Marco Tarqui/i)).toBeInTheDocument();
   });
 });
 

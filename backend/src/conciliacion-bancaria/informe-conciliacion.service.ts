@@ -15,6 +15,7 @@ import {
 } from '@/comprobantes/ports/lineas-cuenta-reader.port';
 import { FechaContable } from '@/common/domain/fecha-contable';
 import { Money } from '@/common/domain/money';
+import { UsuarioReaderPort, USUARIO_READER_PORT } from '@/users/ports/usuario-reader.port';
 
 import { CuentasBancariasService } from './cuentas-bancarias.service';
 import {
@@ -80,6 +81,13 @@ export interface ArranqueAplicadoView {
   diferenciaResidual: Money;
   nota: string | null;
   declaradoPorUserId: string;
+  /**
+   * Identidad presentable de quien declaró (`displayName` o, en su defecto, el
+   * email). `null` cuando el id no resuelve dentro del tenant — un acto viejo
+   * de alguien que ya no es miembro. REQ-ICB-04 pide un acto ATRIBUIDO y un
+   * UUID no atribuye a una persona; el id se conserva igual para trazabilidad.
+   */
+  declaradoPorNombre: string | null;
   declaradoEl: Date;
 }
 
@@ -211,7 +219,22 @@ export class InformeConciliacionService {
     private readonly lineasCuenta: LineasCuentaReaderPort,
     @Inject(IMPORTACION_EXTRACTO_REPOSITORY_PORT)
     private readonly importaciones: ImportacionExtractoRepositoryPort,
+    @Inject(USUARIO_READER_PORT)
+    private readonly usuarios: UsuarioReaderPort,
   ) {}
+
+  /**
+   * Resuelve `userId → nombre presentable`, acotado a los miembros del tenant.
+   * Un id que no resuelve simplemente no entra al mapa: el acto se muestra sin
+   * nombre en vez de con un UUID o con un dato de otra organización.
+   */
+  private async nombresPorUserId(
+    tenantId: string,
+    userIds: readonly string[],
+  ): Promise<Map<string, string>> {
+    const filas = await this.usuarios.listarPorIds(tenantId, userIds);
+    return new Map(filas.map((u) => [u.id, u.displayName ?? u.email]));
+  }
 
   async obtenerInforme(
     tenantId: string,
@@ -302,6 +325,7 @@ export class InformeConciliacionService {
 
     const vinculos = await this.verificarVinculos(tenantId, movs, lineas);
     const reclamos = await this.resolverReclamosDeLineas(tenantId, movs, vinculos);
+    const nombres = await this.nombresPorUserId(tenantId, [arranqueRow.declaradoPorUserId]);
 
     const informe = armarInforme({
       corte,
@@ -320,7 +344,10 @@ export class InformeConciliacionService {
       corte,
       saldoExtracto: informe.saldoExtracto,
       saldoLibros: informe.saldoLibros,
-      arranque: aArranqueAplicadoView(arranqueRow),
+      arranque: aArranqueAplicadoView(
+        arranqueRow,
+        nombres.get(arranqueRow.declaradoPorUserId) ?? null,
+      ),
       partidas: informe.partidas,
       residuo: informe.residuo,
       ...derivarConfiabilidad({
@@ -376,7 +403,8 @@ export class InformeConciliacionService {
       declaradoPorUserId: userId,
     });
 
-    return aArranqueAplicadoView(creado);
+    const nombres = await this.nombresPorUserId(tenantId, [userId]);
+    return aArranqueAplicadoView(creado, nombres.get(userId) ?? null);
   }
 
   /**
@@ -396,7 +424,11 @@ export class InformeConciliacionService {
   ): Promise<ArranqueAplicadoView[]> {
     const cuentaBancaria = await this.cuentasBancarias.findById(tenantId, cuentaBancariaId);
     const filas = await this.arranques.listarHistorial(tenantId, cuentaBancaria.id);
-    return filas.map(aArranqueAplicadoView);
+    const nombres = await this.nombresPorUserId(
+      tenantId,
+      filas.map((f) => f.declaradoPorUserId),
+    );
+    return filas.map((f) => aArranqueAplicadoView(f, nombres.get(f.declaradoPorUserId) ?? null));
   }
 
   // ============================================================
@@ -519,7 +551,10 @@ function saldoDeCuenta(saldos: readonly SaldoVigenteRow[], cuentaBancariaId: str
 }
 
 /** Fila persistida → view de dominio del acto declarado (Money/FechaContable). */
-function aArranqueAplicadoView(row: ArranqueConciliado): ArranqueAplicadoView {
+function aArranqueAplicadoView(
+  row: ArranqueConciliado,
+  declaradoPorNombre: string | null = null,
+): ArranqueAplicadoView {
   return {
     id: row.id,
     fecha: FechaContable.fromDbDate(row.fecha),
@@ -528,6 +563,7 @@ function aArranqueAplicadoView(row: ArranqueConciliado): ArranqueAplicadoView {
     diferenciaResidual: Money.of(row.diferenciaResidual),
     nota: row.nota,
     declaradoPorUserId: row.declaradoPorUserId,
+    declaradoPorNombre,
     declaradoEl: row.createdAt,
   };
 }
