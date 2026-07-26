@@ -57,7 +57,12 @@ function arranqueRow(overrides: Partial<ArranqueConciliado> = {}): ArranqueConci
 
 describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
   let cuentasBancarias: { findById: jest.Mock };
-  let arranques: { vigenteA: jest.Mock; crear: jest.Mock; listarHistorial: jest.Mock };
+  let arranques: {
+    vigenteA: jest.Mock;
+    crear: jest.Mock;
+    listarHistorial: jest.Mock;
+    listarPartidasAbiertas: jest.Mock;
+  };
   let usuarios: { listarPorIds: jest.Mock };
   let service: InformeConciliacionService;
 
@@ -67,6 +72,9 @@ describe('InformeConciliacionService.listarHistorial (REQ-ICB-04, D8)', () => {
       vigenteA: jest.fn(),
       crear: jest.fn(),
       listarHistorial: jest.fn().mockResolvedValue([]),
+      // Sin partidas congeladas por defecto: el caso de un arranque declarado
+      // sobre una cuenta sin nada abierto antes.
+      listarPartidasAbiertas: jest.fn().mockResolvedValue([]),
     };
     // Los demás ports no participan del historial: stubs vacíos.
     usuarios = {

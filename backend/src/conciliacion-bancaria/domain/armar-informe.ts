@@ -124,6 +124,28 @@ export interface InsumosInforme {
   readonly saldoLibros: Money;
   readonly movimientos: readonly MovimientoParaInforme[];
   readonly lineas: readonly LineaParaInforme[];
+  /**
+   * Partidas que YA estaban abiertas al declarar el arranque y que el caller
+   * verificó que SIGUEN abiertas al corte.
+   *
+   * Sin ellas la identidad no cierra y la diferencia sale disfrazada de
+   * residuo: la ventana `arranque.fecha < fecha <= corte` deja afuera todo lo
+   * anterior, lo cual es correcto para lo que ya estaba CERRADO —absorbido en
+   * los saldos declarados— y falso para lo que estaba ABIERTO, que sigue
+   * estando en un lado y no en el otro después del arranque.
+   *
+   * Llegan en forma de detalle porque su importe se congeló al declarar: acá
+   * no se recalcula nada, se suman con el resto de su partida.
+   */
+  readonly pendientesDelArranque: readonly DetalleMovimientoPendiente[];
+  /**
+   * Los IGNORADO anteriores al arranque son partida PARA SIEMPRE: están dentro
+   * del saldo que el banco publica y, por decisión del usuario, los libros no
+   * los van a registrar nunca. Van con nombre propio (REQ-ICB-02) — meterlos
+   * con los pendientes los haría parecer transitorios.
+   */
+  readonly ignoradosDelArranque: readonly DetalleMovimientoIgnorado[];
+  readonly enTransitoDelArranque: readonly DetalleLineaEnTransito[];
 }
 
 // ============================================================
@@ -140,12 +162,22 @@ export interface DetalleMovimientoPendiente {
    * degrada ni se trata como error.
    */
   readonly asentadoEl: FechaContable | null;
+  /**
+   * `true` ⇒ la partida ya estaba abierta CUANDO se declaró el arranque y
+   * sigue abierta al corte. Viene de la lista congelada en la declaración, no
+   * de la ventana. Se marca porque su antigüedad es información: un cargo del
+   * banco sin asentar desde antes del punto de partida es otra conversación
+   * que uno de este mes.
+   */
+  readonly anteriorAlArranque: boolean;
 }
 
 export interface DetalleMovimientoIgnorado {
   readonly movimientoId: string;
   readonly fecha: FechaContable;
   readonly importe: Money;
+  /** `true` ⇒ venía abierta desde antes del arranque (ver `DetalleMovimientoPendiente`). */
+  readonly anteriorAlArranque: boolean;
 }
 
 export interface DetalleLineaEnTransito {
@@ -155,6 +187,8 @@ export interface DetalleLineaEnTransito {
   readonly importe: Money;
   /** No-nulo ⇒ el banco lo registró, pero después del corte (simétrico de `asentadoEl`). */
   readonly registradoPorBancoEl: FechaContable | null;
+  /** `true` ⇒ venía abierta desde antes del arranque (ver `DetalleMovimientoPendiente`). */
+  readonly anteriorAlArranque: boolean;
 }
 
 export interface PartidaInforme<TDetalle> {
@@ -211,8 +245,10 @@ export function armarInforme(insumos: InsumosInforme): InformeConciliacion {
   const enVentana = (fecha: FechaContable): boolean =>
     fecha.isAfter(arranque.fecha) && !fecha.isAfter(corte);
 
-  const pendientes: DetalleMovimientoPendiente[] = [];
-  const ignorados: DetalleMovimientoIgnorado[] = [];
+  // Las congeladas van PRIMERO: son las más viejas y el puente se lee en
+  // orden de antigüedad.
+  const pendientes: DetalleMovimientoPendiente[] = [...insumos.pendientesDelArranque];
+  const ignorados: DetalleMovimientoIgnorado[] = [...insumos.ignoradosDelArranque];
   for (const mov of insumos.movimientos) {
     if (!enVentana(mov.fecha)) continue;
     // Un CREDITO bancario ya está dentro del extracto y falta en libros: para
@@ -230,16 +266,28 @@ export function armarInforme(insumos: InsumosInforme): InformeConciliacion {
           fecha: mov.fecha,
           importe,
           asentadoEl: mov.fechaAsientoVinculado,
+          anteriorAlArranque: false,
         });
       }
     } else if (mov.estadoEfectivo === 'IGNORADO') {
-      ignorados.push({ movimientoId: mov.id, fecha: mov.fecha, importe });
+      ignorados.push({
+        movimientoId: mov.id,
+        fecha: mov.fecha,
+        importe,
+        anteriorAlArranque: false,
+      });
     } else {
-      pendientes.push({ movimientoId: mov.id, fecha: mov.fecha, importe, asentadoEl: null });
+      pendientes.push({
+        movimientoId: mov.id,
+        fecha: mov.fecha,
+        importe,
+        asentadoEl: null,
+        anteriorAlArranque: false,
+      });
     }
   }
 
-  const enTransito: DetalleLineaEnTransito[] = [];
+  const enTransito: DetalleLineaEnTransito[] = [...insumos.enTransitoDelArranque];
   for (const linea of insumos.lineas) {
     if (!enVentana(linea.fecha)) continue;
     // Un DEBITO contable ya está dentro de libros y falta en el extracto:
@@ -254,6 +302,7 @@ export function armarInforme(insumos: InsumosInforme): InformeConciliacion {
           fecha: linea.fecha,
           importe,
           registradoPorBancoEl: linea.fechaMovimientoVinculado,
+          anteriorAlArranque: false,
         });
       }
     } else {
@@ -263,6 +312,7 @@ export function armarInforme(insumos: InsumosInforme): InformeConciliacion {
         fecha: linea.fecha,
         importe,
         registradoPorBancoEl: null,
+        anteriorAlArranque: false,
       });
     }
   }

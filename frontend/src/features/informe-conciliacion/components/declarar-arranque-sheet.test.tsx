@@ -6,12 +6,53 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../hooks/use-declarar-arranque', () => ({
   useDeclararArranque: vi.fn(),
 }));
+vi.mock('../hooks/use-candidatos-arranque', () => ({
+  useCandidatosArranque: vi.fn(),
+}));
 
+import { useCandidatosArranque } from '../hooks/use-candidatos-arranque';
 import { useDeclararArranque } from '../hooks/use-declarar-arranque';
 
 import { DeclararArranqueSheet } from './declarar-arranque-sheet';
 
 const mutateMock = vi.fn();
+
+const CANDIDATO_CHEQUE = {
+  referencia: 'LIN:comp-jun:1',
+  origen: 'LINEA' as const,
+  fecha: '2026-06-20',
+  importe: '-400.00',
+  descripcion: 'Pago con cheque 4471',
+  comprobanteId: 'comp-jun',
+  numeroComprobante: 'D2606-000012',
+};
+const CANDIDATO_APERTURA = {
+  referencia: 'LIN:comp-apertura:1',
+  origen: 'LINEA' as const,
+  fecha: '2026-06-30',
+  importe: '1000.00',
+  descripcion: 'Asiento de apertura',
+  comprobanteId: 'comp-apertura',
+  numeroComprobante: 'D2606-000001',
+};
+
+function mockCandidatos(
+  data: {
+    referencia: string;
+    origen: string;
+    fecha: string;
+    importe: string;
+    descripcion: string;
+    comprobanteId: string | null;
+    numeroComprobante: string | null;
+  }[] = [],
+): void {
+  vi.mocked(useCandidatosArranque).mockReturnValue({
+    data,
+    isPending: false,
+    isError: false,
+  } as unknown as ReturnType<typeof useCandidatosArranque>);
+}
 
 function mockMutation(overrides: { isPending?: boolean } = {}): void {
   vi.mocked(useDeclararArranque).mockReturnValue({
@@ -35,6 +76,7 @@ function renderSheet(onOpenChange = vi.fn()) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockMutation();
+  mockCandidatos();
 });
 
 describe('DeclararArranqueSheet — declarar el punto de partida (REQ-ICB-04)', () => {
@@ -62,6 +104,7 @@ describe('DeclararArranqueSheet — declarar el punto de partida (REQ-ICB-04)', 
         saldoLibros: '990.00',
         diferenciaResidual: '10.00',
         nota: 'Adopción del sistema',
+        referenciasPartidas: [],
       },
       expect.anything(),
     );
@@ -83,6 +126,7 @@ describe('DeclararArranqueSheet — declarar el punto de partida (REQ-ICB-04)', 
         saldoExtracto: '1000.00',
         saldoLibros: '1000.00',
         diferenciaResidual: '0.00',
+        referenciasPartidas: [],
       },
       expect.anything(),
     );
@@ -136,5 +180,93 @@ describe('DeclararArranqueSheet — declarar el punto de partida (REQ-ICB-04)', 
     renderSheet();
 
     expect(screen.getByRole('button', { name: /declarando/i })).toBeDisabled();
+  });
+
+  // ── Partidas abiertas: la propuesta que confirma quien concilia ─────────
+
+  it('lista las partidas abiertas propuestas y NO marca ninguna por default', () => {
+    // Marcar por default reproduciría el defecto en silencio: el asiento de
+    // apertura entraría como partida sin que nadie lo mire.
+    mockCandidatos([CANDIDATO_CHEQUE, CANDIDATO_APERTURA]);
+    renderSheet();
+
+    expect(screen.getByText(/Pago con cheque 4471/)).toBeInTheDocument();
+    expect(screen.getByText(/Asiento de apertura/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pago con cheque 4471/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Asiento de apertura/)).not.toBeChecked();
+  });
+
+  it('envía SOLO las referencias confirmadas', async () => {
+    const user = userEvent.setup();
+    mockCandidatos([CANDIDATO_CHEQUE, CANDIDATO_APERTURA]);
+    renderSheet();
+
+    await user.click(screen.getByLabelText(/Pago con cheque 4471/));
+    await user.type(screen.getByLabelText(/saldo según extracto/i), '1000.00');
+    await user.type(screen.getByLabelText(/saldo según libros/i), '600.00');
+    await user.type(screen.getByLabelText(/diferencia residual/i), '0.00');
+    await user.click(screen.getByRole('button', { name: /declarar arranque/i }));
+
+    expect(mutateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ referenciasPartidas: ['LIN:comp-jun:1'] }),
+      expect.anything(),
+    );
+  });
+
+  it('la verificación aritmética avisa cuando la selección no cuadra, y confirma cuando sí', async () => {
+    const user = userEvent.setup();
+    mockCandidatos([CANDIDATO_CHEQUE, CANDIDATO_APERTURA]);
+    renderSheet();
+
+    // 600 − 1000 + 0 = −400: hay que marcar el cheque y NO la apertura.
+    await user.type(screen.getByLabelText(/saldo según extracto/i), '1000.00');
+    await user.type(screen.getByLabelText(/saldo según libros/i), '600.00');
+    await user.type(screen.getByLabelText(/diferencia residual/i), '0.00');
+
+    expect(screen.getByTestId('verificacion-partidas')).toHaveTextContent(/debería sumar/i);
+
+    await user.click(screen.getByLabelText(/Pago con cheque 4471/));
+    expect(screen.getByTestId('verificacion-partidas')).toHaveTextContent(/cierra/i);
+
+    // Marcar además la apertura vuelve a romper la cuenta.
+    await user.click(screen.getByLabelText(/Asiento de apertura/));
+    expect(screen.getByTestId('verificacion-partidas')).toHaveTextContent(/debería sumar/i);
+  });
+
+  it('sin nada abierto a esa fecha lo dice', () => {
+    mockCandidatos([]);
+    renderSheet();
+
+    expect(screen.getByText(/ambos lados arrancan parejos/i)).toBeInTheDocument();
+  });
+
+  it('el número del comprobante es un link que abre el asiento en otra pestaña', () => {
+    // Decidir si un asiento de junio es un cheque o la apertura suele exigir
+    // VERLO. En otra pestaña, para no perder lo ya marcado en esta.
+    mockCandidatos([CANDIDATO_CHEQUE, CANDIDATO_APERTURA]);
+    renderSheet();
+
+    const link = screen.getByRole('link', { name: 'D2606-000012' });
+    expect(link).toHaveAttribute('href', '/comprobantes/comp-jun');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('un movimiento bancario no tiene asiento que abrir: sin link', () => {
+    mockCandidatos([
+      {
+        referencia: 'MOV:m-jun',
+        origen: 'MOVIMIENTO_PENDIENTE',
+        fecha: '2026-06-15',
+        importe: '-300.00',
+        descripcion: 'DEPOSITO SIN IDENTIFICAR',
+        comprobanteId: null,
+        numeroComprobante: null,
+      },
+    ]);
+    renderSheet();
+
+    expect(screen.getByText(/DEPOSITO SIN IDENTIFICAR/)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

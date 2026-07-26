@@ -6235,6 +6235,57 @@
         ]
       }
     },
+    "/api/conciliacion/arranques/candidatos": {
+      "get": {
+        "description": "LECTURA PURA: no declara nada. Una línea anterior al arranque sin movimiento que la reclame puede ser un cheque en circulación (se arrastra) o el asiento de apertura (su saldo YA está dentro del extracto declarado), y con los datos disponibles son indistinguibles — si la organización importó extractos recién desde el arranque, TODA línea anterior parece en tránsito. Por eso decide quien concilia. Pide `.conciliar` y no `.read`: es un paso de la declaración. Verificación aritmética: la suma de lo confirmado debe dar `saldoLibros − saldoExtracto + diferenciaResidual`.",
+        "operationId": "InformeConciliacionController_listarCandidatos",
+        "parameters": [
+          {
+            "name": "cuentaBancariaId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fecha",
+            "required": true,
+            "in": "query",
+            "description": "Fecha del arranque a evaluar (§4.6).",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CandidatoPartidaArranqueDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Partidas que quedarían ABIERTAS a una fecha: la propuesta que el usuario confirma antes de declarar el arranque.",
+        "tags": [
+          "Conciliación bancaria — Informe"
+        ]
+      }
+    },
     "/api/movimientos-bancarios": {
       "get": {
         "description": "Herramienta de APOYO, no limitante: sin filtro `estado` nada se esconde (REQ-VMB-02). Es LECTURA PURA — nunca escribe, ni siquiera para \"curar\" un vínculo roto (REQ-VMB-06).",
@@ -11901,13 +11952,18 @@
             "type": "string",
             "nullable": true,
             "description": "No-nulo ⇒ el asiento existe pero es POSTERIOR al corte: la diferencia de este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada."
+          },
+          "anteriorAlArranque": {
+            "type": "boolean",
+            "description": "true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes."
           }
         },
         "required": [
           "movimientoId",
           "fecha",
           "importe",
-          "asentadoEl"
+          "asentadoEl",
+          "anteriorAlArranque"
         ]
       },
       "PartidaPendientesDto": {
@@ -11943,12 +11999,17 @@
           "importe": {
             "type": "string",
             "example": "-10.00"
+          },
+          "anteriorAlArranque": {
+            "type": "boolean",
+            "description": "true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes."
           }
         },
         "required": [
           "movimientoId",
           "fecha",
-          "importe"
+          "importe",
+          "anteriorAlArranque"
         ]
       },
       "PartidaIgnoradosDto": {
@@ -11991,6 +12052,10 @@
             "type": "string",
             "nullable": true,
             "description": "No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl)."
+          },
+          "anteriorAlArranque": {
+            "type": "boolean",
+            "description": "true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes."
           }
         },
         "required": [
@@ -11998,7 +12063,8 @@
           "orden",
           "fecha",
           "importe",
-          "registradoPorBancoEl"
+          "registradoPorBancoEl",
+          "anteriorAlArranque"
         ]
       },
       "PartidaEnTransitoDto": {
@@ -12270,6 +12336,56 @@
           "insumos"
         ]
       },
+      "CandidatoPartidaArranqueDto": {
+        "type": "object",
+        "properties": {
+          "referencia": {
+            "type": "string",
+            "example": "LIN:9f3a-…:1",
+            "description": "Referencia estable con la que se confirma esta partida en el POST."
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "MOVIMIENTO_PENDIENTE",
+              "MOVIMIENTO_IGNORADO",
+              "LINEA"
+            ]
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-20"
+          },
+          "importe": {
+            "type": "string",
+            "example": "-400.00",
+            "description": "Contribución FIRMADA extracto→libros. Sale del dato, no del cliente."
+          },
+          "descripcion": {
+            "type": "string",
+            "example": "Pago a proveedor con cheque 4471"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero."
+          },
+          "numeroComprobante": {
+            "type": "string",
+            "nullable": true,
+            "example": "D2606-000012"
+          }
+        },
+        "required": [
+          "referencia",
+          "origen",
+          "fecha",
+          "importe",
+          "descripcion",
+          "comprobanteId",
+          "numeroComprobante"
+        ]
+      },
       "DeclararArranqueDto": {
         "type": "object",
         "properties": {
@@ -12297,6 +12413,16 @@
             "example": "10.00",
             "description": "Diferencia ACEPTADA como inexplicable — declarada, jamás calculada. Positiva cuando el extracto queda por encima de los libros."
           },
+          "referenciasPartidas": {
+            "example": [
+              "LIN:9f3a…:1"
+            ],
+            "description": "Referencias de las partidas abiertas que se CONFIRMA arrastrar, obtenidas de GET /conciliacion/arranques/candidatos. Obligatorio aunque vaya vacío: una línea anterior al arranque puede ser un cheque en circulación o el asiento de apertura, y el sistema no puede distinguirlas — decide quien concilia. Se mandan referencias, no importes: los montos salen del dato.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "nota": {
             "type": "string",
             "maxLength": 500
@@ -12307,7 +12433,8 @@
           "fecha",
           "saldoExtracto",
           "saldoLibros",
-          "diferenciaResidual"
+          "diferenciaResidual",
+          "referenciasPartidas"
         ]
       },
       "MovimientoVerificadorDto": {

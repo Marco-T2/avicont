@@ -118,36 +118,36 @@ enum SubClaseCuenta {
   INGRESO_OPERATIVO
   INGRESO_NO_OPERATIVO
   // Egreso
-  EGRESO_OPERATIVO         // Costos directos (5.1 PUCT: Costo de Ventas)
-  EGRESO_ADMINISTRATIVO    // 5.2 Gastos de Administración
-  EGRESO_COMERCIALIZACION  // 5.3 Gastos de Comercialización (publicidad, fletes de venta, comisiones)
-  EGRESO_FINANCIERO        // 5.4 Gastos Financieros (intereses, comisiones bancarias)
-  EGRESO_NO_OPERATIVO      // 5.5 Otros + 5.6 Ajustes y Diferencias de Cambio
+  EGRESO_OPERATIVO // Costos directos (5.1 PUCT: Costo de Ventas)
+  EGRESO_ADMINISTRATIVO // 5.2 Gastos de Administración
+  EGRESO_COMERCIALIZACION // 5.3 Gastos de Comercialización (publicidad, fletes de venta, comisiones)
+  EGRESO_FINANCIERO // 5.4 Gastos Financieros (intereses, comisiones bancarias)
+  EGRESO_NO_OPERATIVO // 5.5 Otros + 5.6 Ajustes y Diferencias de Cambio
 }
 
 model User {
-  id              String    @id @default(uuid())
-  email           String    @unique
+  id              String   @id @default(uuid())
+  email           String   @unique
   hashedPassword  String
   displayName     String?
-  isEmailVerified Boolean   @default(false)
-  isActive        Boolean   @default(true)
+  isEmailVerified Boolean  @default(false)
+  isActive        Boolean  @default(true)
   // Identidad de plataforma: distingue operadores del SaaS de usuarios comunes.
   // Ver docs/disenos/super-admin-plataforma.md §3 y CLAUDE.md §10.1.
   // Decisión: Boolean v1 (YAGNI — enum platformRole se diferencia cuando
   // aparezca un segundo nivel de operador, ver design.md §6).
-  isSuperAdmin    Boolean   @default(false)
-  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  isSuperAdmin    Boolean  @default(false)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
-  memberships             Membership[]
-  refreshTokens           RefreshToken[]
-  invitationsSent         Invitation[]         @relation("InvitedBy")
-  invitationsAccepted     Invitation[]         @relation("AcceptedBy")
-  customRolesCreated      CustomRole[]         @relation("CustomRoleCreator")
-  impersonationsAsAdmin   ImpersonationLog[]   @relation("ImpersonationAdmin")
-  impersonationsAsTarget  ImpersonationLog[]   @relation("ImpersonationTarget")
-  platformAudits          PlatformAudit[]      @relation("PlatformAuditActor")
+  memberships            Membership[]
+  refreshTokens          RefreshToken[]
+  invitationsSent        Invitation[]       @relation("InvitedBy")
+  invitationsAccepted    Invitation[]       @relation("AcceptedBy")
+  customRolesCreated     CustomRole[]       @relation("CustomRoleCreator")
+  impersonationsAsAdmin  ImpersonationLog[] @relation("ImpersonationAdmin")
+  impersonationsAsTarget ImpersonationLog[] @relation("ImpersonationTarget")
+  platformAudits         PlatformAudit[]    @relation("PlatformAuditActor")
 }
 
 model Organization {
@@ -190,18 +190,18 @@ model Organization {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  memberships         Membership[]
-  customRoles         CustomRole[]
-  invitations         Invitation[]
-  refreshTokens       RefreshToken[]
-  featureFlags        FeatureFlag[]
-  impersonationLogs   ImpersonationLog[]
-  cuentas             Cuenta[]
-  configuracionContable OrgConfiguracionContable?
-  gestionesFiscales   GestionFiscal[]
-  periodosFiscales    PeriodoFiscal[]
-  comprobantes        Comprobante[]
-  contactos           Contacto[]
+  memberships                   Membership[]
+  customRoles                   CustomRole[]
+  invitations                   Invitation[]
+  refreshTokens                 RefreshToken[]
+  featureFlags                  FeatureFlag[]
+  impersonationLogs             ImpersonationLog[]
+  cuentas                       Cuenta[]
+  configuracionContable         OrgConfiguracionContable?
+  gestionesFiscales             GestionFiscal[]
+  periodosFiscales              PeriodoFiscal[]
+  comprobantes                  Comprobante[]
+  contactos                     Contacto[]
   tiposDocumentoFisico          TipoDocumentoFisico[]
   documentosFisicos             DocumentoFisico[]
   comprobantesDocumentosFisicos ComprobanteDocumentoFisico[]
@@ -215,12 +215,12 @@ model Organization {
 
   // Auditoría de acciones de plataforma sobre esta organización.
   // Ver PlatformAudit y docs/disenos/super-admin-plataforma.md §6.
-  platformAudits       PlatformAudit[]
+  platformAudits PlatformAudit[]
 
   // Entitlement de packs (eje 2). La fila existe ⇔ la plataforma habilitó
   // el pack a esta org; `activo` embebido es la activación. Ver
   // docs/disenos/packs-eje2.md §4.4.
-  packEntitlements     OrgPackEntitlement[]
+  packEntitlements OrgPackEntitlement[]
 
   // Pack `contabilidad.conciliacion` (conciliación bancaria). Ver design
   // conciliacion-bancaria §9.
@@ -260,7 +260,7 @@ model Membership {
 }
 
 model CustomRole {
-  id             String @id @default(uuid())
+  id             String  @id @default(uuid())
   organizationId String
   slug           String // ej: "contador", "granjero", "cobrador-aux"
   name           String // ej: "Contador", "Granjero"
@@ -290,7 +290,7 @@ model CustomRole {
 }
 
 model Invitation {
-  id             String           @id @default(uuid())
+  id             String @id @default(uuid())
   organizationId String
   email          String
   invitedById    String
@@ -369,7 +369,7 @@ model ImpersonationLog {
   startedAt      DateTime  @default(now()) @db.Timestamptz(3)
   endedAt        DateTime? @db.Timestamptz(3)
 
-  admin        User          @relation("ImpersonationAdmin",  fields: [adminUserId],  references: [id])
+  admin        User          @relation("ImpersonationAdmin", fields: [adminUserId], references: [id])
   target       User          @relation("ImpersonationTarget", fields: [targetUserId], references: [id])
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
@@ -383,8 +383,8 @@ model ImpersonationLog {
 model ImpersonationAction {
   id                 String   @id @default(uuid())
   impersonationLogId String
-  action             String   // ej: "POST /api/asientos"
-  resource           String?  // ej: "asiento:abc123"
+  action             String // ej: "POST /api/asientos"
+  resource           String? // ej: "asiento:abc123"
   metadata           Json?
   timestamp          DateTime @default(now()) @db.Timestamptz(3)
 
@@ -424,9 +424,9 @@ model Cuenta {
   actividadFlujo ActividadFlujo?
 
   // ----- Jerarquía -----
-  parentId String?
+  parentId  String?
   // nivel persistido (1..8). Validar nivel = parent.nivel + 1 al insert/update.
-  nivel    Int
+  nivel     Int
   esDetalle Boolean @default(false)
 
   // ----- Reglas de uso -----
@@ -526,18 +526,18 @@ model OrgConfiguracionContable {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  ivaCredito              Cuenta? @relation("ConfigIvaCredito",         fields: [ivaCreditoId],              references: [id], onDelete: Restrict)
-  ivaDebito               Cuenta? @relation("ConfigIvaDebito",          fields: [ivaDebitoId],               references: [id], onDelete: Restrict)
-  ivaCreditoImportaciones Cuenta? @relation("ConfigIvaCreditoImp",      fields: [ivaCreditoImportacionesId], references: [id], onDelete: Restrict)
-  itPorPagar              Cuenta? @relation("ConfigIt",                 fields: [itPorPagarId],              references: [id], onDelete: Restrict)
-  iuePorPagar             Cuenta? @relation("ConfigIue",                fields: [iuePorPagarId],             references: [id], onDelete: Restrict)
-  rcIvaRetenido           Cuenta? @relation("ConfigRcIva",              fields: [rcIvaRetenidoId],           references: [id], onDelete: Restrict)
-  difCambioGanancia       Cuenta? @relation("ConfigDifCambioGan",       fields: [difCambioGananciaId],       references: [id], onDelete: Restrict)
-  difCambioPerdida        Cuenta? @relation("ConfigDifCambioPer",       fields: [difCambioPerdidaId],        references: [id], onDelete: Restrict)
-  resultadoEjercicio      Cuenta? @relation("ConfigResultadoEj",        fields: [resultadoEjercicioId],      references: [id], onDelete: Restrict)
-  resultadosAcumulados    Cuenta? @relation("ConfigResultadosAcum",     fields: [resultadosAcumuladosId],    references: [id], onDelete: Restrict)
-  cajaChicaDefault        Cuenta? @relation("ConfigCajaChica",          fields: [cajaChicaDefaultId],        references: [id], onDelete: Restrict)
-  ajustePorInflacion      Cuenta? @relation("ConfigAjusteInflacion",    fields: [ajustePorInflacionId],      references: [id], onDelete: Restrict)
+  ivaCredito              Cuenta? @relation("ConfigIvaCredito", fields: [ivaCreditoId], references: [id], onDelete: Restrict)
+  ivaDebito               Cuenta? @relation("ConfigIvaDebito", fields: [ivaDebitoId], references: [id], onDelete: Restrict)
+  ivaCreditoImportaciones Cuenta? @relation("ConfigIvaCreditoImp", fields: [ivaCreditoImportacionesId], references: [id], onDelete: Restrict)
+  itPorPagar              Cuenta? @relation("ConfigIt", fields: [itPorPagarId], references: [id], onDelete: Restrict)
+  iuePorPagar             Cuenta? @relation("ConfigIue", fields: [iuePorPagarId], references: [id], onDelete: Restrict)
+  rcIvaRetenido           Cuenta? @relation("ConfigRcIva", fields: [rcIvaRetenidoId], references: [id], onDelete: Restrict)
+  difCambioGanancia       Cuenta? @relation("ConfigDifCambioGan", fields: [difCambioGananciaId], references: [id], onDelete: Restrict)
+  difCambioPerdida        Cuenta? @relation("ConfigDifCambioPer", fields: [difCambioPerdidaId], references: [id], onDelete: Restrict)
+  resultadoEjercicio      Cuenta? @relation("ConfigResultadoEj", fields: [resultadoEjercicioId], references: [id], onDelete: Restrict)
+  resultadosAcumulados    Cuenta? @relation("ConfigResultadosAcum", fields: [resultadosAcumuladosId], references: [id], onDelete: Restrict)
+  cajaChicaDefault        Cuenta? @relation("ConfigCajaChica", fields: [cajaChicaDefaultId], references: [id], onDelete: Restrict)
+  ajustePorInflacion      Cuenta? @relation("ConfigAjusteInflacion", fields: [ajustePorInflacionId], references: [id], onDelete: Restrict)
 
   @@map("org_configuracion_contable")
 }
@@ -578,19 +578,19 @@ model FeatureFlag {
 // El mesInicio se deriva de Organization.tipoEmpresaPrincipal (Ley 843 art. 46)
 // y es inmutable una vez creada la gestión.
 model GestionFiscal {
-  id              String              @id @default(uuid())
-  organizationId  String
-  year            Int                  // año fiscal (no necesariamente calendario)
-  mesInicio       Int                  // derivado de tipoEmpresaPrincipal al crear
-  status          GestionFiscalStatus @default(ABIERTA)
-  closedAt        DateTime?            @db.Timestamptz(3)
-  closedByUserId  String?
+  id             String              @id @default(uuid())
+  organizationId String
+  year           Int // año fiscal (no necesariamente calendario)
+  mesInicio      Int // derivado de tipoEmpresaPrincipal al crear
+  status         GestionFiscalStatus @default(ABIERTA)
+  closedAt       DateTime?           @db.Timestamptz(3)
+  closedByUserId String?
 
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  periodos        PeriodoFiscal[]
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodos     PeriodoFiscal[]
 
   @@unique([organizationId, year])
   @@index([organizationId, status])
@@ -607,25 +607,25 @@ enum GestionFiscalStatus {
 // year/month son el calendario REAL (ej. gestión INDUSTRIAL 2026 tiene
 // períodos desde year=2026/month=4 hasta year=2027/month=3).
 model PeriodoFiscal {
-  id               String              @id @default(uuid())
-  organizationId   String
-  gestionId        String
-  year             Int
-  month            Int                  // 1-12 (mes calendario)
-  ordenEnGestion   Int                  // 1-12 (posición en la gestión)
-  status           PeriodoFiscalStatus @default(ABIERTO)
-  esDefinitivo     Boolean             @default(false)
+  id             String              @id @default(uuid())
+  organizationId String
+  gestionId      String
+  year           Int
+  month          Int // 1-12 (mes calendario)
+  ordenEnGestion Int // 1-12 (posición en la gestión)
+  status         PeriodoFiscalStatus @default(ABIERTO)
+  esDefinitivo   Boolean             @default(false)
 
-  closedAt         DateTime?           @db.Timestamptz(3)
-  closedByUserId   String?
+  closedAt       DateTime? @db.Timestamptz(3)
+  closedByUserId String?
 
-  createdAt        DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  gestion          GestionFiscal            @relation(fields: [gestionId], references: [id], onDelete: Cascade)
-  reopenings       PeriodoFiscalReopening[]
-  comprobantes     Comprobante[]
+  organization Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  gestion      GestionFiscal            @relation(fields: [gestionId], references: [id], onDelete: Cascade)
+  reopenings   PeriodoFiscalReopening[]
+  comprobantes Comprobante[]
 
   @@unique([organizationId, year, month])
   @@unique([gestionId, ordenEnGestion])
@@ -642,15 +642,15 @@ enum PeriodoFiscalStatus {
 // Auditoría de reaperturas. Cada fila = una ventana de reapertura; reclosedAt
 // se setea cuando se vuelve a cerrar el período.
 model PeriodoFiscalReopening {
-  id                 String   @id @default(uuid())
-  periodoId          String
-  reopenedAt         DateTime @default(now()) @db.Timestamptz(3)
-  reopenedByUserId   String
-  motivo             String   // mínimo 20 caracteres, validado en el servicio
-  reclosedAt         DateTime? @db.Timestamptz(3)
-  reclosedByUserId   String?
+  id               String    @id @default(uuid())
+  periodoId        String
+  reopenedAt       DateTime  @default(now()) @db.Timestamptz(3)
+  reopenedByUserId String
+  motivo           String // mínimo 20 caracteres, validado en el servicio
+  reclosedAt       DateTime? @db.Timestamptz(3)
+  reclosedByUserId String?
 
-  periodo  PeriodoFiscal @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  periodo PeriodoFiscal @relation(fields: [periodoId], references: [id], onDelete: Cascade)
 
   @@index([periodoId])
   @@map("periodo_fiscal_reopenings")
@@ -664,13 +664,13 @@ model PeriodoFiscalReopening {
 // Tipo de comprobante: determina el prefijo de numeración (A, D, I, E, J, T, C)
 // y la semántica operativa. Enum hardcoded, no configurable per-tenant.
 enum TipoComprobante {
-  APERTURA   // A — saldos iniciales de la gestión
-  DIARIO     // D — asiento general, uso más común
-  INGRESO    // I — entradas de dinero (cobros, ventas)
-  EGRESO     // E — salidas de dinero (pagos, compras)
-  AJUSTE     // J — ajustes, reversiones, reclasificaciones
-  TRASPASO   // T — movimientos entre cuentas internas
-  CIERRE     // C — cierre de cuentas de resultado (Fase 1.5)
+  APERTURA // A — saldos iniciales de la gestión
+  DIARIO // D — asiento general, uso más común
+  INGRESO // I — entradas de dinero (cobros, ventas)
+  EGRESO // E — salidas de dinero (pagos, compras)
+  AJUSTE // J — ajustes, reversiones, reclasificaciones
+  TRASPASO // T — movimientos entre cuentas internas
+  CIERRE // C — cierre de cuentas de resultado (Fase 1.5)
 }
 
 // Estado del comprobante.
@@ -687,64 +687,62 @@ enum EstadoComprobante {
 // Tributario art. 47). Contiene fecha, tipo, número, estado, glosa, moneda
 // principal y totales cache en BOB. El detalle vive en LineaComprobante.
 model Comprobante {
-  id              String            @id @default(uuid())
-  organizationId  String
-  tipo            TipoComprobante
+  id             String            @id @default(uuid())
+  organizationId String
+  tipo           TipoComprobante
   // NULL en BORRADOR. Asignado al CONTABILIZAR con formato {prefijo}{YY}{MM}-{correlativo:6}.
-  numero          String?
-  estado          EstadoComprobante @default(BORRADOR)
+  numero         String?
+  estado         EstadoComprobante @default(BORRADOR)
 
   // FechaContable: calendario puro (CLAUDE.md §4.6 core). Inmutable post-CONTABILIZADO.
-  fechaContable   DateTime          @db.Date
+  fechaContable   DateTime @db.Date
   // Resuelto al create desde fechaContable. Inmutable post-CONTABILIZADO.
   periodoFiscalId String
 
-  glosa           String
-  monedaPrincipal Moneda            @default(BOB)
+  glosa                 String
+  monedaPrincipal       Moneda  @default(BOB)
   // T/C de PRESENTACIÓN (re-expresión del comprobante en otra moneda para reportes).
   // NO es el tipoCambio transaccional de la línea (LineaComprobante.tipoCambio).
   // Nunca entra a validarCoherenciaLineaBorrador ni a la validación de partida doble.
   tipoCambioReexpresion Decimal @default(1) @db.Decimal(14, 8)
 
   // Totales cache en BOB, calculados al contabilizar. Validan partida doble.
-  totalDebitoBob  Decimal           @default(0) @db.Decimal(18, 2)
-  totalCreditoBob Decimal           @default(0) @db.Decimal(18, 2)
+  totalDebitoBob  Decimal @default(0) @db.Decimal(18, 2)
+  totalCreditoBob Decimal @default(0) @db.Decimal(18, 2)
 
   // Origen de auto-entries (Fase 1.5+). En 1.3 siempre NULL. Campo presente
   // para evitar migración futura sobre tabla grande. UNIQUE ignora NULL.
-  origenTipo      String?           // "VENTA" | "COMPRA" | "PAGO" | NULL
-  origenId        String?           // id del documento origen
+  origenTipo String? // "VENTA" | "COMPRA" | "PAGO" | NULL
+  origenId   String? // id del documento origen
 
   // Atributo de ORIGEN, ortogonal al estado (como anulado, §4.7): un comprobante
   // generado por el sistema (ej: asiento de cierre del ejercicio) NO es editable a
   // mano vía API. Solo se regenera por el path-sistema (REQ-CMP-SYS-01).
-  generadoPorSistema Boolean        @default(false)
+  generadoPorSistema Boolean @default(false)
 
   // Anulación por flag (CLAUDE.md §4.7). El comprobante CONTABILIZADO se
   // preserva intacto; se marca con anulado=true. No se generan contra-asientos.
-  anulado          Boolean           @default(false)
-  fechaAnulacion   DateTime?         @db.Timestamptz(3)
+  anulado          Boolean   @default(false)
+  fechaAnulacion   DateTime? @db.Timestamptz(3)
   anuladoPorUserId String?
   motivoAnulacion  String?
 
-  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
   createdByUserId String
-  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
-  organization   Organization           @relation(fields: [organizationId], references: [id],  onDelete: Cascade)
-  periodoFiscal  PeriodoFiscal          @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
-  lineas         LineaComprobante[]
+  organization               Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  periodoFiscal              PeriodoFiscal                @relation(fields: [periodoFiscalId], references: [id], onDelete: Restrict)
+  lineas                     LineaComprobante[]
   documentosFisicosAsociados ComprobanteDocumentoFisico[]
-  adjuntos       AdjuntoComprobante[]
+  adjuntos                   AdjuntoComprobante[]
 
   // Unicidad del número por (tenant, tipo). numero es NULL en BORRADOR y
   // Postgres permite múltiples NULL en un UNIQUE, así que no colisiona.
   @@unique([organizationId, tipo, numero])
-
   // Unicidad de auto-entries (CLAUDE.md §4.9 core, Anti-17). NULLs ignorados
   // en 1.3 → no colisiona. Campo presente para no migrar en Fase 1.5.
   @@unique([organizationId, origenTipo, origenId])
-
   @@index([organizationId, periodoFiscalId, estado])
   @@index([organizationId, fechaContable])
   @@index([organizationId, tipo, fechaContable])
@@ -758,32 +756,32 @@ model Comprobante {
 // día 1 (CLAUDE.md §4.5 core): todos los campos de moneda siempre persisten,
 // aunque sea BOB con tipoCambio=1.
 model LineaComprobante {
-  id              String   @id @default(uuid())
-  organizationId  String   // denormalizado para queries cross-cuenta sin JOIN
-  comprobanteId   String
-  orden           Int      // 1..N dentro del comprobante; inmutable post-create
+  id             String @id @default(uuid())
+  organizationId String // denormalizado para queries cross-cuenta sin JOIN
+  comprobanteId  String
+  orden          Int // 1..N dentro del comprobante; inmutable post-create
 
-  cuentaId        String
+  cuentaId   String
   // Requerido si cuenta.requiereContacto = true. FK a Contacto con
   // onDelete: Restrict (contacto referenciado nunca se elimina).
-  contactoId      String?
+  contactoId String?
 
   // Multi-moneda estructural. BOB → moneda=BOB, tipoCambio=1, debitoBob=debito.
-  moneda          Moneda
-  debito          Decimal  @default(0) @db.Decimal(18, 2)
-  credito         Decimal  @default(0) @db.Decimal(18, 2)
-  tipoCambio      Decimal  @default(1) @db.Decimal(14, 8)
-  debitoBob       Decimal  @default(0) @db.Decimal(18, 2)
-  creditoBob      Decimal  @default(0) @db.Decimal(18, 2)
+  moneda     Moneda
+  debito     Decimal @default(0) @db.Decimal(18, 2)
+  credito    Decimal @default(0) @db.Decimal(18, 2)
+  tipoCambio Decimal @default(1) @db.Decimal(14, 8)
+  debitoBob  Decimal @default(0) @db.Decimal(18, 2)
+  creditoBob Decimal @default(0) @db.Decimal(18, 2)
 
-  glosaLinea      String?
+  glosaLinea String?
 
-  createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  comprobante     Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
-  cuenta          Cuenta      @relation(fields: [cuentaId],      references: [id], onDelete: Restrict)
-  contacto        Contacto?   @relation(fields: [contactoId],    references: [id], onDelete: Restrict)
+  comprobante Comprobante @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  cuenta      Cuenta      @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  contacto    Contacto?   @relation(fields: [contactoId], references: [id], onDelete: Restrict)
 
   @@unique([comprobanteId, orden])
   @@index([organizationId, cuentaId])
@@ -800,10 +798,10 @@ model SecuenciaComprobante {
   organizationId String
   tipo           TipoComprobante
   year           Int
-  month          Int              // 1-12
-  ultimoNumero   Int              @default(0)
+  month          Int // 1-12
+  ultimoNumero   Int             @default(0)
 
-  updatedAt      DateTime         @updatedAt @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@id([organizationId, tipo, year, month])
   @@map("secuencias_comprobante")
@@ -820,7 +818,7 @@ model SecuenciaDocumentoFisico {
   tipoDocumentoFisicoId String
   ultimoNumero          Int
 
-  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@id([organizationId, tipoDocumentoFisicoId])
   @@map("secuencias_documento_fisico")
@@ -845,8 +843,8 @@ model SecuenciaDocumentoFisico {
 //   3. Índices GIN trigram (pg_trgm) sobre razonSocial y nombreComercial
 //      para búsqueda ILIKE eficiente.
 model Contacto {
-  id              String   @id @default(uuid())
-  organizationId  String
+  id             String @id @default(uuid())
+  organizationId String
 
   razonSocial     String
   nombreComercial String?
@@ -855,14 +853,14 @@ model Contacto {
   // endurece donde IVA lo requiera.
   documento       String?
 
-  esCliente       Boolean  @default(false)
-  esProveedor     Boolean  @default(false)
+  esCliente   Boolean @default(false)
+  esProveedor Boolean @default(false)
 
-  email           String?
-  telefono        String?
-  direccion       String?
+  email     String?
+  telefono  String?
+  direccion String?
 
-  activo          Boolean  @default(true)
+  activo Boolean @default(true)
 
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   createdByUserId String
@@ -889,24 +887,24 @@ model Contacto {
 // editable y desactivable. NO eliminable si tiene documentos asociados
 // (FK Restrict desde DocumentoFisico).
 model TipoDocumentoFisico {
-  id             String  @id @default(uuid())
+  id             String @id @default(uuid())
   organizationId String
 
   // 1..100 chars, no vacío. Mostrado en UI al contador.
-  nombre         String
+  nombre String
   // 1..20 chars, kebab-case alfanumérico. Estable, único per-tenant.
   // Ancla del seed (idempotencia vía upsert por (organizationId, codigo)).
-  codigo         String
+  codigo String
 
   // Distingue documentos tributarios (factura, NC, ND) de no-tributarios
   // (recibo, vale, comprobante interno). Anticipa el slice 3: cuando
   // esTributario=true, exigirá Factura adjunta antes de asociar al
   // Comprobante CONTABILIZADO.
-  esTributario   Boolean @default(false)
+  esTributario Boolean @default(false)
 
   // Soft-toggle de visibilidad. NO es soft-delete (CLAUDE.md §4.7) — este
   // modelo es catálogo, no documento contable.
-  activo         Boolean @default(true)
+  activo Boolean @default(true)
 
   // Numeración automática (change numeracion-tipo-documento):
   // Si true, el sistema asigna el número correlativo al crear el documento;
@@ -915,7 +913,7 @@ model TipoDocumentoFisico {
   // tienen número asignado por el emisor externo (factura, NC, ND).
   // Set-once: una vez activado, ni `numeracionAutomatica` ni `numeroInicial`
   // pueden modificarse (ver DomainError TIPO_DOCUMENTO_FISICO_NUMERO_INICIAL_INMUTABLE).
-  numeracionAutomatica Boolean  @default(false)
+  numeracionAutomatica Boolean @default(false)
   // Null cuando numeracionAutomatica=false. Inmutable una vez persistido.
   numeroInicial        Int?
 
@@ -943,31 +941,31 @@ model TipoDocumentoFisico {
 // Inmutable cuando está asociado a un comprobante CONTABILIZADO
 // (proposal D5). Eliminable solo si nunca tuvo asociaciones.
 model DocumentoFisico {
-  id             String  @id @default(uuid())
+  id             String @id @default(uuid())
   organizationId String
 
   tipoDocumentoFisicoId String
 
   // Número impreso. Normalizado en VO NumeroDocumento: trim + uppercase.
   // Regex: ^[A-Z0-9./-]+$, longitud 1..50. Proposal D3: 0042 ≠ 42.
-  numero         String
+  numero String
 
   // FechaContable: calendario puro, sin UTC, sin hora (CLAUDE.md §4.6).
-  fechaEmision   DateTime @db.Date
+  fechaEmision DateTime @db.Date
 
   // Monto/moneda nullable por proposal D4: obligatorios solo si
   // tipo.esTributario=true. Para no-tributarios DEBE ser NULL — el monto
   // vive en el Comprobante. Validación condicional en service.
-  monto          Decimal? @db.Decimal(18, 2)
-  moneda         Moneda?
+  monto  Decimal? @db.Decimal(18, 2)
+  moneda Moneda?
 
   // Glosa libre opcional, hasta 500 chars (validado en DTO).
-  glosa          String?
+  glosa String?
 
   // Contacto opcional. Si esTributario=true (slice 3) será obligatorio
   // a través de Factura; en este slice se mantiene opcional para que
   // recibos sin contacto puedan registrarse.
-  contactoId     String?
+  contactoId String?
 
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   createdByUserId String
@@ -982,7 +980,6 @@ model DocumentoFisico {
 
   // Defense in depth (CLAUDE.md §4.8): UNIQUE en BD + check en service.
   @@unique([organizationId, tipoDocumentoFisicoId, numero])
-
   @@index([organizationId, fechaEmision])
   @@index([organizationId, contactoId])
   @@index([organizationId, tipoDocumentoFisicoId])
@@ -1002,7 +999,7 @@ model DocumentoFisico {
 // `WHERE`) en la migration, porque Prisma no expresa unique parciales
 // nativos. Nombre estable: comprobante_documento_fisico_unique_contabilizado.
 model ComprobanteDocumentoFisico {
-  id             String   @id @default(uuid())
+  id             String @id @default(uuid())
   organizationId String
 
   comprobanteId     String
@@ -1017,18 +1014,17 @@ model ComprobanteDocumentoFisico {
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // CASCADE desde Comprobante: si el comprobante se elimina (BORRADOR
   // descartado), las asociaciones se borran. Los DocumentosFisicos
   // sobreviven.
-  comprobante     Comprobante      @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  comprobante     Comprobante     @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
   // Restrict desde DocumentoFisico: un documento físico con asociaciones
   // no se puede eliminar (queda como histórico, proposal D5).
-  documentoFisico DocumentoFisico  @relation(fields: [documentoFisicoId], references: [id], onDelete: Restrict)
+  documentoFisico DocumentoFisico @relation(fields: [documentoFisicoId], references: [id], onDelete: Restrict)
 
   // No se duplica una asociación específica.
   @@unique([documentoFisicoId, comprobanteId])
-
   @@index([organizationId])
   @@index([comprobanteId])
   @@index([documentoFisicoId])
@@ -1041,25 +1037,25 @@ model ComprobanteDocumentoFisico {
 // 1-N directa: un adjunto pertenece a UN comprobante (no compartido como DocumentoFisico).
 // storageKey convención: {tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}
 model AdjuntoComprobante {
-  id              String   @id @default(uuid())
-  organizationId  String
-  comprobanteId   String
+  id             String @id @default(uuid())
+  organizationId String
+  comprobanteId  String
 
   // Clave única en el storage (MinIO). Convención: {tenantId}/{comprobanteId}/{uuid}-{nombreSaneado}.
   // @unique para detectar duplicados y evitar colisiones.
-  storageKey      String   @unique
+  storageKey String @unique
 
-  nombreOriginal  String
-  mimeType        String
+  nombreOriginal String
+  mimeType       String
   // CLAUDE.md §4.5: tamanoBytes como Int (max 25 MB << 2^31 = 2 GB — no necesita Decimal).
-  tamanoBytes     Int
+  tamanoBytes    Int
   // sha256: previsto para deduplicación futura (v2+). En v1 siempre NULL.
-  sha256          String?
+  sha256         String?
 
   subidoPorUserId String
   // CLAUDE.md §4.6: timestamps de auditoría en UTC (@db.Timestamptz). No son FechaContable de dominio.
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime @updatedAt     @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   // Cascade desde Comprobante: la metadata se borra con el comprobante.
@@ -1089,18 +1085,18 @@ enum NaturalezaRegistro {
 }
 
 model Lote {
-  id             String     @id @default(uuid())
-  organizationId String     // multi-tenant (§4.2) — NOT NULL, toda query filtra
+  id             String @id @default(uuid())
+  organizationId String // multi-tenant (§4.2) — NOT NULL, toda query filtra
 
-  nombre         String?    // etiqueta humana opcional
-  galpon         String?    // texto libre, sin unicidad (granja.md §5.1)
-  fechaIngreso   DateTime   @db.Date  // FechaContable (calendario puro, §4.6)
-  cantidadInicial Int       // pollitos BB. > 0 (CHECK). INMUTABLE post-create (service)
-  estado         EstadoLote @default(ACTIVO)
+  nombre          String? // etiqueta humana opcional
+  galpon          String? // texto libre, sin unicidad (granja.md §5.1)
+  fechaIngreso    DateTime   @db.Date // FechaContable (calendario puro, §4.6)
+  cantidadInicial Int // pollitos BB. > 0 (CHECK). INMUTABLE post-create (service)
+  estado          EstadoLote @default(ACTIVO)
 
-  fechaEstimadaSaca DateTime? @db.Date  // FechaContable opcional
-  fechaCierre       DateTime? @db.Date  // se setea al cerrar
-  detalle           String?             // observaciones libres
+  fechaEstimadaSaca DateTime? @db.Date // FechaContable opcional
+  fechaCierre       DateTime? @db.Date // se setea al cerrar
+  detalle           String? // observaciones libres
 
   // ----- RIEL ADITIVO v1.5 (NO se construye en v1; columnas futuras nullable) -----
   // precioVentaFinal    Decimal? @db.Decimal(18,2)  // snapshot al cerrar (v1.5)
@@ -1115,18 +1111,18 @@ model Lote {
   movimientosInversion MovimientoInversion[]
   movimientosCantidad  MovimientoCantidad[]
 
-  @@index([organizationId, estado])  // dashboard: lotes ACTIVO por org
+  @@index([organizationId, estado]) // dashboard: lotes ACTIVO por org
   @@index([organizationId, fechaIngreso])
   @@map("lotes")
 }
 
 model TipoRegistro {
   id             String             @id @default(uuid())
-  organizationId String             // multi-tenant. Los esSistema se siembran por org al activar granja
+  organizationId String // multi-tenant. Los esSistema se siembran por org al activar granja
   nombre         String
   naturaleza     NaturalezaRegistro
-  esSistema      Boolean            @default(false)  // true = seed, no eliminable
-  activo         Boolean            @default(true)   // soft-disable
+  esSistema      Boolean            @default(false) // true = seed, no eliminable
+  activo         Boolean            @default(true) // soft-disable
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -1135,19 +1131,19 @@ model TipoRegistro {
   movimientosInversion MovimientoInversion[]
   movimientosCantidad  MovimientoCantidad[]
 
-  @@unique([organizationId, nombre])  // unicidad por org (defense in depth + upsert idempotente del seed)
+  @@unique([organizationId, nombre]) // unicidad por org (defense in depth + upsert idempotente del seed)
   @@index([organizationId, naturaleza])
   @@map("tipos_registro")
 }
 
 model MovimientoInversion {
   id             String   @id @default(uuid())
-  organizationId String   // denormalizado para queries sin JOIN (patrón LineaComprobante)
+  organizationId String // denormalizado para queries sin JOIN (patrón LineaComprobante)
   loteId         String
   tipoRegistroId String
-  fecha          DateTime @db.Date  // FechaContable; PUEDE ser anterior a fechaIngreso (gastos previos)
-  monto          Decimal  @db.Decimal(18, 2)  // > 0 (service). Money, nunca number (§4.5)
-  detalle        String?  // @MaxLength(500) en DTO
+  fecha          DateTime @db.Date // FechaContable; PUEDE ser anterior a fechaIngreso (gastos previos)
+  monto          Decimal  @db.Decimal(18, 2) // > 0 (service). Money, nunca number (§4.5)
+  detalle        String? // @MaxLength(500) en DTO
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -1156,19 +1152,19 @@ model MovimientoInversion {
   lote         Lote         @relation(fields: [loteId], references: [id], onDelete: Cascade)
   tipoRegistro TipoRegistro @relation(fields: [tipoRegistroId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, loteId])  // sirve también al read-model batch (WHERE loteId IN (...))
-  @@index([loteId, tipoRegistroId])  // desglose de costos por tipo (informe del lote)
+  @@index([organizationId, loteId]) // sirve también al read-model batch (WHERE loteId IN (...))
+  @@index([loteId, tipoRegistroId]) // desglose de costos por tipo (informe del lote)
   @@map("movimientos_inversion")
 }
 
 model MovimientoCantidad {
   id             String   @id @default(uuid())
-  organizationId String   // denormalizado
+  organizationId String // denormalizado
   loteId         String
   tipoRegistroId String
-  fecha          DateTime @db.Date  // FechaContable
-  cantidad       Int      // > 0 (service). Aves que SALEN (resta) — granja.md §5.4
-  detalle        String?  // @MaxLength(500) en DTO
+  fecha          DateTime @db.Date // FechaContable
+  cantidad       Int // > 0 (service). Aves que SALEN (resta) — granja.md §5.4
+  detalle        String? // @MaxLength(500) en DTO
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -1228,7 +1224,7 @@ enum VerticalPack {
 
 // Tipo de pack (informativo / para agrupación UI). Ver diseño §3.2.
 enum TipoPack {
-  DOMINIO   // genera/consume comprobantes (Ventas, Compras, ...)
+  DOMINIO // genera/consume comprobantes (Ventas, Compras, ...)
   CAPACIDAD // capa transversal (Adjuntos, RAG)
 }
 
@@ -1236,22 +1232,22 @@ enum TipoPack {
 // organizationId → read-only cross-tenant (excepción multi-tenant §4.2 core,
 // análogo a un catálogo compartido). Lo administra la plataforma.
 model Pack {
-  id          String       @id @default(uuid())
+  id                 String       @id @default(uuid())
   // Clave estable namespaced por vertical. Ej: "contabilidad.adjuntos",
   // "contabilidad.rag", "granja.rag".
-  clave       String       @unique
-  nombre      String // user-facing, español
-  descripcion String?
+  clave              String       @unique
+  nombre             String // user-facing, español
+  descripcion        String?
   // Vertical al que pertenece el pack.
-  verticalAplicable VerticalPack
-  tipo        TipoPack
+  verticalAplicable  VerticalPack
+  tipo               TipoPack
   // Un pack retirado del catálogo no se vende (no afecta entitlements existentes).
-  activo      Boolean      @default(true)
+  activo             Boolean      @default(true)
   // Si true, se otorga (habilitado + ACTIVO) automáticamente al provisionar
   // una org del vertical aplicable. Ver design conciliacion-bancaria §7.
-  otorgadoPorDefecto Boolean @default(false)
-  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime     @updatedAt @db.Timestamptz(3)
+  otorgadoPorDefecto Boolean      @default(false)
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz(3)
 
   entitlements OrgPackEntitlement[]
 
@@ -1262,16 +1258,16 @@ model Pack {
 // existe ⇔ el pack está habilitado para la org. La columna `activo` ES la
 // activación embebida (frontera activación⊆entitlement estructural §4.5).
 model OrgPackEntitlement {
-  id             String  @id @default(uuid())
-  organizationId String
-  packId         String
+  id                  String   @id @default(uuid())
+  organizationId      String
+  packId              String
   // Activación embebida: el Owner prende/apaga DENTRO del entitlement.
   // Por defecto false: habilitar ≠ activar.
-  activo         Boolean @default(false)
+  activo              Boolean  @default(false)
   // Auditoría: super-admin que habilitó el pack.
   habilitadoPorUserId String
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   pack         Pack         @relation(fields: [packId], references: [id], onDelete: Restrict)
@@ -1335,12 +1331,12 @@ enum LadoContable {
 // Cuenta bancaria del usuario, vinculada 1:1 a una Cuenta del plan de
 // cuentas. Es el destino de las importaciones de extracto.
 model CuentaBancaria {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   organizationId String
   // @unique (no solo parte del compuesto de abajo): Prisma exige un campo
   // FK unívoco del lado que define una relación 1:1 (Cuenta.cuentaBancaria
   // es singular, no []). Documenta el mismo invariante que @@unique([organizationId, cuentaId]).
-  cuentaId       String   @unique // Cuenta del plan que ELIGE el usuario
+  cuentaId       String         @unique // Cuenta del plan que ELIGE el usuario
   alias          String
   // R-3 / REQ-CB-01 / CRITICAL-5: `perfilExtracto` es la ÚNICA fuente de verdad
   // del banco+formato. `banco` y `formato` los aporta el descriptor del adaptador
@@ -1348,24 +1344,24 @@ model CuentaBancaria {
   // constraint de identidad (`@@unique([org, banco, numeroCuenta])`) y como texto
   // libre "BancoSol" vs "Banco Sol" no protegía nada. Si se quiere un alias de UI
   // editable, va en `alias`, que NO participa de ninguna unicidad.
-  perfilExtracto PerfilExtracto      // enum — un perfil identifica el banco por construcción
+  perfilExtracto PerfilExtracto // enum — un perfil identifica el banco por construcción
   // NULLABLE (REQ-CB-16): se puede crear la cuenta sin el número y capturarlo en
   // la primera importación, con confirmación explícita del usuario — elimina el
   // error de transcripción manual. Mientras sea null NO se puede validar destino:
   // el importador advierte, no rechaza.
   numeroCuenta   String?
-  moneda         Moneda              // validada vs cuenta.permiteMultiMoneda/monedaFuncional
-  activa         Boolean  @default(true)
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt      @db.Timestamptz(3)
+  moneda         Moneda // validada vs cuenta.permiteMultiMoneda/monedaFuncional
+  activa         Boolean        @default(true)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  cuenta       Cuenta       @relation(fields: [cuentaId],       references: [id], onDelete: Restrict)
-  movimientos  MovimientoBancario[]
-  importaciones ImportacionExtracto[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cuenta               Cuenta                @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  movimientos          MovimientoBancario[]
+  importaciones        ImportacionExtracto[]
   arranquesConciliados ArranqueConciliado[]
 
-  @@unique([organizationId, cuentaId])                  // 1 cuenta contable ↔ 1 cuenta bancaria
+  @@unique([organizationId, cuentaId]) // 1 cuenta contable ↔ 1 cuenta bancaria
   // CRITICAL-5: identidad por `perfilExtracto` (no `banco`). El perfil ya fija el
   // banco por construcción, y es un enum → sin ambigüedad "BancoSol"/"Banco Sol".
   // Postgres permite múltiples NULL en un UNIQUE ⇒ varias cuentas del mismo perfil
@@ -1377,79 +1373,79 @@ model CuentaBancaria {
 }
 
 model MovimientoBancario {
-  id               String   @id @default(uuid())
+  id               String @id @default(uuid())
   organizationId   String
   cuentaBancariaId String
-  importacionId    String                       // trazabilidad del origen
+  importacionId    String // trazabilidad del origen
 
-  fecha            DateTime @db.Date            // §4.6 — calendario puro
-  hora             String?                      // 'HH:MM:SS'
-  monto            Decimal  @db.Decimal(18, 2)  // SIEMPRE positivo
-  tipo             LadoBancario
-  moneda           Moneda
+  fecha                  DateTime     @db.Date // §4.6 — calendario puro
+  hora                   String? // 'HH:MM:SS'
+  monto                  Decimal      @db.Decimal(18, 2) // SIEMPRE positivo
+  tipo                   LadoBancario
+  moneda                 Moneda
   descripcion            String
   descripcionNormalizada String
   referencia             String?
-  saldo            Decimal? @db.Decimal(18, 2)
-  contraparteNombre     String?
-  contraparteDocumento  String?
-  datosOriginales  Json                          // renglón crudo, celdas como STRING
+  saldo                  Decimal?     @db.Decimal(18, 2)
+  contraparteNombre      String?
+  contraparteDocumento   String?
+  datosOriginales        Json // renglón crudo, celdas como STRING
 
-  ordinalDia       Int
+  ordinalDia  Int
   // Índice 0-based dentro del orden CRONOLÓGICO del archivo importado
   // (REQ-CB-21). null = importado antes del change o secuencia NO_MONOTONA.
-  ordenFisico      Int?
-  hashDedup        String
-  estado           EstadoMovimientoBancario @default(PENDIENTE)  // proyección cacheada (design §2.3)
+  ordenFisico Int?
+  hashDedup   String
+  estado      EstadoMovimientoBancario @default(PENDIENTE) // proyección cacheada (design §2.3)
 
-  createdAt        DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt      @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  organization   Organization        @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   cuentaBancaria CuentaBancaria      @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
-  importacion    ImportacionExtracto @relation(fields: [importacionId],    references: [id], onDelete: Restrict)
+  importacion    ImportacionExtracto @relation(fields: [importacionId], references: [id], onDelete: Restrict)
   match          MatchConciliacion?
 
-  @@unique([cuentaBancariaId, hashDedup])       // idempotencia ESTRUCTURAL (decisión 7)
+  @@unique([cuentaBancariaId, hashDedup]) // idempotencia ESTRUCTURAL (decisión 7)
   @@index([organizationId, cuentaBancariaId, fecha])
-  @@index([organizationId, fecha])              // listado cross-cuenta del verificador (REQ-VMB-01)
+  @@index([organizationId, fecha]) // listado cross-cuenta del verificador (REQ-VMB-01)
   @@index([cuentaBancariaId, estado, fecha])
   @@map("movimientos_bancarios")
 }
 
 model ImportacionExtracto {
-  id               String   @id @default(uuid())
-  organizationId   String
-  cuentaBancariaId String
-  nombreArchivo    String
-  sha256Archivo    String                       // R-2: SIN storageKey, SIN binario en v1
-  tamanioBytes     Int
-  perfilExtracto   PerfilExtracto
-  fechaDesde       DateTime @db.Date
-  fechaHasta       DateTime @db.Date
-  coberturaDeclarada Boolean                     // true ⇒ del encabezado; false ⇒ min/max de filas
-  saldoInicial     Decimal? @db.Decimal(18, 2)
-  saldoFinal       Decimal? @db.Decimal(18, 2)
-  estadoVerificacion EstadoVerificacionExtracto
-  diferencia       Decimal? @db.Decimal(18, 2)
-  filasLeidas            Int
-  movimientosNuevos      Int
-  movimientosDuplicados  Int
-  importadoPorUserId String
-  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  id                    String                     @id @default(uuid())
+  organizationId        String
+  cuentaBancariaId      String
+  nombreArchivo         String
+  sha256Archivo         String // R-2: SIN storageKey, SIN binario en v1
+  tamanioBytes          Int
+  perfilExtracto        PerfilExtracto
+  fechaDesde            DateTime                   @db.Date
+  fechaHasta            DateTime                   @db.Date
+  coberturaDeclarada    Boolean // true ⇒ del encabezado; false ⇒ min/max de filas
+  saldoInicial          Decimal?                   @db.Decimal(18, 2)
+  saldoFinal            Decimal?                   @db.Decimal(18, 2)
+  estadoVerificacion    EstadoVerificacionExtracto
+  diferencia            Decimal?                   @db.Decimal(18, 2)
+  filasLeidas           Int
+  movimientosNuevos     Int
+  movimientosDuplicados Int
+  importadoPorUserId    String
+  createdAt             DateTime                   @default(now()) @db.Timestamptz(3)
 
-  organization   Organization   @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
-  cuentaBancaria CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cuentaBancaria CuentaBancaria       @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
   movimientos    MovimientoBancario[]
 
   @@index([organizationId, cuentaBancariaId, createdAt])
-  @@index([cuentaBancariaId, sha256Archivo])    // "este archivo ya lo subiste" gratis
+  @@index([cuentaBancariaId, sha256Archivo]) // "este archivo ya lo subiste" gratis
   @@map("importaciones_extracto")
 }
 
 model MatchConciliacion {
-  id                  String @id @default(uuid())
-  organizationId      String
+  id                   String @id @default(uuid())
+  organizationId       String
   // @unique: Prisma exige un campo FK unívoco del lado que define una
   // relación 1:1 (MovimientoBancario.match es singular, no []). v1: 1↔1
   // (design §5.3). Documenta el mismo invariante que el compuesto de abajo.
@@ -1459,24 +1455,24 @@ model MatchConciliacion {
   // decisión 3); Cascade borraría el match dejando el movimiento CONCILIADO
   // huérfano (viola decisión 4). La verificación contra el snapshot en CADA
   // lectura es el mecanismo único que cubre los 3 casos. Ver design §2.
-  comprobanteId       String
-  orden               Int
+  comprobanteId String
+  orden         Int
 
   snapshotCuentaId String
   snapshotMonto    Decimal      @db.Decimal(18, 2)
-  snapshotTipo     LadoContable                       // lado CONTABLE de la línea (NO LadoBancario)
+  snapshotTipo     LadoContable // lado CONTABLE de la línea (NO LadoBancario)
   snapshotMoneda   Moneda
   snapshotFecha    DateTime     @db.Date
 
-  confianzaSugerida  String?                          // 'ALTA'|'MEDIA'|'BAJA'|null (manual)
+  confianzaSugerida   String? // 'ALTA'|'MEDIA'|'BAJA'|null (manual)
   conciliadoPorUserId String
-  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
 
-  organization Organization       @relation(fields: [organizationId],       references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   movimiento   MovimientoBancario @relation(fields: [movimientoBancarioId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, movimientoBancarioId])    // v1: 1↔1 (design §5.3)
-  @@unique([organizationId, comprobanteId, orden])    // una línea se reclama una vez
+  @@unique([organizationId, movimientoBancarioId]) // v1: 1↔1 (design §5.3)
+  @@unique([organizationId, comprobanteId, orden]) // una línea se reclama una vez
   @@index([organizationId, comprobanteId])
   @@map("matches_conciliacion")
 }
@@ -1487,11 +1483,64 @@ model MatchConciliacion {
 // sobre el que se apoyan todos los informes futuros y es la COTA de rendimiento
 // del informe (todo lo anterior al arranque está absorbido en el saldo
 // declarado; la consulta se acota a `arranque.fecha < fecha <= corte`).
+/// Origen de una partida que quedó ABIERTA a la fecha del arranque.
+enum OrigenPartidaArranque {
+  MOVIMIENTO_PENDIENTE // el banco lo registró y los libros, a esa fecha, no
+  MOVIMIENTO_IGNORADO // el banco lo registró y los libros NUNCA lo harán
+  LINEA // los libros la registraron y el banco, a esa fecha, no
+}
+
+// Partidas que ya estaban ABIERTAS cuando se declaró el arranque.
+//
+// POR QUÉ existe: el informe acota el puente a `arranque.fecha < fecha <=
+// corte`, y esa ventana deja afuera lo anterior al arranque. Para lo que ya
+// estaba CERRADO a esa fecha eso es correcto — está absorbido en los saldos.
+// Para lo que estaba ABIERTO no: un cheque girado antes del arranque y no
+// cobrado sigue estando en un lado y no en el otro DESPUÉS del arranque, así
+// que sigue siendo partida. Sin esta tabla aparecía como RESIDUO_NO_EXPLICADO,
+// que es decir "no sé qué es esto" sobre el caso más común de una conciliación
+// bancaria.
+//
+// POR QUÉ CONGELADAS y no derivadas en cada lectura: el ancla
+// `(comprobanteId, orden)` no tiene FK (ver MatchConciliacion), así que no hay
+// forma de expresar en Prisma "líneas sin match"; y el SQL crudo contra
+// `lineas_comprobante` desde conciliación está prohibido por el test de
+// arquitectura (esquivaría el read port y su filtro de tenant). Calcularlas UNA
+// vez, en el POST que declara el arranque, evita ambas cosas y además mueve el
+// escaneo caro a un acto único en vez de a cada informe.
+//
+// Se persiste la contribución FIRMADA extracto→libros ya calculada: es el
+// snapshot de un ACTO declarado, igual que los saldos del arranque. Que una
+// partida siga abierta AL CORTE se resuelve en lectura contra los matches
+// actuales — la lista es chica y acotada.
+model ArranquePartidaAbierta {
+  id             String                @id @default(uuid())
+  organizationId String
+  arranqueId     String
+  origen         OrigenPartidaArranque
+
+  // MOVIMIENTO ⇒ `movimientoBancarioId`. LINEA ⇒ ancla `(comprobanteId, orden)`,
+  // SIN FK por la misma razón que MatchConciliacion: una FK bloquearía editar
+  // el comprobante o borraría el rastro al anularlo.
+  movimientoBancarioId String?
+  comprobanteId        String?
+  orden                Int?
+
+  fecha   DateTime @db.Date
+  /// Contribución FIRMADA extracto→libros, fijada al declarar.
+  importe Decimal  @db.Decimal(18, 2)
+
+  arranque ArranqueConciliado @relation(fields: [arranqueId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, arranqueId])
+  @@map("arranque_partidas_abiertas")
+}
+
 model ArranqueConciliado {
   id                 String   @id @default(uuid())
   organizationId     String
   cuentaBancariaId   String
-  fecha              DateTime @db.Date            // corte del arranque (§4.6 — calendario puro)
+  fecha              DateTime @db.Date // corte del arranque (§4.6 — calendario puro)
   saldoExtracto      Decimal  @db.Decimal(18, 2)
   saldoLibros        Decimal  @db.Decimal(18, 2)
   // Diferencia ACEPTADA al declarar. Se exhibe como partida nombrada del
@@ -1503,8 +1552,9 @@ model ArranqueConciliado {
   // SIN updatedAt a propósito: append-only, una declaración nunca se edita
   // (mismo criterio que ImportacionExtracto y MatchConciliacion).
 
-  organization   Organization   @relation(fields: [organizationId],   references: [id], onDelete: Cascade)
-  cuentaBancaria CuentaBancaria @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cuentaBancaria   CuentaBancaria           @relation(fields: [cuentaBancariaId], references: [id], onDelete: Restrict)
+  partidasAbiertas ArranquePartidaAbierta[]
 
   // SIN @@unique([cuentaBancariaId, fecha]) a propósito (D8): declarar de
   // nuevo sobre la misma fecha NO pisa la anterior — el historial completo

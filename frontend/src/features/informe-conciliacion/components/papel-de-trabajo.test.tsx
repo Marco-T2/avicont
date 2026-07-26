@@ -33,18 +33,19 @@ const INFORME: InformeConciliacion = {
     pendientes: {
       importe: '-200.00',
       detalle: [
-        { movimientoId: 'mov-1', fecha: '2026-07-10', importe: '-150.00', asentadoEl: null },
+        { movimientoId: 'mov-1', fecha: '2026-07-10', importe: '-150.00', asentadoEl: null, anteriorAlArranque: false },
         {
           movimientoId: 'mov-2',
           fecha: '2026-07-31',
           importe: '-50.00',
           asentadoEl: '2026-08-15',
+          anteriorAlArranque: false,
         },
       ],
     },
     ignorados: {
       importe: '-10.00',
-      detalle: [{ movimientoId: 'mov-3', fecha: '2026-07-12', importe: '-10.00' }],
+      detalle: [{ movimientoId: 'mov-3', fecha: '2026-07-12', importe: '-10.00', anteriorAlArranque: false }],
     },
     enTransito: {
       importe: '400.00',
@@ -55,6 +56,7 @@ const INFORME: InformeConciliacion = {
           fecha: '2026-07-20',
           importe: '250.00',
           registradoPorBancoEl: null,
+          anteriorAlArranque: false,
         },
         {
           comprobanteId: 'comp-2',
@@ -62,6 +64,7 @@ const INFORME: InformeConciliacion = {
           fecha: '2026-07-28',
           importe: '150.00',
           registradoPorBancoEl: '2026-08-02',
+          anteriorAlArranque: false,
         },
       ],
     },

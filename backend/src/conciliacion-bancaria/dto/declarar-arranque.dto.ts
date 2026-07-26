@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 /** Monto §4.5: string decimal con hasta 2 decimales, signo permitido. */
 const MONTO_REGEX = /^-?\d+(\.\d{1,2})?$/;
@@ -39,6 +47,21 @@ export class DeclararArranqueDto {
     message: 'diferenciaResidual debe ser un decimal con hasta 2 decimales',
   })
   diferenciaResidual!: string;
+
+  @ApiProperty({
+    type: [String],
+    example: ['LIN:9f3a…:1'],
+    description:
+      'Referencias de las partidas abiertas que se CONFIRMA arrastrar, obtenidas de ' +
+      'GET /conciliacion/arranques/candidatos. Obligatorio aunque vaya vacío: una ' +
+      'línea anterior al arranque puede ser un cheque en circulación o el asiento de ' +
+      'apertura, y el sistema no puede distinguirlas — decide quien concilia. Se ' +
+      'mandan referencias, no importes: los montos salen del dato.',
+  })
+  @IsArray()
+  @ArrayMaxSize(2000)
+  @IsString({ each: true })
+  referenciasPartidas!: string[];
 
   @ApiPropertyOptional({ maxLength: 500 })
   @IsOptional()

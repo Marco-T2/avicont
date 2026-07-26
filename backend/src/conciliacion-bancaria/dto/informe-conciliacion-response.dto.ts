@@ -3,6 +3,7 @@ import { EstadoVerificacionExtracto, Moneda } from '@prisma/client';
 
 import type {
   ArranqueAplicadoView,
+  CandidatoPartidaArranque,
   InformeConciliacionResultado,
   MotivoNoConciliado,
 } from '../informe-conciliacion.service';
@@ -70,12 +71,26 @@ export class DetalleMovimientoPendienteDto {
       'este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada.',
   })
   asentadoEl!: string | null;
+  @ApiProperty({
+    description:
+      'true ⇒ la partida ya estaba abierta cuando se declaró el arranque y ' +
+      'sigue abierta al corte. Su antigüedad es información: un ítem sin ' +
+      'resolver desde antes del punto de partida no es lo mismo que uno de este mes.',
+  })
+  anteriorAlArranque!: boolean;
 }
 
 export class DetalleMovimientoIgnoradoDto {
   @ApiProperty() movimientoId!: string;
   @ApiProperty({ example: '2026-07-12' }) fecha!: string;
   @ApiProperty({ example: '-10.00' }) importe!: string;
+  @ApiProperty({
+    description:
+      'true ⇒ la partida ya estaba abierta cuando se declaró el arranque y ' +
+      'sigue abierta al corte. Su antigüedad es información: un ítem sin ' +
+      'resolver desde antes del punto de partida no es lo mismo que uno de este mes.',
+  })
+  anteriorAlArranque!: boolean;
 }
 
 export class DetalleLineaEnTransitoDto {
@@ -90,6 +105,13 @@ export class DetalleLineaEnTransitoDto {
       'No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl).',
   })
   registradoPorBancoEl!: string | null;
+  @ApiProperty({
+    description:
+      'true ⇒ la partida ya estaba abierta cuando se declaró el arranque y ' +
+      'sigue abierta al corte. Su antigüedad es información: un ítem sin ' +
+      'resolver desde antes del punto de partida no es lo mismo que uno de este mes.',
+  })
+  anteriorAlArranque!: boolean;
 }
 
 export class PartidaPendientesDto {
@@ -174,6 +196,35 @@ export class MotivoNoConciliadoDto {
       '— del extracto o del mayor según el motivo.',
   })
   real?: string;
+}
+
+/** Partida abierta PROPUESTA al declarar un arranque (REQ-ICB-04). */
+export class CandidatoPartidaArranqueDto {
+  @ApiProperty({
+    example: 'LIN:9f3a-…:1',
+    description: 'Referencia estable con la que se confirma esta partida en el POST.',
+  })
+  referencia!: string;
+  @ApiProperty({ enum: ['MOVIMIENTO_PENDIENTE', 'MOVIMIENTO_IGNORADO', 'LINEA'] })
+  origen!: 'MOVIMIENTO_PENDIENTE' | 'MOVIMIENTO_IGNORADO' | 'LINEA';
+  @ApiProperty({ example: '2026-06-20' }) fecha!: string;
+  @ApiProperty({
+    example: '-400.00',
+    description: 'Contribución FIRMADA extracto→libros. Sale del dato, no del cliente.',
+  })
+  importe!: string;
+  @ApiProperty({ example: 'Pago a proveedor con cheque 4471' })
+  descripcion!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un ' +
+      'comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero.',
+  })
+  comprobanteId!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: 'D2606-000012' })
+  numeroComprobante!: string | null;
 }
 
 export class ConfiabilidadInformeDto {
@@ -271,6 +322,20 @@ function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
   }
 }
 
+export function toCandidatoPartidaResponse(
+  c: CandidatoPartidaArranque,
+): CandidatoPartidaArranqueDto {
+  return {
+    referencia: c.referencia,
+    origen: c.origen,
+    fecha: c.fecha.toIso(),
+    importe: c.importe.toBob(),
+    descripcion: c.descripcion,
+    comprobanteId: c.comprobanteId,
+    numeroComprobante: c.numeroComprobante,
+  };
+}
+
 /** También es la respuesta del `POST` de arranque (task 3.8): mismo acto, mismo shape. */
 export function toArranqueAplicadoResponse(arranque: ArranqueAplicadoView): ArranqueAplicadoDto {
   return {
@@ -306,6 +371,7 @@ export function toInformeConciliacionResponse(
                 fecha: d.fecha.toIso(),
                 importe: d.importe.toBob(),
                 asentadoEl: d.asentadoEl === null ? null : d.asentadoEl.toIso(),
+                anteriorAlArranque: d.anteriorAlArranque,
               })),
             },
             ignorados: {
@@ -314,6 +380,7 @@ export function toInformeConciliacionResponse(
                 movimientoId: d.movimientoId,
                 fecha: d.fecha.toIso(),
                 importe: d.importe.toBob(),
+                anteriorAlArranque: d.anteriorAlArranque,
               })),
             },
             enTransito: {
@@ -325,6 +392,7 @@ export function toInformeConciliacionResponse(
                 importe: d.importe.toBob(),
                 registradoPorBancoEl:
                   d.registradoPorBancoEl === null ? null : d.registradoPorBancoEl.toIso(),
+                anteriorAlArranque: d.anteriorAlArranque,
               })),
             },
             arranque: {

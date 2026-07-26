@@ -18,6 +18,9 @@ vi.mock('../hooks/use-historial-arranques', () => ({
   useHistorialArranques: vi.fn(),
 }));
 
+vi.mock('../hooks/use-candidatos-arranque', () => ({
+  useCandidatosArranque: vi.fn(() => ({ data: [], isPending: false, isError: false })),
+}));
 vi.mock('../hooks/use-declarar-arranque', () => ({
   useDeclararArranque: vi.fn(),
 }));
@@ -84,12 +87,25 @@ const INFORME: InformeConciliacion = {
     pendientes: {
       importe: '-200.00',
       detalle: [
-        { movimientoId: 'mov-1', fecha: '2026-07-10', importe: '-200.00', asentadoEl: null },
+        {
+          movimientoId: 'mov-1',
+          fecha: '2026-07-10',
+          importe: '-200.00',
+          asentadoEl: null,
+          anteriorAlArranque: false,
+        },
       ],
     },
     ignorados: {
       importe: '-10.00',
-      detalle: [{ movimientoId: 'mov-3', fecha: '2026-07-12', importe: '-10.00' }],
+      detalle: [
+        {
+          movimientoId: 'mov-3',
+          fecha: '2026-07-12',
+          importe: '-10.00',
+          anteriorAlArranque: false,
+        },
+      ],
     },
     enTransito: {
       importe: '400.00',
@@ -100,6 +116,7 @@ const INFORME: InformeConciliacion = {
           fecha: '2026-07-20',
           importe: '400.00',
           registradoPorBancoEl: null,
+          anteriorAlArranque: false,
         },
       ],
     },

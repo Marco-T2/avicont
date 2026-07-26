@@ -113,6 +113,7 @@ describe('PrismaArranqueConciliadoRepository (integration vs Postgres)', () => {
     diferenciaResidual: new Prisma.Decimal(residual),
     nota: null,
     declaradoPorUserId: 'user-test',
+    partidasAbiertas: [] as const,
   });
 
   // Siembra directa con `createdAt` explícito — para controlar el desempate.
@@ -123,12 +124,9 @@ describe('PrismaArranqueConciliadoRepository (integration vs Postgres)', () => {
     createdAt: Date,
     residual: string,
   ) {
+    const { partidasAbiertas: _omitidas, ...acto } = datos(cuentaBancariaId, fecha, residual);
     return prisma.arranqueConciliado.create({
-      data: {
-        organizationId,
-        ...datos(cuentaBancariaId, fecha, residual),
-        createdAt,
-      },
+      data: { organizationId, ...acto, createdAt },
     });
   }
 

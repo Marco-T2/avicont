@@ -2102,6 +2102,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/conciliacion/arranques/candidatos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Partidas que quedarían ABIERTAS a una fecha: la propuesta que el usuario confirma antes de declarar el arranque.
+         * @description LECTURA PURA: no declara nada. Una línea anterior al arranque sin movimiento que la reclame puede ser un cheque en circulación (se arrastra) o el asiento de apertura (su saldo YA está dentro del extracto declarado), y con los datos disponibles son indistinguibles — si la organización importó extractos recién desde el arranque, TODA línea anterior parece en tránsito. Por eso decide quien concilia. Pide `.conciliar` y no `.read`: es un paso de la declaración. Verificación aritmética: la suma de lo confirmado debe dar `saldoLibros − saldoExtracto + diferenciaResidual`.
+         */
+        get: operations["InformeConciliacionController_listarCandidatos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movimientos-bancarios": {
         parameters: {
             query?: never;
@@ -4087,6 +4107,8 @@ export interface components {
             importe: string;
             /** @description No-nulo ⇒ el asiento existe pero es POSTERIOR al corte: la diferencia de este corte no se resolverá en él (REQ-ICB-07). Se señala, no se degrada. */
             asentadoEl: string | null;
+            /** @description true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes. */
+            anteriorAlArranque: boolean;
         };
         PartidaPendientesDto: {
             /**
@@ -4102,6 +4124,8 @@ export interface components {
             fecha: string;
             /** @example -10.00 */
             importe: string;
+            /** @description true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes. */
+            anteriorAlArranque: boolean;
         };
         PartidaIgnoradosDto: {
             /** @example -10.00 */
@@ -4117,6 +4141,8 @@ export interface components {
             importe: string;
             /** @description No-nulo ⇒ el banco lo registró, pero DESPUÉS del corte (simétrico de asentadoEl). */
             registradoPorBancoEl: string | null;
+            /** @description true ⇒ la partida ya estaba abierta cuando se declaró el arranque y sigue abierta al corte. Su antigüedad es información: un ítem sin resolver desde antes del punto de partida no es lo mismo que uno de este mes. */
+            anteriorAlArranque: boolean;
         };
         PartidaEnTransitoDto: {
             /** @example -400.00 */
@@ -4220,6 +4246,28 @@ export interface components {
             confiabilidad: components["schemas"]["ConfiabilidadInformeDto"];
             insumos: components["schemas"]["InsumosInformeDto"];
         };
+        CandidatoPartidaArranqueDto: {
+            /**
+             * @description Referencia estable con la que se confirma esta partida en el POST.
+             * @example LIN:9f3a-…:1
+             */
+            referencia: string;
+            /** @enum {string} */
+            origen: "MOVIMIENTO_PENDIENTE" | "MOVIMIENTO_IGNORADO" | "LINEA";
+            /** @example 2026-06-20 */
+            fecha: string;
+            /**
+             * @description Contribución FIRMADA extracto→libros. Sale del dato, no del cliente.
+             * @example -400.00
+             */
+            importe: string;
+            /** @example Pago a proveedor con cheque 4471 */
+            descripcion: string;
+            /** @description Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero. */
+            comprobanteId: string | null;
+            /** @example D2606-000012 */
+            numeroComprobante: string | null;
+        };
         DeclararArranqueDto: {
             /** Format: uuid */
             cuentaBancariaId: string;
@@ -4243,6 +4291,13 @@ export interface components {
              * @example 10.00
              */
             diferenciaResidual: string;
+            /**
+             * @description Referencias de las partidas abiertas que se CONFIRMA arrastrar, obtenidas de GET /conciliacion/arranques/candidatos. Obligatorio aunque vaya vacío: una línea anterior al arranque puede ser un cheque en circulación o el asiento de apertura, y el sistema no puede distinguirlas — decide quien concilia. Se mandan referencias, no importes: los montos salen del dato.
+             * @example [
+             *       "LIN:9f3a…:1"
+             *     ]
+             */
+            referenciasPartidas: string[];
             nota?: string;
         };
         MovimientoVerificadorDto: {
@@ -8380,6 +8435,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArranqueAplicadoDto"];
+                };
+            };
+        };
+    };
+    InformeConciliacionController_listarCandidatos: {
+        parameters: {
+            query: {
+                cuentaBancariaId: string;
+                /** @description Fecha del arranque a evaluar (§4.6). */
+                fecha: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidatoPartidaArranqueDto"][];
                 };
             };
         };

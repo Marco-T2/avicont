@@ -83,6 +83,9 @@ function insumos(partial: {
   saldoLibros?: string;
   movimientos?: MovimientoParaInforme[];
   lineas?: LineaParaInforme[];
+  pendientesDelArranque?: InsumosInforme['pendientesDelArranque'];
+  ignoradosDelArranque?: InsumosInforme['ignoradosDelArranque'];
+  enTransitoDelArranque?: InsumosInforme['enTransitoDelArranque'];
 }): InsumosInforme {
   const arranque = partial.arranque ?? { fecha: '2026-06-30', residual: '0' };
   return {
@@ -95,10 +98,75 @@ function insumos(partial: {
     saldoLibros: Money.of(partial.saldoLibros ?? '0'),
     movimientos: partial.movimientos ?? [],
     lineas: partial.lineas ?? [],
+    pendientesDelArranque: partial.pendientesDelArranque ?? [],
+    ignoradosDelArranque: partial.ignoradosDelArranque ?? [],
+    enTransitoDelArranque: partial.enTransitoDelArranque ?? [],
   };
 }
 
 describe('armarInforme (REQ-ICB-01/02/03/04/06/07)', () => {
+  // El hallazgo que motivó esta corrección: el cheque girado ANTES del
+  // arranque y todavía sin cobrar al corte. La ventana lo deja afuera, pero la
+  // diferencia sigue viva en los saldos — antes salía como residuo, que es
+  // decir "no sé qué es esto" sobre el caso más común de una conciliación.
+  it('partida abierta desde ANTES del arranque y aún abierta → es partida nombrada, NO residuo', () => {
+    const informe = armarInforme(
+      insumos({
+        // Al 30/06 el banco publica 10.000 y los libros dicen 9.000: la
+        // diferencia es un cheque girado el 20/06 y no cobrado. El usuario
+        // declaró residual 0 porque NO es inexplicable — y tiene razón.
+        saldoExtracto: '10000',
+        saldoLibros: '9000',
+        enTransitoDelArranque: [
+          {
+            comprobanteId: 'comp-jun',
+            orden: 1,
+            fecha: FechaContable.fromIso('2026-06-20'),
+            importe: Money.of('-1000'),
+            registradoPorBancoEl: null,
+            anteriorAlArranque: true,
+          },
+        ],
+      }),
+    );
+
+    expect(informe.partidas.enTransito.detalle).toHaveLength(1);
+    expect(informe.partidas.enTransito.detalle[0]?.anteriorAlArranque).toBe(true);
+    expect(informe.partidas.enTransito.importe.toBob()).toBe('-1000.00');
+    // La identidad cierra: 9000 − 10000 − (−1000) = 0.
+    expect(informe.residuo?.toBob()).toBe('0.00');
+  });
+
+  it('las congeladas conviven con las de la ventana y se suman en su misma partida', () => {
+    const informe = armarInforme(
+      insumos({
+        saldoExtracto: '10300',
+        saldoLibros: '9000',
+        // Julio: un CREDITO bancario de 300 sin asentar (pendiente de ventana).
+        movimientos: [
+          pendiente({ id: 'm-jul', fecha: '2026-07-10', monto: '300', tipo: 'CREDITO' }),
+        ],
+        enTransitoDelArranque: [
+          {
+            comprobanteId: 'comp-jun',
+            orden: 1,
+            fecha: FechaContable.fromIso('2026-06-20'),
+            importe: Money.of('-1000'),
+            registradoPorBancoEl: null,
+            anteriorAlArranque: true,
+          },
+        ],
+      }),
+    );
+
+    expect(informe.partidas.pendientes.importe.toBob()).toBe('-300.00');
+    expect(informe.partidas.enTransito.importe.toBob()).toBe('-1000.00');
+    // 9000 − 10300 − (−300) − (−1000) = 0.
+    expect(informe.residuo?.toBob()).toBe('0.00');
+    // La de la ventana NO se marca como anterior al arranque.
+    expect(informe.partidas.pendientes.detalle[0]?.anteriorAlArranque).toBe(false);
+  });
+
   // REQ-ICB-02 escenario 1: cada grupo aparece como partida separada y la
   // identidad cierra con residuo cero. Los CONCILIADOS al corte se cancelan
   // contra su contrapartida y NO son partida.
