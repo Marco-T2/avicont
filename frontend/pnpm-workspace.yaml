@@ -71,16 +71,22 @@ overrides:
 #   suite; por eso va como change propio y no como bump acá. BORRAR este ignore ahí.
 # - brace-expansion GHSA-mh99-v99m-4gvg (HIGH): DoS por expansión sin límite de longitud
 #   → crash por out-of-memory. Distinto del GHSA-3jxr-9vmj-r5cp ya cubierto por los
-#   overrides de arriba; este afecta a TODA la línea 5.x hasta 5.0.7 inclusive, o sea a
-#   la versión a la que nos pinea `'brace-expansion@5': '^5.0.7'`.
-#   Superficie real: solo toolchain de build/test (eslint, write-excel-file>archiver-node,
-#   openapi-typescript>@redocly/openapi-core). Un DoS por expansión de llaves exige
-#   un patrón glob hostil; los patrones acá son literales del repo, no input de terceros.
-#   Nada de esto llega al runtime.
-#   Parche: 5.0.8, publicado 2026-07-23 11:39 UTC → madura 2026-07-26 ~11:39 UTC
-#   (07:39 La Paz). ACCIÓN al madurar: el override `^5.0.7` YA admite 5.0.8 — alcanza con
-#   `pnpm update brace-expansion` para mover el lockfile, sin tocar este archivo. Después
-#   BORRAR este ignore.
+#   overrides de arriba.
+#   ⚠️ NO es time-boxed, aunque su versión anterior de este comentario decía que sí.
+#   El rango del advisory es `<=5.0.7` SIN acotar por major y el único parche es `>=5.0.8`:
+#   las líneas 1.x y 2.x caen adentro y NO tienen parche propio. Bumpear el pin de 5.x
+#   (hecho: 5.0.7 → 5.0.8) cierra los caminos que SÍ se podían cerrar, pero no alcanza.
+#   Un override global `brace-expansion: '>=5.0.8'` NO es viable: la v2 exporta la función
+#   como DEFAULT (`module.exports = expandTop`) y la v5 la exporta NOMBRADA
+#   (`exports.expand`). `minimatch@5.1.9` hace `const expand = require('brace-expansion')`
+#   y llama `expand(pattern)` → con la v5 recibiría el namespace y tiraría TypeError en
+#   runtime. Por eso los pines por major de arriba, y por eso esto no se puede forzar.
+#   Camino restante ÚNICO: brace-expansion@2.1.2 ← minimatch@5.1.9 ←
+#   @redocly/openapi-core@1.34.15 ← openapi-typescript@7.13.0 (devDependency).
+#   Superficie real: toolchain de generación de tipos. Un DoS por expansión de llaves
+#   exige un patrón glob hostil; acá los patrones son literales del repo. No llega al bundle.
+#   TRIGGER de revisión: que `openapi-typescript` (hoy 7.13.0, ya es la última) suba
+#   `@redocly/openapi-core` a >=2.x, que se movió a un minimatch nuevo. Verificado 2026-07-26.
 auditConfig:
   ignoreGhsas:
     - GHSA-qwww-vcr4-c8h2
