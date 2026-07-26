@@ -174,9 +174,16 @@ export class ExtractoImportadorService {
       ),
     );
 
+    // Secuencia no monótona: sin ancla cronológica no hay checksum NI saldos.
+    // Ambos quedan null — nunca se inventan (REQ-CB-08).
     const checksum =
       cronologico === null
-        ? { estadoVerificacion: 'SIN_VERIFICAR' as const, diferencia: null }
+        ? {
+            estadoVerificacion: 'SIN_VERIFICAR' as const,
+            diferencia: null,
+            saldoInicial: null,
+            saldoFinal: null,
+          }
         : verificarChecksum(descriptor.estrategiaChecksum, cronologico, {
             saldoInicialDeclarado: parseado.saldoInicialDeclarado,
             saldoFinalDeclarado: parseado.saldoFinalDeclarado,
@@ -211,8 +218,11 @@ export class ExtractoImportadorService {
           fechaDesde: parseado.cobertura.desde.toDbDate(),
           fechaHasta: parseado.cobertura.hasta.toDbDate(),
           coberturaDeclarada: parseado.cobertura.declarada,
-          saldoInicial: parseado.saldoInicialDeclarado?.toPrismaDecimal() ?? null,
-          saldoFinal: parseado.saldoFinalDeclarado?.toPrismaDecimal() ?? null,
+          // Del RESULTADO del checksum, no de `parseado.*Declarado` (REQ-CB-08):
+          // así los 4 perfiles DERIVADO también los persisten. El checksum ya
+          // derivaba el inicial para su propia aritmética y lo descartaba.
+          saldoInicial: checksum.saldoInicial?.toPrismaDecimal() ?? null,
+          saldoFinal: checksum.saldoFinal?.toPrismaDecimal() ?? null,
           estadoVerificacion: checksum.estadoVerificacion,
           diferencia: checksum.diferencia?.toPrismaDecimal() ?? null,
           filasLeidas: parseado.movimientos.length,

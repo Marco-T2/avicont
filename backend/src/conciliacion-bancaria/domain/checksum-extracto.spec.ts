@@ -145,6 +145,111 @@ describe('verificarChecksum (REQ-CB-08, design §4.2)', () => {
     });
   });
 
+  // REQ-CB-08 (modificado): la verificación DEBE devolver los saldos que usó.
+  // Hoy la rama DERIVADO los calcula y los DESCARTA, dejándolos nulos en 4 de 7
+  // perfiles — lo que impide verificar la continuidad entre importaciones
+  // (REQ-CB-23) y fijar el punto de arranque del informe de conciliación.
+  describe('saldos usados por la verificación (REQ-CB-08 modificado)', () => {
+    it('DECLARADO devuelve los saldos de la cabecera', () => {
+      const movimientos = [mov({ monto: '147762.77', tipo: 'DEBITO' })];
+      const resultado = verificarChecksum('DECLARADO', movimientos, {
+        saldoInicialDeclarado: Money.of('327520.14'),
+        saldoFinalDeclarado: Money.of('179757.37'),
+      });
+      expect(resultado.saldoInicial?.toBob()).toBe('327520.14');
+      expect(resultado.saldoFinal?.toBob()).toBe('179757.37');
+    });
+
+    it('DECLARADO con DESCUADRE igual devuelve ambos — son datos REALES del banco', () => {
+      const movimientos = [mov({ monto: '100.00', tipo: 'DEBITO' })];
+      const resultado = verificarChecksum('DECLARADO', movimientos, {
+        saldoInicialDeclarado: Money.of('1000.00'),
+        saldoFinalDeclarado: Money.of('850.00'),
+      });
+      expect(resultado.estadoVerificacion).toBe('DESCUADRE');
+      expect(resultado.saldoInicial?.toBob()).toBe('1000.00');
+      expect(resultado.saldoFinal?.toBob()).toBe('850.00');
+    });
+
+    it('DERIVADO devuelve el inicial derivado y el saldo corrido de la última fila', () => {
+      // primera: CREDITO 100 con saldo 600 ⇒ inicial derivado = 600 − 100 = 500
+      // última: saldo corrido 650
+      const movimientos = [
+        mov({ monto: '100.00', tipo: 'CREDITO', saldo: '600.00' }),
+        mov({ monto: '50.00', tipo: 'CREDITO', saldo: '650.00' }),
+      ];
+      const resultado = verificarChecksum('DERIVADO', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.saldoInicial?.toBob()).toBe('500.00');
+      expect(resultado.saldoFinal?.toBob()).toBe('650.00');
+    });
+
+    it('DERIVADO con DEBITO en la primera fila: el inicial SUMA el monto', () => {
+      const movimientos = [mov({ monto: '3040.38', tipo: 'DEBITO', saldo: '235.17' })];
+      const resultado = verificarChecksum('DERIVADO', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.saldoInicial?.toBob()).toBe('3275.55');
+      expect(resultado.saldoFinal?.toBob()).toBe('235.17');
+    });
+
+    it('DERIVADO con DESCUADRE igual devuelve ambos — el saldo final es el de la última fila PRESENTE', () => {
+      const movimientos = [
+        mov({ monto: '100.00', tipo: 'DEBITO', saldo: '400.00' }),
+        mov({ monto: '50.00', tipo: 'CREDITO', saldo: '999.00' }),
+      ];
+      const resultado = verificarChecksum('DERIVADO', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.estadoVerificacion).toBe('DESCUADRE');
+      expect(resultado.saldoInicial?.toBob()).toBe('500.00');
+      expect(resultado.saldoFinal?.toBob()).toBe('999.00');
+    });
+
+    it('DERIVADO sin columna saldo → ambos NULL, jamás se inventan', () => {
+      const movimientos = [mov({ monto: '100.00', tipo: 'DEBITO', saldo: null })];
+      const resultado = verificarChecksum('DERIVADO', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.saldoInicial).toBeNull();
+      expect(resultado.saldoFinal).toBeNull();
+    });
+
+    it('DECLARADO sin saldos en cabecera → ambos NULL', () => {
+      const movimientos = [mov({ monto: '100.00', tipo: 'DEBITO' })];
+      const resultado = verificarChecksum('DECLARADO', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: Money.of('900.00'),
+      });
+      expect(resultado.saldoInicial).toBeNull();
+      expect(resultado.saldoFinal).toBeNull();
+    });
+
+    it('IMPOSIBLE → ambos NULL', () => {
+      const movimientos = [mov({ monto: '100.00', tipo: 'DEBITO', saldo: '400.00' })];
+      const resultado = verificarChecksum('IMPOSIBLE', movimientos, {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.saldoInicial).toBeNull();
+      expect(resultado.saldoFinal).toBeNull();
+    });
+
+    it('lista vacía → ambos NULL', () => {
+      const resultado = verificarChecksum('DERIVADO', [], {
+        saldoInicialDeclarado: null,
+        saldoFinalDeclarado: null,
+      });
+      expect(resultado.saldoInicial).toBeNull();
+      expect(resultado.saldoFinal).toBeNull();
+    });
+  });
+
   it('lista vacía → SIN_VERIFICAR para cualquier estrategia (nada que verificar)', () => {
     expect(
       verificarChecksum('DECLARADO', [], {
