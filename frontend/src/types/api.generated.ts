@@ -4261,8 +4261,12 @@ export interface components {
              * @example -400.00
              */
             importe: string;
-            /** @example D2606-000012 — Pago a proveedor con cheque 4471 */
+            /** @example Pago a proveedor con cheque 4471 */
             descripcion: string;
+            /** @description Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero. */
+            comprobanteId: string | null;
+            /** @example D2606-000012 */
+            numeroComprobante: string | null;
         };
         DeclararArranqueDto: {
             /** Format: uuid */

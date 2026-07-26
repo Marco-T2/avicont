@@ -201,8 +201,16 @@ export interface CandidatoPartidaArranque {
   fecha: FechaContable;
   /** Contribución FIRMADA extracto→libros. Sale del dato, nunca del cliente. */
   importe: Money;
-  /** Glosa o descripción — con esto una persona reconoce cuál es cuál. */
+  /** Glosa (líneas) o descripción del extracto (movimientos): con esto una persona reconoce cuál es cuál. */
   descripcion: string;
+  /**
+   * Solo en `LINEA`. Permite ABRIR el asiento sin abandonar la declaración:
+   * decidir si un comprobante de junio es un cheque en circulación o la
+   * apertura muchas veces exige ver el asiento entero, no su glosa.
+   */
+  comprobanteId: string | null;
+  /** Solo en `LINEA`, y solo si el comprobante ya fue numerado. */
+  numeroComprobante: string | null;
 }
 
 /** Los CUATRO datos del arranque, DECLARADOS por el usuario (REQ-ICB-04). */
@@ -630,6 +638,8 @@ export class InformeConciliacionService {
         fecha: FechaContable.fromDbDate(mov.fecha),
         importe: mov.tipo === 'CREDITO' ? Money.ZERO.minus(monto) : monto,
         descripcion: mov.descripcion,
+        comprobanteId: null,
+        numeroComprobante: null,
       });
     }
 
@@ -642,12 +652,11 @@ export class InformeConciliacionService {
         origen: 'LINEA',
         fecha: FechaContable.fromDbDate(fila.fechaContable),
         importe: tipo === 'DEBITO' ? monto : Money.ZERO.minus(monto),
-        // Con qué el contador reconoce un cheque frente a un asiento de
-        // apertura: la glosa y el número del comprobante.
-        descripcion:
-          fila.numeroComprobante === null
-            ? fila.glosa
-            : `${fila.numeroComprobante} — ${fila.glosa}`,
+        // Glosa y número van SEPARADOS: el número es el ancla clickeable
+        // hacia el asiento, la glosa el texto que lo describe.
+        descripcion: fila.glosa,
+        comprobanteId: fila.comprobanteId,
+        numeroComprobante: fila.numeroComprobante,
       });
     }
 

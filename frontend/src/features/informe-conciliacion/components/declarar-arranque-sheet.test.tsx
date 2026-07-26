@@ -22,18 +22,30 @@ const CANDIDATO_CHEQUE = {
   origen: 'LINEA' as const,
   fecha: '2026-06-20',
   importe: '-400.00',
-  descripcion: 'D2606-000012 — Pago con cheque 4471',
+  descripcion: 'Pago con cheque 4471',
+  comprobanteId: 'comp-jun',
+  numeroComprobante: 'D2606-000012',
 };
 const CANDIDATO_APERTURA = {
   referencia: 'LIN:comp-apertura:1',
   origen: 'LINEA' as const,
   fecha: '2026-06-30',
   importe: '1000.00',
-  descripcion: 'D2606-000001 — Asiento de apertura',
+  descripcion: 'Asiento de apertura',
+  comprobanteId: 'comp-apertura',
+  numeroComprobante: 'D2606-000001',
 };
 
 function mockCandidatos(
-  data: { referencia: string; origen: string; fecha: string; importe: string; descripcion: string }[] = [],
+  data: {
+    referencia: string;
+    origen: string;
+    fecha: string;
+    importe: string;
+    descripcion: string;
+    comprobanteId: string | null;
+    numeroComprobante: string | null;
+  }[] = [],
 ): void {
   vi.mocked(useCandidatosArranque).mockReturnValue({
     data,
@@ -226,5 +238,35 @@ describe('DeclararArranqueSheet — declarar el punto de partida (REQ-ICB-04)', 
     renderSheet();
 
     expect(screen.getByText(/ambos lados arrancan parejos/i)).toBeInTheDocument();
+  });
+
+  it('el número del comprobante es un link que abre el asiento en otra pestaña', () => {
+    // Decidir si un asiento de junio es un cheque o la apertura suele exigir
+    // VERLO. En otra pestaña, para no perder lo ya marcado en esta.
+    mockCandidatos([CANDIDATO_CHEQUE, CANDIDATO_APERTURA]);
+    renderSheet();
+
+    const link = screen.getByRole('link', { name: 'D2606-000012' });
+    expect(link).toHaveAttribute('href', '/comprobantes/comp-jun');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('un movimiento bancario no tiene asiento que abrir: sin link', () => {
+    mockCandidatos([
+      {
+        referencia: 'MOV:m-jun',
+        origen: 'MOVIMIENTO_PENDIENTE',
+        fecha: '2026-06-15',
+        importe: '-300.00',
+        descripcion: 'DEPOSITO SIN IDENTIFICAR',
+        comprobanteId: null,
+        numeroComprobante: null,
+      },
+    ]);
+    renderSheet();
+
+    expect(screen.getByText(/DEPOSITO SIN IDENTIFICAR/)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

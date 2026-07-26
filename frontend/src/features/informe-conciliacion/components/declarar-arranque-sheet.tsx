@@ -238,7 +238,26 @@ export function DeclararArranqueSheet({
                     <span className="font-medium">{formatearFechaContable(c.fecha)}</span>{' '}
                     <span className="tabular-nums">Bs {formatearMontoBob(c.importe)}</span>
                     {c.origen === 'MOVIMIENTO_IGNORADO' ? ' · ignorado' : ''}
-                    <span className="block text-muted-foreground">{c.descripcion}</span>
+                    <span className="block text-muted-foreground">
+                      {c.comprobanteId !== null && c.numeroComprobante !== null ? (
+                        <>
+                          {/* Decidir si un asiento viejo es un cheque en circulación o la
+                              apertura suele exigir VER el asiento, no su glosa. Se abre en
+                              otra pestaña para no perder lo ya marcado en esta. */}
+                          <a
+                            href={`/comprobantes/${c.comprobanteId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline underline-offset-2 hover:text-foreground"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {c.numeroComprobante}
+                          </a>
+                          {' — '}
+                        </>
+                      ) : null}
+                      {c.descripcion}
+                    </span>
                   </span>
                 </label>
               ))}

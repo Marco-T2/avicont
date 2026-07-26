@@ -213,8 +213,18 @@ export class CandidatoPartidaArranqueDto {
     description: 'Contribución FIRMADA extracto→libros. Sale del dato, no del cliente.',
   })
   importe!: string;
-  @ApiProperty({ example: 'D2606-000012 — Pago a proveedor con cheque 4471' })
+  @ApiProperty({ example: 'Pago a proveedor con cheque 4471' })
   descripcion!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un ' +
+      'comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero.',
+  })
+  comprobanteId!: string | null;
+  @ApiProperty({ type: String, nullable: true, example: 'D2606-000012' })
+  numeroComprobante!: string | null;
 }
 
 export class ConfiabilidadInformeDto {
@@ -321,6 +331,8 @@ export function toCandidatoPartidaResponse(
     fecha: c.fecha.toIso(),
     importe: c.importe.toBob(),
     descripcion: c.descripcion,
+    comprobanteId: c.comprobanteId,
+    numeroComprobante: c.numeroComprobante,
   };
 }
 

@@ -12363,7 +12363,17 @@
           },
           "descripcion": {
             "type": "string",
-            "example": "D2606-000012 — Pago a proveedor con cheque 4471"
+            "example": "Pago a proveedor con cheque 4471"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Solo en LINEA: para abrir el asiento sin abandonar la declaración. Decidir si un comprobante viejo es un cheque en circulación o la apertura suele exigir verlo entero."
+          },
+          "numeroComprobante": {
+            "type": "string",
+            "nullable": true,
+            "example": "D2606-000012"
           }
         },
         "required": [
@@ -12371,7 +12381,9 @@
           "origen",
           "fecha",
           "importe",
-          "descripcion"
+          "descripcion",
+          "comprobanteId",
+          "numeroComprobante"
         ]
       },
       "DeclararArranqueDto": {
