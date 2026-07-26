@@ -580,4 +580,50 @@ describe('Conciliación — Informe (e2e)', () => {
     ]);
     expect(impDescuadre).toBeDefined();
   });
+
+  // ==========================================================
+  // ARRANQUE_EXTRACTO_NO_COINCIDE — el saldo DECLARADO se contrasta
+  // contra el extracto REAL a la fecha del arranque
+  // ==========================================================
+
+  it('saldo de arranque declarado basura con residual "correcto" → residuo 0.00 y el motivo igual viaja por HTTP', async () => {
+    const e = await seed();
+
+    // El extracto real al 05/07 cierra en 714.99 (crédito de 699.00 sobre 15.99).
+    await crearMovimiento(e, {
+      fecha: '2026-07-05',
+      monto: '699.00',
+      tipo: 'CREDITO',
+      saldo: '714.99',
+    });
+
+    // Se declara el arranque al 05/07 con el saldo de APERTURA del día (15.99)
+    // en vez del de cierre — pero con la residual que hace cerrar la identidad:
+    // el caso que NADA detectaba antes de este contraste.
+    await postArranque(e.token, {
+      cuentaBancariaId: e.cuentaBancariaId,
+      fecha: '2026-07-05',
+      saldoExtracto: '15.99',
+      saldoLibros: '15.99',
+      diferenciaResidual: '699.00',
+    }).expect(201);
+
+    const res = await getInforme(e.token, e.cuentaBancariaId);
+
+    expect(res.status).toBe(200);
+    // La identidad cierra "impecable"…
+    expect(res.body.residuo).toBe('0.00');
+    // …y aun así la conclusión se retiene: el punto de partida no coincide
+    // con el extracto. Los TRES números viajan en el motivo.
+    expect(res.body.confiabilidad.conciliado).toBe(false);
+    expect(res.body.confiabilidad.motivos).toEqual([
+      {
+        tipo: 'ARRANQUE_EXTRACTO_NO_COINCIDE',
+        fecha: '2026-07-05',
+        declarado: '15.99',
+        real: '714.99',
+        diferencia: '699.00',
+      },
+    ]);
+  });
 });

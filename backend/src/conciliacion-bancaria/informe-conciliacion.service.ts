@@ -48,6 +48,7 @@ import {
 import {
   MovimientoBancarioRepositoryPort,
   MOVIMIENTO_BANCARIO_REPOSITORY_PORT,
+  SaldoVigenteRow,
 } from './ports/movimiento-bancario.repository.port';
 
 // ============================================================
@@ -90,6 +91,20 @@ export interface ArranqueAplicadoView {
 export type MotivoNoConciliado =
   | { tipo: 'SIN_ARRANQUE' }
   | { tipo: 'SIN_SALDO_EXTRACTO' }
+  /**
+   * El `saldoExtracto` DECLARADO en el arranque vigente no coincide con el
+   * saldo REAL del extracto a la fecha del arranque (misma tolerancia que la
+   * continuidad entre extractos). Puede convivir con residuo 0.00: un residual
+   * "correcto" cierra la identidad aunque el saldo declarado sea basura — por
+   * eso se contrasta aparte. `diferencia` siempre positiva (|declarado − real|).
+   */
+  | {
+      tipo: 'ARRANQUE_EXTRACTO_NO_COINCIDE';
+      fecha: FechaContable;
+      declarado: Money;
+      real: Money;
+      diferencia: Money;
+    }
   | { tipo: 'DESCUADRE'; importacionId: string }
   | { tipo: 'HUECO'; desde: FechaContable; hasta: FechaContable }
   | { tipo: 'DISCONTINUIDAD'; anteriorId: string; siguienteId: string; diferencia: Money }
@@ -200,9 +215,7 @@ export class InformeConciliacionService {
       this.movimientos.saldosVigentes(tenantId, consulta.corte),
       this.importaciones.listarCoberturaPorCuentaBancaria(tenantId, cuentaBancaria.id),
     ]);
-    const filaSaldo = saldos.find((s) => s.cuentaBancariaId === cuentaBancaria.id);
-    const saldoExtracto =
-      filaSaldo === undefined || filaSaldo.saldo === null ? null : Money.of(filaSaldo.saldo);
+    const saldoExtracto = saldoDeCuenta(saldos, cuentaBancaria.id);
 
     if (arranqueRow === null) {
       // ABSTENIDO (REQ-ICB-04): sin punto de arranque no hay identidad, pero
@@ -224,6 +237,7 @@ export class InformeConciliacionService {
         ...derivarConfiabilidad({
           corte,
           arranqueFecha: null,
+          arranqueExtracto: null,
           saldoExtracto,
           residuo: null,
           cobertura,
@@ -236,7 +250,7 @@ export class InformeConciliacionService {
     // inclusivos ⇒ arrancan el día SIGUIENTE al arranque.
     const desdeVentana = arranqueFecha.sumarDias(1).toDbDate();
 
-    const [movs, lineas, suma] = await Promise.all([
+    const [movs, lineas, suma, saldosAlArranque] = await Promise.all([
       this.movimientos.listarPorCuentaBancariaEnRango(tenantId, cuentaBancaria.id, {
         fechaDesde: desdeVentana,
         fechaHasta: consulta.corte,
@@ -251,6 +265,10 @@ export class InformeConciliacionService {
         hasta: consulta.corte,
         desde: arranqueRow.fecha,
       }),
+      // Contraste del arranque: el saldo REAL del extracto A LA FECHA DEL
+      // ARRANQUE (no al corte) — la misma consulta `saldosVigentes` con otra
+      // fecha. Contra él se valida el `saldoExtracto` DECLARADO.
+      this.movimientos.saldosVigentes(tenantId, arranqueRow.fecha),
     ]);
 
     const vinculos = await this.verificarVinculos(tenantId, movs, lineas);
@@ -282,6 +300,10 @@ export class InformeConciliacionService {
       ...derivarConfiabilidad({
         corte,
         arranqueFecha,
+        arranqueExtracto: {
+          declarado: Money.of(arranqueRow.saldoExtracto),
+          real: saldoDeCuenta(saldosAlArranque, cuentaBancaria.id),
+        },
         saldoExtracto,
         residuo: informe.residuo,
         cobertura,
@@ -456,6 +478,16 @@ export class InformeConciliacionService {
 // Mapeos de boundary → insumos del dominio
 // ============================================================
 
+/**
+ * Saldo publicado para UNA cuenta dentro del resultado de `saldosVigentes`:
+ * `null` honesto si la cuenta no tiene fila (sin movimientos ≤ fecha) o si el
+ * último movimiento no publica saldo (REQ-VMB-09).
+ */
+function saldoDeCuenta(saldos: readonly SaldoVigenteRow[], cuentaBancariaId: string): Money | null {
+  const fila = saldos.find((s) => s.cuentaBancariaId === cuentaBancariaId);
+  return fila === undefined || fila.saldo === null ? null : Money.of(fila.saldo);
+}
+
 /** Fila persistida → view de dominio del acto declarado (Money/FechaContable). */
 function aArranqueAplicadoView(row: ArranqueConciliado): ArranqueAplicadoView {
   return {
@@ -536,6 +568,13 @@ interface ParamsConfiabilidad {
   corte: FechaContable;
   /** `null` ⇔ sin arranque declarado. */
   arranqueFecha: FechaContable | null;
+  /**
+   * Contraste del arranque vigente: el `saldoExtracto` DECLARADO vs el saldo
+   * REAL del extracto a la fecha del arranque. `null` sin arranque; `real`
+   * `null` cuando no hay saldo publicado a esa fecha — sin dato no hay
+   * veredicto (misma regla que `SIN_SALDO_EXTRACTO`).
+   */
+  arranqueExtracto: { declarado: Money; real: Money | null } | null;
   saldoExtracto: Money | null;
   residuo: Money | null;
   cobertura: readonly CoberturaImportacionRow[];
@@ -571,6 +610,27 @@ function derivarConfiabilidad(p: ParamsConfiabilidad): {
   const motivos: MotivoNoConciliado[] = [];
   if (p.arranqueFecha === null) motivos.push({ tipo: 'SIN_ARRANQUE' });
   if (p.saldoExtracto === null) motivos.push({ tipo: 'SIN_SALDO_EXTRACTO' });
+
+  // El punto de partida DECLARADO debe coincidir con el extracto real a su
+  // fecha (misma tolerancia que la continuidad entre extractos). Es un
+  // contraste INDEPENDIENTE del residuo: un residual declarado "correcto"
+  // puede cerrar la identidad en 0.00 con un saldo declarado basura — este
+  // motivo existe precisamente para ese caso. Sin saldo real (`null`) no se
+  // emite: un null nunca genera una acusación.
+  if (
+    p.arranqueFecha !== null &&
+    p.arranqueExtracto !== null &&
+    p.arranqueExtracto.real !== null &&
+    !p.arranqueExtracto.declarado.igualaConTolerancia(p.arranqueExtracto.real)
+  ) {
+    motivos.push({
+      tipo: 'ARRANQUE_EXTRACTO_NO_COINCIDE',
+      fecha: p.arranqueFecha,
+      declarado: p.arranqueExtracto.declarado,
+      real: p.arranqueExtracto.real,
+      diferencia: p.arranqueExtracto.declarado.minus(p.arranqueExtracto.real).abs(),
+    });
+  }
 
   for (const f of relevantes) {
     if (f.estadoVerificacion === 'DESCUADRE') {

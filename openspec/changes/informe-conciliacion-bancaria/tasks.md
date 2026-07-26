@@ -87,6 +87,16 @@ Migración **aditiva**, sin backfill.
 - [x] 3.7 Propagar la abstención: sección `confiabilidad` del DTO con
       `conciliado: boolean` + motivos (descuadre, hueco, discontinuidad). El
       informe **siempre se emite**. Montos como STRING (§4.5).
+      _Alcance agregado tras el primer smoke (hallazgo W3, lado BANCO): motivo
+      `ARRANQUE_EXTRACTO_NO_COINCIDE` — el `saldoExtracto` DECLARADO en el
+      arranque vigente se contrasta contra el saldo REAL del extracto a la
+      fecha del arranque (`saldosVigentes` con esa fecha; la MISMA tolerancia
+      que la continuidad entre extractos). Lleva `fecha`, `declarado`, `real`
+      y `diferencia` (siempre positiva) y hace `conciliado: false` aun con
+      residuo 0.00. Sin saldo real (`null`) no se emite — un null nunca
+      acusa. Pendiente al archivar: reflejar este motivo en la spec viva
+      (REQ-ICB-05/06). El lado LIBROS (`arranque.saldoLibros`) sigue SIN
+      contraste — queda para su change propio._
 - [x] 3.8 `informe-conciliacion.controller.ts`: `GET` informe (`read`) y `POST`
       arranque (`conciliar`). E2E: 404 cross-tenant; `read` sin `conciliar` ve
       el informe y no puede declarar; **el `GET` no crea arranque**.

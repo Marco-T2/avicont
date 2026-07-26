@@ -15,6 +15,7 @@ import type {
 export const MOTIVOS_NO_CONCILIADO = [
   'SIN_ARRANQUE',
   'SIN_SALDO_EXTRACTO',
+  'ARRANQUE_EXTRACTO_NO_COINCIDE',
   'DESCUADRE',
   'HUECO',
   'DISCONTINUIDAD',
@@ -137,10 +138,30 @@ export class MotivoNoConciliadoDto {
   @ApiPropertyOptional({ example: '2026-07-19', description: 'Solo HUECO.' }) hasta?: string;
   @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) anteriorId?: string;
   @ApiPropertyOptional({ description: 'Solo DISCONTINUIDAD.' }) siguienteId?: string;
-  @ApiPropertyOptional({ example: '200.00', description: 'Solo DISCONTINUIDAD. Siempre positiva.' })
+  @ApiPropertyOptional({
+    example: '200.00',
+    description: 'Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva.',
+  })
   diferencia?: string;
   @ApiPropertyOptional({ example: '-0.01', description: 'Solo RESIDUO_NO_EXPLICADO. Firmado.' })
   importe?: string;
+  @ApiPropertyOptional({
+    example: '2026-06-05',
+    description: 'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado.',
+  })
+  fecha?: string;
+  @ApiPropertyOptional({
+    example: '15.99',
+    description:
+      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente.',
+  })
+  declarado?: string;
+  @ApiPropertyOptional({
+    example: '714.99',
+    description:
+      'Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque.',
+  })
+  real?: string;
 }
 
 export class ConfiabilidadInformeDto {
@@ -213,6 +234,14 @@ function aMotivoDto(motivo: MotivoNoConciliado): MotivoNoConciliadoDto {
     case 'SIN_ARRANQUE':
     case 'SIN_SALDO_EXTRACTO':
       return { tipo: motivo.tipo };
+    case 'ARRANQUE_EXTRACTO_NO_COINCIDE':
+      return {
+        tipo: motivo.tipo,
+        fecha: motivo.fecha.toIso(),
+        declarado: motivo.declarado.toBob(),
+        real: motivo.real.toBob(),
+        diferencia: motivo.diferencia.toBob(),
+      };
     case 'DESCUADRE':
       return { tipo: motivo.tipo, importacionId: motivo.importacionId };
     case 'HUECO':

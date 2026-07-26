@@ -18,6 +18,17 @@ export function mensajeMotivo(motivo: MotivoNoConciliado): string {
       return 'No hay punto de arranque declarado: el informe no puede fijar desde dónde comparar ambos lados.';
     case 'SIN_SALDO_EXTRACTO':
       return 'Ningún movimiento del extracto hasta el corte publica saldo: falta el saldo bancario contra el cual conciliar.';
+    case 'ARRANQUE_EXTRACTO_NO_COINCIDE': {
+      const fecha = motivo.fecha !== undefined ? ` del ${formatearFechaContable(motivo.fecha)}` : '';
+      if (motivo.declarado !== undefined && motivo.real !== undefined) {
+        const diferencia =
+          motivo.diferencia !== undefined
+            ? ` (diferencia de Bs ${formatearMontoBob(motivo.diferencia)})`
+            : '';
+        return `El arranque${fecha} declara un saldo de extracto de Bs ${formatearMontoBob(motivo.declarado)}, pero el extracto real a esa fecha es Bs ${formatearMontoBob(motivo.real)}${diferencia}: revisá la declaración del punto de partida.`;
+      }
+      return `El saldo de extracto declarado en el arranque${fecha} no coincide con el extracto real a esa fecha: revisá la declaración del punto de partida.`;
+    }
     case 'DESCUADRE':
       return 'Una importación del rango tiene descuadre de verificación: sus movimientos no reproducen el saldo que declara el extracto.';
     case 'HUECO': {

@@ -593,10 +593,16 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
     });
 
     it('residuo ≠ 0 → RESIDUO_NO_EXPLICADO con su importe; ninguna partida se altera', async () => {
-      // Igual que el escenario que cierra, pero el extracto trae 1050:
-      // residuo = 990 − 1050 − (−10) = −50.
+      // Igual que el escenario que cierra, pero el extracto trae 1050 AL
+      // CORTE: residuo = 990 − 1050 − (−10) = −50. A la fecha del arranque el
+      // extracto real coincide con el declarado (1000) — el mock distingue
+      // fechas para que el ÚNICO motivo sea el residuo.
       arranques.vigenteA.mockResolvedValue(arranqueRow());
-      movRepo.saldosVigentes.mockResolvedValue([saldoVigente('1050.00')]);
+      movRepo.saldosVigentes.mockImplementation((_tenant: string, fecha: Date) =>
+        Promise.resolve([
+          saldoVigente(fecha.toISOString().startsWith('2026-06-30') ? '1000.00' : '1050.00'),
+        ]),
+      );
       lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
       importaciones.listarCoberturaPorCuentaBancaria.mockResolvedValue([
         importacion('imp-jul', '2026-07-01', '2026-07-31'),
@@ -632,6 +638,132 @@ describe('InformeConciliacionService.obtenerInforme (REQ-ICB-01/03/04)', () => {
       ]);
       expect(informe.insumos.importaciones[0]?.fechaDesde.toIso()).toBe('2026-07-01');
       expect(informe.insumos.importaciones[0]?.fechaHasta.toIso()).toBe('2026-07-31');
+    });
+  });
+
+  // ==========================================================
+  // Contraste del arranque contra el extracto REAL a su fecha
+  // (ARRANQUE_EXTRACTO_NO_COINCIDE) — alcance agregado tras el
+  // primer smoke: `saldoExtracto` declarado se escribía y jamás
+  // se leía; nadie lo validaba contra el extracto.
+  // ==========================================================
+
+  describe('contraste del arranque contra el extracto real (ARRANQUE_EXTRACTO_NO_COINCIDE)', () => {
+    /** Mock de `saldosVigentes` sensible a la FECHA consultada (clave ISO). */
+    function saldosPorFecha(porIso: Record<string, string | null>) {
+      movRepo.saldosVigentes.mockImplementation((_tenant: string, fecha: Date) => {
+        const clave = fecha.toISOString().slice(0, 10);
+        if (!(clave in porIso)) return Promise.resolve([]);
+        return Promise.resolve([saldoVigente(porIso[clave] ?? null)]);
+      });
+    }
+
+    it('el saldo real se pide a la fecha del ARRANQUE, no al corte: coincide allí → sin motivo aunque la cuenta se movió después', async () => {
+      // Declarado 1000.00 al 30/06; el extracto REAL al 30/06 es 1000.00.
+      // Al corte el saldo ya es 1200.00 — si el contraste se hiciera contra el
+      // corte, el motivo dispararía SIEMPRE que hubiera movimiento posterior.
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      saldosPorFecha({ '2026-06-30': '1000.00', '2026-07-31': '1200.00' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      expect(movRepo.saldosVigentes).toHaveBeenCalledWith(
+        TENANT,
+        new Date('2026-06-30T00:00:00.000Z'),
+      );
+      expect(
+        informe.confiabilidad.motivos.some((m) => m.tipo === 'ARRANQUE_EXTRACTO_NO_COINCIDE'),
+      ).toBe(false);
+    });
+
+    it('declarado difiere del real → motivo con los TRES números, conviviendo con el residuo sin confundirse', async () => {
+      // Declarado 1000.00, real al arranque 1699.00 → diferencia 699.00.
+      // Además el corte trae 1050.00 → residuo −50.00: son DOS causas
+      // distintas y cada una se nombra por separado.
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      saldosPorFecha({ '2026-06-30': '1699.00', '2026-07-31': '1050.00' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      const motivo = informe.confiabilidad.motivos.find(
+        (m) => m.tipo === 'ARRANQUE_EXTRACTO_NO_COINCIDE',
+      );
+      expect(motivo).toBeDefined();
+      if (motivo?.tipo !== 'ARRANQUE_EXTRACTO_NO_COINCIDE') throw new Error('unreachable');
+      expect(motivo.fecha).toEqual(expect.objectContaining({ year: 2026, month: 6, day: 30 }));
+      expect(motivo.declarado.toBob()).toBe('1000.00');
+      expect(motivo.real.toBob()).toBe('1699.00');
+      expect(motivo.diferencia.toBob()).toBe('699.00');
+      // El residuo −50 tiene SU motivo propio: causas distintas, nombres distintos.
+      expect(informe.confiabilidad.motivos.some((m) => m.tipo === 'RESIDUO_NO_EXPLICADO')).toBe(
+        true,
+      );
+    });
+
+    it('CASO PELIGROSO: residual declarado "correcto" cierra el residuo en 0.00 con un saldo declarado basura → el motivo igual aparece', async () => {
+      // El vecino del caso de Marco: saldoExtracto declarado 15.99 (apertura
+      // del día, no cierre), pero residual 699.00 bien declarado. La identidad
+      // cierra impecable — residuo 0.00 — y ANTES de este contraste nada lo
+      // detectaba. El informe cierra Y el motivo aparece igual.
+      arranques.vigenteA.mockResolvedValue(
+        arranqueRow({
+          fecha: new Date('2026-06-05T00:00:00.000Z'),
+          saldoExtracto: new Prisma.Decimal('15.99'),
+          saldoLibros: new Prisma.Decimal('15.99'),
+          diferenciaResidual: new Prisma.Decimal('699.00'),
+        }),
+      );
+      saldosPorFecha({ '2026-06-05': '714.99', '2026-07-31': '714.99' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      // residuo = 15.99 − 714.99 − (−699.00) = 0.00: cierra "perfecto".
+      expect(informe.residuo?.toBob()).toBe('0.00');
+      expect(informe.confiabilidad.conciliado).toBe(false);
+      expect(informe.confiabilidad.motivos).toHaveLength(1);
+      const motivo = informe.confiabilidad.motivos[0];
+      if (motivo?.tipo !== 'ARRANQUE_EXTRACTO_NO_COINCIDE') {
+        throw new Error(`motivo inesperado: ${motivo?.tipo ?? 'ninguno'}`);
+      }
+      expect(motivo.fecha).toEqual(expect.objectContaining({ year: 2026, month: 6, day: 5 }));
+      expect(motivo.declarado.toBob()).toBe('15.99');
+      expect(motivo.real.toBob()).toBe('714.99');
+      expect(motivo.diferencia.toBob()).toBe('699.00');
+    });
+
+    it('sin saldo publicado a la fecha del arranque (fila con saldo null) → sin motivo: sin dato no hay veredicto', async () => {
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      saldosPorFecha({ '2026-06-30': null, '2026-07-31': '1000.00' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      // residuo = 990 − 1000 − (−10) = 0 y ningún motivo: conciliado.
+      expect(informe.confiabilidad).toEqual({ conciliado: true, motivos: [] });
+    });
+
+    it('sin NINGÚN movimiento hasta la fecha del arranque (sin fila) → sin motivo, sin acusación', async () => {
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      saldosPorFecha({ '2026-07-31': '1000.00' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad).toEqual({ conciliado: true, motivos: [] });
+    });
+
+    it('diferencia dentro de la tolerancia (0.01, la MISMA de la continuidad) → sin motivo', async () => {
+      arranques.vigenteA.mockResolvedValue(arranqueRow());
+      saldosPorFecha({ '2026-06-30': '1000.01', '2026-07-31': '1000.00' });
+      lineasCuenta.sumarPorCuentaHasta.mockResolvedValue(suma('0', '0'));
+
+      const informe = await consultar();
+
+      expect(informe.confiabilidad).toEqual({ conciliado: true, motivos: [] });
     });
   });
 

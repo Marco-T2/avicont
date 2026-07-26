@@ -4138,7 +4138,7 @@ export interface components {
         };
         MotivoNoConciliadoDto: {
             /** @enum {string} */
-            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
+            tipo: "SIN_ARRANQUE" | "SIN_SALDO_EXTRACTO" | "ARRANQUE_EXTRACTO_NO_COINCIDE" | "DESCUADRE" | "HUECO" | "DISCONTINUIDAD" | "RESIDUO_NO_EXPLICADO";
             /** @description Solo DESCUADRE. */
             importacionId?: string;
             /**
@@ -4156,7 +4156,7 @@ export interface components {
             /** @description Solo DISCONTINUIDAD. */
             siguienteId?: string;
             /**
-             * @description Solo DISCONTINUIDAD. Siempre positiva.
+             * @description Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva.
              * @example 200.00
              */
             diferencia?: string;
@@ -4165,6 +4165,21 @@ export interface components {
              * @example -0.01
              */
             importe?: string;
+            /**
+             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado.
+             * @example 2026-06-05
+             */
+            fecha?: string;
+            /**
+             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente.
+             * @example 15.99
+             */
+            declarado?: string;
+            /**
+             * @description Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque.
+             * @example 714.99
+             */
+            real?: string;
         };
         ConfiabilidadInformeDto: {
             /** @description true SOLO con arranque declarado, saldo de extracto publicado, insumos sanos y residuo cero exacto. La confiabilidad CALIFICA el informe, nunca lo suprime (REQ-ICB-05). */

@@ -56,6 +56,26 @@ describe('mensajeMotivo — cada motivo en lenguaje de contador, nunca el enum c
     );
   });
 
+  it('ARRANQUE_EXTRACTO_NO_COINCIDE nombra la causa con los tres números y la fecha del arranque', () => {
+    const motivo: MotivoNoConciliado = {
+      tipo: 'ARRANQUE_EXTRACTO_NO_COINCIDE',
+      fecha: '2026-06-05',
+      declarado: '15.99',
+      real: '714.99',
+      diferencia: '699.00',
+    };
+    expect(mensajeMotivo(motivo)).toBe(
+      'El arranque del 05/06/2026 declara un saldo de extracto de Bs 15,99, pero el extracto real a esa fecha es Bs 714,99 (diferencia de Bs 699,00): revisá la declaración del punto de partida.',
+    );
+  });
+
+  it('ARRANQUE_EXTRACTO_NO_COINCIDE sin montos (contrato degradado) no inventa números', () => {
+    const motivo: MotivoNoConciliado = { tipo: 'ARRANQUE_EXTRACTO_NO_COINCIDE' };
+    expect(mensajeMotivo(motivo)).toBe(
+      'El saldo de extracto declarado en el arranque no coincide con el extracto real a esa fecha: revisá la declaración del punto de partida.',
+    );
+  });
+
   it('HUECO sin fechas (contrato degradado) no inventa un tramo', () => {
     const motivo: MotivoNoConciliado = { tipo: 'HUECO' };
     expect(mensajeMotivo(motivo)).toBe(

@@ -12077,6 +12077,7 @@
             "enum": [
               "SIN_ARRANQUE",
               "SIN_SALDO_EXTRACTO",
+              "ARRANQUE_EXTRACTO_NO_COINCIDE",
               "DESCUADRE",
               "HUECO",
               "DISCONTINUIDAD",
@@ -12108,12 +12109,27 @@
           "diferencia": {
             "type": "string",
             "example": "200.00",
-            "description": "Solo DISCONTINUIDAD. Siempre positiva."
+            "description": "Solo DISCONTINUIDAD y ARRANQUE_EXTRACTO_NO_COINCIDE. Siempre positiva."
           },
           "importe": {
             "type": "string",
             "example": "-0.01",
             "description": "Solo RESIDUO_NO_EXPLICADO. Firmado."
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-06-05",
+            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: la fecha del arranque contrastado."
+          },
+          "declarado": {
+            "type": "string",
+            "example": "15.99",
+            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldoExtracto DECLARADO en el arranque vigente."
+          },
+          "real": {
+            "type": "string",
+            "example": "714.99",
+            "description": "Solo ARRANQUE_EXTRACTO_NO_COINCIDE: el saldo REAL del extracto a la fecha del arranque."
           }
         },
         "required": [
