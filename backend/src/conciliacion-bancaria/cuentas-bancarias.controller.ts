@@ -49,6 +49,11 @@ import {
   toImportacionExtractoListItem,
   toImportarExtractoResponse,
 } from './dto/importacion-extracto-response.dto';
+import {
+  IntegridadExtractosResponseDto,
+  toIntegridadExtractosResponse,
+} from './dto/integridad-extractos-response.dto';
+import { IntegridadExtractosService } from './integridad-extractos.service';
 import { ImportarExtractoDto } from './dto/importar-extracto.dto';
 import {
   PerfilExtractoResponseDto,
@@ -90,6 +95,7 @@ export class CuentasBancariasController {
     private readonly service: CuentasBancariasService,
     private readonly importador: ExtractoImportadorService,
     private readonly parserLookup: ExtractoParserLookupService,
+    private readonly integridadService: IntegridadExtractosService,
     @Inject(IMPORTACION_EXTRACTO_REPOSITORY_PORT)
     private readonly importacionRepo: ImportacionExtractoRepositoryPort,
   ) {}
@@ -280,6 +286,26 @@ export class CuentasBancariasController {
       },
     );
     return toImportarExtractoResponse(resultado);
+  }
+
+  @Get(':id/integridad')
+  @RequirePermissions('contabilidad.conciliacion.read')
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOperation({
+    summary: 'Huecos de cobertura y discontinuidades de saldo de la serie de extractos.',
+    description:
+      'Evalúa la SERIE COMPLETA de importaciones (sin paginar): ambas señales son ' +
+      'propiedades del conjunto y sobre una página darían un veredicto falso. ' +
+      'Informativo — nunca rechaza una importación (REQ-CB-09/23).',
+  })
+  @ApiOkResponse({ type: IntegridadExtractosResponseDto })
+  async integridad(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<IntegridadExtractosResponseDto> {
+    const tenantId = resolveTenantId(req);
+    // El service resuelve el 404 cross-tenant (REQ-CB-13).
+    return toIntegridadExtractosResponse(await this.integridadService.evaluar(tenantId, id));
   }
 
   @Get(':id/importaciones')

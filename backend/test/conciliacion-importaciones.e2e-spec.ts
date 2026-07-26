@@ -280,6 +280,39 @@ describe('ConciliacionImportaciones (e2e)', () => {
   });
 
   // ==========================================================
+  // REQ-CB-09/23 — integridad de la serie de extractos
+  // ==========================================================
+
+  it('GET /integridad — una sola importación coherente: serie íntegra, sin huecos ni discontinuidades', async () => {
+    const { token, orgId, ownerId, cuentaId } = await seed();
+    const packId = await crearPack();
+    await otorgarPackActivo(orgId, packId, ownerId);
+    const cbId = await crearCuentaBancaria(token, cuentaId, { numeroCuenta: '5799375-760-305' });
+    await importar(token, cbId, fixture('bancosol-a-mayo-junio.xlsx'), false);
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/cuentas-bancarias/${cbId}/integridad`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.huecos).toEqual([]);
+    expect(res.body.discontinuidades).toEqual([]);
+    expect(res.body.serieIntegra).toBe(true);
+  });
+
+  it('GET /integridad — 404 si la cuenta bancaria es de otro tenant (REQ-CB-13)', async () => {
+    const { token, orgId, ownerId } = await seed();
+    const packId = await crearPack();
+    await otorgarPackActivo(orgId, packId, ownerId);
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/cuentas-bancarias/11111111-1111-4111-8111-111111111111/integridad`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  // ==========================================================
   // 422 — REQ-CB-03 perfil no coincide
   // ==========================================================
 

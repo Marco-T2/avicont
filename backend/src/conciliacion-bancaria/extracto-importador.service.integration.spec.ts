@@ -18,6 +18,7 @@ import { DIALECTO_ECONOMICO } from './adapters/dialectos/economico.dialecto';
 import { DIALECTO_FIE } from './adapters/dialectos/fie.dialecto';
 import { DIALECTO_FORTALEZA } from './adapters/dialectos/fortaleza.dialecto';
 import { DIALECTO_UNION_XLSX } from './adapters/dialectos/union.dialecto';
+import { detectarDiscontinuidades } from './domain/continuidad-extractos';
 import { XlsxCoreExtractoParser } from './adapters/xlsx-core-extracto-parser';
 import type { ExtractoParseado, MovimientoParseado } from './ports/extracto-parser.port';
 import type { DescriptorPerfilExtracto, ExtractoParserPort } from './ports/extracto-parser.port';
@@ -389,6 +390,111 @@ describe('ExtractoImportadorService (integration, REQ-CB-03/04/05/06/07/08/13/16
     expect(importacion.estadoVerificacion).toBe('SIN_VERIFICAR');
     expect(importacion.saldoInicial).toBeNull();
     expect(importacion.saldoFinal).toBeNull();
+  });
+
+  // ============================================================
+  // REQ-CB-23 — la ceguera del checksum DERIVADO y quién la caza
+  // ============================================================
+
+  // ESTE es el test que justifica la continuidad entre importaciones.
+  //
+  // A un extracto DERIVADO de julio se le borra la ÚLTIMA fila antes de
+  // subirlo. Lo que queda sigue siendo un prefijo coherente del saldo corrido
+  // del banco, así que el checksum cierra y devuelve VERIFICADO sobre un
+  // archivo MUTILADO — el borrado de los extremos es invisible para él.
+  //
+  // La continuidad contra el extracto de agosto sí lo detecta, y la magnitud
+  // del salto es exactamente el monto de la fila borrada.
+  it('borrar la última fila de un extracto DERIVADO pasa como VERIFICADO, y la continuidad lo delata', async () => {
+    const cb = await crearCuentaBancaria(null);
+
+    // Julio MUTILADO: la fila real de cierre (CREDITO 200 → saldo 900) no está.
+    const julio = fakeParser({
+      descriptor: { perfil: PerfilExtracto.BANCOSOL_XLSX, estrategiaChecksum: 'DERIVADO' },
+      movimientos: [
+        movimientoFake({
+          fecha: FechaContable.of(2026, 7, 1),
+          tipo: 'CREDITO',
+          monto: Money.of('100.00'),
+          saldo: Money.of('600.00'), // inicial derivado = 600 − 100 = 500
+          descripcion: 'julio-1',
+        }),
+        movimientoFake({
+          fecha: FechaContable.of(2026, 7, 31),
+          tipo: 'CREDITO',
+          monto: Money.of('100.00'),
+          saldo: Money.of('700.00'),
+          descripcion: 'julio-2',
+        }),
+      ],
+      numeroCuentaDeclarado: null,
+    });
+
+    // Agosto: arranca donde cerraba el julio REAL (saldo 900), no el mutilado.
+    const agosto = fakeParser({
+      descriptor: { perfil: PerfilExtracto.BANCOSOL_XLSX, estrategiaChecksum: 'DERIVADO' },
+      movimientos: [
+        movimientoFake({
+          fecha: FechaContable.of(2026, 8, 1),
+          tipo: 'CREDITO',
+          monto: Money.of('50.00'),
+          saldo: Money.of('950.00'), // inicial derivado = 950 − 50 = 900
+          descripcion: 'agosto-1',
+        }),
+        movimientoFake({
+          fecha: FechaContable.of(2026, 8, 31),
+          tipo: 'CREDITO',
+          monto: Money.of('50.00'),
+          saldo: Money.of('1000.00'),
+          descripcion: 'agosto-2',
+        }),
+      ],
+      numeroCuentaDeclarado: null,
+    });
+
+    const resJulio = await servicioConParsers([julio]).importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(Buffer.from('julio-mutilado')),
+      { confirmarNumeroCuenta: false },
+    );
+    const resAgosto = await servicioConParsers([agosto]).importar(
+      tenantA,
+      cb.id,
+      'user-1',
+      archivoDe(Buffer.from('agosto')),
+      { confirmarNumeroCuenta: false },
+    );
+    if (resJulio.requiereConfirmacionCuenta || resAgosto.requiereConfirmacionCuenta) {
+      throw new Error('unreachable');
+    }
+
+    // La ceguera: el archivo está mutilado y el checksum no se entera.
+    expect(resJulio.estadoVerificacion).toBe('VERIFICADO');
+
+    const importaciones = await prisma.importacionExtracto.findMany({
+      where: { organizationId: tenantA, cuentaBancariaId: cb.id },
+    });
+    expect(importaciones).toHaveLength(2);
+
+    const discontinuidades = detectarDiscontinuidades(
+      importaciones.map((i) => ({
+        id: i.id,
+        desde: FechaContable.fromDbDate(i.fechaDesde),
+        hasta: FechaContable.fromDbDate(i.fechaHasta),
+        saldoInicial: i.saldoInicial === null ? null : Money.of(i.saldoInicial),
+        saldoFinal: i.saldoFinal === null ? null : Money.of(i.saldoFinal),
+      })),
+    );
+
+    // La continuidad SÍ lo caza, y el salto es el monto de la fila borrada.
+    expect(discontinuidades).toHaveLength(1);
+    expect(discontinuidades[0]?.anteriorId).toBe(resJulio.importacionId);
+    expect(discontinuidades[0]?.siguienteId).toBe(resAgosto.importacionId);
+    expect(discontinuidades[0]?.saldoFinalAnterior.toBob()).toBe('700.00');
+    expect(discontinuidades[0]?.saldoInicialSiguiente.toBob()).toBe('900.00');
+    expect(discontinuidades[0]?.diferencia.toBob()).toBe('200.00');
   });
 
   // ============================================================

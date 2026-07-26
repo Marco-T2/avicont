@@ -26,14 +26,14 @@ Sin migración. **Habilita PR 2 y PR 3.**
 
 Sin migración, solo lectura. **Prerrequisito de credibilidad del PR 3.**
 
-- [ ] 2.1 `domain/continuidad-extractos.ts`: función pura (molde de
+- [x] 2.1 `domain/continuidad-extractos.ts`: función pura (molde de
       `cobertura-extracto.ts`) que recibe `(fechaDesde, fechaHasta,
       saldoInicial, saldoFinal)[]` y devuelve discontinuidades comparando con
       `Money.igualaConTolerancia`. Saldo `null` ⇒ sin veredicto.
-- [ ] 2.2 **Test de la ceguera (REQ-CB-23)**: un extracto `DERIVADO` al que se
+- [x] 2.2 **Test de la ceguera (REQ-CB-23)**: un extracto `DERIVADO` al que se
       le borran las últimas filas da `estadoVerificacion = VERIFICADO`, y la
       discontinuidad contra el extracto siguiente **sí** lo detecta.
-- [ ] 2.3 Cablear `detectarHuecos` + continuidad para una cuenta bancaria y
+- [x] 2.3 Cablear `detectarHuecos` + continuidad para una cuenta bancaria y
       exponerlos. Ninguna importación se rechaza: advierte. E2E de ambos.
 
 ---

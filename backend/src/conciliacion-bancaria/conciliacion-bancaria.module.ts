@@ -23,6 +23,7 @@ import { ConciliacionController } from './conciliacion.controller';
 import { ConciliacionService } from './conciliacion.service';
 import { CuentasBancariasController } from './cuentas-bancarias.controller';
 import { CuentasBancariasService } from './cuentas-bancarias.service';
+import { IntegridadExtractosService } from './integridad-extractos.service';
 import { ExtractoImportadorService } from './extracto-importador.service';
 import { ExtractoParserLookupService } from './extracto-parser-lookup.service';
 import { MatchConciliacionService } from './match-conciliacion.service';
@@ -70,6 +71,7 @@ import { MOVIMIENTO_BANCARIO_REPOSITORY_PORT } from './ports/movimiento-bancario
     PrismaService,
     TenantContextService,
     CuentasBancariasService,
+    IntegridadExtractosService,
     ExtractoImportadorService,
     ExtractoParserLookupService,
     ExtractoParserRegistry,

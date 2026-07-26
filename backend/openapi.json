@@ -5947,6 +5947,44 @@
         ]
       }
     },
+    "/api/cuentas-bancarias/{id}/integridad": {
+      "get": {
+        "description": "Evalúa la SERIE COMPLETA de importaciones (sin paginar): ambas señales son propiedades del conjunto y sobre una página darían un veredicto falso. Informativo — nunca rechaza una importación (REQ-CB-09/23).",
+        "operationId": "CuentasBancariasController_integridad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegridadExtractosResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Huecos de cobertura y discontinuidades de saldo de la serie de extractos.",
+        "tags": [
+          "Conciliación bancaria — Cuentas bancarias"
+        ]
+      }
+    },
     "/api/conciliacion": {
       "get": {
         "description": "Verifica el ancla de cada match en memoria contra su snapshot (REQ-CB-10). Es LECTURA PURA: nunca escribe, ni siquiera para \"curar\" un vínculo roto.",
@@ -11007,6 +11045,86 @@
         },
         "required": [
           "requiereConfirmacionCuenta"
+        ]
+      },
+      "HuecoCoberturaDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "example": "2026-07-01",
+            "description": "Inclusive, `YYYY-MM-DD` (§4.6)."
+          },
+          "hasta": {
+            "type": "string",
+            "example": "2026-07-31",
+            "description": "Inclusive."
+          }
+        },
+        "required": [
+          "desde",
+          "hasta"
+        ]
+      },
+      "DiscontinuidadSaldoDto": {
+        "type": "object",
+        "properties": {
+          "anteriorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "siguienteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saldoFinalAnterior": {
+            "type": "string",
+            "example": "700.00",
+            "description": "Monto como STRING (§4.5)."
+          },
+          "saldoInicialSiguiente": {
+            "type": "string",
+            "example": "900.00"
+          },
+          "diferencia": {
+            "type": "string",
+            "example": "200.00",
+            "description": "Magnitud del salto, siempre positiva."
+          }
+        },
+        "required": [
+          "anteriorId",
+          "siguienteId",
+          "saldoFinalAnterior",
+          "saldoInicialSiguiente",
+          "diferencia"
+        ]
+      },
+      "IntegridadExtractosResponseDto": {
+        "type": "object",
+        "properties": {
+          "huecos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HuecoCoberturaDto"
+            }
+          },
+          "discontinuidades": {
+            "description": "Saltos de saldo entre importaciones contiguas. Detectan la mutilación de un extracto por los extremos, que el checksum DERIVADO no puede ver (REQ-CB-23).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiscontinuidadSaldoDto"
+            }
+          },
+          "serieIntegra": {
+            "type": "boolean",
+            "description": "true cuando no hay huecos NI discontinuidades. Informativo: nunca bloquea una importación — lo que se retiene aguas abajo es la conclusión del informe."
+          }
+        },
+        "required": [
+          "huecos",
+          "discontinuidades",
+          "serieIntegra"
         ]
       },
       "ImportacionExtractoListItemDto": {
