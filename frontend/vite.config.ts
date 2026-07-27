@@ -25,6 +25,19 @@ export default defineConfig({
       },
     },
   },
+  // `preview` NO hereda `server.proxy`: son dos servidores distintos. Sin esto,
+  // el build servido con `vite preview` manda /api al propio :4173 y recibe el
+  // index.html — el síntoma es un login que falla sin decir por qué.
+  // Lo usa el gate de UI, que corre contra el build y no contra el dev server.
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
