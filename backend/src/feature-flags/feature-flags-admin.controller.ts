@@ -15,6 +15,10 @@ import { FeatureFlagsService } from './feature-flags.service';
  * Ahora requiere `isSuperAdmin === true` en el JWT — solo el super-admin de
  * plataforma puede gestionar los feature flags globales del sistema.
  *
+ * Ese permiso quedó huérfano en el catálogo asignable hasta que se lo borró
+ * (el módulo `sistema` era suyo y quedó vacío): un Owner lo veía en el editor
+ * de roles y otorgarlo no concedía nada. Lo cubre ahora `catalogo-vs-controllers.spec.ts`.
+ *
  * Sin TenantGuard: operación org-less, el catálogo global no pertenece a un tenant.
  */
 @ApiTags('Feature Flags (Admin)')

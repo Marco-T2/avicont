@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { backendErrorMessage } from '@/lib/error-messages';
+import { PERMISSIONS } from '@/lib/permissions';
+import { usePermissions } from '@/lib/use-permissions';
 import type { FeatureFlag } from '@/types/api';
 
 import { useSetFeatureFlag } from '../hooks/use-feature-flags';
@@ -18,6 +20,13 @@ export function FeatureFlagRow({
   hasOverride,
 }: FeatureFlagRowProps): React.JSX.Element {
   const mutation = useSetFeatureFlag();
+  // Los endpoints de flags pasaron a exigir `organizacion.feature-flags.*`, que
+  // SÍ es delegable a un rol personalizado. Antes exigían un permiso fuera del
+  // catálogo, así que sólo entraban OWNER/ADMIN (con wildcard '*', que cubre
+  // ambos): el caso "ve la pantalla pero no puede editar" no existía y ahora sí.
+  // §14.7: el Switch no es un <Button>, así que va disabled sin tooltip.
+  const { has } = usePermissions();
+  const puedeEditar = has(PERMISSIONS.organizacion.featureFlags.update);
 
   function handleToggle(next: boolean): void {
     mutation.mutate(
@@ -64,7 +73,7 @@ export function FeatureFlagRow({
       <Switch
         id={switchId}
         checked={flag.enabled}
-        disabled={mutation.isPending}
+        disabled={mutation.isPending || !puedeEditar}
         onCheckedChange={handleToggle}
         aria-label={`${flag.enabled ? 'Desactivar' : 'Activar'} ${flag.name}`}
       />

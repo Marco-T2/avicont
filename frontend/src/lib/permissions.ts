@@ -118,8 +118,16 @@ export const PERMISSIONS = {
       update: 'organizacion.roles.update',
       delete: 'organizacion.roles.delete',
     },
-    features: {
-      read: 'organizacion.features.read',
+    // El backend los llama `feature-flags`, no `features`. El espejo decía
+    // `organizacion.features.read` — un permiso que no existe en el catálogo,
+    // así que el gate quedaba cerrado para siempre a todo rol personalizado.
+    // Lo cubre ahora `backend/src/common/permisos/catalogo-vs-espejo-frontend.spec.ts`.
+    featureFlags: {
+      read: 'organizacion.feature-flags.read',
+      update: 'organizacion.feature-flags.update',
+    },
+    billing: {
+      read: 'organizacion.billing.read',
     },
   },
 } as const;
