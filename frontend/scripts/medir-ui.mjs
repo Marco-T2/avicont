@@ -11,7 +11,7 @@
 import { parseArgs } from 'node:util';
 import { writeFileSync } from 'node:fs';
 
-import { abrir, fallar, iniciarSesion, lanzarNavegador } from './lib/navegador.mjs';
+import { abrir, fallar, iniciarSesion, lanzarNavegador, nuevaPagina } from './lib/navegador.mjs';
 
 // El reflow tras cambiar el viewport no es instantáneo. Medir antes devuelve los
 // px del ancho ANTERIOR: un número plausible y equivocado, que es la peor clase
@@ -36,6 +36,11 @@ Opciones:
   --email <mail>        Usuario del seed. Default: founder@avicont.bo
   --password <pass>     Default: password
   --sin-login           No inicia sesión (para rutas públicas como /login)
+  --tactil              Emula un dispositivo táctil: \`(pointer: coarse)\` pasa a
+                        dar true, como en un celular o tablet reales. Sin este
+                        flag Chromium se presenta como escritorio (pointer: fine)
+                        y cualquier estilo bajo \`pointer-coarse:\` NO aplica —
+                        medir tap targets sin esto mide el modo equivocado.
   --espera <ms>         Espera tras cambiar el viewport. Default: ${ESPERA_REFLOW_MS}
   --out <archivo>       Escribe el JSON ahí. Si se omite, va a stdout.
   --ayuda               Esto.
@@ -67,6 +72,7 @@ function leerArgumentos() {
       email: { type: 'string', default: 'founder@avicont.bo' },
       password: { type: 'string', default: 'password' },
       'sin-login': { type: 'boolean', default: false },
+      tactil: { type: 'boolean', default: false },
       espera: { type: 'string', default: String(ESPERA_REFLOW_MS) },
       out: { type: 'string' },
       ayuda: { type: 'boolean', default: false },
@@ -102,6 +108,7 @@ function leerArgumentos() {
     email: values.email,
     password: values.password,
     sinLogin: values['sin-login'],
+    tactil: values.tactil,
     out: values.out,
   };
 }
@@ -140,8 +147,10 @@ async function main() {
   const navegador = await lanzarNavegador();
 
   try {
-    const page = await navegador.newPage({
-      viewport: { width: opciones.viewports[0], height: opciones.alto },
+    const page = await nuevaPagina(navegador, {
+      ancho: opciones.viewports[0],
+      alto: opciones.alto,
+      tactil: opciones.tactil,
     });
 
     if (!opciones.sinLogin) await iniciarSesion(page, opciones);
@@ -166,7 +175,7 @@ async function main() {
     }
 
     const salida = JSON.stringify(
-      { baseUrl: opciones.baseUrl, selector: opciones.selector, mediciones },
+      { baseUrl: opciones.baseUrl, selector: opciones.selector, tactil: opciones.tactil, mediciones },
       null,
       2,
     );

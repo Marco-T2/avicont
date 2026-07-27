@@ -39,7 +39,7 @@ export function ContactoListFilters({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Buscar por nombre o NIT…"
           aria-label="Buscar contacto"
-          className="pl-9 pr-9 text-base md:text-sm"
+          className="pl-9 pr-9 pointer-coarse:pr-12 text-base md:text-sm"
         />
         {search.length > 0 ? (
           <Button
@@ -95,7 +95,10 @@ function ChipButton({ active, onClick, children }: ChipButtonProps): React.JSX.E
       aria-pressed={active}
       className={cn(
         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-        'min-h-[44px] md:min-h-0',
+        // Piso táctil de 44px por dispositivo (pointer: coarse), no por
+        // breakpoint — misma convención que button.tsx. La chip es un <button>
+        // crudo, así que el piso del primitivo no la cubre.
+        'pointer-coarse:min-h-11',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         active
           ? 'bg-primary text-primary-foreground border-primary'

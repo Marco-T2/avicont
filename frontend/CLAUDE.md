@@ -278,8 +278,29 @@ Los estándar de Tailwind, sin personalizar:
 
 #### Tap targets mínimos 44×44 px (Apple HIG)
 - Todo `<Button>`, `<a>`, item de lista tocable, icono clickeable.
-- Button de shadcn size `default` (h-9 = 36 px) **no cumple**; para elementos críticos en mobile usar `size="lg"` (h-10 = 40 px) o agregar `py-3 px-4` al wrap.
-- Los icon-only buttons (`size="icon"` = h-9 w-9) requieren `h-10 w-10` o mayor en contextos mobile.
+- **El piso lo aplican los primitivos, no vos**: `button.tsx` e `input.tsx` llevan
+  `pointer-coarse:min-h-11` en su base (y `pointer-coarse:min-w-11` en los sizes
+  icon). Si usás `<Button>` o `<Input>`, no tenés que hacer nada.
+- **Por `pointer: coarse`, NO por breakpoint.** El piso es una propiedad del
+  DISPOSITIVO (dedo vs. mouse), no del ancho de ventana: un iPad a 768 px es
+  táctil y necesita 44 px, y un escritorio con mouse no engorda ni en ventana
+  angosta. **No escribas `min-h-[44px] md:min-h-0`** — esa era la convención
+  vieja y le daba a la tablet densidad de escritorio.
+- Para un `<button>`/`<a>` **crudo** (sin el primitivo), el piso va a mano:
+  `pointer-coarse:min-h-11` (y `pointer-coarse:min-w-11` si es icon-only).
+- **Un control absoluto DENTRO de un input tiene que reservar su espacio**: el
+  botón "limpiar búsqueda" anclado en `right-1` mide 48 px bajo dedo, así que el
+  input necesita `pr-9 pointer-coarse:pr-12`. Sin eso el botón tapa el final del
+  texto y tocar ahí **borra la búsqueda**. El margen es cero: si movés el ancla,
+  recalculá.
+- **Fuera del piso, todavía**: `checkbox.tsx` (16×16), `switch.tsx` (32×18),
+  `tabs` y `select-trigger`. Se arreglan extendiendo el área táctil con un
+  `::after` invisible —agrandarlos les cambia el aspecto—, y eso exige medir por
+  hit-testing porque `getBoundingClientRect()` no ve el pseudo-elemento.
+- **Para verificarlo hay que emular el dedo**: `pnpm run medir:ui -- --tactil`.
+  Sin ese flag Chromium se presenta como escritorio y **ningún estilo
+  `pointer-coarse:` aplica** — medir tap targets sin él mide el modo equivocado
+  y da un verde que no prueba nada.
 
 #### Inputs con `font-size ≥ 16 px` en mobile
 - iOS Safari **hace auto-zoom** al focusear inputs con font < 16 px. Es visualmente destructivo.
@@ -329,7 +350,8 @@ visuales en mobile o dark mode. Copiarlo al cuerpo del commit o del PR:
 - [ ] Renderizado correcto en **375 px** (iPhone SE, viewport mobile)
 - [ ] Renderizado correcto en **768 px** (iPad, breakpoint `md:`)
 - [ ] Renderizado correcto en **1440 px** (laptop, breakpoint `xl:` target)
-- [ ] Tap targets ≥ **44×44 px** en todos los botones/items interactivos de mobile
+- [ ] Tap targets ≥ **44×44 px** en todo lo interactivo, verificado **con dedo
+      emulado** (`pnpm run medir:ui -- --tactil`; sin el flag no se mide nada)
 - [ ] **Modo oscuro** verificado — ningún color literal (ver §6, Anti-F-10).
       Usar variables del tema (`text-foreground`, `bg-primary`, `bg-clase-activo-bg`, …).
 - [ ] Navegación accesible en `< md` (drawer/hamburger funciona)
