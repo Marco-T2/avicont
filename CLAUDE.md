@@ -1262,12 +1262,16 @@ Antes de editar código que caiga en los paths de la tabla, o antes de las opera
 | `backend/src/common/{errors,filters}/**`, agregás una `DomainError` nueva, tocás `GlobalExceptionFilter`, mapeás errores de Prisma | `docs/claude/errores-y-logs.md` |
 | Creás o modificás `*.spec.ts`, `*.integration.spec.ts`, `*.e2e-spec.ts`, factories en `test/` o `__fixtures__/` | `docs/claude/testing.md` |
 | `backend/prisma/migrations/**` o `schema.prisma` | `docs/claude/dominio-contable.md` §4.1–4.2 + `docs/claude/antipatrones.md` Anti-22, Anti-23 |
+| `frontend/src/components/ui/**` (primitivos shadcn) | `docs/claude/verificacion-frontend.md` — **un cambio ahí llega a pantallas que no están en el diff**; exige barrido de regresión, no solo el checklist |
+| Cualquier cambio de `frontend/**` que toque componentes, layout o estilos | `frontend/CLAUDE.md` §7 (qué verificar) + `docs/claude/verificacion-frontend.md` (cómo, y qué NO prueba cada herramienta) |
 
 ### 12.2 Por operación (LEER / CONSULTAR antes o durante)
 
 | Operación | LEER / CONSULTAR |
 |-----------|------------------|
 | Revisar PR propio antes del squash merge | Pasada completa sobre `docs/claude/antipatrones.md` contra el diff |
+| Vas a afirmar un número de UI (px, ancho, alto, solape) o que "se ve bien" | `docs/claude/verificacion-frontend.md` §1–§2 — la tabla de decisión dice el escalón mínimo; un px NO se mide fuera de un navegador real |
+| Escribís un test que assertea sobre `className` | `docs/claude/verificacion-frontend.md` §4 — los literales de clase en un test **regeneran la utility en el CSS de producción**, y un `not.toContain` de un default pasa por la razón equivocada sin su gemelo |
 | Detectás cálculo repetido, mock sospechoso, `new Date()` en dominio, `any`, query sin `tenantId`, o cualquier smell contable | Buscar en `docs/claude/antipatrones.md` por keyword antes de normalizar el patrón |
 | Escribís un asiento automático generado por otro módulo (venta→asiento, pago→asiento) | `docs/claude/dominio-contable.md` §4.1 + `docs/claude/antipatrones.md` Anti-14, Anti-17 |
 | Tocás cálculo de IVA, IT, UFV, conversión de moneda, cierre mensual/anual | `docs/claude/dominio-contable.md` completo, no solo la sección relevante |

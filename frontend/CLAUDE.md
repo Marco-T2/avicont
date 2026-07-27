@@ -342,6 +342,23 @@ visuales en mobile o dark mode. Copiarlo al cuerpo del commit o del PR:
 > El agente que abre un PR sin este checklist debe pedir al caller humano que
 > lo complete antes de mergear. No es opcional cuando hay cambios visuales.
 
+**CÓMO se verifica cada ítem: `docs/claude/verificacion-frontend.md`.** Este
+checklist dice QUÉ mirar; ese doc dice con qué herramienta, y sobre todo **qué NO
+puede probar cada una** — un test de `className` en jsdom no prueba qué clase gana,
+y ningún px se mide fuera de un navegador real. Leelo antes de tildar la primera
+casilla.
+
+Dos reglas que salen de ahí y valen acá:
+
+- **Los ítems que no verificaste van sin tildar y nombrados en el PR.** Tildar a
+  ciegas convierte el checklist en trámite y a la próxima nadie lo mira.
+- **Si tocás un primitivo de `components/ui/`, el checklist no alcanza**: el cambio
+  llega a pantallas que no están en el diff. Va además un barrido de regresión
+  (`verificacion-frontend.md` §3.5). Este checklist estuvo años sin correrse y
+  cuando se corrió destapó una familia de bugs donde el `className` del llamador
+  no hacía nada — invisible en code review, porque un `className` inerte se lee
+  igual que uno que funciona.
+
 ## 8. API client y handlers por feature
 
 ### Cliente único
