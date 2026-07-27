@@ -75,8 +75,10 @@ export function InformeFiltros({ onEmitir, isFetching }: InformeFiltrosProps): R
             {/* `w-full` VA EN EL TRIGGER: el primitivo es `w-fit`, así que se
                 estira al contenido e ignora el `sm:w-72` del div de arriba.
                 Con la etiqueta `alias · numeroCuenta` crecía a 368px y se
-                comía 64px del campo de fecha de al lado. Acotado, el
-                `line-clamp-1` que el primitivo ya trae recorta solo. */}
+                comía 64px del campo de fecha de al lado. Acotado, el value
+                recorta solo con los puntos suspensivos del `truncate` del
+                primitivo (ver `ui/select.tsx`: el `line-clamp-1` que traía
+                shadcn no recortaba con elipsis, lo mataba un `display:flex`). */}
             <SelectTrigger
               id="cuenta-bancaria-informe"
               aria-label="Cuenta bancaria"
