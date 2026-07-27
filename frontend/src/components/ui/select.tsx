@@ -42,7 +42,19 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // El valor recorta con `truncate`, NO con `line-clamp-1`. El default de
+        // shadcn traía `line-clamp-1` y `flex` sobre el MISMO elemento: ambas
+        // declaran `display`, con especificidad idéntica, y en el CSS generado
+        // `flex` sale después — así que ganaba, dejaba el `-webkit-line-clamp`
+        // inerte (solo aplica a `-webkit-box`) y conservaba su `overflow:hidden`.
+        // Resultado: el texto se cortaba SIN puntos suspensivos, y un número de
+        // cuenta recortado se lee como completo.
+        // `flex items-center gap-1.5` existe para items con icono; acá los 23
+        // SelectItem son texto pelado, así que no perdemos nada y `text-overflow`
+        // sí funciona sobre un bloque. Si algún día un item lleva icono, envolvelo
+        // en un elemento propio en vez de devolverle el `flex` al value.
+        // `min-w-0` deja que el flex item se encoja por debajo de su contenido.
+        "flex w-fit items-center justify-between gap-1.5 rounded-md border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
