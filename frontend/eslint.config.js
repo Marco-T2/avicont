@@ -23,6 +23,23 @@ export default defineConfig([
     },
   },
   {
+    // Herramientas de desarrollo (`scripts/medir-ui.mjs`). Sin este bloque
+    // NINGUNA regla las alcanzaría: los demás filtran por `**/*.{ts,tsx}` y un
+    // `.mjs` quedaría fuera del lint sin que nada lo avise — el mismo agujero que
+    // CLAUDE.md §11.4 documenta para el `eslint src` del backend, que dejó 43
+    // errores invisibles en `test/`.
+    //
+    // Van los globals de Node Y los del browser a propósito: el archivo corre en
+    // Node, pero la función que se le pasa a `page.evaluate()` se serializa y se
+    // ejecuta DENTRO de la página, así que usa `document` y `getComputedStyle`
+    // legítimamente desde el mismo archivo.
+    files: ['scripts/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+  {
     // Primitivos shadcn (la capa "ladrillo", frontend/CLAUDE.md §2): co-exportan
     // el componente y su función `cva` de variantes (badgeVariants, etc.).
     // react-refresh/only-export-components es una regla de DX/HMR, no de
