@@ -110,8 +110,11 @@ describe('Permisos asignables filtrados por vertical + packs (e2e)', () => {
       expect(res.status).toBe(200);
       const keys = clavesDe(res.body);
       expect(keys).toContain('contabilidad.asientos.read');
+      // Cross-vertical: `organizacion.*` entra siempre. `sistema.*` también,
+      // pero el módulo quedó sin permisos en el catálogo (su única entrada,
+      // `sistema.feature-flags.admin`, era un permiso muerto y se borró).
       expect(keys).toContain('organizacion.roles.read');
-      expect(keys).toContain('sistema.feature-flags.admin');
+      expect(keys).toContain('organizacion.billing.read');
       expect(keys.some((k) => k.startsWith('granja.'))).toBe(false);
     });
 
