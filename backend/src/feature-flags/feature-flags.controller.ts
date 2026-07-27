@@ -34,7 +34,7 @@ export class FeatureFlagsController {
   }
 
   @Get('list')
-  @RequirePermissions('settings.read')
+  @RequirePermissions('organizacion.feature-flags.read')
   @ApiOperation({ summary: 'List flags with details (global vs overrides)' })
   @ApiResponse({ status: 200, description: 'Detailed flag list' })
   async listFlags(@CurrentTenant() tenantId: string) {
@@ -50,7 +50,7 @@ export class FeatureFlagsController {
   }
 
   @Post('overrides')
-  @RequirePermissions('settings.write')
+  @RequirePermissions('organizacion.feature-flags.update')
   @ApiOperation({ summary: 'Create a tenant-specific flag override' })
   @ApiResponse({ status: 201, description: 'Override created' })
   async createOverride(@CurrentTenant() tenantId: string, @Body() dto: CreateFeatureFlagDto) {
@@ -58,7 +58,7 @@ export class FeatureFlagsController {
   }
 
   @Put('overrides/:key')
-  @RequirePermissions('settings.write')
+  @RequirePermissions('organizacion.feature-flags.update')
   @ApiOperation({ summary: 'Update a tenant-specific flag override' })
   @ApiResponse({ status: 200, description: 'Override updated' })
   async updateOverride(
@@ -70,7 +70,7 @@ export class FeatureFlagsController {
   }
 
   @Post('overrides/:key/toggle')
-  @RequirePermissions('settings.write')
+  @RequirePermissions('organizacion.feature-flags.update')
   @ApiOperation({ summary: 'Toggle a tenant-specific flag' })
   @ApiResponse({ status: 200, description: 'Flag toggled' })
   async toggleOverride(@CurrentTenant() tenantId: string, @Param('key') key: string) {
@@ -79,7 +79,7 @@ export class FeatureFlagsController {
   }
 
   @Delete('overrides/:key')
-  @RequirePermissions('settings.write')
+  @RequirePermissions('organizacion.feature-flags.update')
   @ApiOperation({ summary: 'Delete tenant override (falls back to global)' })
   @ApiResponse({ status: 200, description: 'Override deleted' })
   async deleteOverride(@CurrentTenant() tenantId: string, @Param('key') key: string) {

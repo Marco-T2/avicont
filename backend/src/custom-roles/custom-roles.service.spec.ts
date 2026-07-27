@@ -255,14 +255,17 @@ describe('CustomRolesService (unit)', () => {
       expect(repo.create).toHaveBeenCalled();
     });
 
-    it('acepta organizacion.* y sistema.* siempre (cross-vertical)', async () => {
+    // `sistema.*` ya no se ejercita acá: el módulo quedó sin permisos en el
+    // catálogo (su única entrada era un permiso muerto). La regla cross-vertical
+    // vive testeada en `catalogo-asignable.spec.ts` con un catálogo sintético.
+    it('acepta organizacion.* siempre (cross-vertical)', async () => {
       repo.findBySlug.mockResolvedValue(null);
       repo.create.mockResolvedValue(baseRole() as Awaited<ReturnType<RepoMock['create']>>);
 
       await service.create(TENANT_ID, ACTOR_USER_ID, {
         slug: 'admin-rol',
         name: 'Admin',
-        permissions: ['organizacion.miembros.read', 'sistema.feature-flags.admin'],
+        permissions: ['organizacion.miembros.read', 'organizacion.billing.read'],
       });
 
       expect(repo.create).toHaveBeenCalled();

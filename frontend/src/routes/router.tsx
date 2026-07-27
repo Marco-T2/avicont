@@ -266,7 +266,7 @@ export const router = createBrowserRouter([
           {
             path: '/settings/features',
             element: (
-              <RequirePermission permission={PERMISSIONS.organizacion.features.read}>
+              <RequirePermission permission={PERMISSIONS.organizacion.featureFlags.read}>
                 <FeaturesPage />
               </RequirePermission>
             ),

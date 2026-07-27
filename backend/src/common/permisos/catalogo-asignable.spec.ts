@@ -47,23 +47,43 @@ describe('filtrarCatalogoAsignable', () => {
       expect(keys.some((k) => k.startsWith('contabilidad.'))).toBe(false);
       expect(keys.some((k) => k.startsWith('granja.'))).toBe(false);
       expect(keys).toContain('organizacion.miembros.read');
-      expect(keys).toContain('sistema.feature-flags.admin');
     });
   });
 
   describe('cross-vertical (organizacion / sistema) siempre asignable', () => {
+    // El módulo `sistema` quedó SIN permisos en el catálogo real: su único
+    // entrada (`sistema.feature-flags.admin`) era un permiso muerto y se borró.
+    // La regla cross-vertical sigue viva en `submoduloEsAsignable`, así que se
+    // la ejercita con un catálogo sintético — atarla al catálogo real haría que
+    // el día que alguien sume un permiso de `sistema` nadie sepa si la regla
+    // seguía funcionando.
+    const CATALOGO_CON_SISTEMA = [
+      ...CATALOGO_PERMISOS,
+      {
+        key: 'sistema.mantenimiento.execute',
+        modulo: 'sistema',
+        submodulo: 'mantenimiento',
+        accion: 'execute',
+        descripcion: 'Permiso sintético, solo para este test',
+      },
+    ];
+
     it('incluye organizacion.* y sistema.* en una org de contabilidad', () => {
-      const keys = filtrarCatalogoAsignable(CATALOGO_PERMISOS, ctx()).map((p) => p.key);
+      const keys = filtrarCatalogoAsignable(CATALOGO_CON_SISTEMA, ctx()).map((p) => p.key);
       expect(keys).toContain('organizacion.roles.read');
-      expect(keys).toContain('sistema.feature-flags.admin');
+      expect(keys).toContain('sistema.mantenimiento.execute');
     });
 
     it('incluye organizacion.* y sistema.* en una org de granja', () => {
-      const keys = filtrarCatalogoAsignable(CATALOGO_PERMISOS, ctx({ vertical: 'GRANJA' })).map(
+      const keys = filtrarCatalogoAsignable(CATALOGO_CON_SISTEMA, ctx({ vertical: 'GRANJA' })).map(
         (p) => p.key,
       );
       expect(keys).toContain('organizacion.roles.read');
-      expect(keys).toContain('sistema.feature-flags.admin');
+      expect(keys).toContain('sistema.mantenimiento.execute');
+    });
+
+    it('sistema es cross-vertical incluso sin vertical activo', () => {
+      expect(submoduloEsAsignable('sistema', 'mantenimiento', ctx({ vertical: null }))).toBe(true);
     });
   });
 
@@ -189,8 +209,10 @@ describe('filtrarCatalogoAgrupadoAsignable', () => {
 
     expect(modulos).toContain('contabilidad');
     expect(modulos).toContain('organizacion');
-    expect(modulos).toContain('sistema');
     expect(modulos).not.toContain('granja');
+    // `sistema` no aparece porque quedó sin permisos en el catálogo, no porque
+    // el filtro lo excluya: la función descarta los grupos vacíos.
+    expect(modulos).not.toContain('sistema');
   });
 
   it('no deja módulos vacíos en el agrupado', () => {

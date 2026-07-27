@@ -370,7 +370,7 @@ export const NAV_SECTIONS: NavSection[] = [
         to: '/settings/features',
         label: 'Módulos activos',
         icon: ToggleRight,
-        requiredPermission: PERMISSIONS.organizacion.features.read,
+        requiredPermission: PERMISSIONS.organizacion.featureFlags.read,
       },
       {
         to: '/settings/complementos',

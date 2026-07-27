@@ -16,7 +16,7 @@ export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Get()
-  @RequirePermissions('billing.read')
+  @RequirePermissions('organizacion.billing.read')
   @ApiOperation({ summary: 'Get billing overview for current tenant' })
   @ApiResponse({ status: 200, description: 'Billing overview with subscription info' })
   async getOverview(@CurrentTenant() tenantId: string) {
@@ -24,7 +24,7 @@ export class BillingController {
   }
 
   @Get('limits')
-  @RequirePermissions('billing.read')
+  @RequirePermissions('organizacion.billing.read')
   @ApiOperation({ summary: 'Get plan limits for current tenant' })
   @ApiResponse({ status: 200, description: 'Plan limits and features' })
   async getLimits(@CurrentTenant() tenantId: string) {
@@ -32,7 +32,7 @@ export class BillingController {
   }
 
   @Get('quota/:resource')
-  @RequirePermissions('billing.read')
+  @RequirePermissions('organizacion.billing.read')
   @ApiOperation({ summary: 'Check quota for a specific resource' })
   @ApiResponse({ status: 200, description: 'Quota status' })
   async checkQuota(@CurrentTenant() tenantId: string, @Param('resource') resource: string) {
