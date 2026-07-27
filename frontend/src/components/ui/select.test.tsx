@@ -38,12 +38,22 @@ import { Select, SelectTrigger, SelectValue } from './select';
 const VALUE = '*:data-[slot=select-value]';
 const enValue = (utility: string) => `${VALUE}:${utility}`;
 
-function renderTrigger(className?: string) {
+/**
+ * Mismo motivo que `enValue`: el nombre se ARMA para que el escáner de
+ * Tailwind no lo levante del test y vuelva a emitir en el CSS de producción
+ * justo la regla prefijada que este arreglo sacó del primitivo.
+ */
+const SIZE = 'data-[size';
+const conSize = (valor: string, utility: string) =>
+  `${SIZE}=${valor}]:${utility}`;
+
+function renderTrigger(className?: string, size?: 'sm' | 'default') {
   render(
     <Select>
       <SelectTrigger
         aria-label="Cuenta"
         {...(className !== undefined ? { className } : {})}
+        {...(size !== undefined ? { size } : {})}
       >
         <SelectValue placeholder="Elegí una cuenta" />
       </SelectTrigger>
@@ -92,5 +102,50 @@ describe('SelectTrigger — ancho', () => {
     // Sheet, donde el prefijo impedía el dedupe.
     expect(clases).toContain('w-full');
     expect(clases).not.toContain('w-fit');
+  });
+});
+
+/**
+ * Cuarta instancia de la misma familia. El alto vivía en `data-[size=…]:h-9`,
+ * que tailwind-merge no puede deduplicar contra el `h-8` plano del llamador:
+ * convivían los dos y en CSS ganaba el selector de atributo por especificidad.
+ *
+ * Medido en navegador sobre los 6 sitios que declaran alto: pedían h-8 (32px)
+ * y renderizaban 36px. Uno de ellos es `PeriodoGestionFiltro`, compartido por
+ * 9 pantallas de reportes.
+ */
+describe('SelectTrigger — alto', () => {
+  // Pinnea el default. Sin este test, el "deja ganar al llamador" de abajo
+  // pasa igual si el default desaparece del primitivo — o sea, por la razón
+  // equivocada (misma lección que el `w-fit` de acá arriba).
+  it('trae el alto por defecto como clase plana', () => {
+    const clases = renderTrigger();
+
+    expect(clases).toContain('h-9');
+    // La prefijada por variante es la que causaba el bug: si vuelve, el alto
+    // del llamador queda inerte otra vez y en silencio.
+    expect(clases).not.toContain(conSize('default', 'h-9'));
+  });
+
+  it('respeta el alto chico cuando se lo pide por el prop size', () => {
+    const clases = renderTrigger(undefined, 'sm');
+
+    expect(clases).toContain('h-8');
+    expect(clases).not.toContain('h-9');
+    expect(clases).not.toContain(conSize('sm', 'h-8'));
+  });
+
+  it('deja ganar el alto del llamador sobre el default del primitivo', () => {
+    const clases = renderTrigger('h-11 sm:h-8');
+
+    // Plano contra plano: tailwind-merge sí dedupe y el llamador manda.
+    expect(clases).toContain('h-11');
+    // Por sufijo y no por igualdad: `not.toContain('h-9')` NO ve el token
+    // `data-[size=default]:h-9`, que es otro string — verificado por mutación,
+    // con el bug de vuelta este test pasaba igual.
+    expect(clases.filter((c) => c.endsWith('h-9'))).toHaveLength(0);
+    // El prefijo responsive es otra clave, así que sobrevive intacto: 44px de
+    // tap target en mobile (§7) y la densidad declarada de sm para arriba.
+    expect(clases).toContain('sm:h-8');
   });
 });
