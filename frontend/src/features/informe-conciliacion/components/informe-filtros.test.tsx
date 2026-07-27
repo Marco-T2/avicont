@@ -109,4 +109,25 @@ describe('InformeFiltros', () => {
 
     expect(screen.getByText(/no hay cuentas bancarias configuradas/i)).toBeInTheDocument();
   });
+
+  // El trigger del Select es `w-fit` en el primitivo: se estira al contenido
+  // e ignora el `sm:w-72` del div de arriba. Con la etiqueta larga
+  // `alias · numeroCuenta` crecía a 368px y se comía 64px del campo de fecha
+  // (medido en navegador a 768 y 1440). El `w-full` lo acota a su columna.
+  it('acota el selector de cuenta a su columna, para que no pise el campo de fecha', () => {
+    renderFiltros();
+
+    expect(screen.getByLabelText('Cuenta bancaria')).toHaveClass('w-full');
+  });
+
+  // §7: 44px de tap target en mobile. `size="sm"` da 32px, así que el CTA
+  // principal era el objetivo más chico de la pantalla; en `sm:` vuelve a la
+  // densidad de escritorio.
+  it('da 44px de alto al CTA en mobile sin engordarlo en escritorio', () => {
+    renderFiltros();
+
+    const boton = screen.getByRole('button', { name: /emitir informe/i });
+    expect(boton).toHaveClass('h-11');
+    expect(boton).toHaveClass('sm:h-8');
+  });
 });

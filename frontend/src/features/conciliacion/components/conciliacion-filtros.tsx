@@ -83,7 +83,13 @@ export function ConciliacionFiltros({
             setError(null);
           }}
         >
-          <SelectTrigger id="cuenta-bancaria-conciliacion" aria-label="Cuenta bancaria">
+          {/* `w-full` en el trigger, no en el div: el primitivo es `w-fit` y
+              con la etiqueta `alias · numeroCuenta` se desborda de su columna. */}
+          <SelectTrigger
+            id="cuenta-bancaria-conciliacion"
+            aria-label="Cuenta bancaria"
+            className="w-full"
+          >
             <SelectValue placeholder="Elegí una cuenta" />
           </SelectTrigger>
           <SelectContent>
