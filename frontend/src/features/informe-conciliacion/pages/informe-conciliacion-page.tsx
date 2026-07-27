@@ -47,11 +47,14 @@ export function InformeConciliacionPage(): React.JSX.Element {
   const puedeConciliar = has(PERMISSIONS.contabilidad.conciliacion.conciliar);
 
   const botonDeclarar = (
+    // §7: 44px de tap target en mobile (size="sm" da 32); en `sm:` vuelve a
+    // la densidad de escritorio.
     <PermissionButton
       permission={PERMISSIONS.contabilidad.conciliacion.conciliar}
       deniedReason={DENIED_DECLARAR}
       size="sm"
       variant="outline"
+      className="h-11 sm:h-8"
       onClick={() => setDeclararOpen(true)}
     >
       <Plus className="h-4 w-4 mr-2" />

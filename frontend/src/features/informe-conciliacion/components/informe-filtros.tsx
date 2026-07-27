@@ -72,7 +72,16 @@ export function InformeFiltros({ onEmitir, isFetching }: InformeFiltrosProps): R
               setError(null);
             }}
           >
-            <SelectTrigger id="cuenta-bancaria-informe" aria-label="Cuenta bancaria">
+            {/* `w-full` VA EN EL TRIGGER: el primitivo es `w-fit`, así que se
+                estira al contenido e ignora el `sm:w-72` del div de arriba.
+                Con la etiqueta `alias · numeroCuenta` crecía a 368px y se
+                comía 64px del campo de fecha de al lado. Acotado, el
+                `line-clamp-1` que el primitivo ya trae recorta solo. */}
+            <SelectTrigger
+              id="cuenta-bancaria-informe"
+              aria-label="Cuenta bancaria"
+              className="w-full"
+            >
               <SelectValue placeholder="Elegí una cuenta" />
             </SelectTrigger>
             <SelectContent>
@@ -100,10 +109,14 @@ export function InformeFiltros({ onEmitir, isFetching }: InformeFiltrosProps): R
           />
         </div>
 
+        {/* §7 pide 44px de tap target en mobile y `size="sm"` da 32: el CTA
+            principal era el objetivo más chico de la pantalla. Se sube solo
+            por debajo de `sm`; en escritorio, donde se apunta con mouse, la
+            densidad queda igual. */}
         <Button
           type="button"
           size="sm"
-          className="self-start sm:self-end"
+          className="h-11 self-start sm:h-8 sm:self-end"
           onClick={handleEmitir}
           disabled={isFetching}
         >
