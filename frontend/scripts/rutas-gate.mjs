@@ -37,6 +37,7 @@ export const RUTAS_GATE = [
   '/settings/features',
   '/settings/members',
   '/settings/roles',
+  '/settings/roles/nuevo',
   '/tipos-documento-fisico',
 ];
 

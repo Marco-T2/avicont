@@ -235,6 +235,26 @@ export const router = createBrowserRouter([
               </RequirePermission>
             ),
           },
+          // Las tres rutas montan la MISMA pantalla master-detail; sólo cambia
+          // el panel derecho. El gate de permiso es el de lectura en las tres:
+          // crear y editar los gatea el propio panel (botón deshabilitado /
+          // modo lectura), porque desde `/settings/roles` ya se ve la lista.
+          {
+            path: '/settings/roles/nuevo',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
+                <RolesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/roles/:id',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
+                <RolesPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: '/settings/empresa',
             element: (
