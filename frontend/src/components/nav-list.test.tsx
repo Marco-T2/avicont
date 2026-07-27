@@ -1331,3 +1331,74 @@ describe('NavList — scroll propio', () => {
     expect(nav?.className).toContain('min-h-0');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regresión: el piso táctil de 44px (§7).
+//
+// El sidebar se salvó ENTERO del PR #285 —que puso el piso en `button.tsx` e
+// `input.tsx`— porque acá los controles son `<a>` y `<button>` CRUDOS, sin pasar
+// por el primitivo. Peor: las clases decían `py-3 md:py-2` y `p-3 md:p-2`, que
+// es la convención PROHIBIDA con otra cara — le dan 44px al teléfono y se los
+// sacan al iPad, que es táctil. Medido a 768px con dedo emulado: links 36px,
+// headers de grupo 28px, riel 32px.
+//
+// Este test es DÉBIL a propósito y hay que saberlo: assertea el string de la
+// clase, no el píxel renderizado (jsdom no compila Tailwind ni evalúa
+// `pointer: coarse`). La prueba de verdad es `pnpm run medir:ui -- --tactil`.
+// Existe igual porque nada cubría estas tres cadenas y por eso sobrevivieron
+// intactas a un PR que iba justo de esto.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NavList — piso táctil de 44px (pointer: coarse)', () => {
+  beforeEach(() => {
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+  });
+
+  it('los links de navegación declaran el piso, y NO por breakpoint', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    const links = [...container.querySelectorAll('nav a')];
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.className).toContain('pointer-coarse:min-h-11');
+      // El gemelo del assert de arriba: sin esto, reintroducir `md:py-2` al lado
+      // del piso pasaría el test mientras le devuelve densidad de escritorio al
+      // iPad — que es exactamente el bug que este bloque cubre.
+      expect(link.className).not.toMatch(/md:(py|p)-/);
+    }
+  });
+
+  it('los headers de grupo (button crudo) declaran el piso', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    // Los headers son los únicos <button> del nav con aria-expanded.
+    const headers = [...container.querySelectorAll('nav button[aria-expanded]')];
+    expect(headers.length).toBeGreaterThan(0);
+    for (const header of headers) {
+      expect(header.className).toContain('pointer-coarse:min-h-11');
+    }
+  });
+
+  it('en modo riel el piso va en las DOS dimensiones', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    const controles = [...container.querySelectorAll('nav a, nav button')];
+    expect(controles.length).toBeGreaterThan(0);
+    for (const el of controles) {
+      // Icon-only: sin min-w el blanco queda de 32px de ancho aunque el alto ya
+      // cumpla. El riel mide 64px, así que los 44 entran.
+      expect(el.className).toContain('pointer-coarse:min-h-11');
+      expect(el.className).toContain('pointer-coarse:min-w-11');
+      expect(el.className).not.toMatch(/md:(py|px|p)-/);
+    }
+  });
+});

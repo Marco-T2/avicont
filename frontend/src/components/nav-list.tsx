@@ -187,7 +187,7 @@ function NavGroupBlock({ group, visibleItems, onItemClick }: GroupProps): React.
         aria-expanded={abierto}
         aria-controls={contentId}
         className={cn(
-          'flex w-full items-center gap-1 rounded-md px-3 py-1.5',
+          'flex w-full items-center gap-1 rounded-md px-3 py-1.5 pointer-coarse:min-h-11',
           'text-xs font-semibold uppercase tracking-wide transition-colors',
           'hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
           // Plegado pero con la ruta activa adentro: sin esta pista el usuario
@@ -248,7 +248,8 @@ function NavGroupRail({ group, visibleItems, onItemClick }: GroupProps): React.J
           // adentro del flyout, así que la pista tiene que darla el grupo.
           {...(contieneRutaActiva ? { 'aria-current': 'true' as const } : {})}
           className={cn(
-            'flex w-full items-center justify-center rounded-md p-3 transition-colors md:p-2',
+            'flex w-full items-center justify-center rounded-md p-2 transition-colors',
+            'pointer-coarse:min-h-11 pointer-coarse:min-w-11',
             contieneRutaActiva
               ? 'bg-sidebar-accent text-sidebar-accent-foreground'
               : 'text-sidebar-foreground hover:bg-sidebar-accent/60',
@@ -316,7 +317,9 @@ function NavItemRenderer({ item, onItemClick, collapsed }: ItemProps): React.JSX
   // Clases comunes a disabled y NavLink — cambia el layout según collapsed.
   const base = cn(
     'flex items-center gap-2 rounded-md text-sm transition-colors',
-    collapsed ? 'justify-center p-3 md:p-2' : 'px-3 py-3 md:py-2',
+    collapsed
+      ? 'justify-center p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+      : 'px-3 py-2 pointer-coarse:min-h-11',
   );
 
   if (item.disabled === true) {
