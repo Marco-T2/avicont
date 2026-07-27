@@ -1,12 +1,18 @@
-import { Search, X } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import type { CatalogoAgrupado, PermisoCatalogado } from '@/types/api';
+
+import {
+  esAccionSensible,
+  etiquetaAccion,
+  etiquetaGrupo,
+} from '../lib/etiquetas-permisos';
 
 interface PermissionsPickerProps {
   catalogo: CatalogoAgrupado[] | undefined;
@@ -14,35 +20,16 @@ interface PermissionsPickerProps {
   selected: string[];
   onChange: (next: string[]) => void;
   error?: string;
+  disabled?: boolean;
 }
 
-// Los nombres del catálogo son slugs sin tildes (`organizacion`, `periodos`),
-// porque son identificadores. Acá son texto de UI en español (§1), así que los
-// que llevan tilde o nombre propio se declaran; el resto se deriva.
-//
-// Un slug nuevo que no esté en el mapa cae en la derivación y se ve razonable —
-// no rompe nada, sólo le falta la tilde si la necesitaba.
-const ETIQUETAS: Record<string, string> = {
-  organizacion: 'Organización',
-  configuracion: 'Configuración',
-  'feature-flags': 'Feature flags',
-  'plan-cuentas': 'Plan de cuentas',
-  'libro-diario': 'Libro diario',
-  'libro-mayor': 'Libro mayor',
-  periodos: 'Períodos fiscales',
-  'cierre-mensual': 'Cierre mensual',
-  eeff: 'Estados financieros',
-  'tipos-documento-fisico': 'Tipos de documento físico',
-  'documentos-fisicos': 'Documentos físicos',
-  conciliacion: 'Conciliación',
-  'tipos-registro': 'Tipos de registro',
-};
+type Marca = 'todos' | 'algunos' | 'ninguno';
 
-function etiquetar(slug: string): string {
-  const declarada = ETIQUETAS[slug];
-  if (declarada !== undefined) return declarada;
-  const conEspacios = slug.replace(/-/g, ' ');
-  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1);
+function marcar(keys: string[], seleccionados: Set<string>): Marca {
+  if (keys.length === 0) return 'ninguno';
+  const cuantos = keys.filter((k) => seleccionados.has(k)).length;
+  if (cuantos === 0) return 'ninguno';
+  return cuantos === keys.length ? 'todos' : 'algunos';
 }
 
 function coincide(permiso: PermisoCatalogado, consulta: string): boolean {
@@ -50,26 +37,29 @@ function coincide(permiso: PermisoCatalogado, consulta: string): boolean {
   const aguja = consulta.toLowerCase();
   return (
     permiso.key.toLowerCase().includes(aguja) ||
-    permiso.accion.toLowerCase().includes(aguja) ||
     permiso.descripcion.toLowerCase().includes(aguja) ||
-    permiso.submodulo.toLowerCase().includes(aguja)
+    etiquetaAccion(permiso.accion).toLowerCase().includes(aguja) ||
+    etiquetaGrupo(permiso.submodulo).toLowerCase().includes(aguja)
   );
 }
 
-// Picker agrupado por módulo → submódulo, pensado para una página completa (no
-// para un modal): el catálogo real son ~68 permisos en 21 submódulos y no entra
-// en una pantalla.
+// Árbol de permisos agrupado por módulo → submódulo → acción.
 //
-// Decisiones que bajan el alto, en orden de cuánto aportaron (medido):
-//   - El submódulo es una FILA, no una tarjeta. Con 21 submódulos de 2-6
-//     permisos cada uno, el borde + padding de cada tarjeta pesaba más que los
-//     permisos que contenía.
-//   - Un permiso es su descripción y nada más. La `key`
-//     (`contabilidad.asientos.read`) es la concatenación literal de módulo +
-//     submódulo + acción, y la acción ya abre la descripción ("Crear…",
-//     "Modificar…"): mostrarlas era repetir dos veces lo mismo. La key completa
-//     vive en el `title`.
-//   - Buscador: con 68 permisos, encontrar uno scrolleando no es viable.
+// El catálogo real son ~68 permisos en 21 submódulos. Renderizarlos todos a la
+// vez, con la descripción completa de cada uno, daba un muro de texto que nadie
+// lee. Tres decisiones lo evitan:
+//
+//   - COLAPSADO por defecto salvo el primer módulo. Lo que se ve al entrar es
+//     un índice de 3 líneas, no 68 checkboxes.
+//   - El hijo es SÓLO el verbo (`Ver`, `Crear`, `Anular`): el sustantivo ya lo
+//     da el submódulo que lo agrupa. La descripción del backend queda en el
+//     `title`.
+//   - Cabeceras tri-state con cascada, que reemplazan a los 21 botones de
+//     "Seleccionar todos" que antes ocupaban una línea cada uno.
+//
+// El buscador expande automáticamente los grupos con coincidencias: filtrar y
+// dejar el resultado escondido detrás de un acordeón cerrado sería peor que no
+// filtrar.
 //
 // No resuelve wildcards (`modulo.*`): si un rol los usa, hay que expandirlos.
 export function PermissionsPicker({
@@ -78,13 +68,16 @@ export function PermissionsPicker({
   selected,
   onChange,
   error,
+  disabled = false,
 }: PermissionsPickerProps): React.JSX.Element {
   const [consulta, setConsulta] = useState('');
+  // Preferencia EXPLÍCITA del usuario por módulo. Clave ausente = "sin
+  // preferencia" ⇒ abierto sólo el primero. Mismo patrón que `openGroups` del
+  // sidebar: guardar la preferencia y no el estado permite que un módulo nuevo
+  // del catálogo herede el default sin sembrar nada.
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
-  // El filtrado descarta submódulos y módulos que quedan vacíos: una tarjeta de
-  // submódulo sin permisos adentro es ruido que hace parecer que la búsqueda no
-  // funcionó.
   const catalogoVisible = useMemo(() => {
     if (catalogo === undefined) return [];
     return catalogo
@@ -120,24 +113,27 @@ export function PermissionsPicker({
     [catalogoVisible],
   );
 
-  function togglePermission(key: string): void {
+  // Recibe el estado ACTUAL en vez de leerlo del mapa: con la clave ausente
+  // (default por posición) un `!abiertos[modulo]` daría siempre `true` y el
+  // primer click sobre el módulo ya desplegado no haría nada visible.
+  function alternarModulo(modulo: string, abiertoAhora: boolean): void {
+    setAbiertos({ ...abiertos, [modulo]: !abiertoAhora });
+  }
+
+  function alternarPermiso(key: string): void {
     const next = new Set(selectedSet);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
     onChange(Array.from(next));
   }
 
   // Recibe SIEMPRE los permisos ya filtrados por la búsqueda. Operar sobre el
-  // grupo completo mientras hay una consulta activa seleccionaría permisos que
-  // el usuario no tiene a la vista — el peor tipo de efecto: invisible.
-  function toggleGroup(permisos: PermisoCatalogado[]): void {
+  // grupo completo mientras hay una consulta activa marcaría permisos que el
+  // usuario no tiene a la vista — el peor tipo de efecto: invisible.
+  function alternarGrupo(permisos: PermisoCatalogado[]): void {
     const keys = permisos.map((p) => p.key);
-    const allSelected = keys.every((k) => selectedSet.has(k));
     const next = new Set(selectedSet);
-    if (allSelected) {
+    if (marcar(keys, selectedSet) === 'todos') {
       keys.forEach((k) => next.delete(k));
     } else {
       keys.forEach((k) => next.add(k));
@@ -148,8 +144,8 @@ export function PermissionsPicker({
   if (loading) {
     return (
       <div className="space-y-2">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
         ))}
       </div>
     );
@@ -166,13 +162,13 @@ export function PermissionsPicker({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {error !== undefined ? (
         <p className="text-sm text-destructive">{error}</p>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative sm:max-w-xs sm:flex-1">
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
@@ -195,11 +191,10 @@ export function PermissionsPicker({
             </Button>
           ) : null}
         </div>
-
-        <p className="text-sm text-muted-foreground">
+        <p className="shrink-0 text-xs text-muted-foreground">
           {consulta === ''
-            ? `${totalPermisos} permisos disponibles`
-            : `${totalVisibles} de ${totalPermisos} coinciden`}
+            ? `${selected.length} de ${totalPermisos}`
+            : `${totalVisibles} coinciden`}
         </p>
       </div>
 
@@ -211,110 +206,119 @@ export function PermissionsPicker({
         </div>
       ) : null}
 
-      <div className="space-y-4">
-        {catalogoVisible.map((mod) => {
+      <div className="space-y-2">
+        {catalogoVisible.map((mod, indice) => {
           const permisosModulo = mod.submodulos.flatMap((s) => s.permisos);
-          const moduloCompleto = permisosModulo.every((p) =>
-            selectedSet.has(p.key),
-          );
+          const keysModulo = permisosModulo.map((p) => p.key);
+          const marcaModulo = marcar(keysModulo, selectedSet);
+          const elegidos = keysModulo.filter((k) => selectedSet.has(k)).length;
+          // Con una búsqueda activa se abren todos los que tienen coincidencias:
+          // filtrar y dejar el resultado detrás de un acordeón cerrado sería
+          // peor que no filtrar.
+          const abierto =
+            consulta !== '' || (abiertos[mod.modulo] ?? indice === 0);
 
           return (
-            <section
-              key={mod.modulo}
-              className="overflow-hidden rounded-md border bg-card"
-            >
-              <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide">
-                  {etiquetar(mod.modulo)}
-                </h3>
-                <Button
+            <section key={mod.modulo} className="rounded-md border bg-card">
+              {/* `relative` en todo contenedor de Checkbox: dentro de un <form>
+                  Radix monta un <input> oculto `absolute` por control, y sin
+                  ancestro posicionado su bloque contenedor es el documento —
+                  escapan al `overflow-hidden` del shell (que es `static`) y
+                  estiran el <html>, agregando una segunda barra de scroll. */}
+              <div className="relative flex items-center gap-2 px-3 py-2">
+                <Checkbox
+                  aria-label={`Seleccionar todo ${etiquetaGrupo(mod.modulo)}`}
+                  checked={
+                    marcaModulo === 'algunos'
+                      ? 'indeterminate'
+                      : marcaModulo === 'todos'
+                  }
+                  disabled={disabled}
+                  onCheckedChange={() => alternarGrupo(permisosModulo)}
+                />
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 shrink-0 text-xs"
-                  onClick={() => toggleGroup(permisosModulo)}
+                  onClick={() => alternarModulo(mod.modulo, abierto)}
+                  aria-expanded={abierto}
+                  className="flex min-h-11 flex-1 items-center gap-2 text-left md:min-h-0"
                 >
-                  {moduloCompleto
-                    ? 'Quitar todo el módulo'
-                    : 'Seleccionar todo el módulo'}
-                </Button>
-              </header>
-
-              <div className="divide-y">
-                {mod.submodulos.map((sub) => {
-                  const allKeys = sub.permisos.map((p) => p.key);
-                  const allSelected = allKeys.every((k) => selectedSet.has(k));
-                  const someSelected = allKeys.some((k) => selectedSet.has(k));
-
-                  return (
-                    <div
-                      key={`${mod.modulo}.${sub.submodulo}`}
-                      className="gap-x-4 px-4 py-2 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:items-baseline"
-                    >
-                      <div className="flex items-center gap-2 py-1">
-                        <span className="min-w-0 truncate text-xs font-medium text-foreground">
-                          {etiquetar(sub.submodulo)}
-                        </span>
-                        {someSelected && !allSelected ? (
-                          <Badge variant="outline" className="text-[10px]">
-                            parcial
-                          </Badge>
-                        ) : null}
-                      </div>
-
-                      {/* `flex-wrap` en vez de una grilla de columnas fijas: los
-                          permisos de un submódulo son 2-6 y sus descripciones
-                          tienen largos muy distintos, así que una grilla deja
-                          columnas medio vacías y estira el alto.
-                          Cada fila: 44px en mobile (§7), 32 en desktop — el
-                          mismo par que usan los filtros de /comprobantes.
-
-                          El `relative` del label NO es cosmético. Dentro de un
-                          <form>, Radix monta por cada Checkbox un <input> oculto
-                          `position:absolute` para que participe del submit. Sin
-                          un ancestro posicionado, su bloque contenedor es el
-                          documento: el `overflow-hidden` del DashboardShell es
-                          `static` y no los recorta, así que los 68 estiraban el
-                          <html> y aparecía una SEGUNDA barra de scroll al lado
-                          de la del <main>. Medido: 1254px de scroll fantasma en
-                          el <html>, 0 con esta clase. En el modal no pasaba
-                          porque el DialogContent es `fixed` y sí los contenía. */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                        {sub.permisos.map((p) => {
-                          const checkboxId = `perm-${p.key}`;
-                          return (
-                            <label
-                              key={p.key}
-                              htmlFor={checkboxId}
-                              title={p.key}
-                              className="relative flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent md:min-h-8"
-                            >
-                              <Checkbox
-                                id={checkboxId}
-                                checked={selectedSet.has(p.key)}
-                                onCheckedChange={() => togglePermission(p.key)}
-                              />
-                              <span className="min-w-0 text-xs">
-                                {p.descripcion}
-                              </span>
-                            </label>
-                          );
-                        })}
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 shrink-0 text-xs text-muted-foreground"
-                          onClick={() => toggleGroup(sub.permisos)}
-                        >
-                          {allSelected ? 'Quitar todos' : 'Seleccionar todos'}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                      abierto && 'rotate-90',
+                    )}
+                  />
+                  <span className="text-sm font-semibold">
+                    {etiquetaGrupo(mod.modulo)}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {elegidos} de {keysModulo.length}
+                  </span>
+                </button>
               </div>
+
+              {abierto ? (
+                <div className="divide-y border-t">
+                  {mod.submodulos.map((sub) => {
+                    const keysSub = sub.permisos.map((p) => p.key);
+                    const marcaSub = marcar(keysSub, selectedSet);
+
+                    return (
+                      <div
+                        key={`${mod.modulo}.${sub.submodulo}`}
+                        className="flex flex-col gap-x-3 px-3 py-1.5 sm:flex-row sm:items-center"
+                      >
+                        <div className="relative flex min-h-11 items-center gap-2 sm:min-h-0 sm:w-48 sm:shrink-0">
+                          <Checkbox
+                            aria-label={`Seleccionar todo ${etiquetaGrupo(sub.submodulo)}`}
+                            checked={
+                              marcaSub === 'algunos'
+                                ? 'indeterminate'
+                                : marcaSub === 'todos'
+                            }
+                            disabled={disabled}
+                            onCheckedChange={() => alternarGrupo(sub.permisos)}
+                          />
+                          <span className="truncate text-xs text-muted-foreground">
+                            {etiquetaGrupo(sub.submodulo)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-3">
+                          {sub.permisos.map((p) => {
+                            const id = `perm-${p.key}`;
+                            const sensible = esAccionSensible(p.accion);
+                            return (
+                              <label
+                                key={p.key}
+                                htmlFor={id}
+                                title={`${p.descripcion} · ${p.key}`}
+                                className="relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded-sm px-1 hover:bg-accent md:min-h-8"
+                              >
+                                <Checkbox
+                                  id={id}
+                                  checked={selectedSet.has(p.key)}
+                                  disabled={disabled}
+                                  onCheckedChange={() => alternarPermiso(p.key)}
+                                />
+                                {sensible ? (
+                                  <AlertTriangle
+                                    aria-hidden
+                                    className="h-3 w-3 shrink-0 text-muted-foreground"
+                                  />
+                                ) : null}
+                                <span className="text-xs">
+                                  {etiquetaAccion(p.accion)}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </section>
           );
         })}

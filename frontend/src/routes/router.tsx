@@ -30,7 +30,6 @@ import { FlujoEfectivoPage } from '@/features/flujo-efectivo/pages/flujo-efectiv
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
-import { RoleFormPage } from '@/features/roles/pages/role-form-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { EmpresaPage } from '@/features/tenants/pages/empresa-page';
 import { ComplementosPage } from '@/features/packs/pages/complementos-page';
@@ -236,19 +235,23 @@ export const router = createBrowserRouter([
               </RequirePermission>
             ),
           },
+          // Las tres rutas montan la MISMA pantalla master-detail; sólo cambia
+          // el panel derecho. El gate de permiso es el de lectura en las tres:
+          // crear y editar los gatea el propio panel (botón deshabilitado /
+          // modo lectura), porque desde `/settings/roles` ya se ve la lista.
           {
             path: '/settings/roles/nuevo',
             element: (
-              <RequirePermission permission={PERMISSIONS.organizacion.roles.create}>
-                <RoleFormPage />
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
+                <RolesPage />
               </RequirePermission>
             ),
           },
           {
-            path: '/settings/roles/:id/editar',
+            path: '/settings/roles/:id',
             element: (
-              <RequirePermission permission={PERMISSIONS.organizacion.roles.update}>
-                <RoleFormPage />
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
+                <RolesPage />
               </RequirePermission>
             ),
           },
