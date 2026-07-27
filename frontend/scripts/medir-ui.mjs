@@ -11,7 +11,7 @@
 import { parseArgs } from 'node:util';
 import { writeFileSync } from 'node:fs';
 
-import { chromium } from 'playwright';
+import { abrir, fallar, iniciarSesion, lanzarNavegador } from './lib/navegador.mjs';
 
 // El reflow tras cambiar el viewport no es instantáneo. Medir antes devuelve los
 // px del ancho ANTERIOR: un número plausible y equivocado, que es la peor clase
@@ -47,13 +47,6 @@ Protocolo antes/después (§3.4 del doc — es lo que hace convincente la eviden
   4. git checkout -- <archivo>   (y verificá que el árbol quedó limpio)
   5. diff /tmp/antes.json /tmp/despues.json
 `;
-
-function fallar(titulo, pistas, causa) {
-  console.error(`\n✖ ${titulo}\n`);
-  for (const pista of pistas) console.error(`  ${pista}`);
-  if (causa instanceof Error) console.error(`\n  Error original: ${causa.message}`);
-  process.exit(1);
-}
 
 function leerArgumentos() {
   // `pnpm run medir:ui -- --rutas …` reenvía el `--` LITERAL al script (verificado
@@ -111,59 +104,6 @@ function leerArgumentos() {
     sinLogin: values['sin-login'],
     out: values.out,
   };
-}
-
-async function lanzarNavegador() {
-  try {
-    // --no-sandbox: sin esto Chromium no arranca bajo WSL2 ni en contenedores.
-    return await chromium.launch({ args: ['--no-sandbox'] });
-  } catch (causa) {
-    fallar('No se pudo lanzar Chromium.', [
-      'Playwright NO nombra la causa real en su mensaje; las dos posibles son:',
-      '',
-      '1. Falta el binario del browser (no viaja en el `pnpm install`):',
-      '     pnpm exec playwright install chromium',
-      '',
-      '2. Faltan librerías del sistema (Ubuntu 24.04):',
-      '     sudo apt-get install -y libnspr4 libnss3 libasound2t64',
-      '   El paquete es `libasound2t64`; el nombre viejo `libasound2` ya no existe.',
-      '   Diagnóstico real: ldd ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | grep "not found"',
-      '   (`sudo` no corre con el prefijo `!` de Claude Code: no hay TTY.)',
-    ], causa);
-  }
-}
-
-async function abrir(page, url) {
-  try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 20_000 });
-  } catch (causa) {
-    fallar(`No se pudo abrir ${url}`, [
-      '¿Está levantado el dev server?  cd frontend && pnpm run dev   (:5173)',
-      '¿Y el backend?                  cd backend  && pnpm run start:dev  (:3000)',
-      'Si el backend responde pero con datos viejos, mirá CLAUDE.md §11.7',
-      '(proceso node huérfano aferrado al :3000 sirviendo un dist/ anterior).',
-    ], causa);
-  }
-}
-
-async function iniciarSesion(page, { baseUrl, email, password }) {
-  await abrir(page, `${baseUrl}/login`);
-  await page.fill('#email', email);
-  await page.fill('#password', password);
-  await page.click('button[type="submit"]');
-
-  try {
-    await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15_000 });
-  } catch (causa) {
-    fallar('El login no avanzó: seguimos en /login.', [
-      `Usuario probado: ${email}`,
-      'Causas habituales:',
-      '  • La BD no tiene el usuario del seed → cd backend && pnpm run seed',
-      '  • El backend no está levantado, o devuelve 401',
-      '  • Las credenciales del smoke viven en OTRA organización (pediselas al dueño',
-      '    del entorno en vez de crear datos por tu cuenta — §3.3 del doc).',
-    ], causa);
-  }
 }
 
 // Se miden TODAS las coincidencias del selector, nunca la primera. Es la lección

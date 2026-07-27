@@ -160,6 +160,153 @@ jobs:
       - name: Build
         run: pnpm run build
 
+  # Gate de UI: falla si alguna pantalla recorta contenido horizontalmente.
+  #
+  # El invariante se eligió CON DATOS, no a ojo (ver docs/claude/verificacion-frontend.md §6):
+  # el candidato obvio —"tap targets ≥44px"— lo violan 118 de 186 elementos
+  # interactivos en 25 de 25 rutas, porque 36px es el default de button.tsx.
+  # Nacería con 118 excepciones. Éste, en cambio, es binario por pantalla y su
+  # baseline es verde con la allowlist vacía.
+  #
+  # Necesita el stack real porque toda pantalla vive detrás del login. Los pasos
+  # de infra son los mismos que ya usa `contract-drift`; lo que suma es el seed
+  # (el gate entra con el usuario founder) y servir el build del frontend.
+  ui-gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saas
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+      redis:
+        image: redis:6
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
+      REDIS_HOST: localhost
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      MINIO_ENDPOINT: localhost
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: avicont-adjuntos
+      MINIO_USE_SSL: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24.11.0'
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Start MinIO server
+        # AppModule bootstrapea MinioStorageAdapter.onModuleInit → ensureBucket.
+        run: |
+          docker run -d --name minio-ui-gate \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pnpm install
+
+      - name: Copy env
+        working-directory: backend
+        run: cp .env.example .env
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: pnpm exec prisma generate
+
+      - name: Run Prisma migrations
+        working-directory: backend
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed
+        # `seed` crea el usuario founder + la org piloto con los que entra el gate.
+        # `seed:packs` otorga los entitlements: la org del seed se crea con un
+        # upsert directo de Prisma, no por TenantsService, así que no recibe los
+        # packs otorgados por default.
+        working-directory: backend
+        run: |
+          pnpm run seed
+          pnpm run seed:packs
+
+      - name: Build backend
+        working-directory: backend
+        run: pnpm run build
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          node dist/main.js > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 40); do
+            curl -sf -o /dev/null http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          echo "::error::El backend no respondió en /api/health"
+          cat /tmp/backend.log
+          exit 1
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install
+
+      - name: Install Chromium
+        # El binario no viaja en el pnpm install; --with-deps trae las libs del SO.
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm run build
+
+      - name: Start preview server
+        # Se sirve el BUILD, no el dev server: el gate mide lo que recibe el usuario.
+        # El proxy /api → :3000 lo define `preview` en vite.config.ts.
+        working-directory: frontend
+        run: |
+          pnpm run preview > /tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:4173/ && exit 0
+            sleep 2
+          done
+          echo "::error::El preview no respondió en :4173"
+          cat /tmp/preview.log
+          exit 1
+
+      - name: UI gate
+        working-directory: frontend
+        run: pnpm run gate:ui
+
+      - name: Backend log on failure
+        if: failure()
+        run: tail -100 /tmp/backend.log || true
+
   # Gate anti-drift del contrato OpenAPI (deuda "openapi-typescript", CLAUDE.md §10.10).
   # Regenera el contrato (backend/openapi.json) y los tipos del frontend
   # (api.generated.ts) desde el código actual. Si un DTO del backend cambió y

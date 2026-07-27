@@ -393,16 +393,48 @@ revisión de browser. **Ojo: `playwright install` PODA las revisiones que ya no
 corresponden** (el 1234 desapareció de la cache al instalar el 1228), así que no
 cuentes con tener las dos a mano.
 
-**Lo que sigue sin resolverse: esto NO corre en CI.** La mitad "repetible entre
-sesiones" está cerrada; la mitad "corre en CI" es un problema de otro tamaño y
-quedó afuera a propósito. Medir una ruta autenticada en CI exige levantar el stack
-entero (backend + postgres + redis + minio + migraciones + seed + preview del
-frontend) — es otro pipeline E2E, no un step. Y hace falta decidir **qué assertea**,
-que es la parte difícil: un gate de "tap targets ≥ 44 px a 375 px" hoy fallaría
-contra el botón `h-7 w-7` de `comprobantes-filters.tsx`, que son 28 px
-**deliberados**. Un gate que nace pidiendo allowlist se vuelve trámite, y este
-checklist ya estuvo años siendo un trámite. Conviene elegir el invariante después
-de usar la herramienta unas cuantas veces, no antes.
+### 6.1 El gate en CI (cerrado el 2026-07-27)
+
+Corre como el job **`ui-gate`** de `.github/workflows/ci.yml`:
+`pnpm run gate:ui` (`frontend/scripts/gate-ui.mjs`) sobre el **build** servido con
+`vite preview`, con el stack real detrás porque toda pantalla vive tras el login.
+
+**El invariante se eligió midiendo, no opinando** — y el dato mató al candidato
+obvio. Tap targets ≥ 44 px: **118 de 186** elementos interactivos visibles lo
+violan, en **25 de 25 rutas**. La firma dominante es `36×36` (botones-ícono), y
+36 px es `h-9`, **el default de `button.tsx`**. No era el `h-7 w-7` deliberado de
+`comprobantes-filters.tsx` lo que estorbaba: es que **el mínimo del checklist §7
+nunca lo cumplió el propio sistema de diseño**. Ese gate nace con 118 excepciones,
+o sea no assertea nada. Sigue siendo deuda real, pero de rediseño, no de CI.
+
+**El invariante que quedó**: en cada pantalla, `main` no desborda horizontalmente
+(`scrollWidth <= clientWidth`), a 375 y 768 px. Binario por pantalla, sin grises, y
+su baseline es **verde con la allowlist vacía**.
+
+**La trampa que casi lo hunde, y la lección general**: medido sobre `body` daba
+cero desborde en toda la app… y el cero era **falso**. `dashboard-shell.tsx`
+envuelve el contenido en un `overflow-hidden`, así que el desborde nunca llega al
+body. Se destapó **inyectando un `<div style={{width:2000}}>` en una página real**:
+`html` y `body` seguían reportando 375 px con `desborda:false`. La sonda correcta
+es `main`. **Un invariante nuevo se valida por mutación ANTES de creerle el verde**
+— si no, lo que se versiona es un instrumento que no mide.
+
+Lo que el gate protege es contenido **inalcanzable**: recortado y sin scroll que lo
+rescate. El primer bug que encontró fue el CTA `Nuevo comprobante` terminando en
+x=490 sobre un viewport de 375.
+
+**Cobertura y sus límites** (declarados, no omitidos): 24 rutas × 2 viewports.
+`scripts/rutas-gate.mjs` lista las cubiertas y las excluidas **con motivo**;
+`src/routes/rutas-gate.test.ts` compara esa lista contra el router de verdad en
+las dos direcciones, así que una pantalla nueva sin decisión de cobertura rompe
+la suite. Quedan fuera las rutas con `:id`, las públicas, granja (la org del seed
+es vertical CONTABILIDAD) y platform-admin (pide super-admin).
+
+El gate **falla si una ruta redirige** en vez de abrir. No es celo: el barrido
+manual previo contaba `/gestiones/cierre` como pantalla y en realidad estaba
+midiendo `/periodos-fiscales` dos veces, porque ese path es un redirector y sin
+gestiones en la BD rebota. Una medición que no vio la pantalla no puede reportarse
+como verde.
 
 ---
 
