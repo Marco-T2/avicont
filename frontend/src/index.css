@@ -173,6 +173,35 @@ body {
   height: 100%;
 }
 
+/* Los controles de formulario de Radix (Checkbox, Switch, Select, RadioGroup,
+   Slider) montan un input nativo oculto —el "BubbleInput"— para que el control
+   participe del submit. Lo renderizan dentro de un Fragment, como SIBLING del
+   botón: el padre en el DOM es el contenedor del call site, así que el
+   primitivo de `components/ui/` no tiene ningún elemento propio donde
+   arreglarlo.
+
+   Ese input va `position: absolute` SIN top/left, dando por sentado que el
+   contenedor sea un containing block. Por default no lo es, así que el
+   containing block pasa a ser el documento y el input se ancla en su posición
+   estática — que en una pantalla larga cae muy por debajo del viewport. El
+   `<html>` se estira para contenerlo y aparece una segunda barra de scroll,
+   provocada por un elemento invisible.
+
+   Se lo ancla al origen. `!important` no es negociable: Radix aplica el style
+   inline DESPUÉS del spread de props, y no hay forma de pisarlo desde React.
+   No se toca `position` ni el contenedor: darle `relative` al padre también lo
+   arregla (es lo que hacen a mano varios call sites), pero le crea un stacking
+   context a contenedores arbitrarios y eso se paga en z-index ajenos.
+
+   Medido en navegador sobre /settings/roles/nuevo con contenido largo: 1317px
+   de scroll vertical parásito con el bug activo, 0 con esta regla, y el `main`
+   sin moverse un píxel. */
+input[aria-hidden='true'][tabindex='-1'],
+select[aria-hidden='true'][tabindex='-1'] {
+  top: 0 !important;
+  left: 0 !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
