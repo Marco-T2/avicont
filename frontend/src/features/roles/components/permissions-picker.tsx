@@ -267,7 +267,18 @@ export function PermissionsPicker({
                           tienen largos muy distintos, así que una grilla deja
                           columnas medio vacías y estira el alto.
                           Cada fila: 44px en mobile (§7), 32 en desktop — el
-                          mismo par que usan los filtros de /comprobantes. */}
+                          mismo par que usan los filtros de /comprobantes.
+
+                          El `relative` del label NO es cosmético. Dentro de un
+                          <form>, Radix monta por cada Checkbox un <input> oculto
+                          `position:absolute` para que participe del submit. Sin
+                          un ancestro posicionado, su bloque contenedor es el
+                          documento: el `overflow-hidden` del DashboardShell es
+                          `static` y no los recorta, así que los 68 estiraban el
+                          <html> y aparecía una SEGUNDA barra de scroll al lado
+                          de la del <main>. Medido: 1254px de scroll fantasma en
+                          el <html>, 0 con esta clase. En el modal no pasaba
+                          porque el DialogContent es `fixed` y sí los contenía. */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                         {sub.permisos.map((p) => {
                           const checkboxId = `perm-${p.key}`;
@@ -276,7 +287,7 @@ export function PermissionsPicker({
                               key={p.key}
                               htmlFor={checkboxId}
                               title={p.key}
-                              className="flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent md:min-h-8"
+                              className="relative flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent md:min-h-8"
                             >
                               <Checkbox
                                 id={checkboxId}
