@@ -121,12 +121,12 @@ function CuentaBloque({ cuenta }: CuentaBloqueProps): React.JSX.Element {
         <div className="overflow-x-auto border-t">
           <Table className="min-w-[700px] table-fixed">
             <colgroup>
-              <col className="w-[13%]" /> {/* Fecha */}
-              <col className="w-[16%]" /> {/* Comprobante */}
-              <col className="w-[33%]" /> {/* Glosa */}
-              <col className="w-[12%]" /> {/* Debe */}
-              <col className="w-[12%]" /> {/* Haber */}
-              <col className="w-[14%]" /> {/* Saldo corriente */}
+              <col className="w-[13%]" /* Fecha */ />
+              <col className="w-[16%]" /* Comprobante */ />
+              <col className="w-[33%]" /* Glosa */ />
+              <col className="w-[12%]" /* Debe */ />
+              <col className="w-[12%]" /* Haber */ />
+              <col className="w-[14%]" /* Saldo corriente */ />
             </colgroup>
             <TableHeader>
               <TableRow>

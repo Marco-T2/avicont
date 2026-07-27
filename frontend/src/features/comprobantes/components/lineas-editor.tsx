@@ -186,13 +186,13 @@ export function LineasEditor({ mode, cuentas }: LineasEditorProps): React.JSX.El
         >
           <table className="w-full min-w-[800px] table-fixed text-sm">
             <colgroup>
-              <col className="w-[32px]" /> {/* Handle de arrastre — fijo, solo el ícono */}
-              <col className="w-[22%]" /> {/* Cuenta */}
-              <col className="w-[11%]" /> {/* Debe */}
-              <col className="w-[11%]" /> {/* Haber */}
-              <col className="w-[40%]" /> {/* Glosa línea — la más ancha */}
-              <col className="w-[16%]" /> {/* Contacto */}
-              <col className="w-[44px]" /> {/* Eliminar — fijo, solo el ícono */}
+              <col className="w-[32px]" /* Handle de arrastre — fijo, solo el ícono */ />
+              <col className="w-[22%]" /* Cuenta */ />
+              <col className="w-[11%]" /* Debe */ />
+              <col className="w-[11%]" /* Haber */ />
+              <col className="w-[40%]" /* Glosa línea — la más ancha */ />
+              <col className="w-[16%]" /* Contacto */ />
+              <col className="w-[44px]" /* Eliminar — fijo, solo el ícono */ />
             </colgroup>
             <thead>
               <tr className="bg-muted/50 text-muted-foreground">

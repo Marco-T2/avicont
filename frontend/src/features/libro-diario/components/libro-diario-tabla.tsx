@@ -146,11 +146,11 @@ export function LibroDiarioTabla({
           CLAUDE.md §7 "tablas con muchas columnas → scroll horizontal". */}
       <Table className="min-w-[700px] table-fixed">
         <colgroup>
-          <col className="w-[14%]" /> {/* Código cuenta */}
-          <col className="w-[36%]" /> {/* Nombre cuenta */}
-          <col className="w-[25%]" /> {/* Glosa línea */}
-          <col className="w-[12%]" /> {/* Debe BOB */}
-          <col className="w-[13%]" /> {/* Haber BOB */}
+          <col className="w-[14%]" /* Código cuenta */ />
+          <col className="w-[36%]" /* Nombre cuenta */ />
+          <col className="w-[25%]" /* Glosa línea */ />
+          <col className="w-[12%]" /* Debe BOB */ />
+          <col className="w-[13%]" /* Haber BOB */ />
         </colgroup>
         <TableHeader>
           <TableRow>

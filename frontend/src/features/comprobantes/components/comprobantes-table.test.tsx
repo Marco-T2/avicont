@@ -149,6 +149,19 @@ describe('ComprobantesTable', () => {
     expect(cols.length).toBe(9);
   });
 
+  it('el colgroup no contiene nodos de texto — solo <col>', () => {
+    // Un `{/* comentario */}` al final de la línea del <col> deja un text node
+    // " " entre hermanos: HTML no lo permite dentro de <colgroup> y React lo
+    // reporta como error de hidratación. Los comentarios van en su propia línea.
+    renderTable();
+    const colgroup = document.querySelector('table > colgroup');
+    expect(colgroup).not.toBeNull();
+    const noElemento = Array.from(colgroup?.childNodes ?? []).filter(
+      (n) => n.nodeType !== Node.ELEMENT_NODE,
+    );
+    expect(noElemento).toHaveLength(0);
+  });
+
   it('ya no muestra la columna Tipo', () => {
     renderTable();
     expect(screen.queryByRole('columnheader', { name: 'Tipo' })).toBeNull();
