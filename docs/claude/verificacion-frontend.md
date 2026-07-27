@@ -1,5 +1,5 @@
 <!--
-Última edición: 2026-07-26
+Última edición: 2026-07-27
 Última revisión contra core: 2026-07-27
 Owner: frontend-lead
 -->
@@ -128,13 +128,48 @@ sudo apt-get install -y libnspr4 libnss3 libasound2t64   # Ubuntu 24.04
   equivocado. Diagnóstico real: `ldd <binario> | grep "not found"`.
 - `sudo` **no funciona con el prefijo `!` del prompt de Claude Code** (no hay TTY):
   el humano lo corre en su propia terminal.
-- Playwright **no es dependencia del repo** — se instala ad-hoc en el scratchpad
-  (`npm install playwright`). Los browsers ya están cacheados en
-  `~/.cache/ms-playwright/`. Convertirlo en `devDependency` es una decisión abierta
-  (ver §6).
-- Lanzar siempre con `args: ['--no-sandbox']`.
+- Playwright **es `devDependency` del frontend** desde 2026-07-27 (ver §6). El
+  `pnpm install` NO baja ningún browser: eso es un comando aparte, una sola vez
+  por máquina y por versión de Playwright.
 
-**Qué medir.** No mires una captura: leé el DOM.
+  ```bash
+  cd frontend && pnpm exec playwright install chromium
+  ```
+
+- Lanzar siempre con `args: ['--no-sandbox']` (el script ya lo hace).
+
+**Qué medir: usá el script versionado.** No escribas un archivo nuevo en el
+scratchpad — el barrido de regresión sólo sirve si la medición de hoy es
+comparable con la de la próxima sesión, y un script que se reescribe cada vez mide
+distinto cada vez.
+
+```bash
+cd frontend
+pnpm run medir:ui -- --ayuda
+
+# Los 6 SelectTrigger del PR #276, en los tres viewports de §7:
+pnpm run medir:ui -- \
+  --rutas /comprobantes,/eeff/libro-mayor \
+  --selector '[data-slot="select-trigger"]' \
+  --out /tmp/despues.json
+```
+
+Devuelve, **por cada coincidencia** (no la primera: todas), `ancho`/`alto`/`x`/`y`,
+`display`, `textOverflow`, `overflowX`, `fontSize` y `desborda`
+(`scrollWidth > clientWidth`). El JSON está pensado para `diff`.
+
+- **Un elemento con ancho 0 no es un bug del script**: el selector coincide pero el
+  elemento no se renderiza en ese viewport (una tabla desktop oculta en mobile).
+  Se informa, no se filtra.
+- `--sin-login` para rutas públicas (`/login`). Sin el flag entra con el usuario del
+  seed antes de medir.
+- **`pnpm run medir:ui -- …` reenvía el `--` literal al script** (pnpm 11.2.2,
+  verificado). El script lo descarta; si escribís otra herramienta con `parseArgs`,
+  acordate o vas a comerte un `ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL` que no dice
+  nada sobre la causa.
+
+Si preferís entender qué hace por dentro, o necesitás medir algo que el script no
+cubre, ésta es la forma cruda:
 
 ```js
 const { chromium } = require('playwright');
@@ -210,12 +245,24 @@ Cuando tocás un primitivo de `components/ui/`, el cambio llega a pantallas que 
 están en el diff. Medí **todas las instancias** en varias rutas y viewports, antes y
 después, y diffeá:
 
-```js
-const RUTAS = ['/comprobantes', '/plan-cuentas', '/settings/empresa', '/conciliacion'];
-const ANCHOS = [375, 768, 1440];
-// por cada combinación: para cada [role="combobox"] (o el selector que aplique)
-//   { id, alto, ancho, offsetY del texto respecto del contenedor, display }
+Es exactamente para lo que existe `medir:ui`: mide **todas** las coincidencias del
+selector en cada ruta y viewport, y escupe un JSON diffeable.
+
+```bash
+cd frontend
+RUTAS=/comprobantes,/plan-cuentas,/settings/empresa,/conciliacion
+SEL='[data-slot="select-trigger"]'
+
+pnpm run medir:ui -- --rutas "$RUTAS" --selector "$SEL" --out /tmp/despues.json
+# revertí SOLO el primitivo, esperá el HMR (~5 s)
+pnpm run medir:ui -- --rutas "$RUTAS" --selector "$SEL" --out /tmp/antes.json
+# restaurá el primitivo y verificá que el árbol quedó limpio
+diff /tmp/antes.json /tmp/despues.json
 ```
+
+> ⚠️ Para revertir el primitivo usá `git stash` o un edit inverso, **no
+> `git checkout <archivo>` si tenés trabajo sin commitear en él**: te devuelve al
+> HEAD, no a "antes de la mutación", y te comés el cambio entero.
 
 Un diff que cambia **exactamente lo que quisiste cambiar y nada más** es la prueba
 de no-regresión. En el #274 fueron 21 mediciones y el diff fue una palabra por
@@ -317,16 +364,45 @@ te sorprende, sospechá primero del instrumento.
 
 ---
 
-## 6. Estado del entorno y decisión abierta
+## 6. Estado del entorno y la decisión (cerrada el 2026-07-27)
 
-- Chromium cacheado en `~/.cache/ms-playwright/` (revisión 1234, Playwright 1.62).
-- Las 3 librerías del sistema quedaron instaladas el 2026-07-27.
 - Frontend en `:5173`, backend en `:3000`.
-- **Decisión abierta**: hoy Playwright se instala ad-hoc en el scratchpad, así que
-  la medición **no es repetible entre sesiones ni corre en CI**. Convertirlo en
-  `devDependency` del frontend + un script versionado (`scripts/medir-ui.mjs`) haría
-  repetible el barrido de regresión, al costo de una dependencia pesada y de la
-  regla de `minimumReleaseAge` (72 h). **Sin decidir** — no se agregó nada al repo.
+- Las 3 librerías del sistema quedaron instaladas el 2026-07-27.
+- `playwright` es **`devDependency` del frontend**, pin `^1.61.1`, con
+  `scripts/medir-ui.mjs` versionado y expuesto como `pnpm run medir:ui`.
+- Chromium en `~/.cache/ms-playwright/`, **revisión 1228** (la que le corresponde a
+  Playwright 1.61.1).
+
+**El costo que esta sección declaraba era falso.** Decía "una dependencia pesada":
+`playwright` son **4,9 MB**, su única dependencia es `playwright-core`, y
+**ninguno de los dos tiene install scripts** (verificado desempaquetando los
+tarballs, no con `npm view`, que devuelve vacío tanto si el campo falta como si no
+existe el paquete). Dos consecuencias que importan:
+
+- `allowBuilds: {}` del `pnpm-workspace.yaml` **no lo bloquea**: no hay build que
+  ignorar, así que no aparece el `ERR_PNPM_IGNORED_BUILDS`.
+- Lo pesado es el **binario del browser** (~114 MB), que `pnpm install` **no
+  descarga**: se baja con un comando explícito y vive en `~/.cache`, fuera del repo.
+
+**Lo que sí costó: el cooldown de 72 h.** `minimumReleaseAgeStrict` rechazó
+Playwright `1.62.0` por 9 horas (publicada 62,9 h antes). Se pinneó `1.61.1`, que
+usa **Chromium 1228** en vez del **1234** de la 1.62 — o sea, una descarga de 114 MB
+aunque el 1234 ya estuviera cacheado. Al bumpear la versión de Playwright hay que
+volver a correr `pnpm exec playwright install chromium`: cada release trae su propia
+revisión de browser. **Ojo: `playwright install` PODA las revisiones que ya no
+corresponden** (el 1234 desapareció de la cache al instalar el 1228), así que no
+cuentes con tener las dos a mano.
+
+**Lo que sigue sin resolverse: esto NO corre en CI.** La mitad "repetible entre
+sesiones" está cerrada; la mitad "corre en CI" es un problema de otro tamaño y
+quedó afuera a propósito. Medir una ruta autenticada en CI exige levantar el stack
+entero (backend + postgres + redis + minio + migraciones + seed + preview del
+frontend) — es otro pipeline E2E, no un step. Y hace falta decidir **qué assertea**,
+que es la parte difícil: un gate de "tap targets ≥ 44 px a 375 px" hoy fallaría
+contra el botón `h-7 w-7` de `comprobantes-filters.tsx`, que son 28 px
+**deliberados**. Un gate que nace pidiendo allowlist se vuelve trámite, y este
+checklist ya estuvo años siendo un trámite. Conviene elegir el invariante después
+de usar la herramienta unas cuantas veces, no antes.
 
 ---
 
