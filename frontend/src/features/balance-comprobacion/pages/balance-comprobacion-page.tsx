@@ -56,7 +56,7 @@ export function BalanceComprobacionPage(): React.JSX.Element {
             partida doble antes de emitir los estados financieros.
           </p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
           <BotonExportarBalanceComprobacion data={data} perfil={empresa} rango={rango} />
           <BotonExportarBalanceComprobacionPdf data={data} perfil={empresa} rango={rango} />
         </div>

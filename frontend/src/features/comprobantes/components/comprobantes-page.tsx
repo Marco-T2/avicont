@@ -79,7 +79,7 @@ export function ComprobantesPage(): React.JSX.Element {
             Asientos contables del libro diario
           </p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
           <BotonExportarComprobantes
             filtros={filtrosExport}
             perfil={empresa ?? null}
