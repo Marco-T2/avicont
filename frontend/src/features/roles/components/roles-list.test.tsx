@@ -1,17 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomRole } from '@/types/api';
 
 import { RolesList } from './roles-list';
 
-// Hook de borrado y el dialog de form mockeados para aislar la tabla.
+// Hook de borrado mockeado para aislar la tabla.
 vi.mock('../hooks/use-roles', () => ({
   useDeleteRole: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-vi.mock('./role-form-dialog', () => ({
-  RoleFormDialog: () => null,
 }));
 
 const { hasMock } = vi.hoisted(() => ({ hasMock: vi.fn(() => true) }));
@@ -43,8 +41,28 @@ const role: CustomRole = {
   createdById: 'u-1',
 };
 
+function LocationProbe(): React.JSX.Element {
+  const location = useLocation();
+  return <span data-testid="ruta">{location.pathname}</span>;
+}
+
 async function abrirMenu(): Promise<void> {
-  render(<RolesList roles={[role]} />);
+  render(
+    <MemoryRouter initialEntries={['/settings/roles']}>
+      <Routes>
+        <Route
+          path="/settings/roles"
+          element={
+            <>
+              <RolesList roles={[role]} />
+              <LocationProbe />
+            </>
+          }
+        />
+        <Route path="/settings/roles/:id/editar" element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>,
+  );
   await userEvent.click(screen.getByRole('button', { name: /acciones para contador junior/i }));
 }
 
@@ -67,5 +85,16 @@ describe('RolesList — gating de menu-items', () => {
     expect(screen.getByRole('menuitem', { name: /eliminar/i })).toHaveAttribute(
       'data-disabled',
     );
+  });
+
+  // La edición dejó de ser un modal: ahora navega. Si el path se rompe, el
+  // usuario cae en la pantalla de "no encontramos ese rol" sin explicación.
+  it('Editar navega a la ruta de edición con el id del rol', async () => {
+    hasMock.mockReturnValue(true);
+    await abrirMenu();
+
+    await userEvent.click(screen.getByRole('menuitem', { name: /editar/i }));
+
+    expect(screen.getByTestId('ruta')).toHaveTextContent('/settings/roles/r-1/editar');
   });
 });

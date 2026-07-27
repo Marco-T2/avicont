@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CatalogoAgrupado, PermisoCatalogado } from '@/types/api';
 
@@ -14,10 +16,62 @@ interface PermissionsPickerProps {
   error?: string;
 }
 
-// Picker plano (sin accordion) agrupado por módulo → submódulo. Cada submódulo
-// tiene su propio "Seleccionar todos" para acelerar. No intenta resolver
-// wildcards (`modulo.*`): si el rol los usa, hay que expandirlos o dejar el
-// wildcard como entrada manual futura.
+// Los nombres del catálogo son slugs sin tildes (`organizacion`, `periodos`),
+// porque son identificadores. Acá son texto de UI en español (§1), así que los
+// que llevan tilde o nombre propio se declaran; el resto se deriva.
+//
+// Un slug nuevo que no esté en el mapa cae en la derivación y se ve razonable —
+// no rompe nada, sólo le falta la tilde si la necesitaba.
+const ETIQUETAS: Record<string, string> = {
+  organizacion: 'Organización',
+  configuracion: 'Configuración',
+  'feature-flags': 'Feature flags',
+  'plan-cuentas': 'Plan de cuentas',
+  'libro-diario': 'Libro diario',
+  'libro-mayor': 'Libro mayor',
+  periodos: 'Períodos fiscales',
+  'cierre-mensual': 'Cierre mensual',
+  eeff: 'Estados financieros',
+  'tipos-documento-fisico': 'Tipos de documento físico',
+  'documentos-fisicos': 'Documentos físicos',
+  conciliacion: 'Conciliación',
+  'tipos-registro': 'Tipos de registro',
+};
+
+function etiquetar(slug: string): string {
+  const declarada = ETIQUETAS[slug];
+  if (declarada !== undefined) return declarada;
+  const conEspacios = slug.replace(/-/g, ' ');
+  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1);
+}
+
+function coincide(permiso: PermisoCatalogado, consulta: string): boolean {
+  if (consulta === '') return true;
+  const aguja = consulta.toLowerCase();
+  return (
+    permiso.key.toLowerCase().includes(aguja) ||
+    permiso.accion.toLowerCase().includes(aguja) ||
+    permiso.descripcion.toLowerCase().includes(aguja) ||
+    permiso.submodulo.toLowerCase().includes(aguja)
+  );
+}
+
+// Picker agrupado por módulo → submódulo, pensado para una página completa (no
+// para un modal): el catálogo real son ~68 permisos en 21 submódulos y no entra
+// en una pantalla.
+//
+// Decisiones que bajan el alto, en orden de cuánto aportaron (medido):
+//   - El submódulo es una FILA, no una tarjeta. Con 21 submódulos de 2-6
+//     permisos cada uno, el borde + padding de cada tarjeta pesaba más que los
+//     permisos que contenía.
+//   - Un permiso es su descripción y nada más. La `key`
+//     (`contabilidad.asientos.read`) es la concatenación literal de módulo +
+//     submódulo + acción, y la acción ya abre la descripción ("Crear…",
+//     "Modificar…"): mostrarlas era repetir dos veces lo mismo. La key completa
+//     vive en el `title`.
+//   - Buscador: con 68 permisos, encontrar uno scrolleando no es viable.
+//
+// No resuelve wildcards (`modulo.*`): si un rol los usa, hay que expandirlos.
 export function PermissionsPicker({
   catalogo,
   loading = false,
@@ -25,7 +79,46 @@ export function PermissionsPicker({
   onChange,
   error,
 }: PermissionsPickerProps): React.JSX.Element {
+  const [consulta, setConsulta] = useState('');
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  // El filtrado descarta submódulos y módulos que quedan vacíos: una tarjeta de
+  // submódulo sin permisos adentro es ruido que hace parecer que la búsqueda no
+  // funcionó.
+  const catalogoVisible = useMemo(() => {
+    if (catalogo === undefined) return [];
+    return catalogo
+      .map((mod) => ({
+        ...mod,
+        submodulos: mod.submodulos
+          .map((sub) => ({
+            ...sub,
+            permisos: sub.permisos.filter((p) => coincide(p, consulta)),
+          }))
+          .filter((sub) => sub.permisos.length > 0),
+      }))
+      .filter((mod) => mod.submodulos.length > 0);
+  }, [catalogo, consulta]);
+
+  const totalPermisos = useMemo(
+    () =>
+      (catalogo ?? []).reduce(
+        (acc, mod) =>
+          acc + mod.submodulos.reduce((a, s) => a + s.permisos.length, 0),
+        0,
+      ),
+    [catalogo],
+  );
+
+  const totalVisibles = useMemo(
+    () =>
+      catalogoVisible.reduce(
+        (acc, mod) =>
+          acc + mod.submodulos.reduce((a, s) => a + s.permisos.length, 0),
+        0,
+      ),
+    [catalogoVisible],
+  );
 
   function togglePermission(key: string): void {
     const next = new Set(selectedSet);
@@ -37,6 +130,9 @@ export function PermissionsPicker({
     onChange(Array.from(next));
   }
 
+  // Recibe SIEMPRE los permisos ya filtrados por la búsqueda. Operar sobre el
+  // grupo completo mientras hay una consulta activa seleccionaría permisos que
+  // el usuario no tiene a la vista — el peor tipo de efecto: invisible.
   function toggleGroup(permisos: PermisoCatalogado[]): void {
     const keys = permisos.map((p) => p.key);
     const allSelected = keys.every((k) => selectedSet.has(k));
@@ -72,45 +168,92 @@ export function PermissionsPicker({
   return (
     <div className="space-y-4">
       {error !== undefined ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       ) : null}
 
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">
-          {selected.length} permiso{selected.length === 1 ? '' : 's'} seleccionado
-          {selected.length === 1 ? '' : 's'}
-        </span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative sm:max-w-xs sm:flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={consulta}
+            onChange={(e) => setConsulta(e.target.value)}
+            placeholder="Buscar permiso…"
+            aria-label="Buscar permiso"
+            className="h-11 pl-8 text-base md:h-9 md:text-sm"
+          />
+          {consulta !== '' ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Limpiar búsqueda"
+              className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
+              onClick={() => setConsulta('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          ) : null}
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          {consulta === ''
+            ? `${totalPermisos} permisos disponibles`
+            : `${totalVisibles} de ${totalPermisos} coinciden`}
+        </p>
       </div>
 
+      {catalogoVisible.length === 0 ? (
+        <div className="flex h-24 items-center justify-center rounded-md border border-dashed">
+          <p className="text-sm text-muted-foreground">
+            Ningún permiso coincide con «{consulta}».
+          </p>
+        </div>
+      ) : null}
+
       <div className="space-y-4">
-        {catalogo.map((mod) => (
-          <section
-            key={mod.modulo}
-            className="rounded-md border bg-card p-4 space-y-3"
-          >
-            <header className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide">
-                {mod.modulo}
-              </h3>
-            </header>
+        {catalogoVisible.map((mod) => {
+          const permisosModulo = mod.submodulos.flatMap((s) => s.permisos);
+          const moduloCompleto = permisosModulo.every((p) =>
+            selectedSet.has(p.key),
+          );
 
-            <div className="space-y-3">
-              {mod.submodulos.map((sub) => {
-                const allKeys = sub.permisos.map((p) => p.key);
-                const allSelected =
-                  allKeys.length > 0 &&
-                  allKeys.every((k) => selectedSet.has(k));
-                const someSelected = allKeys.some((k) => selectedSet.has(k));
+          return (
+            <section
+              key={mod.modulo}
+              className="overflow-hidden rounded-md border bg-card"
+            >
+              <header className="flex items-center justify-between gap-2 border-b px-4 py-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide">
+                  {etiquetar(mod.modulo)}
+                </h3>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 text-xs"
+                  onClick={() => toggleGroup(permisosModulo)}
+                >
+                  {moduloCompleto
+                    ? 'Quitar todo el módulo'
+                    : 'Seleccionar todo el módulo'}
+                </Button>
+              </header>
 
-                return (
-                  <div
-                    key={`${mod.modulo}.${sub.submodulo}`}
-                    className="space-y-2 rounded-md border bg-background p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-foreground">
-                          {sub.submodulo}
+              <div className="divide-y">
+                {mod.submodulos.map((sub) => {
+                  const allKeys = sub.permisos.map((p) => p.key);
+                  const allSelected = allKeys.every((k) => selectedSet.has(k));
+                  const someSelected = allKeys.some((k) => selectedSet.has(k));
+
+                  return (
+                    <div
+                      key={`${mod.modulo}.${sub.submodulo}`}
+                      className="gap-x-4 px-4 py-2 lg:grid lg:grid-cols-[11rem_minmax(0,1fr)] lg:items-baseline"
+                    >
+                      <div className="flex items-center gap-2 py-1">
+                        <span className="min-w-0 truncate text-xs font-medium text-foreground">
+                          {etiquetar(sub.submodulo)}
                         </span>
                         {someSelected && !allSelected ? (
                           <Badge variant="outline" className="text-[10px]">
@@ -118,50 +261,52 @@ export function PermissionsPicker({
                           </Badge>
                         ) : null}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => toggleGroup(sub.permisos)}
-                      >
-                        {allSelected ? 'Quitar todos' : 'Seleccionar todos'}
-                      </Button>
-                    </div>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {sub.permisos.map((p) => {
-                        const checkboxId = `perm-${p.key}`;
-                        return (
-                          <label
-                            key={p.key}
-                            htmlFor={checkboxId}
-                            className="flex cursor-pointer items-start gap-2 rounded-sm px-2 py-1 hover:bg-accent"
-                          >
-                            <Checkbox
-                              id={checkboxId}
-                              checked={selectedSet.has(p.key)}
-                              onCheckedChange={() => togglePermission(p.key)}
-                              className="mt-0.5"
-                            />
-                            <div className="min-w-0 text-xs leading-tight">
-                              <div className="font-medium">{p.accion}</div>
-                              <div className="text-muted-foreground">
+
+                      {/* `flex-wrap` en vez de una grilla de columnas fijas: los
+                          permisos de un submódulo son 2-6 y sus descripciones
+                          tienen largos muy distintos, así que una grilla deja
+                          columnas medio vacías y estira el alto.
+                          Cada fila: 44px en mobile (§7), 32 en desktop — el
+                          mismo par que usan los filtros de /comprobantes. */}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        {sub.permisos.map((p) => {
+                          const checkboxId = `perm-${p.key}`;
+                          return (
+                            <label
+                              key={p.key}
+                              htmlFor={checkboxId}
+                              title={p.key}
+                              className="flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent md:min-h-8"
+                            >
+                              <Checkbox
+                                id={checkboxId}
+                                checked={selectedSet.has(p.key)}
+                                onCheckedChange={() => togglePermission(p.key)}
+                              />
+                              <span className="min-w-0 text-xs">
                                 {p.descripcion}
-                              </div>
-                              <code className="text-[10px] text-muted-foreground/80">
-                                {p.key}
-                              </code>
-                            </div>
-                          </label>
-                        );
-                      })}
+                              </span>
+                            </label>
+                          );
+                        })}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 shrink-0 text-xs text-muted-foreground"
+                          onClick={() => toggleGroup(sub.permisos)}
+                        >
+                          {allSelected ? 'Quitar todos' : 'Seleccionar todos'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

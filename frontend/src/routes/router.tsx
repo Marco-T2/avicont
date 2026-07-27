@@ -30,6 +30,7 @@ import { FlujoEfectivoPage } from '@/features/flujo-efectivo/pages/flujo-efectiv
 import { MembersPage } from '@/features/memberships/pages/members-page';
 import { PeriodosFiscalesPage } from '@/features/periodos-fiscales/pages/periodos-fiscales-page';
 import { PlanCuentasPage } from '@/features/plan-cuentas/pages/plan-cuentas-page';
+import { RoleFormPage } from '@/features/roles/pages/role-form-page';
 import { RolesPage } from '@/features/roles/pages/roles-page';
 import { EmpresaPage } from '@/features/tenants/pages/empresa-page';
 import { ComplementosPage } from '@/features/packs/pages/complementos-page';
@@ -232,6 +233,22 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.organizacion.roles.read}>
                 <RolesPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/roles/nuevo',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.create}>
+                <RoleFormPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/roles/:id/editar',
+            element: (
+              <RequirePermission permission={PERMISSIONS.organizacion.roles.update}>
+                <RoleFormPage />
               </RequirePermission>
             ),
           },

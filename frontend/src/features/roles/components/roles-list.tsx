@@ -1,5 +1,6 @@
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
 import {
@@ -37,8 +38,6 @@ import type { CustomRole } from '@/types/api';
 
 import { useDeleteRole } from '../hooks/use-roles';
 
-import { RoleFormDialog } from './role-form-dialog';
-
 interface RolesListProps {
   roles: CustomRole[];
   loading?: boolean;
@@ -48,9 +47,9 @@ export function RolesList({
   roles,
   loading = false,
 }: RolesListProps): React.JSX.Element {
-  const [editRole, setEditRole] = useState<CustomRole | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomRole | null>(null);
   const deleteMutation = useDeleteRole();
+  const navigate = useNavigate();
 
   // Gating de permisos: los ítems de menú se deshabilitan (no se ocultan) cuando
   // falta el permiso, sumándose a la condición de negocio `isEditable`. Sin
@@ -147,7 +146,9 @@ export function RolesList({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem
-                        onClick={() => setEditRole(role)}
+                        onClick={() =>
+                          void navigate(`/settings/roles/${role.id}/editar`)
+                        }
                         disabled={!role.isEditable || !puedeActualizar}
                       >
                         <Pencil className="h-4 w-4 mr-2" />
@@ -170,16 +171,6 @@ export function RolesList({
           </TableBody>
         </Table>
       </div>
-
-      {editRole !== null ? (
-        <RoleFormDialog
-          open={true}
-          onOpenChange={(o) => {
-            if (!o) setEditRole(null);
-          }}
-          role={editRole}
-        />
-      ) : null}
 
       <AlertDialog
         open={deleteTarget !== null}

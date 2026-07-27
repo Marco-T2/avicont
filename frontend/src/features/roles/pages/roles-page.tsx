@@ -1,11 +1,9 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useNavigate } from 'react-router';
 
 import { PermissionButton } from '@/components/shared/permission-button';
 import { PERMISSIONS } from '@/lib/permissions';
 
-import { RoleFormDialog } from '../components/role-form-dialog';
 import { RolesList } from '../components/roles-list';
 import { useRoles } from '../hooks/use-roles';
 
@@ -13,12 +11,8 @@ import { useRoles } from '../hooks/use-roles';
 // Los roles de sistema (OWNER/ADMIN) no se listan acá: son inmutables y se
 // asignan desde /settings/members.
 export function RolesPage(): React.JSX.Element {
-  const [createOpen, setCreateOpen] = useState(false);
+  const navigate = useNavigate();
   const rolesQuery = useRoles();
-
-  if (rolesQuery.isError) {
-    toast.error('No se pudieron cargar los roles');
-  }
 
   return (
     <div className="space-y-6">
@@ -33,7 +27,7 @@ export function RolesPage(): React.JSX.Element {
         <PermissionButton
           permission={PERMISSIONS.organizacion.roles.create}
           deniedReason="No tenés permiso para crear roles"
-          onClick={() => setCreateOpen(true)}
+          onClick={() => void navigate('/settings/roles/nuevo')}
           className="self-start"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -41,12 +35,26 @@ export function RolesPage(): React.JSX.Element {
         </PermissionButton>
       </div>
 
-      <RolesList
-        roles={rolesQuery.data ?? []}
-        loading={rolesQuery.isLoading}
-      />
-
-      <RoleFormDialog open={createOpen} onOpenChange={setCreateOpen} />
+      {/* Banner inline en vez de toast: la lista es lo único que renderiza esta
+          página, así que el error es crítico para el render. Un `toast.error()`
+          en el cuerpo del componente se dispara en CADA re-render mientras
+          `isError` siga true (Anti-F-13). */}
+      {rolesQuery.isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3">
+          <p className="text-sm">
+            No se pudieron cargar los roles.{' '}
+            <button
+              type="button"
+              className="underline underline-offset-2"
+              onClick={() => void rolesQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          </p>
+        </div>
+      ) : (
+        <RolesList roles={rolesQuery.data ?? []} loading={rolesQuery.isLoading} />
+      )}
     </div>
   );
 }
