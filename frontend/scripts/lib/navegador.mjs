@@ -39,6 +39,20 @@ export async function lanzarNavegador() {
   }
 }
 
+// `hasTouch: true` es lo ÚNICO que hace falta para que Chromium responda
+// `matches: true` a `(pointer: coarse)` — verificado con Playwright 1.61 sobre
+// about:blank: `isMobile` solo NO lo cambia (sigue `pointer: fine`), y con
+// `hasTouch` cambian también `any-pointer: coarse` y `hover: none`. Sin esta
+// opción, cualquier fix condicionado a `pointer-coarse:` es INVISIBLE para
+// estos scripts: medirían el modo escritorio y darían un verde que no prueba
+// nada sobre táctil.
+export async function nuevaPagina(navegador, { ancho, alto, tactil = false }) {
+  return navegador.newPage({
+    viewport: { width: ancho, height: alto },
+    ...(tactil ? { hasTouch: true } : {}),
+  });
+}
+
 export async function abrir(page, url) {
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 20_000 });

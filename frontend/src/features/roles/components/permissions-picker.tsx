@@ -176,7 +176,7 @@ export function PermissionsPicker({
             onChange={(e) => setConsulta(e.target.value)}
             placeholder="Buscar permiso…"
             aria-label="Buscar permiso"
-            className="h-11 pl-8 text-base md:h-9 md:text-sm"
+            className="h-11 pl-8 pr-9 pointer-coarse:pr-12 text-base md:h-9 md:text-sm"
           />
           {consulta !== '' ? (
             <Button
@@ -240,7 +240,7 @@ export function PermissionsPicker({
                   type="button"
                   onClick={() => alternarModulo(mod.modulo, abierto)}
                   aria-expanded={abierto}
-                  className="flex min-h-11 flex-1 items-center gap-2 text-left md:min-h-0"
+                  className="flex pointer-coarse:min-h-11 flex-1 items-center gap-2 text-left"
                 >
                   <ChevronRight
                     className={cn(
@@ -268,7 +268,7 @@ export function PermissionsPicker({
                         key={`${mod.modulo}.${sub.submodulo}`}
                         className="flex flex-col gap-x-3 px-3 py-1.5 sm:flex-row sm:items-center"
                       >
-                        <div className="relative flex min-h-11 items-center gap-2 sm:min-h-0 sm:w-48 sm:shrink-0">
+                        <div className="relative flex pointer-coarse:min-h-11 items-center gap-2 sm:w-48 sm:shrink-0">
                           <Checkbox
                             aria-label={`Seleccionar todo ${etiquetaGrupo(sub.submodulo)}`}
                             checked={
@@ -293,7 +293,7 @@ export function PermissionsPicker({
                                 key={p.key}
                                 htmlFor={id}
                                 title={`${p.descripcion} · ${p.key}`}
-                                className="relative flex min-h-11 cursor-pointer items-center gap-1.5 rounded-sm px-1 hover:bg-accent md:min-h-8"
+                                className="relative flex min-h-8 pointer-coarse:min-h-11 cursor-pointer items-center gap-1.5 rounded-sm px-1 hover:bg-accent"
                               >
                                 <Checkbox
                                   id={id}

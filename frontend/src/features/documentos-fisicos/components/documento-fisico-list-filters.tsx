@@ -148,7 +148,10 @@ function ChipButton({ active, onClick, children }: ChipButtonProps): React.JSX.E
       aria-pressed={active}
       className={cn(
         'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-        'min-h-[44px] md:min-h-0',
+        // Piso táctil de 44px por dispositivo (pointer: coarse), no por
+        // breakpoint — misma convención que button.tsx. La chip es un <button>
+        // crudo, así que el piso del primitivo no la cubre.
+        'pointer-coarse:min-h-11',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         active
           ? 'bg-primary text-primary-foreground border-primary'

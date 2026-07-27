@@ -21,7 +21,7 @@
 
 import { parseArgs } from 'node:util';
 
-import { abrir, fallar, iniciarSesion, lanzarNavegador } from './lib/navegador.mjs';
+import { abrir, fallar, iniciarSesion, lanzarNavegador, nuevaPagina } from './lib/navegador.mjs';
 import { RUTAS_GATE, VIEWPORTS } from './rutas-gate.mjs';
 
 // Mismo valor que `medir-ui.mjs`. Verificado que alcanza: el barrido completo da
@@ -40,6 +40,11 @@ Opciones:
   --email <mail>     Usuario del seed. Default: founder@avicont.bo
   --password <pass>  Default: password
   --espera <ms>      Espera tras cambiar el viewport. Default: ${ESPERA_REFLOW_MS}
+  --tactil           Emula un dispositivo táctil: \`(pointer: coarse)\` da true y
+                     aplican los estilos bajo \`pointer-coarse:\` (tap targets de
+                     44px). Default: apagado — que el gate de CI emule touch es
+                     una decisión aparte, porque los mínimos táctiles engordan
+                     elementos y pueden hacer desbordar pantallas hoy verdes.
   --ayuda            Esto.
 
 Requiere el backend en :3000 (con seed corrido) y el frontend servido en
@@ -62,6 +67,7 @@ function leerArgumentos() {
       email: { type: 'string', default: 'founder@avicont.bo' },
       password: { type: 'string', default: 'password' },
       espera: { type: 'string', default: String(ESPERA_REFLOW_MS) },
+      tactil: { type: 'boolean', default: false },
       ayuda: { type: 'boolean', default: false },
     },
   });
@@ -81,6 +87,7 @@ function leerArgumentos() {
     email: values.email,
     password: values.password,
     espera,
+    tactil: values.tactil,
   };
 }
 
@@ -124,8 +131,10 @@ async function main() {
   const violaciones = [];
 
   try {
-    const page = await navegador.newPage({
-      viewport: { width: VIEWPORTS[0], height: 900 },
+    const page = await nuevaPagina(navegador, {
+      ancho: VIEWPORTS[0],
+      alto: 900,
+      tactil: opciones.tactil,
     });
 
     await iniciarSesion(page, opciones);

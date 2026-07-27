@@ -87,7 +87,7 @@ export function ComprobantesFilters(): React.JSX.Element {
           onChange={(e) => setQInput(e.target.value)}
           placeholder="Buscar por número o glosa…"
           aria-label="Buscar comprobante"
-          className="pl-9 pr-9 text-base md:text-sm"
+          className="pl-9 pr-9 pointer-coarse:pr-12 text-base md:text-sm"
         />
         {qInput.length > 0 ? (
           <Button
