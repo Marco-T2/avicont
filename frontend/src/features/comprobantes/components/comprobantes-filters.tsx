@@ -113,7 +113,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={tipo === '' ? 'todos' : tipo}
             onValueChange={(v) => setParam('tipo', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-tipo" className="h-8 text-sm w-36">
+            <SelectTrigger id="filter-tipo" className="h-11 sm:h-8 text-sm w-36">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -138,7 +138,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={estado === '' ? 'todos' : estado}
             onValueChange={(v) => setParam('estado', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-estado" className="h-8 text-sm w-40">
+            <SelectTrigger id="filter-estado" className="h-11 sm:h-8 text-sm w-40">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -159,7 +159,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={periodoFiscalId === '' ? 'todos' : periodoFiscalId}
             onValueChange={(v) => setParam('periodoFiscalId', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-periodo" className="h-8 text-sm w-44">
+            <SelectTrigger id="filter-periodo" className="h-11 sm:h-8 text-sm w-44">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>

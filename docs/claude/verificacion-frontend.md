@@ -1,5 +1,5 @@
 <!--
-Última edición: 2026-07-27
+Última edición: 2026-07-26
 Última revisión contra core: 2026-07-27
 Owner: frontend-lead
 -->
@@ -225,6 +225,15 @@ línea (`flex` → `block`), con alto/ancho/offset idénticos.
 paso encontró un bug preexistente que nadie buscaba (un `h-8` declarado que
 renderizaba 36 px). Medir para descartar también descubre.
 
+**Y el barrido es el que CUENTA, no el `grep`.** Al arreglar ese `h-8` (#276), el
+`grep` de una línea dio 3 sitios afectados y el barrido en navegador dio 6: el que
+faltaba era `PeriodoGestionFiltro` —compartido por **9 pantallas de reportes**—,
+invisible porque su `className` está en su propia línea del JSX. Si el `grep`
+hubiera sido la última palabra, el arreglo dejaba 9 pantallas a 32 px de tap
+target sin que nadie lo notara. Regla: el `grep` **enumera candidatos**; el
+recuento sale del navegador. Y si vas a grepear JSX, `-A4` mínimo — el atributo
+casi nunca está en la línea de la etiqueta.
+
 ---
 
 ## 4. Tests de `className` — qué valen y cómo no arruinarlos
@@ -297,6 +306,7 @@ trabajo.
 | **Regex sobre un string ya recortado** | `className` cortado a 120 caracteres ⇒ "falta `w-full`", y estaba más allá del corte | Evaluar sobre el valor completo; recortar solo para imprimir. |
 | **Comparar rangos donde no hay solape posible** | "337 px de solape" a 375 px, donde los campos están apilados en `flex-col` | Antes de medir un solape, confirmá que los elementos comparten fila en ese viewport. |
 | **`grep` que busca la forma equivocada** | Buscar `max-w-` y concluir "no declaran ancho" cuando pasan `w-64` | Buscar por concepto, no por una grafía; y verificar el negativo. |
+| **`grep` de una línea sobre JSX multilínea** | `grep "<SelectTrigger.*className"` da 3 sitios; el atributo de los otros 3 está en su propia línea ⇒ arreglo aplicado a la mitad | `grep -A4`, y el recuento final sale del barrido en navegador (§3.5), no del `grep`. |
 | **`grep` copiado entre dev y prod** | El del bundle devuelve vacío contra el CSS del dev server (atributo con/sin comillas) ⇒ se lee como "no existe" | Probá el `grep` contra algo que **sabés** que está antes de creerle un negativo. |
 | **jsdom no tiene layout** | `getBoundingClientRect()` devuelve todo en 0 | Cualquier px se mide en el escalón 5. |
 | **Artefacto viejo** | `dist/` de una build anterior; proceso node aferrado al `:3000` (§11.7) | Timestamp del artefacto vs. hora del cambio, siempre. |
