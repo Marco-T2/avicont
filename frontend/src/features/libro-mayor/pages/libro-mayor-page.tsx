@@ -65,7 +65,7 @@ export function LibroMayorPage(): React.JSX.Element {
             Movimientos por cuenta con saldo inicial, corriente y final
           </p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
           <BotonExportarLibroMayor data={data} perfil={empresa} rango={rango} />
           <BotonExportarLibroMayorPdf data={data} perfil={empresa} rango={rango} />
         </div>
