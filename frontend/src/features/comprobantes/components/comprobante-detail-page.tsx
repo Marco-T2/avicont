@@ -288,12 +288,12 @@ export function ComprobanteDetailPage(): React.JSX.Element {
           <div className="overflow-x-auto rounded-md border">
             <Table className="min-w-[800px] table-fixed">
               <colgroup>
-                <col className="w-[44px]" /> {/* # orden */}
-                <col className="w-[24%]" /> {/* Cuenta */}
-                <col className="w-[13%]" /> {/* Debe */}
-                <col className="w-[13%]" /> {/* Haber */}
-                <col className="w-[34%]" /> {/* Glosa línea */}
-                <col className="w-[16%]" /> {/* Contacto */}
+                <col className="w-[44px]" /* # orden */ />
+                <col className="w-[24%]" /* Cuenta */ />
+                <col className="w-[13%]" /* Debe */ />
+                <col className="w-[13%]" /* Haber */ />
+                <col className="w-[34%]" /* Glosa línea */ />
+                <col className="w-[16%]" /* Contacto */ />
               </colgroup>
               <TableHeader>
                 <TableRow>

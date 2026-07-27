@@ -116,18 +116,22 @@ export function ComprobantesTable({
         {/* table-fixed + colgroup: anchos en % predecibles e independientes del
             contenido (una glosa o razón social larga se trunca, no desbalancea
             la fila). Mismo criterio que el editor y el detalle. min-w-[1000px]
-            = piso: por debajo scrollea en vez de aplastar (CLAUDE.md §7). */}
+            = piso: por debajo scrollea en vez de aplastar (CLAUDE.md §7).
+            Los rótulos van DENTRO del tag: un comentario JSX al final de la
+            línea deja un text node " " entre los col, y colgroup no admite
+            texto (React lo reporta como error de hidratación). Guard estático
+            en src/jsx-colgroup-sin-texto.test.ts. */}
         <Table className="min-w-[1000px] table-fixed">
           <colgroup>
-            <col className="w-[9%]" /> {/* Fecha */}
-            <col className="w-[12%]" /> {/* Número */}
-            <col className="w-[13%]" /> {/* Documento */}
-            <col className="w-[10%]" /> {/* Nro. Ref. */}
-            <col className="w-[15%]" /> {/* Contacto */}
-            <col className="w-[21%]" /> {/* Glosa — la más ancha */}
-            <col className="w-[10%]" /> {/* Estado */}
-            <col className="w-[10%]" /> {/* Total BOB */}
-            <col className="w-[56px]" /> {/* Ver — fijo */}
+            <col className="w-[9%]" /* Fecha */ />
+            <col className="w-[12%]" /* Número */ />
+            <col className="w-[13%]" /* Documento */ />
+            <col className="w-[10%]" /* Nro. Ref. */ />
+            <col className="w-[15%]" /* Contacto */ />
+            <col className="w-[21%]" /* Glosa — la más ancha */ />
+            <col className="w-[10%]" /* Estado */ />
+            <col className="w-[10%]" /* Total BOB */ />
+            <col className="w-[56px]" /* Ver — fijo */ />
           </colgroup>
           <TableHeader>
             <TableRow>
