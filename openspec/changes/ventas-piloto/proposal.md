@@ -499,8 +499,11 @@ se corrige en consecuencia.
 El criterio implícito del template, leído de los hechos: **el Contador
 contabiliza y anula asientos, pero no cierra nada** — tiene
 `asientos.{CRUD, post, void, edit-posted}` y **ningún** verbo irreversible
-(`gestiones.cerrar`, `periodos.cerrar/reabrir/marcar-definitivo`,
-`cierre-mensual.execute`).
+(`gestiones.cerrar`, `periodos.cerrar/reabrir/marcar-definitivo`). *Corrección
+del relevamiento original*: acá figuraba también `cierre-mensual.execute` como
+verbo real — **no lo es**. `cierre-mensual.{read,execute}` son legacy
+declarados sin endpoint; el cierre mensual de verdad se enforcea como
+`contabilidad.periodos.cerrar` (verificado en el PR de RBAC, ver abajo).
 
 Por simetría, Ventas recibe el mismo trato que asientos:
 
@@ -513,29 +516,52 @@ Por simetría, Ventas recibe el mismo trato que asientos:
 Un contador que puede contabilizar y anular un asiento manual puede hacerlo con
 una venta: es el mismo acto. Ningún verbo de cierre.
 
-**Lo que está en juego es menos de lo que parece**, y conviene saberlo:
+**Actualizado tras el PR de RBAC (#291, abierto en paralelo el 2026-07-28)**
+— dos datos de esta decisión cambiaron de signo y uno se confirma:
 
-- El seed hace `upsert` con **`update: {}`** (`seed.ts:95-97`): si el rol
-  contador ya existe, **no toca sus permisos**. Sumar strings solo afecta roles
-  creados desde cero.
-- **Las organizaciones nuevas no reciben ningún template**:
-  `TenantsService.create` siembra plan de cuentas, tipos de documento y tipos de
-  registro, pero **no crea ningún `CustomRole`**. El comentario de
-  `schema.prisma:274` dice *"se precargan al crear la org"* y **es falso**.
+- **El argumento "está en juego menos de lo que parece" se dio vuelta.** Esta
+  decisión minimizaba el impacto porque el seed hacía `upsert` con
+  `update: {}` — el rol contador existente no se tocaba y sumar strings solo
+  afectaba roles creados desde cero. **Ya no**: #291 pasa los upserts de
+  contador y granjero a `update: { permissions: ... }`, así que el template se
+  refresca en cada corrida del seed y **sumar permisos SÍ alcanza a la org
+  piloto**. Consecuencia: la lista de verbos de la tabla de arriba deja de ser
+  un default inofensivo — es lo que el rol va a tener de verdad.
+- **Las organizaciones nuevas siguen sin recibir ningún template** — esto NO
+  cambió: `TenantsService.create` siembra plan de cuentas, tipos de documento
+  y tipos de registro, pero no crea ningún `CustomRole`. Lo que #291 corrigió
+  es el **comentario mentiroso** de `schema.prisma:274` ("se precargan al
+  crear la org"), no el comportamiento.
 
-⚠️ **Hallazgo colateral que NO se arregla en este change**: el permiso
-`contabilidad.asientos.edit-posted` **se enforcea** desde el service
-(`comprobantes.service.ts:582,935`, 403 `MISSING_PERMISSION_EDIT_POSTED`) y se
-otorga en el seed, pero **no existe en el catálogo**. Como
-`validatePermissions` rechaza todo permiso exacto fuera del catálogo, **ningún
-rol creado desde la UI puede recibirlo**. Se escapó porque
-`catalogo-vs-controllers.spec.ts` escanea decoradores `@RequirePermissions` en
-controllers y este permiso se verifica desde el **service**. Hay al menos dos
-más iguales: `periodos.create` y `cierre-mensual.create` (este último ni
-coincide con el verbo real, que es `execute`). **Va en PR de RBAC propio.**
-Relevante para acá: Ventas edita documentos contabilizados (D-17, D-20) — si
-necesita un permiso equivalente, **hay que declararlo en el catálogo y no
-repetir el agujero**.
+⚠️ **Hallazgo colateral — RESUELTO en #291** (acá estaba anotado como "va en
+PR de RBAC propio"; ese PR ya existe y lo que encontró difiere del
+relevamiento original):
+
+- `contabilidad.asientos.edit-posted` **sí se enforcea** (2 call sites en
+  `ComprobantesService` vía `rbac.hasPermission`) y **quedó declarado en el
+  catálogo** ⇒ pasa a ser asignable desde la UI, marcado como acción sensible.
+  **Esto habilita D-17/D-20 para Ventas**: el molde del permiso
+  estado-dependiente ya existe y está catalogado.
+- `contabilidad.periodos.create` **no lo enforcea nadie**: los 12 períodos
+  nacen al crear la gestión fiscal, y ese endpoint exige `gestiones.create`.
+  Sale del template; entran `gestiones.{read,create}`.
+- `contabilidad.cierre-mensual.create` **tampoco lo enforcea nadie**, y el
+  relevamiento original de esta decisión estaba equivocado en el verbo: el
+  real no es `execute` — `cierre-mensual.{read,execute}` son legacy sin
+  endpoint y el cierre mensual se enforcea como `contabilidad.periodos.cerrar`
+  (corregido arriba).
+- El hueco de fondo era **del test**: escaneaba solo decoradores en
+  controllers. `catalogo-vs-controllers.spec.ts` ahora confronta el catálogo
+  contra **tres puntas** — decoradores, `.hasPermission(...)` en todo `src/`,
+  y `seed.ts ⊆ catálogo`. Barrido completo: **cero fantasmas adicionales**.
+
+**Y el criterio de esta decisión ya actuó como guarda, no como preferencia**:
+la primera versión de #291 le otorgaba `contabilidad.periodos.cerrar` al
+Contador; Marco lo frenó **citando D-23**, y se corrigió. El template queda
+con `periodos.read` + `cierre-mensual.read` + `gestiones.{read,create}` y
+**ningún verbo irreversible** — `periodos.cerrar` se evaluó explícitamente y
+se descartó. La tabla de verbos de Ventas de arriba sigue el mismo criterio,
+ahora probado en combate.
 
 ### D-06 — sigue en pie, pero su costo estaba mal medido
 
@@ -808,9 +834,12 @@ Tres trampas que el design tiene que respetar:
    archivo del frontend como texto (`catalogo-vs-espejo-frontend.spec.ts`): un
    typo en el string rompe el build.
 
-Decisión de producto pendiente: el template **Contador** es una lista manual
-(`prisma/seed.ts:34-37`) que ya tiene `ventas.{read,create,update,delete}` pero
-**no** `post` ni `void`, ni nada de `items`/`cobros`.
+Decisión de producto: el template **Contador** es una lista manual en
+`prisma/seed.ts` que ya tiene `ventas.{read,create,update,delete}` pero
+**no** `post` ni `void`, ni nada de `items`/`cobros`. Los verbos que recibe
+quedaron decididos en D-23 — y desde #291 el upsert del seed **refresca** los
+permisos en cada corrida, así que sumar los strings al template alcanza a la
+org piloto de verdad (D-23, actualización).
 
 **Dinero**: `Money` (decimal.js) en TS, `@db.Decimal(18,2)` en Prisma, `string`
 en los DTOs (§4.5). Cantidades `@db.Decimal(18,6)`.
@@ -987,11 +1016,12 @@ contacto (D-20), recorte con varios cobros (D-21), backfill de
 
 Fuera de este change quedan dos PRs propios, identificados en el camino:
 
-- **RBAC**: `asientos.edit-posted`, `periodos.create` y `cierre-mensual.create`
-  están en el seed y **no en el catálogo**. El primero se enforcea de verdad
-  desde el service y **ningún rol creado por la UI puede recibirlo**. Incluye
-  tapar el hueco del test, que solo escanea decoradores en controllers. Ver
-  D-23.
+- **RBAC**: ~~pendiente~~ → **abierto como #291** (`fix/rbac-permisos-fantasma`).
+  `edit-posted` declarado en el catálogo (asignable desde la UI), los dos
+  fantasmas sin enforcement (`periodos.create`, `cierre-mensual.create`) fuera
+  del template, y el test confrontando tres puntas (decoradores +
+  `.hasPermission` + seed). Detalle y correcciones al relevamiento original en
+  D-23, que quedó actualizado.
 - **Docs**: `ClockPort.hoyEnLaPaz()`, `nowUtc()` y `yearEnLaPaz()` son símbolos
   **fantasma** citados en 23 líneas de docs y comentarios vivos.
 
