@@ -131,15 +131,25 @@ Reglas:
 
 | Condición | Asiento |
 |---|---|
-| CONTADO | `Debe <cuenta de efectivo destino> / Haber <cuenta de ingreso por línea>` |
+| CONTADO | `Debe <cuenta destino ELEGIDA> / Haber <cuenta de ingreso por línea>` |
 | CREDITO | `Debe CxC (concepto cuentasPorCobrarId) / Haber <cuenta de ingreso por línea>` |
 
 - PROHIBIDO modelar contado como "crédito cobrado inmediatamente" (D-04): una
   venta CONTADO no crea partida abierta ni toca el mayor de CxC.
-- La cuenta de efectivo del CONTADO es **elegible** con default Caja General
-  (criterio D-05: la política "dónde cayó la plata" es del contador). *Ver
-  pregunta abierta PA-1 al final de esta spec: el proposal solo declara el
-  selector para el Cobro.*
+- **PA-1 cerrada (Marco, 2026-07-28)**: la venta CONTADO lleva **selector de
+  cuenta destino, precargado en Caja General** — mismo trato que el `Cobro`,
+  extendiendo D-05 en vez de crear una excepción: dos formularios que hacen
+  lo mismo (recibir plata) no piden datos distintos, y quien cobra por
+  transferencia no necesita un asiento de traslado para reflejar lo que ya
+  sabe al vender. La elegibilidad es el criterio ÚNICO definido en
+  REQ-CXC-02 (efectivo/equivalentes: `actividadFlujo = 'EFECTIVO'` o prefijo
+  `1.1.1`, más `activa` ∧ `esDetalle` — Anti-01: no se define dos veces);
+  cuenta fuera del criterio → 422 `VENTA_CUENTA_DESTINO_NO_ELEGIBLE`. El
+  asiento debita **la cuenta elegida**, nunca una constante. El default es
+  precarga de UI: si `1.1.1.001` no existe o no es elegible, el formulario
+  no precarga — jamás un 500; una org sin ninguna cuenta elegible cae en el
+  mismo 422 del criterio (cubierto por la elegibilidad, no se duplica con un
+  `*_CONCEPTO_NO_CONFIGURADO`).
 - **B-1 — obligatorio**: toda línea contra la cuenta CxC (`1.1.2.001`,
   `requiereContacto: true`) DEBE llevar `contactoId = venta.contactoId`. Sin
   esto la primera venta a crédito falla en runtime al contabilizar, y el aging
@@ -161,10 +171,41 @@ Reglas:
 
 #### Escenario: venta al contado no ensucia CxC
 
-- DADO una venta CONTADO
+- DADO una venta CONTADO con cuenta destino `1.1.1.002 BANCOS` elegida
 - CUANDO se contabiliza
-- ENTONCES el asiento debita la cuenta de efectivo destino y NO toca `1.1.2.001`
+- ENTONCES el asiento debita `1.1.1.002` (la elegida, no Caja General) y NO
+  toca `1.1.2.001`
 - Y no aparece en el estado de cuenta del cliente
+
+#### Escenario (−): cuenta destino no elegible
+
+- DADO una venta CONTADO cuya cuenta destino es una cuenta de gasto (`5.x`)
+  activa y de detalle
+- CUANDO se guarda o contabiliza
+- ENTONCES rechaza con 422 `VENTA_CUENTA_DESTINO_NO_ELEGIBLE`
+
+#### Escenario (−): cuenta destino inactiva
+
+- DADO una venta CONTADO cuya cuenta destino cumple el criterio de efectivo
+  pero tiene `activa = false`
+- CUANDO se contabiliza
+- ENTONCES rechaza — §4.1 exige cuenta activa, y el criterio de REQ-CXC-02 la
+  excluye de elegible
+
+#### Escenario (−): cuenta destino no es de detalle
+
+- DADO una venta CONTADO cuya cuenta destino es la agrupadora `1.1.1`
+  (`esDetalle = false`)
+- CUANDO se contabiliza
+- ENTONCES rechaza — §4.1 exige `esDetalle = true`
+
+#### Escenario: el default ausente no rompe nada
+
+- DADO una organización cuyo plan no tiene `1.1.1.001` pero sí otra cuenta
+  elegible
+- CUANDO se abre el formulario y se vende al contado contra esa otra cuenta
+- ENTONCES el formulario no precarga default, la venta procede y en ningún
+  caso hay un 500
 
 #### Escenario: regenerar no duplica
 
@@ -370,21 +411,17 @@ catalogado, #291).
 |---|---|---|
 | `VENTA_VENCIMIENTO_REQUERIDO` | 422 | CREDITO sin `fechaVencimiento` (o CONTADO con ella) |
 | `VENTA_CONCEPTO_NO_CONFIGURADO` | 422 | `cuentasPorCobrarId`/`ventasId` sin mapear (B-12) |
+| `VENTA_CUENTA_DESTINO_NO_ELEGIBLE` | 422 | cuenta destino del CONTADO fuera del criterio de efectivo/equivalentes (PA-1, criterio en REQ-CXC-02) |
 | `VENTA_CUENTA_SNAPSHOT_INACTIVA` | 422 | cuenta del snapshot inactiva o no-detalle al generar el asiento |
 | `VENTA_ANULADA_NO_EDITABLE` | 409 | editar/anular una venta ya anulada (§4.7) |
 
-## Preguntas abiertas (decisiones de producto — las cierra Marco)
+## Preguntas abiertas
 
-- **PA-1 — Cuenta destino de la venta CONTADO.** El proposal declara la
-  "cuenta destino elegible" solo para el `Cobro` (D-05), pero no dice si la
-  venta al contado lleva el mismo selector o va SIEMPRE a Caja General. Esta
-  spec asume selector con default Caja General por simetría con el push-back
-  registrado en D-05 (una transferencia recibida al contado nunca pasó por el
-  cajón). Confirmar antes del design.
-- **PA-2 — Posición del grupo `comercial` en el sidebar.** El proposal pide el
-  grupo pero no fija dónde (R-3 registra la presión de anti-agobio). El delta
-  de `frontend-sidebar-nav` propone: después del suelto `/comprobantes`, antes
-  de `libros`. Confirmar.
+**Ninguna.** PA-1 (cuenta destino de la venta CONTADO — selector precargado
+en Caja General, criterio de elegibilidad en REQ-CXC-02) y PA-2 (grupo
+`comercial` primero en la sección Contabilidad — ver delta de
+`frontend-sidebar-nav`) fueron cerradas por Marco el 2026-07-28 e
+incorporadas a los requisitos.
 
 ## Nota §2.2 — qué NO lleva comentario regulatorio
 

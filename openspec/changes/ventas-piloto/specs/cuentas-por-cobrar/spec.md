@@ -43,9 +43,25 @@ QuickBooks — posicionamiento §10.9). Módulo
 ### REQ-CXC-02: El Cobro — hecho contable independiente (D-05, D-11, B-1)
 
 `Cobro`: `contactoId`, `fechaContable`, `monto` (> 0, `Money`, string en DTO
-§4.5), **cuenta destino elegible** (cualquier cuenta de efectivo que el
-contador decida; default Caja General — D-05), `glosa`. DEBE existir por sí
-solo, sin depender de ninguna venta.
+§4.5), **cuenta destino elegible** (D-05), `glosa`. DEBE existir por sí solo,
+sin depender de ninguna venta.
+
+**Criterio de elegibilidad de la cuenta destino — ÚNICO y definido acá**
+(lo comparte la venta CONTADO, REQ-VTA-04; PA-1 cerrada por Marco
+2026-07-28). Una cuenta es elegible ⇔ `activa = true` ∧ `esDetalle = true` ∧
+identificada como **efectivo/equivalentes** por la regla que YA existe en el
+EFE: marca explícita `actividadFlujo = 'EFECTIVO'`, o en su defecto código
+bajo el prefijo `1.1.1` ("EFECTIVO Y EQUIVALENTES DE EFECTIVO",
+`CODIGO_EFECTIVO_PREFIJO`). No se inventa una segunda definición de
+"efectivo" (Anti-01: la regla vive en un solo lugar). Cuenta no elegible →
+422 `COBRO_CUENTA_DESTINO_NO_ELEGIBLE`.
+
+El **default Caja General** (`1.1.1.001`) es **precarga de UI**, no concepto
+de backend: el backend siempre recibe la cuenta destino explícita y valida
+elegibilidad. Si `1.1.1.001` no existe o no es elegible en el plan del
+tenant, el formulario no precarga y el usuario elige — NUNCA un 500; una
+organización sin ninguna cuenta elegible cae en el mismo 422 del criterio (no
+se duplica con un `*_CONCEPTO_NO_CONFIGURADO`).
 
 Su comprobante es de tipo **`INGRESO`** (serie `I` existente, SIN tipo nuevo —
 D-11), `generadoPorSistema = true`, `origenTipo = 'COBRO'`,
@@ -73,6 +89,13 @@ no por el tipo del comprobante (D-11).
 - ENTONCES el cobro se contabiliza `Debe Caja General / Haber CxC` con el
   contacto en la línea CxC
 - Y queda con 500 de saldo no aplicado (saldo a favor)
+
+#### Escenario (−): cuenta destino no elegible
+
+- DADO un cobro cuya cuenta destino es una cuenta de gasto (`5.x`) activa y
+  de detalle
+- CUANDO se registra
+- ENTONCES rechaza con 422 `COBRO_CUENTA_DESTINO_NO_ELEGIBLE`
 
 #### Escenario: los cobros son invisibles para la conciliación (D-05, D-13)
 
@@ -272,6 +295,7 @@ manual `frontend/src/lib/permissions.ts` actualizado.
 | Código | HTTP | Condición |
 |---|---|---|
 | `COBRO_CONCEPTO_NO_CONFIGURADO` | 422 | `cuentasPorCobrarId` sin mapear (B-12) |
+| `COBRO_CUENTA_DESTINO_NO_ELEGIBLE` | 422 | cuenta destino fuera del criterio de efectivo/equivalentes (PA-1) |
 | `COBRO_MONTO_INFERIOR_APLICADO` | 422 | bajar el monto por debajo de lo aplicado (matriz fila 8) |
 | `APLICACION_EXCEDE_COBRO` | 422 | Σ aplicaciones superaría el monto del cobro (B-6) |
 | `APLICACION_EXCEDE_VENTA` | 422 | Σ aplicaciones superaría el total de la venta (B-6) |
