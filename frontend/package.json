@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "medir:ui": "node scripts/medir-ui.mjs",
+    "medir:tap": "node scripts/medir-tap-targets.mjs",
     "gate:ui": "node scripts/gate-ui.mjs",
     "gen:api-types": "openapi-typescript ../backend/openapi.json --default-non-nullable false -o src/types/api.generated.ts"
   },
