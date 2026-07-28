@@ -1,7 +1,7 @@
 // CLAUDE.md §4.6: la fecha contable es calendario puro; el "hoy" se calcula en
 // America/La_Paz, nunca en UTC. `new Date().toISOString()` desplaza el día cuando
 // Bolivia (UTC-4) todavía no cruzó la medianoche en UTC. Espeja el
-// ClockPort.hoyEnLaPaz() del backend. El locale 'en-CA' produce YYYY-MM-DD directo.
+// ClockPort.currentDateLaPaz() del backend. El locale 'en-CA' produce YYYY-MM-DD directo.
 const FECHA_ISO_LA_PAZ = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/La_Paz',
   year: 'numeric',

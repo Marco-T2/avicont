@@ -167,7 +167,7 @@ Tenant postea `POST /api/comprobantes` con `{ tipo, fechaContable, glosa, lineas
 **Invariantes mínimas del borrador:**
 - `tipo` válido.
 - `fechaContable` formato ISO `YYYY-MM-DD`, parseable a `FechaContable`.
-- `fechaContable <= ClockPort.hoyEnLaPaz()` (no al futuro).
+- `fechaContable` no posterior a `FechaContable.fromIso(clock.currentDateLaPaz())` (no al futuro).
 - `lineas.length >= 1` (al menos una; 2 las exige contabilizar).
 - Cada línea: cuenta existe, activa, esDetalle (las cabeceras no reciben movimientos).
 - Cada línea: débito XOR crédito (nunca ambos, nunca ninguno) — se permite `0` para
@@ -204,7 +204,7 @@ reabrir el período primero; el endpoint rechaza con `COMPROBANTE_BLOQUEADO`.
 
 En una sola TX:
 1. Crear comprobante `AJUSTE` con:
-   - `fechaContable = ClockPort.hoyEnLaPaz()` (nunca la fecha del original)
+   - `fechaContable = FechaContable.fromIso(clock.currentDateLaPaz())` (nunca la fecha del original)
    - `periodoFiscalId` resuelto desde esa fecha (debe estar ABIERTO)
    - `glosa = "Reversión de {numeroOriginal}: {motivo}"`
    - `lineas` con `debito ↔ credito` invertidos (también en BOB)
@@ -488,7 +488,7 @@ Al contabilizar:
 - `anuladoEn`, `createdAt`, `updatedAt`, `ComprobanteAuditoria.timestamp` son
   `timestamptz` UTC.
 - `new Date()` **prohibido** en el servicio y dominio del módulo. Solo
-  `ClockPort.hoyEnLaPaz()` y `ClockPort.nowUtc()` (Anti-20).
+  `ClockPort.currentDateLaPaz()` y `ClockPort.now()` (Anti-20).
 
 ### 5.7 No soft-delete (§4.7 core)
 
@@ -864,10 +864,10 @@ async anular(
       throw new ComprobanteYaAnuladoError(id);
     }
 
-    const hoy = this.clock.hoyEnLaPaz();
+    const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
     const periodoReversion = await this.periodos.obtenerAbiertoPorFecha(tx, tenantId, hoy);
     if (!periodoReversion) {
-      throw new PeriodoReversionNoAbiertoError(hoy.toString());
+      throw new PeriodoReversionNoAbiertoError(hoy.toIso());
     }
 
     const numeroReversion = await this.asignarNumero(tx, {
@@ -915,7 +915,7 @@ async anular(
       where: { id: original.id },
       data: {
         estado:           EstadoComprobante.ANULADO,
-        anuladoEn:        this.clock.nowUtc(),
+        anuladoEn:        this.clock.now(),
         anuladoPorUserId: userId,
         motivoAnulacion:  motivo,
       },
@@ -1051,7 +1051,7 @@ export class PrismaComprobantesLockAdapter extends ComprobantesLockPort {
 |---|---|---|---|
 | `PeriodosReaderPort` | `periodos-fiscales` (nuevo, expone para 1.3) | Resolver `periodoFiscalId` desde `fechaContable`, validar `status === ABIERTO`, obtener período abierto por fecha en la anulación | N/A — dependencia hard |
 | `CuentasReaderPort` | `cuentas` (nuevo, expone para 1.3) | Validar batch de cuentas: existencia, `activa`, `esDetalle`, `requiereContacto`, `permiteMultiMoneda`, `monedaFuncional` | N/A |
-| `ClockPort` | `common/clock` (ya existe) | `hoyEnLaPaz()` para la fecha de la reversión, `nowUtc()` para timestamps | `FakeClockAdapter` en tests |
+| `ClockPort` | `common/clock` (ya existe) | `currentDateLaPaz()` (string ISO, se eleva con `FechaContable.fromIso`) para la fecha de la reversión, `now()` para timestamps | `FakeClockAdapter` en tests |
 | `ConfiguracionContableReaderPort` | `configuracion-contable` (ya existe) | **No se usa en 1.3**. Reservado para Fase 1.5 (auto-entries IVA/dif. cambio). Mencionado acá para contrato estable. | — |
 
 **Shape mínimo de los puertos nuevos:**
@@ -1181,7 +1181,7 @@ con millones de filas.
 | Partida doble | Validada en BOB con tolerancia ±Bs 0.01, dentro de la TX del contabilizar. |
 | Multi-moneda | Estructural desde día 1: cada línea tiene `moneda`, `monto`, `tipoCambio`, `montoBob`. Cargador BCB es Fase 1.5. |
 | Anulación | Crea comprobante AJUSTE de reversión (líneas invertidas). FK bidireccional. Estado `ANULADO` + `anuladoPorId`. Nunca solo cambio de estado. |
-| Fecha de la reversión | `hoyEnLaPaz()` y período abierto correspondiente, no la fecha del original. |
+| Fecha de la reversión | `currentDateLaPaz()` y período abierto correspondiente, no la fecha del original. |
 | Bloqueo por cierre | `PrismaComprobantesLockAdapter` reemplaza el Noop de Fase 1.2. Mismo contrato `ComprobantesLockPort`. |
 | Auditoría | Tabla `ComprobanteAuditoria` separada del `AuditLog` genérico. Diff resumen, flag `fueDuranteReapertura`. |
 | Documentos físicos | Implementado en Fase 1.4 (slice 2): relación cabecera-cabecera N:M `comprobante_documento_fisico`, NO un campo en `LineaComprobante`. Ver `docs/disenos/documento-fisico.md`. |

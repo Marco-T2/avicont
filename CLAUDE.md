@@ -618,7 +618,7 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 
 - `FechaContable` (calendario puro, sin UTC, sin hora) para fechas del dominio contable: comprobantes, facturas, cotizaciones UFV, tipo de cambio.
 - `timestamptz` en UTC solo para `createdAt`, `updatedAt`, `auditoria.timestamp`.
-- `new Date()` **prohibido** en `src/**/domain/` y `src/**/*.service.ts`. Usar `ClockPort.hoyEnLaPaz()` inyectable.
+- `new Date()` **prohibido** en `src/**/domain/` y `src/**/*.service.ts`. Usar el `ClockPort` inyectable: `currentDateLaPaz()` (string ISO `YYYY-MM-DD`, se eleva con `FechaContable.fromIso`) para fechas de calendario, `currentYearLaPaz()` para el año, y `now()` para timestamps UTC.
 - Contenedor Docker `TZ=UTC`. `America/La_Paz` solo en capa de presentación.
 
 ### 4.7 Anulación de comprobantes vía flag (no reversa automática)

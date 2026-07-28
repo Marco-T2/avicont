@@ -169,7 +169,7 @@ Lote 1──< MovimientoInversion   >──1 TipoRegistro (naturaleza = INVERSIO
 **Derivados — NO se almacenan, se calculan en lectura** (como los saldos en
 contabilidad; evita drift):
 
-- `edadDias` = `ClockPort.hoyEnLaPaz()` − `fechaIngreso`.
+- `edadDias` = diferencia en días calendario entre `ClockPort.currentDateLaPaz()` y `fechaIngreso`.
 - `avesVivas` = `cantidadInicial` − Σ(`MovimientoCantidad.cantidad`).
 - `costoAcumulado` = Σ(`MovimientoInversion.monto`) (`Money`).
 - `costoPorPolloVivo` = `avesVivas > 0 ? costoAcumulado / avesVivas : null` (mostrar "—" si no hay aves vivas).

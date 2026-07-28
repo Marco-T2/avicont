@@ -144,7 +144,8 @@ admin. El estado tampoco se cambia vía edición (solo vía el endpoint de cerra
 
 El sistema DEBE permitir cerrar un lote `ACTIVO` mediante
 `POST /api/granja/lotes/:id/cerrar` con permiso `granja.lotes.update`. Al cerrar,
-el `estado` pasa a `CERRADO` y `fechaCierre` se setea a `ClockPort.hoyEnLaPaz()`.
+el `estado` pasa a `CERRADO` y `fechaCierre` se setea a
+`FechaContable.fromIso(clock.currentDateLaPaz())`.
 La transición `ACTIVO → CERRADO` es la única permitida. El sistema NO DEBE
 permitir cerrar un lote que ya está `CERRADO`.
 

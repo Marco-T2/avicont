@@ -13,7 +13,7 @@
  *   5. Por línea: XOR débito/crédito — solo uno puede ser > 0.
  *   6. Por línea: coherencia montoBob ≈ monto × tipoCambio (±0.01).
  *   7. Por línea: tipoCambio > 0; si moneda=BOB entonces tipoCambio=1.
- *   8. fechaContable <= hoyEnLaPaz (no asientos al futuro).
+ *   8. fechaContable <= hoy (`FechaContable` construida desde `ClockPort.currentDateLaPaz()`) — no asientos al futuro.
  *
  * Las validaciones que dependen de leer otra entidad (cuenta activa,
  * cuenta esDetalle, cuenta requiereContacto, cuenta permiteMultiMoneda)

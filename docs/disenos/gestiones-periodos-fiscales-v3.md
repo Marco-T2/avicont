@@ -684,7 +684,7 @@ export const CATALOGO_PERMISOS = {
 ```typescript
 async crearGestion(tenantId: string, year: number, userId: string) {
   // Validar rango de year (pre-TX, fail fast)
-  const currentYear = this.clock.yearEnLaPaz();
+  const currentYear = this.clock.currentYearLaPaz();
   if (year < 2000 || year > currentYear + 1) {
     throw new GestionYearFueraDeRangoError(year, 2000, currentYear + 1);
   }
@@ -1009,6 +1009,6 @@ Este documento incorpora los siguientes ajustes solicitados:
 **Del v2→v3:**
 - **N1 (Inmutabilidad de `tipoEmpresaPrincipal`):** adelantada a "existe al menos una `GestionFiscal`" en lugar de "al primer comprobante contabilizado". Port `GestionesReaderPort.existeAlgunaGestion` expuesto para que `tenants` enforce la regla. Nuevo código de error `TENANT_EMPRESA_INMUTABLE` (409).
 - **N2 (Adapter stub en Fase 1.2):** `NoopComprobantesLockAdapter` permite cerrar/reabrir períodos end-to-end en Fase 1.2 sin tener el módulo `comprobantes`. Fase 1.3 hace el swap del adapter sin tocar `periodos-fiscales`.
-- **N3 (Validación del year):** rango `[2000, currentYearLaPaz + 1]` con `ClockPort.yearEnLaPaz()`. Nuevo código de error `GESTION_YEAR_FUERA_DE_RANGO` (422).
+- **N3 (Validación del year):** rango `[2000, currentYearLaPaz + 1]` con `ClockPort.currentYearLaPaz()`. Nuevo código de error `GESTION_YEAR_FUERA_DE_RANGO` (422).
 - **Nitpick 1:** §10.1 aclara que `CONTADOR SENIOR/JUNIOR/AUDITOR EXTERNO` son plantillas sugeridas, no roles del sistema.
 - **Nitpick 2:** §3.2 deja anotado como deuda UX el "cerrar meses vacíos en bulk" para el frontend de Fase 1.2.
