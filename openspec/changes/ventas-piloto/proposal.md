@@ -24,9 +24,10 @@ Corre en **organización de prueba**, no en producción.
 ### In Scope
 
 **Catálogo de ítems (mínimo)**
-- `Item`: código, nombre, `tipo PRODUCTO | SERVICIO`, unidad de medida, precio
-  unitario sugerido (opcional), cuenta de ingreso (opcional, cae al default),
-  `activo` (soft-delete, espejo de Contactos).
+- `Item`: código **opcional** (único solo cuando existe, D-24), nombre,
+  `tipo PRODUCTO | SERVICIO`, unidad de medida, precio unitario sugerido
+  (opcional), cantidad por defecto (D-25), cuenta de ingreso (opcional, cae al
+  default), `activo` (soft-delete, espejo de Contactos).
 - **Módulo propio compartido** `backend/src/items/` con `ItemsReaderPort` de
   superficie mínima (D-15). No es una tabla escondida dentro de Ventas.
 - CRUD y listado. Sin inventario, sin stock, sin costo.
@@ -36,7 +37,8 @@ Corre en **organización de prueba**, no en producción.
 **Ventas**
 - Cabecera: contacto (cliente), fecha contable, `condicionPago CONTADO | CREDITO`,
   fecha de vencimiento (solo crédito), glosa.
-- Líneas: ítem, descripción, cantidad, precio unitario, subtotal.
+- Líneas: ítem (FK viva **y** snapshot de descripción/precio/cuenta, D-28),
+  descripción, cantidad, precio unitario, subtotal.
 - **Todo en BOB** (D-10). Las líneas contables se emiten con el tri-valor del
   núcleo fijo en `moneda = BOB`, `tipoCambio = 1`, `debitoBob = debito`.
 - **La venta ES su propio comprobante** (D-02), **desde el borrador**: el
@@ -85,7 +87,9 @@ Corre en **organización de prueba**, no en producción.
 ### Out of Scope
 
 - **IVA débito e IT** (D-09). Las cuentas existen y ya están cableadas; el
-  cálculo entra en v2. El piloto corre en org de prueba por esto.
+  cálculo entra en v2. El piloto corre en org de prueba por esto. **La forma
+  que tomará en v2 ya quedó fijada en D-29** — campo separado de `tipo`,
+  referencia configurable, nunca enum ni booleano.
 - **Compras / CxP.** Espejo, change propio.
 - **Inventario, costo de ventas, stock.** Pack aparte.
 - **Pack Avícola** (Despacho, Boleta Cerrada, faena, merma, landed cost).
@@ -93,7 +97,8 @@ Corre en **organización de prueba**, no en producción.
   no se construye acá.
 - **Anticipos como pasivo separado.** Descartado (D-03).
 - **Campo "Deposit" en la factura** (pago parcial en el acto en una sola
-  pantalla). Es crédito + cobro, dos pasos.
+  pantalla). Es crédito + cobro, dos pasos. **El camino preferido para cuando
+  entre quedó anotado en D-30** — atributo de la factura, no documento aparte.
 - **Reclasificación de presentación** de CxC acreedor en el Balance General.
   Se agrega el día que moleste, sobre datos históricos.
 - **Notas de crédito / devoluciones.**
@@ -280,6 +285,13 @@ Dato de contexto: **no existe hoy ninguna entidad de producto/artículo vendible
 en el repo** — ni en granja (`TipoRegistro` clasifica movimientos, `Lote` es
 cría) ni en ningún lado. `Item` es el primero; no se duplica nada.
 
+> ⚠️ **Ajustada por el estudio comparado (2026-07-28)** — la tabla de campos e
+> índices de arriba se lee con cuatro correcciones: `codigo` pasa a opcional
+> con UNIQUE PARCIAL (D-24), se suma `cantidadPorDefecto` (D-25), la semántica
+> de `tipo` y el destino del stock quedan firmados (D-26), y la exclusión de
+> `esVendible`/`esComprable` queda documentada como divergencia deliberada
+> contra el consenso del mercado, no como omisión (D-27).
+
 ### D-16 — FIFO es política de la casa, no aplicación de la ley
 
 Resuelve Q-4. **La sugerencia se queda como está**: campo de importe recibido,
@@ -344,6 +356,12 @@ Detalle heredado del core, no decisión nueva: el número codifica `YYMM`, así 
 mover la `fechaContable` de una venta a otro mes **conserva** su número original
 (`V2606-000042` con fecha de julio). Es la conducta que §4.3 ya acepta para
 cualquier comprobante; que nadie la "arregle" después.
+
+> **Refuerzo externo (2026-07-28)**: ver «Evidencia VeriFactu» al final de las
+> decisiones del estudio comparado. La libertad de edición de esta decisión se
+> sostiene porque corre sobre los rieles de §4.3/§4.4/§4.9; Invoice Ninja, sin
+> esos rieles, tuvo que apagar la suya entera con un `if` al entrar en régimen
+> fiscal estricto.
 
 ### D-18 — Anular desvincula el match; la conciliación se re-vincula sola
 
@@ -481,8 +499,11 @@ se corrige en consecuencia.
 El criterio implícito del template, leído de los hechos: **el Contador
 contabiliza y anula asientos, pero no cierra nada** — tiene
 `asientos.{CRUD, post, void, edit-posted}` y **ningún** verbo irreversible
-(`gestiones.cerrar`, `periodos.cerrar/reabrir/marcar-definitivo`,
-`cierre-mensual.execute`).
+(`gestiones.cerrar`, `periodos.cerrar/reabrir/marcar-definitivo`). *Corrección
+del relevamiento original*: acá figuraba también `cierre-mensual.execute` como
+verbo real — **no lo es**. `cierre-mensual.{read,execute}` son legacy
+declarados sin endpoint; el cierre mensual de verdad se enforcea como
+`contabilidad.periodos.cerrar` (verificado en el PR de RBAC, ver abajo).
 
 Por simetría, Ventas recibe el mismo trato que asientos:
 
@@ -495,29 +516,52 @@ Por simetría, Ventas recibe el mismo trato que asientos:
 Un contador que puede contabilizar y anular un asiento manual puede hacerlo con
 una venta: es el mismo acto. Ningún verbo de cierre.
 
-**Lo que está en juego es menos de lo que parece**, y conviene saberlo:
+**Actualizado tras el PR de RBAC (#291, abierto en paralelo el 2026-07-28)**
+— dos datos de esta decisión cambiaron de signo y uno se confirma:
 
-- El seed hace `upsert` con **`update: {}`** (`seed.ts:95-97`): si el rol
-  contador ya existe, **no toca sus permisos**. Sumar strings solo afecta roles
-  creados desde cero.
-- **Las organizaciones nuevas no reciben ningún template**:
-  `TenantsService.create` siembra plan de cuentas, tipos de documento y tipos de
-  registro, pero **no crea ningún `CustomRole`**. El comentario de
-  `schema.prisma:274` dice *"se precargan al crear la org"* y **es falso**.
+- **El argumento "está en juego menos de lo que parece" se dio vuelta.** Esta
+  decisión minimizaba el impacto porque el seed hacía `upsert` con
+  `update: {}` — el rol contador existente no se tocaba y sumar strings solo
+  afectaba roles creados desde cero. **Ya no**: #291 pasa los upserts de
+  contador y granjero a `update: { permissions: ... }`, así que el template se
+  refresca en cada corrida del seed y **sumar permisos SÍ alcanza a la org
+  piloto**. Consecuencia: la lista de verbos de la tabla de arriba deja de ser
+  un default inofensivo — es lo que el rol va a tener de verdad.
+- **Las organizaciones nuevas siguen sin recibir ningún template** — esto NO
+  cambió: `TenantsService.create` siembra plan de cuentas, tipos de documento
+  y tipos de registro, pero no crea ningún `CustomRole`. Lo que #291 corrigió
+  es el **comentario mentiroso** de `schema.prisma:274` ("se precargan al
+  crear la org"), no el comportamiento.
 
-⚠️ **Hallazgo colateral que NO se arregla en este change**: el permiso
-`contabilidad.asientos.edit-posted` **se enforcea** desde el service
-(`comprobantes.service.ts:582,935`, 403 `MISSING_PERMISSION_EDIT_POSTED`) y se
-otorga en el seed, pero **no existe en el catálogo**. Como
-`validatePermissions` rechaza todo permiso exacto fuera del catálogo, **ningún
-rol creado desde la UI puede recibirlo**. Se escapó porque
-`catalogo-vs-controllers.spec.ts` escanea decoradores `@RequirePermissions` en
-controllers y este permiso se verifica desde el **service**. Hay al menos dos
-más iguales: `periodos.create` y `cierre-mensual.create` (este último ni
-coincide con el verbo real, que es `execute`). **Va en PR de RBAC propio.**
-Relevante para acá: Ventas edita documentos contabilizados (D-17, D-20) — si
-necesita un permiso equivalente, **hay que declararlo en el catálogo y no
-repetir el agujero**.
+⚠️ **Hallazgo colateral — RESUELTO en #291** (acá estaba anotado como "va en
+PR de RBAC propio"; ese PR ya existe y lo que encontró difiere del
+relevamiento original):
+
+- `contabilidad.asientos.edit-posted` **sí se enforcea** (2 call sites en
+  `ComprobantesService` vía `rbac.hasPermission`) y **quedó declarado en el
+  catálogo** ⇒ pasa a ser asignable desde la UI, marcado como acción sensible.
+  **Esto habilita D-17/D-20 para Ventas**: el molde del permiso
+  estado-dependiente ya existe y está catalogado.
+- `contabilidad.periodos.create` **no lo enforcea nadie**: los 12 períodos
+  nacen al crear la gestión fiscal, y ese endpoint exige `gestiones.create`.
+  Sale del template; entran `gestiones.{read,create}`.
+- `contabilidad.cierre-mensual.create` **tampoco lo enforcea nadie**, y el
+  relevamiento original de esta decisión estaba equivocado en el verbo: el
+  real no es `execute` — `cierre-mensual.{read,execute}` son legacy sin
+  endpoint y el cierre mensual se enforcea como `contabilidad.periodos.cerrar`
+  (corregido arriba).
+- El hueco de fondo era **del test**: escaneaba solo decoradores en
+  controllers. `catalogo-vs-controllers.spec.ts` ahora confronta el catálogo
+  contra **tres puntas** — decoradores, `.hasPermission(...)` en todo `src/`,
+  y `seed.ts ⊆ catálogo`. Barrido completo: **cero fantasmas adicionales**.
+
+**Y el criterio de esta decisión ya actuó como guarda, no como preferencia**:
+la primera versión de #291 le otorgaba `contabilidad.periodos.cerrar` al
+Contador; Marco lo frenó **citando D-23**, y se corrigió. El template queda
+con `periodos.read` + `cierre-mensual.read` + `gestiones.{read,create}` y
+**ningún verbo irreversible** — `periodos.cerrar` se evaluó explícitamente y
+se descartó. La tabla de verbos de Ventas de arriba sigue el mismo criterio,
+ahora probado en combate.
 
 ### D-06 — sigue en pie, pero su costo estaba mal medido
 
@@ -525,6 +569,188 @@ La exploración dice que agregar `TipoComprobante.VENTA` *"cuesta un valor en el
 enum + una línea en `PREFIJO_POR_TIPO`"*. **Es falso**, y la decisión se
 reconfirma **conociendo el precio real** (detalle en R-6): lo que se compra es
 la serie de numeración `V2607-000001` separada de los `I`.
+
+## Decisiones del estudio comparado (2026-07-28)
+
+Salen de leer el **código** de los cuatro sistemas de referencia desplegados en
+`~/proyectos`: Odoo 19, ERPNext v16, Bigcapital e Invoice Ninja 5.13. Mismo
+criterio de método que la matriz de QB (D-12/D-14): evidencia de qué funcionó
+—y qué dolió— en el mercado, no fuente normativa. Las citas de archivo y línea
+están verificadas contra los repos locales, no contra documentación.
+
+### D-24 — `codigo` del ítem es OPCIONAL, con UNIQUE PARCIAL (ajusta D-15)
+
+Invoice Ninja tiene **un solo campo obligatorio** en el producto: el concepto
+(`product_key` — `app/DataMapper/InvoiceItem.php:23`); todo lo demás es
+opcional. Es el sistema de mostrador de los cuatro, y la lección es de
+fricción pura: **obligar a inventar un código antes de poder guardar es
+pedirle nomenclatura a quien solo quiere cobrar**. El negocio que trabaja con
+códigos los va a cargar; al que no, el sistema no lo detiene.
+
+- `codigo` pasa a nullable. Unicidad **solo cuando existe**: UNIQUE PARCIAL
+  sobre `(organizationId, codigo) WHERE "codigo" IS NOT NULL`.
+- **Precedente exacto en casa**:
+  `contactos_organizationId_documento_partial_key` (UNIQUE PARCIAL
+  `WHERE documento IS NOT NULL`, migración `20260424020927_fase_1_4_contactos`,
+  en la tabla de objetos raw vivos de `CLAUDE.md` §11.6) — el mismo problema
+  (`documento` opcional, único cuando está) resuelto de la misma forma.
+- Enforcement **simultáneo** constraint + guard de servicio con error amigable
+  (cicatriz F-01: solo-servicio falla bajo concurrencia; solo-constraint da un
+  500 críptico).
+- **Costo asumido con los ojos abiertos**: un unique parcial no se expresa en
+  `schema.prisma` — es **objeto raw SQL** y arrastra el protocolo §11.6
+  completo. Va escrito a mano al final de la migración de tablas, entra a la
+  tabla de objetos raw vivos de `CLAUDE.md` §11.6, y **toda migración
+  regenerada de acá en adelante va a intentar dropearlo** (los `contactos_*`
+  aparecen en cada regeneración desde 2026-04; este se les suma).
+
+La fila de índices de D-15 queda corregida: donde decía
+`unique [organizationId, codigo]` va el parcial.
+
+### D-25 — `cantidadPorDefecto` entra; `unidadMedida` no se toca (ajusta D-15)
+
+Dos calibraciones del mismo estudio, en direcciones opuestas:
+
+- **`cantidadPorDefecto` entra** (`@db.Decimal(18,6)`, default 1). Invoice
+  Ninja lo trae en el producto como "Cantidad por Defecto" (`Product.php`,
+  campo `quantity`). Un campo, cero lógica: si el negocio vende en cajas de 12
+  o jaulas de 20, la línea nace pre-llenada y el vendedor confirma en vez de
+  tipear. Relación costo/valor difícil de superar.
+- **`unidadMedida` se conserva como string en el ítem.** Los dos extremos del
+  mercado la encuadran: Invoice Ninja NO la tiene; ERPNext le dedica un
+  DocType entero (`UOM`) con tabla de conversiones. Nuestro string libre es el
+  punto medio correcto para un negocio que vende por kilo — nombra la unidad
+  sin comprarse un motor de conversiones que nadie pidió.
+
+### D-26 — `tipo PRODUCTO | SERVICIO` se queda, pero el stock JAMÁS será un tercer valor (ajusta D-15)
+
+El estudio destapó que el enum puede estar cortando por el eje equivocado.
+Bigcapital usa **tres** valores — `service | non-inventory | inventory`
+(`Item.schema.ts:7`) — porque separa dos preguntas que nuestro `tipo` mezcla
+en una: *¿es físico?* y *¿le sigo el stock?*. Y `non-inventory` es
+**exactamente el caso del piloto**: vendemos cosas físicas sin llevar stock.
+ERPNext corta por el otro lado: no tiene campo tipo — tiene un booleano
+`is_stock_item` y nada más.
+
+La disyuntiva, con honestidad: en el piloto `tipo` no alimenta ninguna lógica.
+Podría borrarse (camino ERPNext) o triplicarse (camino Bigcapital). Decisión
+tomada:
+
+- **Se queda con dos valores**, con la semántica redefinida por escrito:
+  `tipo` responde *¿es físico?* y nada más. Es la distinción que el negocio
+  nombra ("vendo pollo y también flete") y mantenerla no cuesta nada.
+- **"¿Le sigo el stock?" será un booleano aditivo** (`llevaStock` o el nombre
+  que fije el pack Inventario), a la ERPNext — **nunca un tercer valor
+  `INVENTARIO` del enum**. Dos razones, las dos medidas:
+  1. El costo real de un valor de enum en este repo: 4 archivos backend que el
+     compilador exige + **9 listas hardcodeadas del frontend que NO avisan**
+     (medido en R-6 para `TipoComprobante`; el enum de `Item` va a criar sus
+     propias listas y pagará el mismo precio por cada valor).
+  2. Mezclar ejes en un solo campo es la pendiente que termina en la lista de
+     9 valores de Invoice Ninja (ver D-29): cada combinación nueva de los ejes
+     exige un valor nuevo, y a los dos ejes siguientes la lista es
+     incomprensible.
+
+### D-27 — Sin `esVendible`/`esComprable`: divergencia DELIBERADA contra el consenso (confirma D-15)
+
+**3 de los 4 sistemas los tienen**: Odoo (`sale_ok`/`purchase_ok`), ERPNext
+(`is_sales_item`/`is_purchase_item`), Bigcapital (`sellable`/`purchasable` —
+`Item.dto.ts:54,90`). D-15 los dejó afuera por YAGNI y **la decisión se
+sostiene**: durante todo el piloto hay un único consumidor (Ventas), así que
+los flags tendrían un único valor posible — un campo que no puede variar no es
+un campo, es una constante con disfraz.
+
+Lo que cambia es el registro: **queda escrito como divergencia deliberada
+contra el consenso del mercado, no como omisión**. Una omisión sin documentar
+se lee como olvido. El que llegue con Compras en la mano tiene que encontrar
+esta nota: ahí los flags pasan a tener dos consumidores reales y entran como
+dos columnas aditivas — rutina en este repo, tal como D-15 ya anticipó.
+
+### D-28 — `LineaVenta` lleva FK al ítem Y snapshot: las dos cosas
+
+El patrón **unánime y no declarado** en los cuatro sistemas: el documento
+guarda una **copia de la configuración vigente al momento de emitirse**
+(descripción, precio, cuentas). El ítem del catálogo cambia mañana; la venta
+de ayer es un hecho y no se mueve.
+
+Y la advertencia del que tiró de más: Invoice Ninja guarda en la línea SOLO el
+snapshot — `product_key` como string suelto, **sin `product_id`**
+(`app/DataMapper/InvoiceItem.php`: cero apariciones; las líneas son un blob
+JSON en la factura). Consecuencia verificada en su propio código: "ventas por
+producto" **no se puede responder en SQL** — `ProductSalesExport.php:88`
+filtra con `whereJsonContains` y después **recorre las facturas en PHP**
+(`:162-166`) comparando strings; renombrar el producto rompe la serie
+histórica. Los otros 3 conservan la referencia (ERPNext `item_code`, Odoo
+`product_id`) y son los que pueden agregar.
+
+Para `LineaVenta`:
+
+| Pieza | Qué guarda | Para qué |
+|---|---|---|
+| `itemId` FK | referencia viva al catálogo | "ventas por ítem" es un JOIN; el rename no rompe historia |
+| `descripcion` snapshot | el texto al momento de vender, editable por línea | el documento dice lo que se pactó |
+| `precioUnitario` snapshot | el precio pactado, no el sugerido vigente | ídem |
+| `cuentaIngresoId` snapshot | la cuenta resuelta al crear la línea | la regeneración (D-17) reproduce el MISMO asiento aunque la config del ítem haya cambiado |
+
+El snapshot de la cuenta no es cosmético: sin él, editar una venta
+contabilizada re-resolvería la cuenta desde la config **actual** del ítem, y
+la regeneración de D-17 produciría un asiento distinto del original por un
+cambio de configuración que nada tuvo que ver con la edición. La re-validación
+del Approach sigue aplicando entera: cuenta desactivada en el snapshot →
+error, no bypass.
+
+### D-29 — Anotación para v2: el tratamiento del IVA será una REFERENCIA configurable, separada de `tipo` (anota D-09)
+
+D-09 dejó el IVA fuera del piloto y **sigue fuera**. Esto fija la forma que
+tendrá cuando entre, para que nadie la improvise en caliente:
+
+1. **Campo separado de `tipo`.** Invoice Ninja fundió los dos ejes en una sola
+   lista de 9 valores (`Product.php:73-81`: Físico / Servicio / Digital /
+   Envío / Exento / Tasa reducida / Override / Tasa cero / Inverso), y el
+   resultado es que **no puede decir que un bien físico está exento** — un
+   campo, un valor. Esa lista existe para serializar el código UBL de la
+   factura electrónica europea (`'S'`/`'E'`/`'Z'`/`'AE'` —
+   `Product.php:117-120`): es **destino de serialización, no modelo**.
+2. **Referencia a un registro configurable, no enum ni booleano.** El patrón
+   correcto es `sell_tax_rate_id` de Bigcapital / `account.tax` de Odoo. Un
+   booleano `exento` tiene una trampa específica: **exento ≠ tasa cero** (la
+   tasa cero permite recuperar crédito fiscal; la exención no), un booleano
+   los vuelve indistinguibles y la diferencia recién aparece en la
+   declaración, cuando ya es tarde.
+
+Nada de esto toca el piloto: el `Item` de v1 **no lleva ningún campo de IVA**.
+
+### D-30 — Anotación para v2: el anticipo exigible como ATRIBUTO de la factura (anota D-04)
+
+D-04 dejó el "Deposit" fuera del piloto y **sigue fuera**. Camino preferido
+cuando entre: el de Invoice Ninja — `partial` + `partial_due_date` como
+**atributos de la factura** (`Invoice.php:195,228`), con estado propio
+`PARTIAL` y el vencido calculado contra **ambas** fechas
+(`Invoice.php:503-511`). Para un negocio que trabaja con seña ("50% para
+despachar, saldo a 30 días") es un solo documento con dos vencimientos — más
+natural que fabricar dos documentos. No pisa D-03/D-07: el anticipo exigible
+es un atributo de la venta, no un pasivo separado ni una tabla nueva.
+
+### Evidencia VeriFactu — el modelo libre se apaga solo al entrar en régimen estricto
+
+La cita de oro del estudio, dicha por el código de un competidor. Invoice
+Ninja —el más permisivo de los cuatro con editar y borrar— al activar
+**VeriFactu** (facturación electrónica española) **bloquea borrar, cancelar y
+revertir sus propias facturas**:
+`app/Utils/Traits/Invoice/ActionsInvoice.php` — `invoiceDeletable` (:41-53),
+`invoiceCancellable` (:67-77), `invoiceReversable` (:89-92); la rama
+`verifactuEnabled()` devuelve `false` para casi todo lo que en modo libre
+devuelve `true`.
+
+Por qué pesa acá: es la prueba —dicha por el que la sufrió— de que **el modelo
+libre no sobrevive a la contabilidad seria**. El mismo producto, al entrar en
+régimen fiscal estricto, apaga su propia flexibilidad con un `if`. Avicont ya
+está parado del lado correcto: el borrado está prohibido desde el día uno
+(§4.7, D-12), el número correlativo es inmutable (§4.9, D-17), y la edición
+libre corre solo dentro de período abierto y con auditoría por triggers
+(§4.3). Lo que Invoice Ninja tuvo que apagar de apuro, acá nunca estuvo
+prendido. Si algún día el SIN exige un régimen equivalente (R-1), el punto de
+partida es este — no el de ellos.
 
 ## Capabilities
 
@@ -576,6 +802,12 @@ no teórico: `Item.cuentaIngresoId` es configuración **almacenada**, y la cuent
 puede desactivarse después de haberse configurado. Defense in depth (§4.2):
 ninguna capa confía en que la anterior hizo su trabajo.
 
+**La regeneración lee los snapshots, no el catálogo** (D-28). El asiento se
+reconstruye desde `LineaVenta` (precio y cuenta copiados al crear la línea),
+nunca re-resolviendo la config vigente del ítem: así editar una venta
+reproduce el mismo asiento salvo lo que el usuario efectivamente editó. La
+re-validación del párrafo anterior corre igual sobre esos snapshots.
+
 **Gating**: `@RequireModule('contabilidad')` solamente (D-01). Sin pack — un
 submódulo que no es pack queda **asignable automáticamente**
 (`catalogo-asignable.ts:75-77`), y OWNER/ADMIN reciben todo permiso nuevo solo,
@@ -602,9 +834,12 @@ Tres trampas que el design tiene que respetar:
    archivo del frontend como texto (`catalogo-vs-espejo-frontend.spec.ts`): un
    typo en el string rompe el build.
 
-Decisión de producto pendiente: el template **Contador** es una lista manual
-(`prisma/seed.ts:34-37`) que ya tiene `ventas.{read,create,update,delete}` pero
-**no** `post` ni `void`, ni nada de `items`/`cobros`.
+Decisión de producto: el template **Contador** es una lista manual en
+`prisma/seed.ts` que ya tiene `ventas.{read,create,update,delete}` pero
+**no** `post` ni `void`, ni nada de `items`/`cobros`. Los verbos que recibe
+quedaron decididos en D-23 — y desde #291 el upsert del seed **refresca** los
+permisos en cada corrida, así que sumar los strings al template alcanza a la
+org piloto de verdad (D-23, actualización).
 
 **Dinero**: `Money` (decimal.js) en TS, `@db.Decimal(18,2)` en Prisma, `string`
 en los DTOs (§4.5). Cantidades `@db.Decimal(18,6)`.
@@ -628,8 +863,9 @@ método inexistente. Corregirlo va en PR propio de docs.
 | `backend/src/items/` | **nuevo** |
 | `backend/src/ventas/` | **nuevo** |
 | `backend/src/cuentas-por-cobrar/` | **nuevo** |
-| `schema.prisma` | modelos `Item`, `Venta`, `LineaVenta`, `Cobro`, `AplicacionCobro`; valor `VENTA` en `TipoComprobante`; 2 campos en `OrgConfiguracionContable` |
-| `prisma/migrations/` | **tres** migraciones: enum-only escrita a mano, tablas (ver R-6), y backfill data-only (D-22) |
+| `schema.prisma` | modelos `Item` (`codigo` nullable D-24, `cantidadPorDefecto` D-25), `Venta`, `LineaVenta` (FK + snapshots D-28), `Cobro`, `AplicacionCobro`; valor `VENTA` en `TipoComprobante`; 2 campos en `OrgConfiguracionContable` |
+| `prisma/migrations/` | **tres** migraciones: enum-only escrita a mano, tablas (ver R-6) **+ el UNIQUE PARCIAL de `Item.codigo` como raw SQL a mano dentro de la de tablas (D-24)**, y backfill data-only (D-22) |
+| `CLAUDE.md` §11.6 | sumar el UNIQUE PARCIAL de `Item.codigo` a la tabla de objetos raw SQL vivos (D-24) — sin eso, la próxima migración regenerada lo dropea y nadie lo rescata |
 | `tipos-documento-fisico/seed/tipos-universales.ts` | `VENTA` en los tipos que hoy llevan `INGRESO` (D-22) — si no, cada tenant nuevo reproduce el problema |
 | `comprobantes/` | `ComprobanteWriterPort` + adapter |
 | `cuentas/adapters/seed/comercial.ts` | `MAPEO_CODIGO_A_CONCEPTO` += CxC y Ventas |
@@ -656,6 +892,9 @@ exhaustivos hacen que el compilador exija los primeros; el frontend **no avisa**
 - **R-1 — El piloto se convierte en producción.** Sin IVA, las ventas cargadas
   son fiscalmente incompletas y no se arreglan sin rehacer asientos
   contabilizados. *Mitigación*: org de prueba, y decirlo en la UI del piloto.
+  La evidencia VeriFactu (estudio comparado) es el recordatorio de qué pasa
+  cuando un modelo flexible choca con un régimen fiscal estricto: Invoice
+  Ninja tuvo que apagar el suyo con un `if`.
 - **R-2 — Fricción del period lock.** carmen eliminó su estado de bloqueo
   porque el negocio lo rechazó (H-4). Cerrar un mes va a impedir corregir
   ventas. *Mitigación*: el flujo de reapertura ya existe (§4.4); el borrador
@@ -688,6 +927,10 @@ exhaustivos hacen que el compilador exija los primeros; el frontend **no avisa**
   `comprobante_documento_fisico_unique_contabilizado` depende de
   **`EstadoComprobante`, no de `TipoComprobante`** — un `ADD VALUE` acá no lo
   afecta funcionalmente, pero hay que rescatarlo igual si Prisma lo dropea.
+  Y D-24 **suma un objeto raw nuevo a la lista**: el UNIQUE PARCIAL de
+  `Item.codigo` nace escrito a mano dentro de la migración de tablas y entra a
+  la tabla de §11.6 desde el día uno — cada regeneración futura tiene un
+  objeto más que rescatar.
 - **R-7 — `tiposComprobanteAplicables` no se entera del valor nuevo.**
   `TipoDocumentoFisico.tiposComprobanteAplicables` es `"TipoComprobante"[]`
   (`schema.prisma:923`): agregar `VENTA` al enum **no** lo agrega a los tipos de
@@ -700,8 +943,9 @@ exhaustivos hacen que el compilador exija los primeros; el frontend **no avisa**
 
 **Tres migraciones** (D-22): (1) enum-only `ALTER TYPE … ADD VALUE 'VENTA'`,
 escrita a mano; (2) tablas nuevas + dos columnas nullable en
-`OrgConfiguracionContable`; (3) backfill data-only de
-`tiposComprobanteAplicables`.
+`OrgConfiguracionContable` + el UNIQUE PARCIAL de `Item.codigo` como raw SQL a
+mano (D-24 — aditivo también, pero deja la migración fuera de lo puramente
+generado); (3) backfill data-only de `tiposComprobanteAplicables`.
 
 Las dos primeras son **aditivas puras** y no tocan datos existentes. **La
 tercera SÍ toca datos existentes**: hace `UPDATE` sobre
@@ -772,11 +1016,12 @@ contacto (D-20), recorte con varios cobros (D-21), backfill de
 
 Fuera de este change quedan dos PRs propios, identificados en el camino:
 
-- **RBAC**: `asientos.edit-posted`, `periodos.create` y `cierre-mensual.create`
-  están en el seed y **no en el catálogo**. El primero se enforcea de verdad
-  desde el service y **ningún rol creado por la UI puede recibirlo**. Incluye
-  tapar el hueco del test, que solo escanea decoradores en controllers. Ver
-  D-23.
+- **RBAC**: ~~pendiente~~ → **abierto como #291** (`fix/rbac-permisos-fantasma`).
+  `edit-posted` declarado en el catálogo (asignable desde la UI), los dos
+  fantasmas sin enforcement (`periodos.create`, `cierre-mensual.create`) fuera
+  del template, y el test confrontando tres puntas (decoradores +
+  `.hasPermission` + seed). Detalle y correcciones al relevamiento original en
+  D-23, que quedó actualizado.
 - **Docs**: `ClockPort.hoyEnLaPaz()`, `nowUtc()` y `yearEnLaPaz()` son símbolos
   **fantasma** citados en 23 líneas de docs y comentarios vivos.
 
@@ -852,6 +1097,12 @@ spec **tiene que enunciar** o se pierden en la implementación.
   las tablas de Ventas. El único acto que §4.7 exige auditar para siempre
   destruye parte de su propio contexto. Riesgo aceptado y nombrado; el design
   debería evaluar un soft-delete, que costaría poco.
+- **B-15 — Normalización del `codigo` opcional.** Nace de D-24: el UNIQUE
+  PARCIAL es case-sensitive y sensible a espacios por default — `"ABC"`,
+  `"abc"` y `"ABC "` serían tres códigos distintos. La spec tiene que decidir
+  si se normaliza (trim y/o case) antes de persistir, con el precedente de
+  cómo lo resuelve `Contactos.documento` como referencia — no dejarlo al
+  criterio del que implemente.
 
 ## Success Criteria
 
@@ -878,3 +1129,9 @@ spec **tiene que enunciar** o se pierden en la implementación.
    `cobros` en el espejo del frontend.
 9. Un cobro genera un comprobante `INGRESO` con `origenTipo = 'COBRO'`, y el
    listado de comprobantes lo distingue de una venta **sin mirar el tipo**.
+10. Un ítem se guarda con solo el nombre — sin código (D-24). Dos ítems sin
+    código conviven en la misma org; dos con el mismo código chocan, con
+    constraint de DB **y** error amigable del servicio.
+11. Cambiar el precio sugerido o la cuenta de ingreso de un ítem **no altera**
+    ninguna venta existente ni su asiento (snapshot, D-28), y "ventas por
+    ítem" se responde con un JOIN por `itemId` — no parseando strings.
