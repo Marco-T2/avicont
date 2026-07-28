@@ -45,6 +45,7 @@ const ETIQUETAS_ACCION: Record<string, string> = {
   conciliar: 'Conciliar',
   interact: 'Interactuar',
   'marcar-definitivo': 'Marcar definitivo',
+  'edit-posted': 'Editar contabilizados',
 };
 
 // Acciones cuyo efecto NO se deshace desde la app, o que mueven la frontera de
@@ -61,6 +62,9 @@ const ACCIONES_SENSIBLES = new Set([
   'marcar-definitivo',
   'admin',
   'remove',
+  // Toca comprobantes ya CONTABILIZADOS (§4.3): conceder esto mueve la frontera
+  // de lo inmutable, misma liga que anular o cerrar.
+  'edit-posted',
 ]);
 
 function derivar(slug: string): string {

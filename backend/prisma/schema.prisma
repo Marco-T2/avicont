@@ -271,7 +271,8 @@ model CustomRole {
   // Wildcards permitidos: "contabilidad.*", "*.read".
   permissions String[]
 
-  // Templates "Contador" y "Granjero" se precargan al crear la org.
+  // Templates "Contador" y "Granjero": hoy los siembra SOLO prisma/seed.ts en la
+  // org piloto — crear una org (TenantsService.create) NO los precarga todavía.
   // El admin puede editarlos (isEditable=true) pero no eliminarlos si isSystemDefault=true.
   isSystemDefault Boolean @default(false)
   isEditable      Boolean @default(true)

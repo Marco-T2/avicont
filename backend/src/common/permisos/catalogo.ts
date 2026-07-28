@@ -13,7 +13,10 @@
 //
 // Cuando agregás un módulo o un endpoint nuevo:
 //   1. Agregá el permiso fino acá.
-//   2. Decoralo con @RequirePermissions('...') en el controller.
+//   2. Decoralo con @RequirePermissions('...') en el controller — o, si la
+//      decisión depende del estado del recurso, verificalo desde el service
+//      con RbacService.hasPermission (el spec catalogo-vs-controllers escanea
+//      AMBOS caminos: un permiso enforceado fuera del catálogo rompe el build).
 //   3. Si corresponde, sumalo a los templates en prisma/seed.ts.
 
 export interface PermisoCatalogado {
@@ -119,6 +122,10 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
       ...CRUD('asientos contables'),
       post: 'Contabilizar asientos (DRAFT → CONTABILIZADO)',
       void: 'Anular asientos contabilizados',
+      // Se verifica desde ComprobantesService (rbac.hasPermission), no desde un
+      // decorator: la exigencia depende del ESTADO del comprobante (§4.3). Vivió
+      // enforceado sin estar acá — ningún rol de la UI podía recibirlo.
+      'edit-posted': 'Editar asientos contabilizados mientras el período esté abierto',
     },
   },
   {

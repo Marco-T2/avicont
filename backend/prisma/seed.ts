@@ -40,9 +40,14 @@ const CONTADOR_PERMISSIONS = [
   'contabilidad.compras.update',
   'contabilidad.compras.delete',
   'contabilidad.periodos.read',
-  'contabilidad.periodos.create',
-  'contabilidad.cierre-mensual.read',
-  'contabilidad.cierre-mensual.create',
+  // El cierre mensual se enforcea como periodos.cerrar (periodos-fiscales.controller);
+  // el viejo 'cierre-mensual.create' era un fantasma que ningún endpoint exigía.
+  'contabilidad.periodos.cerrar',
+  // Los períodos no se crean sueltos: nacen los 12 al crear la gestión fiscal
+  // (gestiones-fiscales.controller exige gestiones.create). El viejo
+  // 'periodos.create' era un fantasma sin enforcement.
+  'contabilidad.gestiones.read',
+  'contabilidad.gestiones.create',
   'contabilidad.eeff.read',
   'contabilidad.configuracion.read',
   'contabilidad.configuracion.update',
@@ -94,7 +99,11 @@ async function main() {
   // Templates precargados (editables) para cada organización nueva.
   await prisma.customRole.upsert({
     where: { organizationId_slug: { organizationId: asociacion.id, slug: 'contador' } },
-    update: {},
+    // Refresca los permisos en cada corrida: con `update: {}` un rol ya existente
+    // conservaba el array viejo y las correcciones del template jamás llegaban a
+    // la org piloto. Pisa ediciones manuales del template — aceptado: el seed
+    // reconstruye el entorno de referencia (CLAUDE.md §11.2).
+    update: { permissions: CONTADOR_PERMISSIONS },
     create: {
       organizationId: asociacion.id,
       slug: 'contador',
@@ -109,7 +118,7 @@ async function main() {
 
   await prisma.customRole.upsert({
     where: { organizationId_slug: { organizationId: asociacion.id, slug: 'granjero' } },
-    update: {},
+    update: { permissions: GRANJERO_PERMISSIONS },
     create: {
       organizationId: asociacion.id,
       slug: 'granjero',
