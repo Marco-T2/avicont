@@ -22,7 +22,7 @@
 - Dominio puro: NO importar NestJS, Prisma runtime, ni librerías externas. `import type` de Prisma sí está permitido (divergencia aceptada §5 doc deudas).
 - Value objects: `private constructor`, `static of(raw)` o `static fromX(...)`, métodos `toString()` y `equals(other)`. Self-validating en el factory.
 - Errores de dominio: extender `DomainError` (NotFoundError/ConflictError/ValidationError/ForbiddenError/UnauthorizedError/InvalidStateError/ExternalServiceError). Code `{MODULO}_{SUBDOMINIO}_{CONDICION}` ESTABLE.
-- `new Date()` PROHIBIDO en `domain/` y `*.service.ts` — usar `ClockPort.hoyEnLaPaz()` cuando se necesite tiempo.
+- `new Date()` PROHIBIDO en `domain/` y `*.service.ts` — usar el `ClockPort` inyectable (`currentDateLaPaz()` para fechas de calendario, `now()` para timestamps UTC).
 - Idioma: nombres de clase y archivos en español (`Asiento`, `Comprobante`, `Cuenta`, `LineaComprobante`).
 - Spec hermana `*.spec.ts` al lado del archivo, sin DB, sin NestJS.
 

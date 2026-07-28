@@ -120,7 +120,7 @@ período o un rango.
 - **Fecha de corte única** (Balance General) → **hoy**.
 - El "hoy" y el "año en curso" se calculan en **America/La_Paz**, nunca en UTC (§4.6),
   vía el helper compartido `@/lib/fecha-actual` (`hoyEnLaPazISO` / `primerDiaDelAnioISO`),
-  que espeja el `ClockPort.hoyEnLaPaz()` del backend. **No** usar `new Date()` con la TZ
+  que espeja el `ClockPort.currentDateLaPaz()` del backend. **No** usar `new Date()` con la TZ
   del navegador ni `toISOString()` (desplaza el día en la madrugada boliviana).
 - `01/01` es el **año calendario**, no el inicio de la gestión activa (coincide para
   empresas COMERCIAL; para industrial/agro/minera es un default que el usuario ajusta).

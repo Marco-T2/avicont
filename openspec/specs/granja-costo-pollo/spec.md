@@ -33,7 +33,7 @@ activos sin incurrir en N×2 queries.
 | **avesVivas** | `cantidadInicial − Σ(MovimientoCantidad.cantidad)` | `Int`, invariante `≥ 0` |
 | **costoAcumulado** | `Σ(MovimientoInversion.monto)` | `Money`, siempre `≥ 0` |
 | **costoPorPolloVivo** | `avesVivas > 0 ? costoAcumulado / avesVivas : null` | `Money` o `null` (UI muestra "—") |
-| **edadDias** | `ClockPort.hoyEnLaPaz() − fechaIngreso` | `Int` |
+| **edadDias** | días calendario entre `ClockPort.currentDateLaPaz()` y `fechaIngreso` | `Int` |
 | **porcentajeMortalidad** | `Σ(muertes) / cantidadInicial` | porcentaje |
 
 ---
@@ -104,7 +104,7 @@ gastó en Alimento, Vacunas, etc.).
 
 #### Escenario: edadDias usa ClockPort, no new Date
 
-- DADO un lote con `fechaIngreso = 2026-06-01` y `ClockPort.hoyEnLaPaz()` fijado en `2026-06-15`
+- DADO un lote con `fechaIngreso = 2026-06-01` y `ClockPort.currentDateLaPaz()` fijado en `2026-06-15`
 - CUANDO se lee el informe
 - ENTONCES `edadDias = 14` (el cálculo usa `ClockPort`, determinista en test)
 

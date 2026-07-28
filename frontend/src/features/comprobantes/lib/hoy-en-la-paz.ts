@@ -1,5 +1,5 @@
 // CLAUDE.md §4.6: FechaContable es calendario puro; el "hoy" contable se
-// calcula en America/La_Paz, nunca en UTC. Equivale al ClockPort.hoyEnLaPaz()
+// calcula en America/La_Paz, nunca en UTC. Equivale al ClockPort.currentDateLaPaz()
 // del backend. Usar new Date().toISOString() acá desplaza el día cuando la
 // hora de Bolivia (UTC-4) ya cruzó la medianoche en UTC.
 const FECHA_ISO_LA_PAZ = new Intl.DateTimeFormat('en-CA', {

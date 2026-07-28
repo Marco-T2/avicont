@@ -88,7 +88,7 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 
 - **Qué**: `format(new Date(), 'yyyy-MM')` para determinar el período actual.
 - **Por qué duele**: contenedor en UTC, Bolivia en -4. A las 20h La Paz ya es día siguiente en UTC.
-- **Regla**: `ClockPort.hoyEnLaPaz()` inyectable. Tests usan `FakeClock`.
+- **Regla**: `ClockPort` inyectable — `currentDateLaPaz()` (string ISO, se eleva con `FechaContable.fromIso`) para fechas de calendario, `now()` para timestamps UTC. Tests usan `FakeClockAdapter`.
 - **Enforcement**: lint prohíbe `new Date()` en dominio. `ClockPort` es el único camino.
 
 #### Anti-09: Enums como strings dispersos
