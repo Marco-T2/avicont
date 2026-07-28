@@ -37,8 +37,10 @@ export const PASO_ROBO_PX = 4;
 export const ALCANCE_MAX_PX = 60;
 
 /**
- * Los 4 primitivos de `components/ui/` que siguen fuera del piso táctil
- * (frontend/CLAUDE.md §7). El slot identifica al PRIMITIVO interactivo real:
+ * Los 4 primitivos de `components/ui/` que aplican el piso táctil por su
+ * cuenta —`::after`/`::before` invisible o `min-h-11`, ver frontend/CLAUDE.md
+ * §7— y que por eso SOLO se pueden verificar por hit-testing. El slot
+ * identifica al PRIMITIVO interactivo real:
  * `data-slot="select"` va sobre el Root de Radix, que no renderiza DOM — lo
  * que se toca es el trigger. Es un dato, no lógica: agregar un primitivo a la
  * sonda es agregar una fila acá.
@@ -190,10 +192,38 @@ export function sondearTapTargets(config) {
       // resuelve a otro control interactivo es un conflicto: hoy, porque ese
       // vecino está a <22px del centro; mañana, porque el ::after le robaría
       // el click a él.
+      //
+      // La frontera INFERIOR y DERECHA del box no se muestrea sobre la línea:
+      // esos offsets se retraen 1px (+22 → +21). Dos tap targets contiguos de
+      // 44px teselan perfecto y COMPARTEN la línea del borde, y el hit-testing
+      // CSS es half-open ([top, bottom) × [left, right)): un rect contiene su
+      // borde top/left y excluye su bottom/right. En el borde inferior/derecho
+      // del box, el vecino que tesela EMPIEZA exactamente ahí ⇒ contiene el
+      // punto ⇒ se reportaría robo justo cuando el layout es PERFECTO (pasó de
+      // verdad: filas de checkboxes a pitch exacto de 44px en
+      // /settings/roles/nuevo daban 6 robos falsos @375 con las víctimas
+      // midiendo 44×44 completos). El borde superior/izquierdo se muestrea
+      // SOBRE la línea, a propósito: ahí la misma semántica juega a favor —
+      // un vecino que TERMINA en la línea no contiene el punto (queda fuera de
+      // su [top, bottom)), así que solo resuelve a otro control si su extent
+      // CRUZA la línea hacia adentro del box, aunque sea por una banda
+      // sub-pixel. Los 4 robos reales pre-fix se detectaron exactamente así
+      // (lados arriba/izquierda); los falsos, todos por abajo/derecha.
+      // Retraer ambos lados mataría esa sensibilidad; retraer solo el
+      // inferior/derecho es lo mínimo que elimina el falso de la teselación,
+      // porque en ese borde el punto exacto NO distingue "vecino que empieza
+      // en la línea" (robo cero) de "invasor sub-pixel" — y ante esa ambigüedad
+      // se elige no gritar sobre layouts perfectos. La garantía de
+      // PASO_ROBO_PX (≥4 puntos sobre un vecino de ≥16px) se conserva: solo se
+      // corre 1px el anillo de un borde.
       const ladrones = new Map();
       const mitad = minimo / 2;
-      for (let ox = -mitad; ox <= mitad; ox += pasoRobo) {
-        for (let oy = -mitad; oy <= mitad; oy += pasoRobo) {
+      const desplazamientos = [];
+      for (let o = -mitad; o <= mitad; o += pasoRobo) {
+        desplazamientos.push(o === mitad ? mitad - 1 : o);
+      }
+      for (const ox of desplazamientos) {
+        for (const oy of desplazamientos) {
           const x = cx + ox;
           const y = cy + oy;
           if (x < 0 || y < 0 || x >= anchoViewport || y >= altoViewport) continue;

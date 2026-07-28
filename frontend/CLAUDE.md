@@ -293,14 +293,34 @@ Los estándar de Tailwind, sin personalizar:
   input necesita `pr-9 pointer-coarse:pr-12`. Sin eso el botón tapa el final del
   texto y tocar ahí **borra la búsqueda**. El margen es cero: si movés el ancla,
   recalculá.
-- **Fuera del piso, todavía**: `checkbox.tsx` (16×16), `switch.tsx` (32×18),
-  `tabs` y `select-trigger`. Se arreglan extendiendo el área táctil con un
-  `::after` invisible —agrandarlos les cambia el aspecto—, y eso exige medir por
-  hit-testing porque `getBoundingClientRect()` no ve el pseudo-elemento.
-- **Para verificarlo hay que emular el dedo**: `pnpm run medir:ui -- --tactil`.
-  Sin ese flag Chromium se presenta como escritorio y **ningún estilo
-  `pointer-coarse:` aplica** — medir tap targets sin él mide el modo equivocado
-  y da un verde que no prueba nada.
+- **Los 4 primitivos restantes ya están en el piso**, cada uno con el mecanismo
+  que su diseño tolera — no todos usan el mismo, y eso es a propósito:
+  - `checkbox.tsx` y `switch.tsx` → **`::after` invisible** bajo
+    `pointer-coarse:` que extiende el hit-area. Su FORMA es el diseño (la caja
+    de 16px, la píldora de 32×18): agrandarlos les cambia el aspecto.
+  - `tabs.tsx` (`TabsTrigger`) → **`::before` invisible**, porque su `::after`
+    ya está ocupado por el indicador de la variante `line`. Solo se extiende en
+    vertical: hacia los costados le robaría el click al trigger vecino.
+  - `select-trigger` → **`pointer-coarse:min-h-11`**, igual que `button.tsx` e
+    `input.tsx`: el trigger ES visualmente un input y crece como él; no hay
+    forma que preservar.
+
+  **Los insets de los pseudo-elementos se computan desde el PADDING box**, no
+  desde el border box: el borde de 1px hizo fallar el cálculo ingenuo en los 4
+  primitivos (daba 46/42/43 contra los 44 reales). Por eso los insets se
+  **miden** con `pnpm run medir:tap -- --tactil` (hit-testing con
+  `elementFromPoint` — `getBoundingClientRect()` no ve pseudo-elementos),
+  nunca se calculan de cabeza.
+- **Para verificar tap targets hay que emular el dedo**: `--tactil` en
+  `medir:tap`/`medir:ui`. Sin ese flag Chromium se presenta como escritorio y
+  **ningún estilo `pointer-coarse:` aplica** — medir tap targets sin él mide el
+  modo equivocado y da un verde que no prueba nada.
+- **El invariante tiene gate en CI**: `pnpm run gate:tap`
+  (`scripts/gate-tap-targets.mjs`, paso `Tap targets gate` del job `ui-gate`)
+  falla si un primitivo del piso mide <44×44 bajo dedo o si su box de 44px le
+  roba el click a otro control, sobre las 25 rutas de `scripts/rutas-gate.mjs`.
+  Allowlist vacía. Lo que no alcanza (platform-admin, granja, contenido de
+  sheets/dialogs) está declarado en su cabecera.
 
 #### Inputs con `font-size ≥ 16 px` en mobile
 - iOS Safari **hace auto-zoom** al focusear inputs con font < 16 px. Es visualmente destructivo.
@@ -351,7 +371,10 @@ visuales en mobile o dark mode. Copiarlo al cuerpo del commit o del PR:
 - [ ] Renderizado correcto en **768 px** (iPad, breakpoint `md:`)
 - [ ] Renderizado correcto en **1440 px** (laptop, breakpoint `xl:` target)
 - [ ] Tap targets ≥ **44×44 px** en todo lo interactivo, verificado **con dedo
-      emulado** (`pnpm run medir:ui -- --tactil`; sin el flag no se mide nada)
+      emulado** (`pnpm run medir:tap -- --tactil` para los primitivos del piso,
+      `pnpm run medir:ui -- --tactil` para geometría general; sin el flag no se
+      mide nada). `pnpm run gate:tap` en verde si el cambio toca un primitivo
+      del piso o una pantalla de `rutas-gate.mjs`
 - [ ] **Modo oscuro** verificado — ningún color literal (ver §6, Anti-F-10).
       Usar variables del tema (`text-foreground`, `bg-primary`, `bg-clase-activo-bg`, …).
 - [ ] Navegación accesible en `< md` (drawer/hamburger funciona)

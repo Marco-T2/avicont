@@ -47,6 +47,9 @@ const SIZE = 'data-[size';
 const conSize = (valor: string, utility: string) =>
   `${SIZE}=${valor}]:${utility}`;
 
+// Armado por el mismo motivo: que el escáner no regenere la utility desde acá.
+const PISO_TACTIL = ['pointer-coarse', ['min-h', '11'].join('-')].join(':');
+
 function renderTrigger(className?: string, size?: 'sm' | 'default') {
   render(
     <Select>
@@ -144,8 +147,37 @@ describe('SelectTrigger — alto', () => {
     // `data-[size=default]:h-9`, que es otro string — verificado por mutación,
     // con el bug de vuelta este test pasaba igual.
     expect(clases.filter((c) => c.endsWith('h-9'))).toHaveLength(0);
-    // El prefijo responsive es otra clave, así que sobrevive intacto: 44px de
-    // tap target en mobile (§7) y la densidad declarada de sm para arriba.
+    // El prefijo responsive es otra clave, así que sobrevive intacto. (Que un
+    // llamador NO deba escribir `h-11 sm:h-8` es la convención §7 — acá solo
+    // se prueba la mecánica del merge.)
     expect(clases).toContain('sm:h-8');
+  });
+});
+
+/**
+ * Red DÉBIL, igual que en button.tsx/input.tsx: jsdom no aplica Tailwind, así
+ * que esto prueba que la clase llega al DOM, no que gane la cascada. El layout
+ * real se verificó por hit-testing en navegador (`pnpm run medir:tap --tactil`).
+ * Lo que caza: que el piso táctil se borre del primitivo sin que nadie lo note,
+ * o que vuelva la convención vieja por breakpoint al lado del piso.
+ */
+describe('SelectTrigger — piso táctil de 44px (pointer: coarse)', () => {
+  it('lleva el piso de alto', () => {
+    expect(renderTrigger()).toContain(PISO_TACTIL);
+  });
+
+  it('el piso sobrevive al merge con un alto del llamador', () => {
+    // tailwind-merge solo colapsa clases del MISMO grupo y MISMO prefijo de
+    // variante: el h-8 plano del llamador no debe comerse el min-h táctil.
+    expect(renderTrigger(['h', '8'].join('-'))).toContain(PISO_TACTIL);
+  });
+
+  it('no reintroduce el piso por breakpoint (convención vieja)', () => {
+    // Gemelo negativo del piso: mata al mutante "piso presente Y además
+    // `md:h-*`/`md:min-h-*` al lado", que es la convención vieja disfrazada.
+    const conBreakpoint = renderTrigger().filter((c) =>
+      /^md:(min-h|h|py|p)-/.test(c),
+    );
+    expect(conBreakpoint).toHaveLength(0);
   });
 });

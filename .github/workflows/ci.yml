@@ -160,13 +160,17 @@ jobs:
       - name: Build
         run: pnpm run build
 
-  # Gate de UI: falla si alguna pantalla recorta contenido horizontalmente.
+  # Gates de UI sobre el build servido con vite preview:
+  #   1. gate:ui  — ninguna pantalla recorta contenido horizontalmente.
+  #   2. gate:tap — los primitivos del piso táctil miden ≥44×44 bajo dedo y su
+  #      box de 44px no le roba el click a otro control.
   #
-  # El invariante se eligió CON DATOS, no a ojo (ver docs/claude/verificacion-frontend.md §6):
-  # el candidato obvio —"tap targets ≥44px"— lo violan 118 de 186 elementos
-  # interactivos en 25 de 25 rutas, porque 36px es el default de button.tsx.
-  # Nacería con 118 excepciones. Éste, en cambio, es binario por pantalla y su
-  # baseline es verde con la allowlist vacía.
+  # El primer invariante se eligió CON DATOS, no a ojo (ver
+  # docs/claude/verificacion-frontend.md §6): en su momento "tap targets ≥44px"
+  # se descartó porque lo violaban 141 de 217 controles — un gate que nace con
+  # excepciones no assertea nada. Los PRs #285/#286 y el piso en los 4
+  # primitivos (checkbox/switch/tabs/select) llevaron ese baseline a cero, y
+  # desde entonces el segundo gate lo congela. Ambos nacen con allowlist vacía.
   #
   # Necesita el stack real porque toda pantalla vive detrás del login. Los pasos
   # de infra son los mismos que ya usa `contract-drift`; lo que suma es el seed
@@ -302,6 +306,13 @@ jobs:
       - name: UI gate
         working-directory: frontend
         run: pnpm run gate:ui
+
+      - name: Tap targets gate
+        # Emula (pointer: coarse) por su cuenta — gate:ui corre en modo
+        # escritorio a propósito y este invariante solo existe bajo dedo.
+        # Reusa el mismo stack (backend + seed + preview) que el paso anterior.
+        working-directory: frontend
+        run: pnpm run gate:tap
 
       - name: Backend log on failure
         if: failure()
