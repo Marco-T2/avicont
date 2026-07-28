@@ -40,12 +40,18 @@ const CONTADOR_PERMISSIONS = [
   'contabilidad.compras.update',
   'contabilidad.compras.delete',
   'contabilidad.periodos.read',
-  // El cierre mensual se enforcea como periodos.cerrar (periodos-fiscales.controller);
-  // el viejo 'cierre-mensual.create' era un fantasma que ningún endpoint exigía.
-  'contabilidad.periodos.cerrar',
+  // El viejo 'cierre-mensual.create' era un fantasma que ningún endpoint exigía
+  // y se eliminó SIN reemplazo. El verbo real del cierre mensual es
+  // periodos.cerrar (periodos-fiscales.controller), pero queda deliberadamente
+  // FUERA de este template: D-23 (openspec/changes/ventas-piloto/proposal.md)
+  // — el Contador contabiliza y anula, pero no cierra nada; ningún verbo
+  // irreversible (gestiones.cerrar, periodos.cerrar/reabrir/marcar-definitivo,
+  // cierre-mensual.execute). No lo "arregles" otorgándolo.
+  'contabilidad.cierre-mensual.read',
   // Los períodos no se crean sueltos: nacen los 12 al crear la gestión fiscal
   // (gestiones-fiscales.controller exige gestiones.create). El viejo
-  // 'periodos.create' era un fantasma sin enforcement.
+  // 'periodos.create' era un fantasma sin enforcement; crear no es
+  // irreversible, así que no choca con D-23.
   'contabilidad.gestiones.read',
   'contabilidad.gestiones.create',
   'contabilidad.eeff.read',
