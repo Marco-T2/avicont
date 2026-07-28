@@ -225,7 +225,11 @@ export function PermissionsPicker({
                   ancestro posicionado su bloque contenedor es el documento —
                   escapan al `overflow-hidden` del shell (que es `static`) y
                   estiran el <html>, agregando una segunda barra de scroll. */}
-              <div className="relative flex items-center gap-2 px-3 py-2">
+              {/* pointer-coarse:gap-4: bajo dedo el ::after del checkbox llega
+                  a 14px más allá de su borde; con gap-2 (8px) le robaba el
+                  click al borde izquierdo del botón del acordeón — robo medido
+                  por medir:tap ANTES de este cambio. 16px de gap lo despeja. */}
+              <div className="relative flex items-center gap-2 pointer-coarse:gap-4 px-3 py-2">
                 <Checkbox
                   aria-label={`Seleccionar todo ${etiquetaGrupo(mod.modulo)}`}
                   checked={

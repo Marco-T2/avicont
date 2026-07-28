@@ -133,7 +133,6 @@ export function MovimientosPanel({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onDeshacer(matchDeshacible)}
                       >
@@ -144,7 +143,6 @@ export function MovimientosPanel({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onCambiarEstado(mov.id, 'IGNORADO')}
                       >
@@ -155,7 +153,6 @@ export function MovimientosPanel({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-10 sm:h-8"
                         disabled={accionEnCurso}
                         onClick={() => onCambiarEstado(mov.id, 'PENDIENTE')}
                       >

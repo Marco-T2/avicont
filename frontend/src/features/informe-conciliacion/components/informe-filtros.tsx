@@ -111,14 +111,13 @@ export function InformeFiltros({ onEmitir, isFetching }: InformeFiltrosProps): R
           />
         </div>
 
-        {/* §7 pide 44px de tap target en mobile y `size="sm"` da 32: el CTA
-            principal era el objetivo más chico de la pantalla. Se sube solo
-            por debajo de `sm`; en escritorio, donde se apunta con mouse, la
-            densidad queda igual. */}
+        {/* §7: el piso táctil de 44px lo aplica button.tsx con pointer-coarse:
+            — por dispositivo, no por breakpoint. size="sm" (32px) queda para
+            mouse, también en ventana angosta. */}
         <Button
           type="button"
           size="sm"
-          className="h-11 self-start sm:h-8 sm:self-end"
+          className="self-start sm:self-end"
           onClick={handleEmitir}
           disabled={isFetching}
         >

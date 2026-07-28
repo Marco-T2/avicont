@@ -158,7 +158,7 @@ export function VerificadorFiltros({
           <Select value={cuentaBancariaId} onValueChange={setCuentaBancariaId}>
             <SelectTrigger
               id="verificador-cuenta"
-              className="h-11 sm:h-8 w-48 text-sm"
+              className="h-8 w-48 text-sm"
               aria-label="Cuenta bancaria"
             >
               <SelectValue />
@@ -242,7 +242,7 @@ export function VerificadorFiltros({
           <Select value={estado} onValueChange={setEstado}>
             <SelectTrigger
               id="verificador-estado"
-              className="h-11 sm:h-8 w-44 text-sm"
+              className="h-8 w-44 text-sm"
               aria-label="Estado"
             >
               <SelectValue />

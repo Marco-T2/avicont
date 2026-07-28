@@ -393,23 +393,60 @@ revisión de browser. **Ojo: `playwright install` PODA las revisiones que ya no
 corresponden** (el 1234 desapareció de la cache al instalar el 1228), así que no
 cuentes con tener las dos a mano.
 
-### 6.1 El gate en CI (cerrado el 2026-07-27)
+### 6.1 Los gates en CI (desborde cerrado el 2026-07-27; tap targets, el mismo día más tarde)
 
-Corre como el job **`ui-gate`** de `.github/workflows/ci.yml`:
-`pnpm run gate:ui` (`frontend/scripts/gate-ui.mjs`) sobre el **build** servido con
-`vite preview`, con el stack real detrás porque toda pantalla vive tras el login.
+Corren como el job **`ui-gate`** de `.github/workflows/ci.yml`: `pnpm run gate:ui`
+(`frontend/scripts/gate-ui.mjs`, desborde horizontal) y `pnpm run gate:tap`
+(`frontend/scripts/gate-tap-targets.mjs`, piso táctil) sobre el **build** servido
+con `vite preview`, con el stack real detrás porque toda pantalla vive tras el
+login.
 
-**El invariante se eligió midiendo, no opinando** — y el dato mató al candidato
-obvio. Tap targets ≥ 44 px: **118 de 186** elementos interactivos visibles lo
-violan, en **25 de 25 rutas**. La firma dominante es `36×36` (botones-ícono), y
-36 px es `h-9`, **el default de `button.tsx`**. No era el `h-7 w-7` deliberado de
-`comprobantes-filters.tsx` lo que estorbaba: es que **el mínimo del checklist §7
-nunca lo cumplió el propio sistema de diseño**. Ese gate nace con 118 excepciones,
-o sea no assertea nada. Sigue siendo deuda real, pero de rediseño, no de CI.
+**El primer invariante se eligió midiendo, no opinando** — y el dato de entonces
+mató al candidato obvio. Tap targets ≥ 44 px se descartó como gate porque lo
+violaba la mayoría de la app (la cifra que circuló, "118 de 186", estaba además
+mal: la medición real daba **141 de 217** controles visibles @375). La firma
+dominante era `36×36`, y 36 px es `h-9`, **el default de `button.tsx`**: el mínimo
+del checklist §7 nunca lo había cumplido el propio sistema de diseño. Un gate que
+nace con 141 excepciones no assertea nada — en ese momento era deuda de rediseño,
+no de CI.
 
-**El invariante que quedó**: en cada pantalla, `main` no desborda horizontalmente
-(`scrollWidth <= clientWidth`), a 375 y 768 px. Binario por pantalla, sin grises, y
-su baseline es **verde con la allowlist vacía**.
+**Eso cambió en tres pasos, y hoy tap targets SÍ es gate:**
+
+1. **PR #285** puso el piso `pointer-coarse:min-h-11` en `button.tsx` e
+   `input.tsx` — por **dispositivo** (`pointer: coarse`), no por breakpoint — y
+   barrió los `h-11 sm:h-8` de los call sites: las violaciones masivas del
+   default cayeron de una.
+2. **PR #286** aplicó el mismo piso al sidebar — el archivo que más violaba la
+   regla y que el #285 había dejado intacto mientras la escribía en el doc. Es la
+   prueba de que sin gate la regla vuelve a ser una promesa.
+3. El cierre llevó al piso los 4 primitivos restantes (`checkbox`, `switch`,
+   `tabs-trigger`, `select-trigger`) con `::after`/`::before` invisibles o
+   `min-h-11` según su diseño (frontend/CLAUDE.md §7), medidos con una sonda de
+   **hit-testing** (`scripts/lib/tap-targets.mjs`, expuesta como
+   `pnpm run medir:tap`) porque `getBoundingClientRect()` no ve pseudo-elementos.
+   Con el baseline en **cero**, el invariante se congeló en
+   `scripts/gate-tap-targets.mjs` (paso `Tap targets gate` del job `ui-gate`):
+   falla si un primitivo mide <44×44 bajo dedo **o** si su box de 44 px le roba
+   el click a otro control. Nace con **allowlist vacía**, igual que el de
+   desborde.
+
+La sonda del gate aprendió una lección propia: muestrear la **frontera** del box
+de 44 px reporta robo justo cuando el layout es perfecto — dos tap targets
+contiguos de 44 teselan y comparten la línea, y el hit-testing se la da al
+vecino. El borde inferior/derecho del box se muestrea retraído 1 px; el
+superior/izquierdo sobre la línea, donde la semántica half-open de los rects CSS
+(`[top, bottom)`) hace que solo un invasor real resuelva ahí. El porqué completo
+vive en `scripts/lib/tap-targets.mjs`.
+
+Fuera del alcance del gate de tap (declarado en su cabecera, no escondido):
+`/platform-admin/*` (pide super-admin; ahí queda un switch en celda de tabla de
+`feature-flags-page.tsx:175`, fila ≈34 px, **sin verificar**), `/granja/*` (la
+org del seed es vertical CONTABILIDAD) y el contenido de sheets/dialogs que
+exigen un click para montarse.
+
+**El invariante del gate de desborde**: en cada pantalla, `main` no desborda
+horizontalmente (`scrollWidth <= clientWidth`), a 375 y 768 px. Binario por
+pantalla, sin grises, y su baseline es **verde con la allowlist vacía**.
 
 **La trampa que casi lo hunde, y la lección general**: medido sobre `body` daba
 cero desborde en toda la app… y el cero era **falso**. `dashboard-shell.tsx`
@@ -423,14 +460,15 @@ Lo que el gate protege es contenido **inalcanzable**: recortado y sin scroll que
 rescate. El primer bug que encontró fue el CTA `Nuevo comprobante` terminando en
 x=490 sobre un viewport de 375.
 
-**Cobertura y sus límites** (declarados, no omitidos): 24 rutas × 2 viewports.
-`scripts/rutas-gate.mjs` lista las cubiertas y las excluidas **con motivo**;
-`src/routes/rutas-gate.test.ts` compara esa lista contra el router de verdad en
-las dos direcciones, así que una pantalla nueva sin decisión de cobertura rompe
-la suite. Quedan fuera las rutas con `:id`, las públicas, granja (la org del seed
-es vertical CONTABILIDAD) y platform-admin (pide super-admin).
+**Cobertura y sus límites** (declarados, no omitidos): 25 rutas × 2 viewports,
+compartidas por ambos gates. `scripts/rutas-gate.mjs` lista las cubiertas y las
+excluidas **con motivo**; `src/routes/rutas-gate.test.ts` compara esa lista
+contra el router de verdad en las dos direcciones, así que una pantalla nueva
+sin decisión de cobertura rompe la suite. Quedan fuera las rutas con `:id`, las
+públicas, granja (la org del seed es vertical CONTABILIDAD) y platform-admin
+(pide super-admin).
 
-El gate **falla si una ruta redirige** en vez de abrir. No es celo: el barrido
+Ambos gates **fallan si una ruta redirige** en vez de abrir. No es celo: el barrido
 manual previo contaba `/gestiones/cierre` como pantalla y en realidad estaba
 midiendo `/periodos-fiscales` dos veces, porque ese path es un redirector y sin
 gestiones en la BD rebota. Una medición que no vio la pantalla no puede reportarse

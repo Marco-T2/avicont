@@ -120,14 +120,16 @@ describe('InformeFiltros', () => {
     expect(screen.getByLabelText('Cuenta bancaria')).toHaveClass('w-full');
   });
 
-  // §7: 44px de tap target en mobile. `size="sm"` da 32px, así que el CTA
-  // principal era el objetivo más chico de la pantalla; en `sm:` vuelve a la
-  // densidad de escritorio.
-  it('da 44px de alto al CTA en mobile sin engordarlo en escritorio', () => {
+  // §7: el piso táctil de 44px lo aplica button.tsx por `pointer: coarse`
+  // (propiedad del dispositivo). El CTA no debe reintroducir la convención
+  // vieja por breakpoint (`h-11 sm:h-8`), que le daba 44px a un mouse en
+  // ventana angosta y nada extra a una tablet táctil.
+  it('no fija el alto del CTA por breakpoint: el piso táctil viene del primitivo', () => {
     renderFiltros();
 
     const boton = screen.getByRole('button', { name: /emitir informe/i });
-    expect(boton).toHaveClass('h-11');
-    expect(boton).toHaveClass('sm:h-8');
+    // Armado para que el escáner de Tailwind no levante el literal del test.
+    expect(boton).toHaveClass(['pointer-coarse', 'min-h-11'].join(':'));
+    expect(boton.className).not.toMatch(/\bsm:h-\d/);
   });
 });

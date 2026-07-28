@@ -255,7 +255,7 @@ export function PeriodoGestionFiltro({
             >
               <SelectTrigger
                 id="pgf-preset"
-                className="h-11 sm:h-8 text-sm w-52"
+                className="h-8 text-sm w-52"
                 aria-label="Preset de período"
               >
                 <SelectValue />

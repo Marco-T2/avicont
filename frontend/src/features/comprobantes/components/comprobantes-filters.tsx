@@ -103,7 +103,11 @@ export function ComprobantesFilters(): React.JSX.Element {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      {/* pointer-coarse:gap-y-6: bajo dedo el ::after del switch sube 13px más
+          allá de su borde; con gap-3 (12px) entre líneas wrapeadas a 375px le
+          robaba 1px al select de arriba (medido con medir:tap). 24px de aire
+          vertical dejan a cada control su box táctil completo. */}
+      <div className="flex flex-wrap items-end gap-3 pointer-coarse:gap-y-6">
         {/* Filtro tipo */}
         <div className="space-y-1">
           <Label htmlFor="filter-tipo" className="text-xs text-muted-foreground">
@@ -113,7 +117,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={tipo === '' ? 'todos' : tipo}
             onValueChange={(v) => setParam('tipo', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-tipo" className="h-11 sm:h-8 text-sm w-36">
+            <SelectTrigger id="filter-tipo" className="h-8 text-sm w-36">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -138,7 +142,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={estado === '' ? 'todos' : estado}
             onValueChange={(v) => setParam('estado', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-estado" className="h-11 sm:h-8 text-sm w-40">
+            <SelectTrigger id="filter-estado" className="h-8 text-sm w-40">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>
@@ -159,7 +163,7 @@ export function ComprobantesFilters(): React.JSX.Element {
             value={periodoFiscalId === '' ? 'todos' : periodoFiscalId}
             onValueChange={(v) => setParam('periodoFiscalId', v === 'todos' ? '' : v)}
           >
-            <SelectTrigger id="filter-periodo" className="h-11 sm:h-8 text-sm w-44">
+            <SelectTrigger id="filter-periodo" className="h-8 text-sm w-44">
               <SelectValue placeholder="Todos" />
             </SelectTrigger>
             <SelectContent>

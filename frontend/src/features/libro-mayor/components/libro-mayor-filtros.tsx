@@ -92,7 +92,12 @@ export function LibroMayorFiltros({
         error={error}
       />
 
-      <div className="flex flex-wrap items-end gap-3">
+      {/* pointer-coarse:gap-y-6: bajo dedo el ::after de cada switch sube y
+          baja 13px más allá de su borde; a 375px los dos switches quedan en
+          líneas wrapeadas consecutivas y con gap-3 (12px) sus áreas táctiles
+          se pisaban entre sí y con el autocomplete de arriba (medido con
+          medir:tap). El pitch necesita ≥44px entre centros: 24px de aire. */}
+      <div className="flex flex-wrap items-end gap-3 pointer-coarse:gap-y-6">
         {/* Filtro por cuenta (opcional) */}
         <div className="space-y-1">
           <Label htmlFor="mayor-cuenta" className="text-xs text-muted-foreground">

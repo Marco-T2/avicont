@@ -2,11 +2,15 @@
 // Gate de UI: falla el build si alguna pantalla recorta contenido horizontalmente.
 //
 // El invariante NO se eligió a ojo. Se midió la app entera con `medir:ui` y el
-// dato descartó al candidato obvio: "tap targets ≥44px" lo violan 118 de 186
-// elementos interactivos en 25 de 25 rutas, porque 36px es el alto por default
-// de `button.tsx`. Un gate así nace con 118 excepciones, o sea no assertea nada.
+// dato descartó al candidato obvio: "tap targets ≥44px" lo violaban 141 de 217
+// controles visibles @375, porque el propio sistema de diseño no cumplía su
+// mínimo. Un gate así nace con las excepciones puestas, o sea no assertea nada.
+// (Eso cambió: los PRs #285/#286 y el piso en los 4 primitivos llevaron el
+// baseline a cero, y hoy tap targets SÍ es gate — `gate-tap-targets.mjs`, que
+// emula dedo. Este script sigue midiendo SIN emulación táctil a propósito:
+// desborde en modo escritorio; cada invariante en su script.)
 //
-// Este invariante, en cambio, es binario por pantalla y su baseline es verde con
+// Este invariante es binario por pantalla y su baseline es verde con
 // la allowlist vacía. Ver `docs/claude/verificacion-frontend.md` §6.
 //
 // Por qué `main` y no `body`: `dashboard-shell.tsx` envuelve el contenido en un
