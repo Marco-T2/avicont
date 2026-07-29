@@ -39,15 +39,23 @@ import type {
   LineaFlujoCalculada,
 } from '../dto/estado-flujo-efectivo-response.dto';
 import type { CuentaEstructuraRow, SaldoCuentaRow } from '../ports/eeff-saldos-reader.port';
+import { esEfectivoPorCodigo } from '@/common/domain/efectivo';
+
 import { calcularResultadoEjercicioBob } from './resultado-ejercicio';
 import { calcularSaldoNeto } from './saldo-naturaleza';
 
 /**
- * Prefijo de efectivo y equivalentes del plan de cuentas — convención del seed
- * comercial (`1.1.1` = "EFECTIVO Y EQUIVALENTES DE EFECTIVO", hojas CAJA/BANCOS).
- * Heurística confiable como fallback, no garantía: el admin puede recodificar.
+ * El prefijo y el predicado por cuenta viven en `common/domain/efectivo.ts`
+ * porque Ventas/Cobros los comparten (§3.3: `cuentas` no puede importar de
+ * `reportes`). Se re-exporta el prefijo para no romper a quien ya lo importaba
+ * desde acá.
+ *
+ * ⚠️ Lo que NO se comparte es la regla de abajo: el **interruptor de
+ * organización** de este reporte (si alguna cuenta está marcada, la heurística
+ * se apaga para todas) es propio del EFE. Ventas usa una **unión por cuenta**.
+ * Ver el docstring de `common/domain/efectivo.ts`.
  */
-export const CODIGO_EFECTIVO_PREFIJO = '1.1.1';
+export { CODIGO_EFECTIVO_PREFIJO } from '@/common/domain/efectivo';
 
 const NOMBRE_RESULTADO_EJERCICIO = 'Resultado del ejercicio';
 
@@ -86,10 +94,6 @@ export function resolverActividadFlujo(cuenta: CuentaEstructuraRow): ActividadFl
   }
   // NIC 7: resto (corrientes no-efectivo, ingresos, egresos) = operación.
   return ActividadFlujo.OPERACION;
-}
-
-function esEfectivoPorCodigo(cuenta: CuentaEstructuraRow): boolean {
-  return cuenta.esDetalle && cuenta.codigoInterno.startsWith(CODIGO_EFECTIVO_PREFIJO);
 }
 
 export function construirEstadoFlujoEfectivo(
