@@ -27,6 +27,7 @@ import { FechaContable } from '@/common/domain/fecha-contable';
 import { Money } from '@/common/domain/money';
 
 import {
+  ComprobanteAnularMotivoInvalidoError,
   ComprobanteDesbalanceadoError,
   ComprobanteMontoCeroError,
   ComprobanteSinLineasError,
@@ -40,6 +41,23 @@ import {
 
 /** Mínimo de líneas para contabilizar (un asiento necesita al menos un DEBE y un HABER). */
 export const MIN_LINEAS_CONTABILIZADO = 2;
+
+/**
+ * §4.7: la anulación exige un motivo con al menos 10 caracteres significativos.
+ * Es la ÚNICA fricción del flujo, así que la regla tiene que ser una sola:
+ * la comparte el `anular` de usuario y el `anularSistema` que usan ventas y
+ * cobros. Devuelve el motivo ya trimmeado — lo que se persiste y lo que se
+ * mide son el mismo string, no dos parecidos.
+ *
+ * @throws ComprobanteAnularMotivoInvalidoError
+ */
+export function validarMotivoAnulacion(motivo: string | null | undefined): string {
+  const motivoTrim = (motivo ?? '').trim();
+  if (motivoTrim.length < ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA) {
+    throw new ComprobanteAnularMotivoInvalidoError(motivoTrim.length);
+  }
+  return motivoTrim;
+}
 
 export interface LineaParaValidar {
   orden: number;
