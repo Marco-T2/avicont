@@ -5394,6 +5394,274 @@
         ]
       }
     },
+    "/api/items": {
+      "post": {
+        "operationId": "ItemsController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Crea un ítem. Sólo `nombre` y `tipo` son obligatorios (D-24): no se le pide nomenclatura a quien sólo quiere cobrar.",
+        "tags": [
+          "Ítems"
+        ]
+      },
+      "get": {
+        "operationId": "ItemsController_listar",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda parcial case-insensitive sobre nombre y código.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PRODUCTO",
+                "SERVICIO"
+              ]
+            }
+          },
+          {
+            "name": "activo",
+            "required": false,
+            "in": "query",
+            "description": "true (default) sólo activos, false sólo inactivos, 'all' ambos.",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarItemsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Lista ítems del tenant con paginación y filtros (q, tipo, activo).",
+        "tags": [
+          "Ítems"
+        ]
+      }
+    },
+    "/api/items/{id}": {
+      "get": {
+        "operationId": "ItemsController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Detalle del ítem.",
+        "tags": [
+          "Ítems"
+        ]
+      },
+      "patch": {
+        "operationId": "ItemsController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "PATCH del ítem. Sólo toca los campos presentes. El toggle activo/inactivo vive en endpoints dedicados.",
+        "tags": [
+          "Ítems"
+        ]
+      },
+      "delete": {
+        "operationId": "ItemsController_desactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Desactiva el ítem (soft-delete). Idempotente. Deja de ofrecerse para ventas nuevas; las existentes no se tocan.",
+        "tags": [
+          "Ítems"
+        ]
+      }
+    },
+    "/api/items/{id}/reactivar": {
+      "post": {
+        "operationId": "ItemsController_reactivar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Reactiva un ítem inactivo. Idempotente.",
+        "tags": [
+          "Ítems"
+        ]
+      }
+    },
     "/api/libros/diario": {
       "get": {
         "operationId": "ReportesController_obtenerLibroDiario",
@@ -9762,6 +10030,201 @@
             "type": "string",
             "nullable": true,
             "format": "uuid"
+          }
+        }
+      },
+      "CreateItemDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Pollo entero",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "PRODUCTO",
+              "SERVICIO"
+            ],
+            "example": "PRODUCTO",
+            "description": "Responde ¿es físico? y nada más. \"¿Le sigo el stock?\" será un booleano del pack Inventario, nunca un tercer valor de este enum (D-26)."
+          },
+          "codigo": {
+            "type": "string",
+            "example": "P-01",
+            "maxLength": 50,
+            "nullable": true,
+            "description": "Opcional (D-24). Se normaliza a mayúsculas y sin espacios en los bordes; único por organización sólo cuando existe."
+          },
+          "unidadMedida": {
+            "type": "string",
+            "example": "kg",
+            "maxLength": 20,
+            "nullable": true,
+            "description": "Texto libre. No hay motor de conversiones (D-25)."
+          },
+          "precioUnitarioSugerido": {
+            "type": "string",
+            "example": "6.305000",
+            "nullable": true,
+            "description": "Decimal(18,6) como string. Es un PRECIO sugerido, no un monto: admite sub-centavo (precio por kg) y el redondeo a moneda ocurre una sola vez, en el subtotal de la línea."
+          },
+          "cantidadPorDefecto": {
+            "type": "string",
+            "example": "12",
+            "description": "Decimal(18,6) como string, > 0. Si se omite, el default del schema es 1. Sirve para negocios que venden en cajas o jaulas (D-25)."
+          },
+          "cuentaIngresoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Cuenta de ingreso del ítem. Si se omite, al vender cae al concepto `ventasId` de la configuración contable. Debe ser activa y de detalle."
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo"
+        ]
+      },
+      "ItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "codigo": {
+            "type": "string",
+            "nullable": true,
+            "example": "P-01"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Pollo entero"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "PRODUCTO",
+              "SERVICIO"
+            ]
+          },
+          "unidadMedida": {
+            "type": "string",
+            "nullable": true,
+            "example": "kg"
+          },
+          "precioUnitarioSugerido": {
+            "type": "string",
+            "nullable": true,
+            "example": "6.305000"
+          },
+          "cantidadPorDefecto": {
+            "type": "string",
+            "example": "1.000000"
+          },
+          "cuentaIngresoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "activo": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "codigo",
+          "nombre",
+          "tipo",
+          "unidadMedida",
+          "precioUnitarioSugerido",
+          "cantidadPorDefecto",
+          "cuentaIngresoId",
+          "activo",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ListarItemsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemResponseDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 42
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 50
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateItemDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Pollo entero",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "PRODUCTO",
+              "SERVICIO"
+            ]
+          },
+          "codigo": {
+            "type": "string",
+            "maxLength": 50,
+            "nullable": true
+          },
+          "unidadMedida": {
+            "type": "string",
+            "maxLength": 20,
+            "nullable": true
+          },
+          "precioUnitarioSugerido": {
+            "type": "string",
+            "example": "6.305000",
+            "nullable": true
+          },
+          "cantidadPorDefecto": {
+            "type": "string",
+            "example": "12"
+          },
+          "cuentaIngresoId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
           }
         }
       },

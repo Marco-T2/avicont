@@ -230,6 +230,17 @@ export class CuentasService {
       );
     }
 
+    const items = await this.repo.itemsActivosQueUsanCuenta(tenantId, id);
+    if (items.length > 0) {
+      throw new ConflictException(
+        cuentaError(
+          CuentaErrorCode.REFERENCIADA_POR_ITEMS,
+          'La cuenta está asignada como cuenta de ingreso de ítems activos; re-mapealos antes de desactivar',
+          { cuentaId: id, items },
+        ),
+      );
+    }
+
     const desactivada = await this.repo.desactivar(id, tenantId);
     return toCuentaResponse(desactivada);
   }

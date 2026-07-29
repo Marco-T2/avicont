@@ -39,6 +39,7 @@ function makeRepoMock(): MockRepo {
     desactivar: jest.fn(),
     reactivar: jest.fn(),
     conceptosQueUsanCuenta: jest.fn(),
+    itemsActivosQueUsanCuenta: jest.fn(),
   };
 }
 
@@ -347,9 +348,40 @@ describe('CuentasService', () => {
       );
     });
 
-    it('desactiva cuando no tiene conceptos ni es requerida', async () => {
+    it('rechaza con la lista de items cuando esta enchufada como cuentaIngresoId', async () => {
+      // REQ-ITM-05 / Anti-41: el admin no desactiva una cuenta sin saber que
+      // hay items apuntandole. La lista va en `details` para que la UI diga
+      // CUALES, no solo cuantos.
       repo.findById.mockResolvedValue(cuentaFactory());
       repo.conceptosQueUsanCuenta.mockResolvedValue([]);
+      repo.itemsActivosQueUsanCuenta.mockResolvedValue([
+        { id: 'i1', nombre: 'Pollo entero', codigo: 'P-01' },
+        { id: 'i2', nombre: 'Flete', codigo: null },
+      ]);
+
+      await expectErrorCode(
+        service.desactivar(TENANT_ID, 'c1'),
+        CuentaErrorCode.REFERENCIADA_POR_ITEMS,
+      );
+      expect(repo.desactivar).not.toHaveBeenCalled();
+    });
+
+    it('los items INACTIVOS no bloquean (el guard mira solo los activos)', async () => {
+      // El repo ya filtra por activo; el service confia en eso. Un item
+      // desactivado no va a generar ninguna venta nueva, asi que retenerle la
+      // cuenta al admin seria un bloqueo sin causa.
+      repo.findById.mockResolvedValue(cuentaFactory());
+      repo.conceptosQueUsanCuenta.mockResolvedValue([]);
+      repo.itemsActivosQueUsanCuenta.mockResolvedValue([]);
+      repo.desactivar.mockResolvedValue(cuentaFactory({ activa: false }));
+
+      await expect(service.desactivar(TENANT_ID, 'c1')).resolves.toBeDefined();
+    });
+
+    it('desactiva cuando no tiene conceptos, ni items, ni es requerida', async () => {
+      repo.findById.mockResolvedValue(cuentaFactory());
+      repo.conceptosQueUsanCuenta.mockResolvedValue([]);
+      repo.itemsActivosQueUsanCuenta.mockResolvedValue([]);
       repo.desactivar.mockResolvedValue(cuentaFactory({ activa: false }));
 
       const resp = await service.desactivar(TENANT_ID, 'c1');

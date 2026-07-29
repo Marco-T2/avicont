@@ -186,6 +186,20 @@ export class PrismaCuentaRepository implements CuentaRepositoryPort {
     return CONCEPTO_FIELDS.filter((field) => rawConfig[field] === cuentaId);
   }
 
+  async itemsActivosQueUsanCuenta(
+    tenantId: string,
+    cuentaId: string,
+  ): Promise<{ id: string; nombre: string; codigo: string | null }[]> {
+    // Sólo los ACTIVOS: un ítem desactivado no va a generar ninguna venta
+    // nueva, así que retenerle la cuenta al admin sería un bloqueo sin causa.
+    // Sostenido por el índice (organizationId, cuentaIngresoId).
+    return this.prisma.item.findMany({
+      where: { organizationId: tenantId, cuentaIngresoId: cuentaId, activo: true },
+      select: { id: true, nombre: true, codigo: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
   private async actualizarCampo(
     id: string,
     tenantId: string,

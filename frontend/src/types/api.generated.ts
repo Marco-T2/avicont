@@ -1776,6 +1776,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista ítems del tenant con paginación y filtros (q, tipo, activo). */
+        get: operations["ItemsController_listar"];
+        put?: never;
+        /** Crea un ítem. Sólo `nombre` y `tipo` son obligatorios (D-24): no se le pide nomenclatura a quien sólo quiere cobrar. */
+        post: operations["ItemsController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle del ítem. */
+        get: operations["ItemsController_obtener"];
+        put?: never;
+        post?: never;
+        /** Desactiva el ítem (soft-delete). Idempotente. Deja de ofrecerse para ventas nuevas; las existentes no se tocan. */
+        delete: operations["ItemsController_desactivar"];
+        options?: never;
+        head?: never;
+        /** PATCH del ítem. Sólo toca los campos presentes. El toggle activo/inactivo vive en endpoints dedicados. */
+        patch: operations["ItemsController_actualizar"];
+        trace?: never;
+    };
+    "/api/items/{id}/reactivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactiva un ítem inactivo. Idempotente. */
+        post: operations["ItemsController_reactivar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/libros/diario": {
         parameters: {
             query?: never;
@@ -3407,6 +3461,88 @@ export interface components {
             cajaChicaDefaultId?: string | null;
             /** Format: uuid */
             ajustePorInflacionId?: string | null;
+        };
+        CreateItemDto: {
+            /** @example Pollo entero */
+            nombre: string;
+            /**
+             * @description Responde ¿es físico? y nada más. "¿Le sigo el stock?" será un booleano del pack Inventario, nunca un tercer valor de este enum (D-26).
+             * @example PRODUCTO
+             * @enum {string}
+             */
+            tipo: "PRODUCTO" | "SERVICIO";
+            /**
+             * @description Opcional (D-24). Se normaliza a mayúsculas y sin espacios en los bordes; único por organización sólo cuando existe.
+             * @example P-01
+             */
+            codigo?: string | null;
+            /**
+             * @description Texto libre. No hay motor de conversiones (D-25).
+             * @example kg
+             */
+            unidadMedida?: string | null;
+            /**
+             * @description Decimal(18,6) como string. Es un PRECIO sugerido, no un monto: admite sub-centavo (precio por kg) y el redondeo a moneda ocurre una sola vez, en el subtotal de la línea.
+             * @example 6.305000
+             */
+            precioUnitarioSugerido?: string | null;
+            /**
+             * @description Decimal(18,6) como string, > 0. Si se omite, el default del schema es 1. Sirve para negocios que venden en cajas o jaulas (D-25).
+             * @example 12
+             */
+            cantidadPorDefecto?: string;
+            /**
+             * Format: uuid
+             * @description Cuenta de ingreso del ítem. Si se omite, al vender cae al concepto `ventasId` de la configuración contable. Debe ser activa y de detalle.
+             */
+            cuentaIngresoId?: string | null;
+        };
+        ItemResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example P-01 */
+            codigo: string | null;
+            /** @example Pollo entero */
+            nombre: string;
+            /** @enum {string} */
+            tipo: "PRODUCTO" | "SERVICIO";
+            /** @example kg */
+            unidadMedida: string | null;
+            /** @example 6.305000 */
+            precioUnitarioSugerido: string | null;
+            /** @example 1.000000 */
+            cantidadPorDefecto: string;
+            /** Format: uuid */
+            cuentaIngresoId: string | null;
+            /** @example true */
+            activo: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ListarItemsResponseDto: {
+            items: components["schemas"]["ItemResponseDto"][];
+            /** @example 42 */
+            total: number;
+            /** @example 1 */
+            page: number;
+            /** @example 50 */
+            pageSize: number;
+        };
+        UpdateItemDto: {
+            /** @example Pollo entero */
+            nombre?: string;
+            /** @enum {string} */
+            tipo?: "PRODUCTO" | "SERVICIO";
+            codigo?: string | null;
+            unidadMedida?: string | null;
+            /** @example 6.305000 */
+            precioUnitarioSugerido?: string | null;
+            /** @example 12 */
+            cantidadPorDefecto?: string;
+            /** Format: uuid */
+            cuentaIngresoId?: string | null;
         };
         RangoFechasDto: {
             /** @example 2026-04-01 */
@@ -7977,6 +8113,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfiguracionContableResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_listar: {
+        parameters: {
+            query?: {
+                /** @description Búsqueda parcial case-insensitive sobre nombre y código. */
+                q?: string;
+                tipo?: "PRODUCTO" | "SERVICIO";
+                /** @description true (default) sólo activos, false sólo inactivos, 'all' ambos. */
+                activo?: components["schemas"]["Object"];
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarItemsResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_desactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_actualizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateItemDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponseDto"];
+                };
+            };
+        };
+    };
+    ItemsController_reactivar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponseDto"];
                 };
             };
         };

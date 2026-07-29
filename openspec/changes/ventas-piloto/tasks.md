@@ -35,10 +35,10 @@ TDD estricto (RED → GREEN). 1 task = 1 commit; cierra con `tsc` + suite del su
 
 ## Fase 3 — `items`
 
-- [ ] 3.1 RED/GREEN dominio: normalizar `codigo` (trim → null, `toUpperCase`).
-- [ ] 3.2 Repositorio + `ItemsReaderPort` (`obtenerBatch → {id, activo}`) + `ITEM_CODIGO_DUPLICADO`.
-- [ ] 3.3 Service, controller, DTOs, módulo. `@RequireModule('contabilidad')`, decoradores con literales string.
-- [ ] 3.4 Guard `CUENTA_REFERENCIADA_POR_ITEMS` al desactivar una cuenta.
+- [x] 3.1 RED/GREEN dominio: normalizar `codigo` (trim → null, `toUpperCase`). 100% cobertura; 4 mutantes verificados (sin uppercase, vacío→`''`, uppercase en `normalizarOpcional`, normalizar de más sacando guiones). Se sumó `normalizarOpcional` para `unidadMedida`, que SÍ conserva el case.
+- [x] 3.2 Repositorio + `ItemsReaderPort` (`obtenerBatch → {id, activo}`) + `ITEM_CODIGO_DUPLICADO`. 41 tests de integración contra Postgres. El test del port assertea las **claves** del objeto, no los valores, para que sumar un campo al `select` rompa. `findByCodigo(null)` no consulta: devolver "el primer ítem sin código" haría que el guard rechazara toda alta sin código a partir de la segunda. Sin borrado físico (REQ-ITM-01).
+- [x] 3.3 Service, controller, DTOs, módulo. `@RequireModule('contabilidad')`, decoradores con literales string. Las 4 `contabilidad.items.*` **salen** de `DECLARADOS_SIN_ENDPOINT` acá (la Fase 1 las había metido). `DELETE` = desactivar, y devuelve el ítem para que el cliente vea `activo: false` sin re-consultar. **Error nuevo, fuera de la tabla de la spec**: `ITEM_CUENTA_INGRESO_INVALIDA` — sin validar `cuentaIngresoId` contra el tenant, la FK aceptaría el id de otra organización (§4.2, bug de seguridad), y la venta explotaría mucho después al generar el asiento. El guard de unicidad excluye el ítem propio.
+- [x] 3.4 Guard `CUENTA_REFERENCIADA_POR_ITEMS` al desactivar una cuenta. Vive en el repositorio de `cuentas` (`itemsActivosQueUsanCuenta`), que lee la tabla de `items` — mismo patrón que `contactos.countLineasReferenciadoras` leyendo `lineas_comprobante`: responder "¿quién me referencia?" es del dueño del recurso protegido, y así `ItemsReaderPort` no crece (REQ-ITM-04). `details` lleva la LISTA, no un conteo. Mira sólo los ítems ACTIVOS: uno desactivado no genera ventas nuevas, así que bloquear por él sería un bloqueo sin causa. Filtro probado en integración (un mock devuelve lo que se le diga); 3 mutantes mueren.
 
 ## Fase 4 — `ventas`
 

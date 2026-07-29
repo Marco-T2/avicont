@@ -18,6 +18,7 @@ import { ConfiguracionContableModule } from './configuracion-contable/configurac
 import { PeriodosFiscalesModule } from './periodos-fiscales/periodos-fiscales.module';
 import { ComprobantesModule } from './comprobantes/comprobantes.module';
 import { ContactosModule } from './contactos/contactos.module';
+import { ItemsModule } from './items/items.module';
 import { TiposDocumentoFisicoModule } from './tipos-documento-fisico/tipos-documento-fisico.module';
 import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos.module';
 import { ReportesModule } from './reportes/reportes.module';
@@ -92,6 +93,7 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     PeriodosFiscalesModule,
     ComprobantesModule,
     ContactosModule,
+    ItemsModule,
     TiposDocumentoFisicoModule,
     DocumentosFisicosModule,
     ReportesModule,

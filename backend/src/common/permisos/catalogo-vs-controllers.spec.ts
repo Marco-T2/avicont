@@ -171,15 +171,13 @@ const DECLARADOS_SIN_ENDPOINT: readonly string[] = [
   'contabilidad.compras.delete',
   'contabilidad.compras.post',
   'contabilidad.compras.void',
-  // Módulo comercial (change `ventas-piloto`): el catálogo se declara entero
+  // Módulo comercial (change `ventas-piloto`): el catálogo se declaró entero
   // en la Fase 1 —schema y RBAC juntos— y los controllers llegan en las
-  // fases 3 (items), 4 (ventas) y 5 (cobros). Cada grupo sale de esta lista
-  // cuando aterriza SU controller, no antes: la aserción es igualdad exacta
-  // en las dos direcciones, así que sacarlos ahora rompería el build.
-  'contabilidad.items.read',
-  'contabilidad.items.create',
-  'contabilidad.items.update',
-  'contabilidad.items.delete',
+  // fases 4 (ventas) y 5 (cobros). Cada grupo sale de esta lista cuando
+  // aterriza SU controller, no antes: la aserción es igualdad exacta en las
+  // dos direcciones.
+  //
+  // `contabilidad.items.*` ya salió: su controller aterrizó en la Fase 3.
   'contabilidad.cobros.read',
   'contabilidad.cobros.create',
   'contabilidad.cobros.update',
