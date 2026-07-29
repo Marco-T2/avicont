@@ -197,6 +197,41 @@ describe('PrismaComprobanteRepository — path-sistema comercial (integration vs
       expect(cuantos).toBe(1);
     });
 
+    // El eje que el test de arriba NO cubre: las dos corridas EN PARALELO.
+    //
+    // Es el único caso que distingue una alta idempotente de un check-then-act.
+    // Secuencialmente el `findUnique` ve la fila de la corrida anterior y todo
+    // parece bien; en paralelo las dos lecturas no ven nada, las dos insertan,
+    // y la segunda choca contra el @@unique. Sin serialización el usuario
+    // recibe un 409 genérico y la transacción de la venta entera revierte —
+    // exactamente lo que el contrato del port promete que no pasa (Anti-17,
+    // §4.9, cicatriz F-01: "enforcement solo en servicio falla bajo
+    // concurrencia").
+    it('dos corridas CONCURRENTES dejan UN comprobante y ninguna falla', async () => {
+      const datos = datosVenta();
+
+      const [primera, segunda] = await Promise.all([
+        prisma.$transaction((tx) => repo.crearBorradorSistemaSiNoExiste(tenantId, datos, tx)),
+        prisma.$transaction((tx) => repo.crearBorradorSistemaSiNoExiste(tenantId, datos, tx)),
+      ]);
+
+      // Las dos devuelven el MISMO comprobante: la que perdió la carrera
+      // encuentra el de la ganadora en vez de explotar.
+      expect(segunda.id).toBe(primera.id);
+
+      const cuantos = await prisma.comprobante.count({
+        where: { organizationId: tenantId, origenTipo: ORIGEN_TIPO_VENTA },
+      });
+      expect(cuantos).toBe(1);
+
+      // Y el que quedó tiene sus líneas completas: la perdedora no debe haber
+      // alcanzado a insertar líneas sueltas contra el comprobante de la otra.
+      const lineas = await prisma.lineaComprobante.count({
+        where: { comprobanteId: primera.id },
+      });
+      expect(lineas).toBe(2);
+    });
+
     // Devolver el existente SIN tocarlo: para cambiarle las líneas está
     // `reemplazarComprobante`. Si la segunda corrida pisara los datos, una
     // regeneración disfrazada de alta borraría la edición del contador.

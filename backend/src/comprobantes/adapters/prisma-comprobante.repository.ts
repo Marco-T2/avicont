@@ -212,11 +212,47 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
     return res.count;
   }
 
+  /**
+   * Alta idempotente por origen (Anti-17, §4.9).
+   *
+   * ## Por qué un advisory lock y no `upsert`
+   *
+   * El contrato del port pide "upsert, nunca `create` ciego", y la intención es
+   * la correcta: leer-y-después-insertar sin serializar es un check-then-act y
+   * bajo concurrencia la segunda transacción choca contra el
+   * `@@unique(organizationId, origenTipo, origenId)`. Medido: el test
+   * «dos corridas CONCURRENTES» fallaba con `P2002`, que el filtro global
+   * traduce a un 409 genérico y hace revertir la TX de la venta entera.
+   *
+   * Pero `prisma.upsert` **no lo arregla acá**: con `lineas: { create: [...] }`
+   * anidado Prisma no puede emitir un `INSERT ... ON CONFLICT` — resuelve el
+   * upsert como SELECT + INSERT, o sea el mismo check-then-act con otro nombre.
+   * Escribirlo así habría dejado el bug intacto con la apariencia de arreglado.
+   *
+   * Y tampoco sirve capturar el `P2002` para re-leer: el `tx` es REQUERIDO, y
+   * en Postgres un error dentro de una transacción la deja abortada (25P02).
+   * Después del choque no se puede seguir usando ese `tx` para nada.
+   *
+   * Queda el lock de transacción: serializa las altas del MISMO origen y se
+   * libera solo al cerrar la TX. La que pierde la carrera entra al `findUnique`
+   * cuando la ganadora ya committeó, encuentra su comprobante y lo devuelve —
+   * que es exactamente lo que el port promete. Cuesta un lock por alta y no
+   * bloquea orígenes distintos (una colisión de hash sólo los serializaría, sin
+   * afectar la corrección).
+   */
   async crearBorradorSistemaSiNoExiste(
     tenantId: string,
     data: ComprobanteCrearSistemaData,
     tx: Prisma.TransactionClient,
   ): Promise<{ id: string }> {
+    // Separador `|`: no aparece en un uuid (hex y guiones) ni en un
+    // `origenTipo` (A-Z y _), asi que ('a','bc') y ('ab','c') no colapsan al
+    // mismo lock. NO usar 0x00: un `text` de Postgres no puede contenerlo y el
+    // error que devuelve (22021) culpa al encoding, no al separador.
+    const claveOrigen = `comprobante-sistema:${tenantId}|${data.origenTipo}|${data.origenId}`;
+    // `$executeRaw` porque no hay resultado que leer: la función devuelve `void`.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${claveOrigen}, 0))`;
+
     const existente = await tx.comprobante.findUnique({
       where: {
         organizationId_origenTipo_origenId: {
