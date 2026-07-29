@@ -162,7 +162,8 @@ Aplicación → **no toca este flujo**: cero comprobantes (D-03).
 | `comprobantes/comprobantes.service.ts` | Modify | consume el extract; `anular` rechaza origen comercial (REQ-CMP-VTA-04) |
 | `common/domain/efectivo.ts` | Create | `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo` — la BASE compartida, no "el criterio" |
 | `common/audited-transaction.runner.ts` | **Move** | desde `comprobantes/infrastructure/`; movimiento puro (ver decisión) |
-| `comprobantes/infrastructure/index.ts` + `comprobantes.module.ts` | Modify | cola del movimiento del runner |
+| `comprobantes/infrastructure/` | **Delete** | el directorio queda vacío tras el movimiento; su barrel `index.ts` no lo importaba nadie |
+| `comprobantes/comprobantes.module.ts` | Modify | cola del movimiento del runner |
 | `reportes/domain/estado-flujo-efectivo.ts` | Modify | importa el prefijo de `common/`; **su interruptor org-wide NO se toca** |
 | `items/`, `ventas/`, `cuentas-por-cobrar/` | Create | módulos hexagonales completos |
 | `prisma/schema.prisma` | Modify | 6 modelos + `VENTA` en el enum + 2 campos en `OrgConfiguracionContable` + **`'VENTA'`/`'COBRO'` en el comentario-contrato de `origenTipo`** (B-13) |

@@ -1019,6 +1019,29 @@ Correr **desde `backend/`**:
 > `minio-storage.adapter.integration.spec.ts` que parecen una regresión y NO lo son**.
 > Es infra, no lógica. Los comandos de abajo ya lo incluyen: usalos tal cual.
 
+> ⚠️ **El flag NO alcanza para los E2E: hace falta el contenedor de MinIO ARRIBA.**
+>
+> ```bash
+> docker compose up -d postgres redis minio     # los tres, no dos
+> ```
+>
+> `AppModule` instancia el adapter de MinIO al compilar. Si el contenedor no está,
+> el `beforeAll` de cada suite E2E **excede su timeout de 5 s** y fallan **TODAS**
+> —incluidas las que no tocan adjuntos— con este mensaje:
+>
+> ```
+> thrown: "Exceeded timeout of 5000 ms for a hook."
+>     > 19 |   beforeAll(async () => {
+> ```
+>
+> Se lee como una regresión masiva del código y es **infra**: el stack trace
+> apunta al `beforeAll` del test, no a MinIO, así que nada en el error nombra la
+> causa. Medido el 2026-07-29: con `postgres` + `redis` solamente, la suite de
+> `impersonation` caía entera; agregando `minio`, 51/51 suites en verde.
+>
+> Por eso `postgres` + `redis` **ya no son "el mínimo viable"** si vas a correr
+> E2E (ver §11.5).
+
 **Unitarios + integración**:
 ```bash
 cd backend
@@ -1066,6 +1089,13 @@ preexistente (Node v24 + AWS SDK + ts-jest)". No requería cambiar configuració
 con el flag de arriba**. Cualquier doc o comentario que siga afirmando que esos tests están
 bloqueados está desactualizado.
 
+> Precisión (2026-07-29): el flag resuelve el **error de carga del módulo**
+> (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG`), que era la deuda W3. Aparte de
+> eso, **el contenedor de MinIO tiene que estar arriba** — `minio-storage.adapter.integration.spec.ts`
+> lo dice en su propio encabezado, y los E2E lo necesitan para compilar `AppModule`
+> (ver el aviso al inicio de esta sección). Son dos requisitos distintos y hacen
+> falta los dos.
+
 **Flake histórico de `auth-logout-all` — NO reproducido desde 2026-07-24.** Esta nota decía
 que `test/auth-logout-all.e2e-spec.ts` caía ~5 tests dentro de la suite E2E completa pero
 pasaba 5/5 en aislamiento. **Medido el 2026-07-24 sobre `main`: 45/45 suites y 592/592 tests
@@ -1098,7 +1128,10 @@ pnpm run format                            # prettier sobre src/ y test/
 
 ### 11.5 Checklist antes de arrancar a codear desde cero
 
-1. Desde la raíz del repo: `docker compose up -d postgres redis` (mínimo viable)
+1. Desde la raíz del repo: `docker compose up -d postgres redis` (mínimo viable
+   para `start:dev` y para `jest src/`). **Si vas a correr los E2E, sumá `minio`**:
+   `docker compose up -d postgres redis minio` — sin él fallan TODAS las suites
+   por timeout del `beforeAll`, con un síntoma que no nombra la causa (§11.3).
 2. Si es la primera vez, desde `backend/`:
    `DATABASE_URL=... pnpm exec prisma migrate deploy`
 3. Desde `backend/`: `pnpm run start:dev` para el backend en watch mode
