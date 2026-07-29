@@ -35,6 +35,23 @@ const CONTADOR_PERMISSIONS = [
   'contabilidad.ventas.create',
   'contabilidad.ventas.update',
   'contabilidad.ventas.delete',
+  // Contabilizar y anular ventas (D-23: los 6 verbos, mismo trato que
+  // asientos). Faltaban: el template tenía sólo el CRUD.
+  'contabilidad.ventas.post',
+  'contabilidad.ventas.void',
+  // Catálogo de ítems: 4 verbos, sin post ni void (D-23).
+  'contabilidad.items.read',
+  'contabilidad.items.create',
+  'contabilidad.items.update',
+  'contabilidad.items.delete',
+  // Cobros: los 6 verbos. Aplicar/desaplicar caen bajo `update` — mutan el
+  // vínculo con la venta, no crean un hecho contable.
+  'contabilidad.cobros.read',
+  'contabilidad.cobros.create',
+  'contabilidad.cobros.update',
+  'contabilidad.cobros.delete',
+  'contabilidad.cobros.post',
+  'contabilidad.cobros.void',
   'contabilidad.compras.read',
   'contabilidad.compras.create',
   'contabilidad.compras.update',
