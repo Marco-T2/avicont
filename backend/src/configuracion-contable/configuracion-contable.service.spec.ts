@@ -55,6 +55,8 @@ function configExistente(
     difCambioPerdidaId: null,
     resultadoEjercicioId: null,
     resultadosAcumuladosId: null,
+    cuentasPorCobrarId: null,
+    ventasId: null,
     cajaChicaDefaultId: null,
     ajustePorInflacionId: null,
     createdAt: now,
