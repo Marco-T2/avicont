@@ -1157,34 +1157,65 @@ Mantener esta tabla actualizada cuando se agregue un objeto nuevo en raw SQL.
 
 ---
 
-### 11.7 Un cambio de backend "no aparece" en la app — proceso huérfano en `:3000`
+### 11.7 Un cambio de backend "no aparece" en la app — proceso viejo aferrado a `:3000`
 
 Síntoma: tocás el backend, `pnpm exec jest` pasa, `dist/` recompila, pero la app
 del navegador sigue con el comportamiento viejo. Parece un bug del código y **no
 lo es**.
 
-Causa: un `node dist/main` de una corrida anterior quedó **huérfano** (su padre
-murió; en WSL el PPID se reasigna a `/init`) y sigue aferrado al `:3000`. Node
-ya tiene el JS cargado en memoria: **el proceso viejo NO ve el `dist/`
-recompilado**.
+Mecanismo común: un `node dist/main` de una corrida anterior sigue aferrado al
+`:3000`. Node ya tiene el JS cargado en memoria, así que **el proceso viejo NO
+ve el `dist/` recompilado**.
+
+Pero las causas son **dos**, y una ya está corregida:
+
+**Causa A — el proceso no moría ante SIGTERM. CORREGIDA (PR #293, 2026-07-28).**
+`otel-bootstrap` registraba `process.once('SIGTERM', …)` sin llamar nunca a
+`process.exit`. Registrar un handler de señal **suprime el comportamiento por
+defecto de Node**, que es terminar; con el servidor HTTP todavía escuchando, el
+event loop nunca se vaciaba. `nest start --watch` manda SIGTERM antes de
+relanzar, así que **todo** reinicio del watcher fallaba con `EADDRINUSE` — no
+algunos. Medido: 45 s después de un SIGTERM único el proceso seguía vivo y
+respondiendo `HTTP 200`. No era azar ambiental ni WSL: era un bug del código, y
+explica las variantes 1 y 3 de la tabla. Hoy el apagado está ordenado en
+`main.ts` y lo congela `backend/test/shutdown.e2e-spec.ts`.
+
+**Causa B — proceso huérfano de verdad. SIGUE VIGENTE.** El padre murió y en WSL
+el PPID se reasigna a `/init`. Un `start:dev` lanzado en background por una
+herramienta que después termina queda desacoplado y nadie le manda nunca la
+señal. Es la variante 2.
 
 **Mordió TRES veces el 2026-07-24, con tres síntomas distintos.** Por eso el
 chequeo decisivo no es ninguno de los síntomas, sino el del recuadro de abajo:
 
-| # | Watcher | `dist/` | En el log | Cómo se veía |
-|---|---------|---------|-----------|--------------|
-| 1 | vivo pero trabado | recompilaba | 27 × `EADDRINUSE` | una jornada de cambios que nunca llegaron a la app |
-| 2 | **no existía** | **borrado** | **nada** | app sirviendo un binario de 1h35m atrás, sin un solo rastro |
-| 3 | vivo y compilando OK | recompilaba | 18 × `EADDRINUSE` | un fix recién mergeado que "no funcionaba" (daba el MISMO número de error que antes del fix) |
+| # | Causa | Watcher | `dist/` | En el log | Cómo se veía |
+|---|-------|---------|---------|-----------|--------------|
+| 1 | A | vivo pero trabado | recompilaba | 27 × `EADDRINUSE` | una jornada de cambios que nunca llegaron a la app |
+| 2 | B | **no existía** | **borrado** | **nada** | app sirviendo un binario de 1h35m atrás, sin un solo rastro |
+| 3 | A | vivo y compilando OK | recompilaba | 18 × `EADDRINUSE` | un fix recién mergeado que "no funcionaba" (daba el MISMO número de error que antes del fix) |
+
+> **Si ves `EADDRINUSE` después del PR #293, no asumas la causa A.** Estaba
+> cubierta por un test, así que lo más probable es que alguien haya registrado un
+> handler de señal nuevo que no termina el proceso — buscar con
+> `grep -rn "process.on\|process.once" backend/src/`.
 
 > **El chequeo que sirve SIEMPRE**: comparar el arranque del proceso que escucha
-> contra la fecha del `dist/`. **Si el `dist/` es más nuevo que el proceso, el
+> contra **todo** el `dist/`. **Si hay algún `.js` más nuevo que el proceso, el
 > proceso no lo tiene** — sin importar qué diga el log.
 >
 > ```bash
-> ps -o pid,ppid,lstart,cmd -p $(ss -tlnp | grep -oP ':3000.*pid=\K[0-9]+' | head -1)
-> ls -la --time-style=+%H:%M:%S backend/dist/<algún-archivo-que-tocaste>.js
+> PID=$(ss -tlnp | grep -oP ':3000.*pid=\K[0-9]+' | head -1)
+> ps -o pid,ppid,lstart,cmd -p "$PID"          # anotar el lstart
+> find backend/dist -name '*.js' -newermt '<lstart del proceso>'
 > ```
+>
+> **No compares contra `dist/main.js`**: es el archivo que menos cambia en el
+> desarrollo diario, y `tsc` reemite sólo lo afectado por el cambio — medido:
+> **1 archivo de 597** al tocar uno solo. El 2026-07-28 `dist/main.js` era del día
+> anterior mientras el proceso había arrancado ese mismo día, lo que por este
+> chequeo mal hecho daba "el proceso está sano" y era **falso**: el archivo
+> delator era `dist/common/permisos/catalogo.js`. Un `main.js` viejo no prueba
+> nada; el `find` sobre todo el `dist/` sí.
 
 **Lo insidioso de la variante 1**: el log imprime `Nest application successfully
 started` **3 ms antes** del `EADDRINUSE`. Leyendo el tail parece que reinició
@@ -1207,10 +1238,14 @@ Diagnóstico (en orden):
 
 ```bash
 ss -tlnp | grep :3000                      # anotar el PID que escucha
-ps -o pid,ppid,etime,lstart,cmd -p <PID>   # lstart vs. último cambio; PPID=1 o /init → huérfano
-ls -la backend/dist/<archivo>.js           # ¿el dist es MÁS NUEVO que el proceso? → no lo tiene
+ps -o pid,ppid,etime,lstart,cmd -p <PID>   # lstart; PPID=1 o /init → huérfano (causa B)
+find backend/dist -name '*.js' -newermt '<lstart>'   # ¿hay algo más nuevo? → no lo tiene
 grep -c "EADDRINUSE" <log del start:dev>   # >0 confirma; ==0 NO descarta (ver variante 2)
 ```
+
+El conteo de `EADDRINUSE` **no** equivale al de reinicios fallidos: cada intento
+imprime el error más de una vez, y el watcher puede lanzar dos procesos a la vez
+(observado el 2026-07-28: 12 líneas para 4 intentos).
 
 Fix: `kill <pid-huerfano>`. Si el watcher quedó trabado, bajar el árbol entero
 (el `sh -c nest start --watch`, el `pnpm` y el bash padre) y relanzar
@@ -1221,15 +1256,20 @@ antes de relanzar.
 viva** (la del dev, o `! pnpm run start:dev` en el prompt de Claude Code). Un
 `start:dev` disparado en background por una herramienta que después termina deja
 el proceso desacoplado: cuando ese padre muere, el PPID se reasigna a `/init` y
-ya está huérfano. Así nacieron las variantes 2 y 3.
+ya está huérfano. Así nació la variante 2.
+
+Sigue siendo la práctica correcta, pero **no era la explicación de las variantes
+1 y 3**: esas venían de la causa A, y pasaban igual lanzando el dev server desde
+una terminal propia. Atribuirlas a "cómo se lanzó" fue lo que mantuvo el bug
+escondido durante meses.
 
 Ojo con la trampa de verificar el PPID una sola vez: un proceso puede arrancar
 con padre real y **huerfanizarse minutos después**, cuando el padre termina
 (verificado el 2026-07-24: PPID `71511` al arrancar, `/init` media hora más
 tarde). Mientras nadie recompile sigue sirviendo lo correcto, así que el
 problema no se nota — hasta el próximo cambio de backend, que no llegará. Por
-eso el chequeo confiable es siempre **`lstart` del proceso vs. fecha del
-`dist/`**, no el parentesco.
+eso el chequeo confiable es siempre **`lstart` del proceso vs. el `find` sobre
+todo el `dist/`**, no el parentesco.
 
 **Verificar contra el proceso VIVO** (no contra `dist/`) — sin necesidad de un
 JWT, porque el Swagger JSON es público en dev:
