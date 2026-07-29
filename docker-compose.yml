@@ -232,7 +232,13 @@ services:
       - saas_network
 
   minio:
-    image: minio/minio:latest
+    # Pinneado a propósito: `minio/minio` fue archivado upstream el 2026-02-13 y
+    # la community edition ya removió la administración por consola (crear access
+    # keys, usuarios y políticas quedaron sólo en `mc`). Con `:latest` un pull
+    # casual degrada la consola de :9001 sin aviso. Esta release es la última
+    # verificada con la consola usable. Si hace falta salir de MinIO, el
+    # `StoragePort` es hexagonal: el swap a S3/R2/Garage es endpoint + creds.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: saas_minio
     restart: unless-stopped
     ports:
