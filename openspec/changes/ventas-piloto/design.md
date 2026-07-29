@@ -167,6 +167,36 @@ diferencia entre `montoTotal` y `Σ subtotales`**, que es justo el invariante
 que REQ-VTA-03 declara. Ese, y no el de la spec, es el test que discrimina: el
 escenario `31.515 → 31.52` da lo mismo con half-up y half-even.
 
+### Decisión: elegibilidad de efectivo = marca explícita ∪ prefijo (por cuenta)
+
+**Choice** (Marco, 2026-07-28): una cuenta es elegible como destino de cobro
+⇔ `activa` ∧ `esDetalle` ∧ (`actividadFlujo = 'EFECTIVO'` **o** código bajo
+`1.1.1`). Unión **por cuenta** — NO el interruptor de organización del EFE.
+
+**Rationale**: son dos preguntas distintas. *"¿es efectivo y equivalente para
+el flujo de caja?"* es de presentación; *"¿puede entrar plata acá?"* es
+operativa. Una cuenta que el admin excluyó de su EFE sigue siendo un lugar
+legítimo donde se recibe un cobro. El interruptor org-wide las fuerza a ser la
+misma y produce el efecto de que marcar una cuenta **saque otra** del selector
+— con `1.1.1.001 CAJA` como default, eso es romper la operación desde un
+reporte.
+
+**La configuración explícita ya existe y esta regla la aprovecha**: el `<Select>`
+"Actividad de flujo de efectivo" de `/plan-cuentas` (modo edición) escribe
+`Cuenta.actividadFlujo`. Con la unión, marcar `EFECTIVO` **agrega** la cuenta al
+conjunto elegible, y las `1.1.1.*` siguen valiendo sin configurar nada — el
+mismo Enfoque C del EFE (explícito gana, heurística de fallback), que hace que
+funcione desde el día uno. Hoy las 110 cuentas están en `null`, así que no hay
+migración.
+
+**Deuda que abre, nombrada**: (1) el `hint` de ese Select dice que clasifica
+"para el Estado de Flujo de Efectivo (NIC 7)" — si el campo además habilita
+cuentas de cobro, el texto miente por omisión y **debe actualizarse en este
+change**; (2) la unión no permite EXCLUIR una `1.1.1.*` de la elegibilidad. Si
+algún día hace falta, va un campo propio, no un tercer significado encima de
+`actividadFlujo`. No va en `OrgConfiguracionContable`: ese mapa es 1:1
+(concepto → una cuenta) y acá el conjunto es de N cuentas.
+
 ### Decisión: la cartera se deriva de `anulado` + saldo, NUNCA del estado
 
 **Choice**: el conjunto vigente de CxC usa `estado IN (CONTABILIZADO,
@@ -214,7 +244,11 @@ molde. La venta **no lleva estado propio espejado** — se lee del comprobante.
   cartera debe derivarse de `anulado` + saldo, **no** del estado del
   comprobante.
 
-- [ ] **BLOQUEANTE — el criterio de efectivo de la spec NO es el del EFE.**
+- [x] ~~**El criterio de efectivo de la spec NO es el del EFE**~~ → **RESUELTO
+  por Marco (2026-07-28): va la opción B, unión por cuenta.** Ver la decisión
+  abajo. Contexto original conservado:
+
+- [ ] ~~**BLOQUEANTE — el criterio de efectivo de la spec NO es el del EFE.**~~
   REQ-CXC-02 lo describe por cuenta ("explícito, o **en su defecto** el prefijo
   `1.1.1`"). El EFE real usa un **interruptor de organización**
   (`estado-flujo-efectivo.ts:106-111`): si **alguna** cuenta está marcada
