@@ -13,6 +13,7 @@ import {
   createTestUser,
   prisma,
 } from './helpers/test-factory';
+import { waitForRow } from './helpers/wait-for';
 
 /**
  * E2E del Slice 5 (entitlement admin): el super-admin habilita/revoca packs a
@@ -218,12 +219,12 @@ describe('Packs entitlement admin (Slice 5)', () => {
       .send({ clave: 'contabilidad.adjuntos' });
     expect(res.status).toBe(201);
 
-    await new Promise((r) => setTimeout(r, 150));
-
-    const auditRow = await prisma.platformAudit.findFirst({
-      where: { targetOrganizationId: contabilidadOrgId, action: { contains: 'POST' } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const auditRow = await waitForRow(() =>
+      prisma.platformAudit.findFirst({
+        where: { targetOrganizationId: contabilidadOrgId, action: { contains: 'POST' } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
     expect(auditRow).not.toBeNull();
     expect(auditRow?.targetOrganizationId).toBe(contabilidadOrgId);
   });

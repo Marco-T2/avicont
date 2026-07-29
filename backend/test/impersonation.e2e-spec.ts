@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
 import { cleanupTestData } from './helpers/test-factory';
+import { waitForRow, waitForRows } from './helpers/wait-for';
 
 describe('Impersonation (e2e)', () => {
   let app: INestApplication;
@@ -113,11 +114,10 @@ describe('Impersonation (e2e)', () => {
     expect(r.status).toBe(200);
 
     // Esperar al async tap del interceptor (write a ImpersonationAction)
-    await new Promise((res) => setTimeout(res, 200));
-
-    const actions = await prisma.impersonationAction.findMany({
-      where: { impersonationLogId: impId },
-    });
+    const actions = await waitForRows(
+      () => prisma.impersonationAction.findMany({ where: { impersonationLogId: impId } }),
+      1,
+    );
     expect(actions.length).toBeGreaterThanOrEqual(1);
 
     // Cerrar
@@ -236,12 +236,12 @@ describe('Impersonation (e2e)', () => {
       expect(res.status).toBe(201);
       const impId = res.body.impersonationId as string;
 
-      // Dar tiempo al void fire-and-forget del platformAudit.record
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      const auditRow = await prisma.platformAudit.findFirst({
-        where: { action: 'platform.impersonation.start', targetOrganizationId: orgId },
-      });
+      // El platformAudit.record es un void fire-and-forget: polling, no sleep fijo.
+      const auditRow = await waitForRow(() =>
+        prisma.platformAudit.findFirst({
+          where: { action: 'platform.impersonation.start', targetOrganizationId: orgId },
+        }),
+      );
       expect(auditRow).not.toBeNull();
       expect(auditRow?.payload).toMatchObject({ impersonationId: impId });
     });
@@ -419,19 +419,18 @@ describe('Impersonation (e2e)', () => {
       expect(res.status).toBe(201);
       const impId = res.body.impersonationId as string;
 
-      // Dar tiempo al void fire-and-forget del platformAudit.record
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      // ImpersonationLog creado (auditoría existente)
+      // ImpersonationLog se escribe DENTRO del request: ya está, no se espera.
       const log = await prisma.impersonationLog.findUnique({ where: { id: impId } });
       expect(log).not.toBeNull();
       expect(log?.targetUserId).toBe(targetMemberId);
       expect(log?.organizationId).toBe(targetOrgId);
 
-      // platform_audit creado (auditoría cross-tenant SA)
-      const auditRow = await prisma.platformAudit.findFirst({
-        where: { action: 'platform.impersonation.start', targetOrganizationId: targetOrgId },
-      });
+      // platform_audit sí es void fire-and-forget: polling, no sleep fijo.
+      const auditRow = await waitForRow(() =>
+        prisma.platformAudit.findFirst({
+          where: { action: 'platform.impersonation.start', targetOrganizationId: targetOrgId },
+        }),
+      );
       expect(auditRow).not.toBeNull();
       expect(auditRow?.payload).toMatchObject({ impersonationId: impId });
     });

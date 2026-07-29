@@ -11,6 +11,7 @@ import {
   createTestUser,
   prisma,
 } from './helpers/test-factory';
+import { waitForRow } from './helpers/wait-for';
 
 async function buildApp(): Promise<INestApplication> {
   const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -134,12 +135,12 @@ describe('Platform Members — REQ-PM-01: GET /admin/platform/orgs/:id/members',
     expect(res.status).toBe(200);
 
     // PlatformAuditInterceptor escribe de forma async (fire-and-forget)
-    await new Promise((r) => setTimeout(r, 150));
-
-    const auditRow = await prisma.platformAudit.findFirst({
-      where: { targetOrganizationId: orgId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const auditRow = await waitForRow(() =>
+      prisma.platformAudit.findFirst({
+        where: { targetOrganizationId: orgId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
     expect(auditRow).not.toBeNull();
     expect(auditRow?.targetOrganizationId).toBe(orgId);
   });
