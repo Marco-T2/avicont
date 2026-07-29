@@ -59,6 +59,32 @@ export const PERMISSIONS = {
       update: 'contabilidad.documentos-fisicos.update',
       delete: 'contabilidad.documentos-fisicos.delete',
     },
+    /** Módulo comercial. Las pantallas llegan en la fase 6 del change. */
+    items: {
+      read: 'contabilidad.items.read',
+      create: 'contabilidad.items.create',
+      update: 'contabilidad.items.update',
+      // El endpoint es DELETE pero la operación es "desactivar" (soft-delete).
+      delete: 'contabilidad.items.delete',
+    },
+    ventas: {
+      read: 'contabilidad.ventas.read',
+      create: 'contabilidad.ventas.create',
+      update: 'contabilidad.ventas.update',
+      delete: 'contabilidad.ventas.delete',
+      post: 'contabilidad.ventas.post',
+      void: 'contabilidad.ventas.void',
+    },
+    cobros: {
+      read: 'contabilidad.cobros.read',
+      create: 'contabilidad.cobros.create',
+      // Aplicar y desaplicar un cobro caen acá: mutan el vínculo con la
+      // venta, no crean un hecho contable.
+      update: 'contabilidad.cobros.update',
+      delete: 'contabilidad.cobros.delete',
+      post: 'contabilidad.cobros.post',
+      void: 'contabilidad.cobros.void',
+    },
     tiposDocumento: {
       // El submódulo en el catálogo backend es `tipos-documento-fisico`
       // (catalogo.ts), NO `tipos-documento`. La key debe espejarlo exacto.

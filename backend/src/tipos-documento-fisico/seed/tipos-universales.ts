@@ -15,7 +15,7 @@ export const TIPOS_UNIVERSALES: readonly TipoDocumentoFisicoSeedRow[] = [
     codigo: 'factura-emitida',
     nombre: 'Factura emitida',
     esTributario: true,
-    tiposComprobanteAplicables: ['INGRESO', 'DIARIO'],
+    tiposComprobanteAplicables: ['INGRESO', 'VENTA', 'DIARIO'],
   },
   {
     codigo: 'factura-recibida',
@@ -33,13 +33,13 @@ export const TIPOS_UNIVERSALES: readonly TipoDocumentoFisicoSeedRow[] = [
     codigo: 'nota-debito-emitida',
     nombre: 'Nota de débito (emitida)',
     esTributario: true,
-    tiposComprobanteAplicables: ['INGRESO', 'AJUSTE', 'DIARIO'],
+    tiposComprobanteAplicables: ['INGRESO', 'VENTA', 'AJUSTE', 'DIARIO'],
   },
   {
     codigo: 'recibo-ingreso',
     nombre: 'Recibo de ingreso',
     esTributario: false,
-    tiposComprobanteAplicables: ['INGRESO', 'DIARIO'],
+    tiposComprobanteAplicables: ['INGRESO', 'VENTA', 'DIARIO'],
   },
   {
     codigo: 'recibo-egreso',
@@ -55,6 +55,7 @@ export const TIPOS_UNIVERSALES: readonly TipoDocumentoFisicoSeedRow[] = [
       'APERTURA',
       'DIARIO',
       'INGRESO',
+      'VENTA',
       'EGRESO',
       'AJUSTE',
       'TRASPASO',

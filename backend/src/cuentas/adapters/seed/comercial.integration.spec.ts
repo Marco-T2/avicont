@@ -11,8 +11,8 @@ import {
  *
  * Fija como contrato verificable que `sembrarPlanCuentasComercial` produce
  * EXACTAMENTE el mismo plan de cuentas que el seed previo basado en
- * `CatalogoPuct` —61 hojas + jerarquía, mismos códigos/niveles, 8 cuentas
- * `esRequeridaSistema`, 8/8 conceptos de `OrgConfiguracionContable`— SIN
+ * `CatalogoPuct` —61 hojas + jerarquía, mismos códigos/niveles, 10 cuentas
+ * `esRequeridaSistema`, 10/10 conceptos de `OrgConfiguracionContable`— SIN
  * consultar la tabla `CatalogoPuct` (los nombres/niveles/clases salen
  * inlineados del propio seed). Toda inserción filtra por `organizationId`
  * (CLAUDE.md §4.2).
@@ -108,7 +108,7 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
     });
   });
 
-  it('preserva las 8 cuentas esRequeridaSistema con los mismos codigoInterno', async () => {
+  it('preserva las 10 cuentas esRequeridaSistema con los mismos codigoInterno', async () => {
     await sembrarPlanCuentasComercial(prisma, organizationId);
 
     const requeridas = await prisma.cuenta.findMany({
@@ -117,12 +117,14 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
       orderBy: { codigoInterno: 'asc' },
     });
     expect(requeridas.map((c) => c.codigoInterno)).toEqual([
+      '1.1.2.001',
       '1.1.6.001',
       '2.1.4.001',
       '2.1.4.002',
       '2.1.4.004',
       '3.1.3.001',
       '3.1.4.001',
+      '4.1.1.001',
       '4.4.1.003',
       '5.6.1.003',
     ]);
@@ -153,7 +155,7 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
     });
   });
 
-  it('pobla OrgConfiguracionContable con los 8 conceptos mapeados (8/8)', async () => {
+  it('pobla OrgConfiguracionContable con los 10 conceptos mapeados (10/10)', async () => {
     const stats = await sembrarPlanCuentasComercial(prisma, organizationId);
     const config = await poblarConfiguracionContableRequerida(
       prisma,
@@ -170,9 +172,11 @@ describe('sembrarPlanCuentasComercial (integration) — seed autocontenido', () 
       config.resultadoEjercicioId,
       config.difCambioGananciaId,
       config.difCambioPerdidaId,
+      config.cuentasPorCobrarId,
+      config.ventasId,
     ];
-    expect(conceptos.filter((v) => v !== null)).toHaveLength(8);
-    expect(Object.keys(MAPEO_CODIGO_A_CONCEPTO)).toHaveLength(8);
+    expect(conceptos.filter((v) => v !== null)).toHaveLength(10);
+    expect(Object.keys(MAPEO_CODIGO_A_CONCEPTO)).toHaveLength(10);
     expect(config.organizationId).toBe(organizationId);
   });
 

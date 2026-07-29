@@ -13,6 +13,11 @@ const TIPOS_COMPROBANTE = [
   'AJUSTE',
   'TRASPASO',
   'CIERRE',
+  // Whitelist de VALIDACIÓN, espejo de Prisma — no es la oferta del form.
+  // CIERRE y VENTA son generados por sistema y NO se ofrecen en el <Select>
+  // de `comprobante-cabecera-form`; están acá para poder representar lo que
+  // el backend devuelve.
+  'VENTA',
 ] as const;
 
 // Valida un decimal positivo estricto (> 0). Espejo del DECIMAL_POSITIVE del backend.

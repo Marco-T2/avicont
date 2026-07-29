@@ -40,6 +40,7 @@ const TIPO_PRISMA_A_DOMINIO: Record<PrismaTipoComprobante, TipoComprobante> = {
   AJUSTE: TipoComprobante.AJUSTE,
   TRASPASO: TipoComprobante.TRASPASO,
   CIERRE: TipoComprobante.CIERRE,
+  VENTA: TipoComprobante.VENTA,
 };
 
 export function toDominioTipoComprobante(p: PrismaTipoComprobante): TipoComprobante {

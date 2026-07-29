@@ -72,7 +72,7 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
     expect(config).not.toBeNull();
     expect(config!.organizationId).toBe(tenantA);
 
-    // Los 8 conceptos requeridos deben estar mapeados
+    // Los 10 conceptos requeridos deben estar mapeados
     const conceptos = [
       config!.ivaCreditoId,
       config!.ivaDebitoId,
@@ -82,8 +82,10 @@ describe('PrismaPlanCuentasSeederAdapter (integration)', () => {
       config!.resultadoEjercicioId,
       config!.difCambioGananciaId,
       config!.difCambioPerdidaId,
+      config!.cuentasPorCobrarId,
+      config!.ventasId,
     ];
-    expect(conceptos.filter((v) => v !== null)).toHaveLength(8);
+    expect(conceptos.filter((v) => v !== null)).toHaveLength(10);
   });
 
   it('idempotencia: re-ejecutar sobre el mismo tenant no duplica cuentas', async () => {

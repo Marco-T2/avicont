@@ -42,6 +42,7 @@ const TIPO_LABELS: Record<string, string> = {
   AJUSTE: 'Ajuste',
   APERTURA: 'Apertura',
   CIERRE: 'Cierre',
+  VENTA: 'Venta',
 };
 
 function CorrelativoDisplay({

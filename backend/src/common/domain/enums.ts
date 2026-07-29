@@ -101,4 +101,5 @@ export enum TipoComprobante {
   AJUSTE = 'AJUSTE',
   TRASPASO = 'TRASPASO',
   CIERRE = 'CIERRE',
+  VENTA = 'VENTA',
 }

@@ -1,5 +1,5 @@
 <!--
-Última edición: 2026-07-28
+Última edición: 2026-07-29
 Última revisión contra core: 2026-07-28
 Owner: backend-lead
 -->
@@ -162,6 +162,7 @@ model LineaComprobante {
 | Tipo de cambio | `@db.Decimal(14, 8)` | 8 decimales evita pérdida en re-cálculos. |
 | Porcentajes (IVA 13%, IT 3%) | `@db.Decimal(5, 4)` | `0.1300` para 13%. |
 | Cantidades (inventario) | `@db.Decimal(18, 6)` | 6 decimales para unidades fraccionales. |
+| Precio unitario (`LineaVenta.precioUnitario`, `Item.precioUnitarioSugerido`) | `@db.Decimal(18, 6)` | Un precio por unidad puede necesitar sub-centavo (precio por kg). NO es un monto: el redondeo a moneda ocurre **una sola vez**, en el subtotal (`Money.of(cantidad).mul(precioUnitario).redondearABob()`). Redondear el precio a 2 antes de multiplicar arrastra el error a toda la línea. |
 
 #### Regla de oro inmutable
 

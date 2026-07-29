@@ -2565,7 +2565,7 @@ export interface components {
              * @example DIARIO
              * @enum {string}
              */
-            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA";
             /**
              * @description Fecha contable en formato ISO YYYY-MM-DD
              * @example 2026-04-22
@@ -2600,7 +2600,7 @@ export interface components {
         ComprobanteListItemDto: {
             id: string;
             /** @enum {string} */
-            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            tipo: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA";
             /** @example I2604-000042 */
             numero: string | null;
             /** @enum {string} */
@@ -2641,7 +2641,7 @@ export interface components {
              * @example DIARIO
              * @enum {string}
              */
-            tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+            tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA";
             /**
              * @description Fecha contable en formato ISO YYYY-MM-DD
              * @example 2026-04-22
@@ -2967,7 +2967,7 @@ export interface components {
             codigo: string;
             esTributario: boolean;
             activo: boolean;
-            tiposComprobanteAplicables: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE")[];
+            tiposComprobanteAplicables: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA")[];
             organizationId: string;
             createdAt: string;
             updatedAt: string;
@@ -3002,7 +3002,7 @@ export interface components {
              *       "DIARIO"
              *     ]
              */
-            tiposComprobanteAplicables: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE")[];
+            tiposComprobanteAplicables: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA")[];
             /**
              * @description Si true, el sistema asigna el número correlativo automáticamente. Incompatible con esTributario=true. Inmutable post-creación.
              * @example false
@@ -3021,7 +3021,7 @@ export interface components {
             /** @description Activar o desactivar el tipo sin eliminarlo. */
             activo?: boolean;
             /** @description Reemplaza la lista completa de tipos de comprobante aplicables. */
-            tiposComprobanteAplicables?: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE")[];
+            tiposComprobanteAplicables?: ("APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA")[];
             /** @description Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422. */
             numeracionAutomatica?: boolean;
             /** @description Set-once — solo se puede definir al crear el tipo. Enviar este campo en un PATCH retorna 422. */
@@ -5853,7 +5853,7 @@ export interface operations {
         parameters: {
             query?: {
                 periodoFiscalId?: string;
-                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA";
                 estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
                 fechaDesde?: string;
                 fechaHasta?: string;
@@ -5905,7 +5905,7 @@ export interface operations {
         parameters: {
             query?: {
                 periodoFiscalId?: string;
-                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE";
+                tipo?: "APERTURA" | "DIARIO" | "INGRESO" | "EGRESO" | "AJUSTE" | "TRASPASO" | "CIERRE" | "VENTA";
                 estado?: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
                 fechaDesde?: string;
                 fechaHasta?: string;

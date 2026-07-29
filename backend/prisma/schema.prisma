@@ -230,6 +230,14 @@ model Organization {
   matchesConciliacion   MatchConciliacion[]
   arranquesConciliados  ArranqueConciliado[]
 
+  // Módulo comercial (Ventas y Cuentas por Cobrar).
+  items                       Item[]
+  ventas                      Venta[]
+  lineasVenta                 LineaVenta[]
+  cobros                      Cobro[]
+  aplicacionesCobro           AplicacionCobro[]
+  aplicacionesCobroDesvincula AplicacionCobroDesvinculada[]
+
   @@map("organizations")
 }
 
@@ -472,6 +480,8 @@ model Cuenta {
   configDifCambioPerdida        OrgConfiguracionContable[] @relation("ConfigDifCambioPer")
   configResultadoEjercicio      OrgConfiguracionContable[] @relation("ConfigResultadoEj")
   configResultadosAcumulados    OrgConfiguracionContable[] @relation("ConfigResultadosAcum")
+  configCuentasPorCobrar        OrgConfiguracionContable[] @relation("ConfigCuentasPorCobrar")
+  configVentas                  OrgConfiguracionContable[] @relation("ConfigVentas")
   configCajaChicaDefault        OrgConfiguracionContable[] @relation("ConfigCajaChica")
   configAjustePorInflacion      OrgConfiguracionContable[] @relation("ConfigAjusteInflacion")
 
@@ -481,6 +491,13 @@ model Cuenta {
   // Pack `contabilidad.conciliacion`: la cuenta banco que el usuario vinculó
   // a esta cuenta del plan (a lo sumo una, @@unique en CuentaBancaria).
   cuentaBancaria CuentaBancaria?
+
+  // Módulo comercial. Las tres FKs son onDelete: Restrict — una cuenta
+  // enchufada a un ítem, al snapshot de una línea o al destino de un cobro
+  // no se borra por arrastre.
+  itemsCuentaIngreso       Item[]       @relation("ItemCuentaIngreso")
+  lineasVentaCuentaIngreso LineaVenta[] @relation("LineaVentaCuentaIngreso")
+  cobrosCuentaDestino      Cobro[]      @relation("CobroCuentaDestino")
 
   @@unique([organizationId, codigoInterno])
   @@index([organizationId, claseCuenta])
@@ -518,6 +535,10 @@ model OrgConfiguracionContable {
   resultadoEjercicioId   String? // Resultado del Ejercicio (PATRIMONIO_RESULTADOS)
   resultadosAcumuladosId String? // Resultados Acumulados (PATRIMONIO_RESULTADOS)
 
+  // ---- Módulo comercial (Ventas / Cuentas por Cobrar) ----
+  cuentasPorCobrarId String? // Cuentas por Cobrar Comerciales (1.1.2.001) — contrapartida de la venta a crédito y del cobro
+  ventasId           String? // Ventas (4.1.1.001) — cuenta de ingreso por defecto cuando el ítem no trae la suya
+
   // ---- Otros ----
   cajaChicaDefaultId   String? // Cuenta default para movimientos de caja chica sin especificar
   ajustePorInflacionId String? // AITB — Ajuste Integral por Inflación (poco usado hoy, algunos sectores)
@@ -537,6 +558,8 @@ model OrgConfiguracionContable {
   difCambioPerdida        Cuenta? @relation("ConfigDifCambioPer", fields: [difCambioPerdidaId], references: [id], onDelete: Restrict)
   resultadoEjercicio      Cuenta? @relation("ConfigResultadoEj", fields: [resultadoEjercicioId], references: [id], onDelete: Restrict)
   resultadosAcumulados    Cuenta? @relation("ConfigResultadosAcum", fields: [resultadosAcumuladosId], references: [id], onDelete: Restrict)
+  cuentasPorCobrar        Cuenta? @relation("ConfigCuentasPorCobrar", fields: [cuentasPorCobrarId], references: [id], onDelete: Restrict)
+  ventas                  Cuenta? @relation("ConfigVentas", fields: [ventasId], references: [id], onDelete: Restrict)
   cajaChicaDefault        Cuenta? @relation("ConfigCajaChica", fields: [cajaChicaDefaultId], references: [id], onDelete: Restrict)
   ajustePorInflacion      Cuenta? @relation("ConfigAjusteInflacion", fields: [ajustePorInflacionId], references: [id], onDelete: Restrict)
 
@@ -672,6 +695,7 @@ enum TipoComprobante {
   AJUSTE // J — ajustes, reversiones, reclasificaciones
   TRASPASO // T — movimientos entre cuentas internas
   CIERRE // C — cierre de cuentas de resultado (Fase 1.5)
+  VENTA // V — venta a cliente (módulo comercial)
 }
 
 // Estado del comprobante.
@@ -716,8 +740,10 @@ model Comprobante {
   // String LIBRE, no enum: no hay acople 1:1 con `TipoComprobante` (el cierre
   // del ejercicio mapea sus TRES origenTipo al mismo `tipo = CIERRE`).
   // Valores VIVOS hoy: "CIERRE_GASTOS" | "CIERRE_INGRESOS" | "CIERRE_RESULTADO"
-  // | NULL. Al ser strings comparados en varios call sites, usarlos SIEMPRE vía
-  // constante de dominio — un typo es un `false` silencioso (Anti-09).
+  // | "VENTA" | "COBRO" | NULL. Al ser strings comparados en varios call
+  // sites, usarlos SIEMPRE vía constante de dominio — un typo es un `false`
+  // silencioso (Anti-09). Esta lista es ENUMERATIVA: sumar un origen y no
+  // sumarlo acá deja el contrato mintiendo por omisión.
   origenTipo String?
   origenId   String? // id del documento origen
 
@@ -875,6 +901,11 @@ model Contacto {
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lineasComprobante LineaComprobante[]
   documentosFisicos DocumentoFisico[]
+
+  // Módulo comercial (onDelete: Restrict en ambas puntas — un contacto con
+  // historia comercial no se borra).
+  ventas Venta[]
+  cobros Cobro[]
 
   @@index([organizationId])
   @@index([organizationId, activo])
@@ -1581,4 +1612,254 @@ model ArranqueConciliado {
   // queda auditable y `vigenteA` desempata por `fecha DESC, createdAt DESC`.
   @@index([organizationId, cuentaBancariaId, fecha])
   @@map("arranques_conciliados")
+}
+
+// ============================================================
+// Módulo comercial — Ventas y Cuentas por Cobrar (piloto)
+// Ver openspec/changes/ventas-piloto/{proposal,design,specs}
+// ============================================================
+
+// Responde ¿es físico? y NADA MÁS (D-26). "¿Le sigo el stock?" será un
+// booleano aditivo del pack Inventario — NUNCA un tercer valor de este enum:
+// mezclar los dos ejes en un campo es la pendiente que termina en una lista
+// incomprensible, y cada valor cuesta 4 archivos backend que el compilador
+// exige más 9 listas del frontend que NO avisan.
+enum TipoItem {
+  PRODUCTO
+  SERVICIO
+}
+
+enum CondicionPago {
+  CONTADO
+  CREDITO
+}
+
+// Catálogo mínimo de ítems vendibles. Sin inventario, sin stock, sin costo.
+// El único campo obligatorio para guardar es `nombre` (D-24): no se le pide
+// nomenclatura a quien solo quiere cobrar.
+model Item {
+  id             String @id @default(uuid())
+  organizationId String
+
+  // Opcional (D-24). Normalizado antes de persistir y de comparar: trim →
+  // null si queda vacío, y toUpperCase (B-15). La unicidad rige SOLO cuando
+  // existe, vía UNIQUE PARCIAL raw `WHERE "codigo" IS NOT NULL` — ver
+  // CLAUDE.md §11.6; acá NO va @@unique porque Prisma no los expresa.
+  codigo String?
+  nombre String
+  tipo   TipoItem
+
+  // String libre a propósito (D-25): punto medio entre Invoice Ninja (no la
+  // tiene) y ERPNext (DocType `UOM` con tabla de conversiones). Nombra la
+  // unidad sin comprarse un motor de conversiones que nadie pidió.
+  unidadMedida String?
+
+  precioUnitarioSugerido Decimal? @db.Decimal(18, 6)
+  // Si el negocio vende en cajas de 12 o jaulas de 20, la línea nace
+  // pre-llenada y el vendedor confirma en vez de tipear (D-25).
+  cantidadPorDefecto     Decimal  @default(1) @db.Decimal(18, 6)
+
+  // Cae al concepto `ventasId` de la configuración cuando es null.
+  cuentaIngresoId String?
+
+  // Soft-delete espejo de Contacto: se desactiva, no se borra — las ventas
+  // existentes conservan su itemId y sus snapshots intactos.
+  activo Boolean @default(true)
+
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  createdByUserId String
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cuentaIngreso Cuenta?      @relation("ItemCuentaIngreso", fields: [cuentaIngresoId], references: [id], onDelete: Restrict)
+  lineasVenta   LineaVenta[]
+
+  @@index([organizationId])
+  @@index([organizationId, activo])
+  // Sostiene el guard de REQ-ITM-05: "¿qué ítems activos usan esta cuenta?"
+  @@index([organizationId, cuentaIngresoId])
+  @@map("items")
+}
+
+// La venta ES su propio comprobante (D-02): el Comprobante nace en BORRADOR
+// en la misma transacción, con origenTipo='VENTA' y origenId=venta.id.
+//
+// SIN estado propio ni flag `anulado` a propósito: se leen del comprobante.
+// Un estado espejado se desincronizaría en masa y en silencio el día que se
+// cierra un período — `bloquearPorPeriodo` pasa TODOS sus comprobantes de
+// CONTABILIZADO a BLOQUEADO. El vínculo con el comprobante es el
+// @@unique([organizationId, origenTipo, origenId]) de Comprobante; NO hay
+// comprobanteId acá, que sería la misma arista escrita dos veces.
+model Venta {
+  id             String @id @default(uuid())
+  organizationId String
+
+  contactoId       String
+  // Calendario puro, sin UTC ni hora (§4.6).
+  fechaContable    DateTime      @db.Date
+  condicionPago    CondicionPago
+  // Obligatoria solo en CREDITO; prohibida en CONTADO (validado en servicio).
+  fechaVencimiento DateTime?     @db.Date
+  glosa            String
+
+  // Σ de subtotales YA REDONDEADOS (§4.5, half-up). Persistido porque es un
+  // hecho del documento pactado, como LineaComprobante.debitoBob; el backend
+  // lo recalcula en cada write, en la misma TX que reemplaza las líneas.
+  montoTotal Decimal @db.Decimal(18, 2)
+
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  createdByUserId String
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  organization              Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacto                  Contacto                      @relation(fields: [contactoId], references: [id], onDelete: Restrict)
+  lineas                    LineaVenta[]
+  aplicaciones              AplicacionCobro[]
+  aplicacionesDesvinculadas AplicacionCobroDesvinculada[]
+
+  @@index([organizationId])
+  @@index([organizationId, contactoId])
+  @@index([organizationId, fechaContable])
+  @@map("ventas")
+}
+
+// FK viva AL ÍTEM **y** snapshot (D-28): la referencia hace que "ventas por
+// ítem" sea un JOIN y no un parseo de strings; el snapshot hace que el
+// documento diga lo que se pactó aunque el catálogo cambie mañana.
+//
+// El snapshot de la cuenta NO es cosmético: sin él, editar una venta
+// contabilizada re-resolvería la cuenta desde la config ACTUAL del ítem y la
+// regeneración produciría un asiento distinto del original por un cambio de
+// configuración que nada tuvo que ver con la edición.
+model LineaVenta {
+  id             String @id @default(uuid())
+  // No nulo y propio de la línea, no solo vía la cabecera (§4.2).
+  organizationId String
+  ventaId        String
+
+  orden Int // 1..N dentro de la venta
+
+  itemId      String
+  descripcion String // snapshot editable por línea
+
+  // (18,6): el precio por unidad puede necesitar sub-centavo (precio por kg).
+  // El redondeo a moneda ocurre UNA sola vez, en el subtotal.
+  cantidad        Decimal @db.Decimal(18, 6)
+  precioUnitario  Decimal @db.Decimal(18, 6)
+  cuentaIngresoId String // snapshot: resuelta al CREAR la línea
+
+  // Money.of(cantidad).mul(precioUnitario).redondearABob() — half-up, la
+  // política única de la casa. Nunca lo redondea Postgres.
+  subtotal Decimal @db.Decimal(18, 2)
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  venta         Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  item          Item         @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  cuentaIngreso Cuenta       @relation("LineaVentaCuentaIngreso", fields: [cuentaIngresoId], references: [id], onDelete: Restrict)
+
+  @@unique([ventaId, orden])
+  @@index([organizationId])
+  @@index([ventaId])
+  @@index([organizationId, itemId])
+  @@map("lineas_venta")
+}
+
+// Hecho contable INDEPENDIENTE: existe por sí solo, sin depender de ninguna
+// venta (un cobro sin venta es un anticipo). Su comprobante es de tipo
+// INGRESO —serie I existente, sin tipo nuevo (D-11)— y el listado distingue
+// un cobro de una venta por origenTipo, no por el tipo del comprobante.
+model Cobro {
+  id             String @id @default(uuid())
+  organizationId String
+
+  contactoId    String
+  fechaContable DateTime @db.Date
+  monto         Decimal  @db.Decimal(18, 2)
+
+  // Elegibilidad validada en servicio contra CuentasEfectivoReaderPort:
+  // activa ∧ esDetalle ∧ (actividadFlujo='EFECTIVO' ∪ prefijo 1.1.1).
+  // El default Caja General es precarga de UI, NO concepto de backend.
+  cuentaDestinoId String
+  glosa           String
+
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  createdByUserId String
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  organization              Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacto                  Contacto                      @relation(fields: [contactoId], references: [id], onDelete: Restrict)
+  cuentaDestino             Cuenta                        @relation("CobroCuentaDestino", fields: [cuentaDestinoId], references: [id], onDelete: Restrict)
+  aplicaciones              AplicacionCobro[]
+  aplicacionesDesvinculadas AplicacionCobroDesvinculada[]
+
+  @@index([organizationId])
+  @@index([organizationId, contactoId])
+  @@index([organizationId, fechaContable])
+  @@map("cobros")
+}
+
+// VÍNCULO, no hecho contable (D-03): crear, editar, mover o borrar una
+// aplicación NO genera asiento ni toca ningún comprobante — el del cobro
+// queda byte-idéntico ante cualquier re-imputación.
+//
+// El borrado es FÍSICO (D-12). Lo que queda del acto vive en
+// AplicacionCobroDesvinculada; ver por qué NO es un soft-delete allá.
+model AplicacionCobro {
+  id             String @id @default(uuid())
+  organizationId String
+
+  cobroId       String
+  ventaId       String
+  // > 0. Σ por cobro ≤ cobro.monto y Σ por venta ≤ venta.montoTotal, ambos
+  // validados intra-TX bajo FOR UPDATE (REQ-CXC-04, cicatriz F-03).
+  montoAplicado Decimal @db.Decimal(18, 2)
+
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  createdByUserId String
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cobro        Cobro        @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+  venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([cobroId])
+  @@index([ventaId])
+  @@map("aplicaciones_cobro")
+}
+
+// Rastro APPEND-ONLY de las aplicaciones que se eliminaron al anular una
+// venta o un cobro, o al cambiarles el contacto (B-14).
+//
+// Append-only y no soft-delete sobre AplicacionCobro a propósito: con un
+// `deletedAt` allá, TODA derivación de Σ montoAplicado necesitaría un WHERE,
+// y un filtro olvidado en el SUM() de REQ-CXC-04 SOBRE-APLICA PLATA. El
+// riesgo caería justo sobre el invariante de dinero. Precedente de la casa:
+// ArranqueConciliado conserva el acto anulado — los REPORTES se calculan,
+// los ACTOS se guardan.
+//
+// Los triggers de comprobantes_audit NO servían: la función está clavada a
+// comprobante_id y ramifica por TG_TABLE_NAME, no es genérica.
+model AplicacionCobroDesvinculada {
+  id             String @id @default(uuid())
+  organizationId String
+
+  cobroId       String
+  ventaId       String
+  montoAplicado Decimal @db.Decimal(18, 2)
+  motivo        String
+  userId        String
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  // SIN updatedAt a propósito: un rastro no se edita (mismo criterio que
+  // ImportacionExtracto, MatchConciliacion y ArranqueConciliado).
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cobro        Cobro        @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+  venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([cobroId])
+  @@index([ventaId])
+  @@map("aplicaciones_cobro_desvinculadas")
 }

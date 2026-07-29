@@ -60,6 +60,7 @@ const ETIQUETAS_TIPO_COMPROBANTE: Readonly<Record<string, string>> = {
   AJUSTE: 'Ajuste',
   TRASPASO: 'Traspaso',
   CIERRE: 'Cierre',
+  VENTA: 'Venta',
 };
 
 /** Placeholder para el número de un asiento sin contabilizar (numero === null). */

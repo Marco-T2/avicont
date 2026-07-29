@@ -158,6 +158,22 @@ export const CATALOGO_PERMISOS: PermisoCatalogado[] = definir([
   },
   {
     modulo: 'contabilidad',
+    submodulo: 'items',
+    // Sin `post` ni `void`: un ítem no se contabiliza ni se anula. `delete`
+    // es la desactivación (soft-delete espejo de contactos).
+    acciones: CRUD('ítems del catálogo'),
+  },
+  {
+    modulo: 'contabilidad',
+    submodulo: 'cobros',
+    acciones: {
+      ...CRUD('cobros'),
+      post: 'Contabilizar cobros',
+      void: 'Anular cobros',
+    },
+  },
+  {
+    modulo: 'contabilidad',
     submodulo: 'gestiones',
     acciones: {
       read: 'Consultar gestiones fiscales',
