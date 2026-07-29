@@ -1778,6 +1778,51 @@ describe('ComprobantesService', () => {
       expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
     });
 
+    // §4.1 — `requiereContacto` se validaba SOLO en `contabilizar`. Editar un
+    // CONTABILIZADO reemplaza las líneas en bloque, así que por este camino se
+    // podía dejar una línea contra una cuenta que exige contacto (p. ej. CUENTAS
+    // POR COBRAR) sin `contactoId`. Rompe el aging de cartera, que se apoya
+    // justamente en ese campo.
+    // Mapa de cuentas del happy path, pero con CAJA exigiendo contacto.
+    function cuentasConContactoRequerido() {
+      const cuenta = (id: string, codigo: string, requiereContacto: boolean) => ({
+        id,
+        codigoInterno: codigo,
+        activa: true,
+        esDetalle: true,
+        requiereContacto,
+        permiteMultiMoneda: true,
+        monedaFuncional: Moneda.BOB,
+      });
+      return new Map([
+        [CUENTA_CAJA_ID, cuenta(CUENTA_CAJA_ID, '1.1.2.001', true)],
+        [CUENTA_VENTAS_ID, cuenta(CUENTA_VENTAS_ID, '4.1.1.001', false)],
+      ]);
+    }
+
+    it('(−) rechaza reemplazar lineas dejando sin contacto una cuenta que lo requiere', async () => {
+      const { service, repo, cuentas } = setupEditarHappyPath();
+      cuentas.obtenerBatch.mockResolvedValue(cuentasConContactoRequerido());
+
+      // El DTO manda la línea de esa cuenta sin `contactoId`.
+      await expect(
+        service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dtoEditar()),
+      ).rejects.toMatchObject({ code: 'COMPROBANTE_CONTACTO_REQUERIDO' });
+      expect(repo.reemplazarComprobante).not.toHaveBeenCalled();
+    });
+
+    it('acepta reemplazar lineas cuando la cuenta que requiere contacto lo trae', async () => {
+      const { service, repo, cuentas } = setupEditarHappyPath();
+      cuentas.obtenerBatch.mockResolvedValue(cuentasConContactoRequerido());
+
+      const dto = dtoEditar();
+      dto.lineas[0] = { ...dto.lineas[0]!, contactoId: 'contacto-1' } as (typeof dto.lineas)[0];
+
+      await service.editarContabilizado(TENANT_ID, USER_ID, 'comp-c', dto);
+
+      expect(repo.reemplazarComprobante).toHaveBeenCalled();
+    });
+
     it('happy path: reemplaza lineas y recalcula totales (REQ-COMP-EDIT-CONTABILIZADO-02)', async () => {
       const { service, repo } = setupEditarHappyPath();
 

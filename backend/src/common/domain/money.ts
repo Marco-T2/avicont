@@ -3,8 +3,11 @@
  *
  * Reglas del dominio que encapsula:
  *   - Aritmética exacta sobre decimal (no float IEEE-754).
- *   - Redondeo a 2 decimales para BOB/USD vía `toBob()` (half-up implícito
- *     por `Prisma.Decimal.toFixed`).
+ *   - Redondeo a 2 decimales para BOB/USD: **half-up**, política única de la
+ *     casa. Para PERSISTIR un monto calculado usar `redondearABob()`, que lo
+ *     hace explícito; `toBob()` es FORMATO (devuelve `string`) y aplica la
+ *     misma política vía `Prisma.Decimal.toFixed`. Half-up es también lo que
+ *     hace Postgres `numeric(18,2)`, así que las tres capas coinciden.
  *   - Tolerancia de partida doble: ±Bs 0.01 (Código Tributario art. 47,
  *     originada en redondeos de conversión multi-moneda).
  *
@@ -79,6 +82,29 @@ export class Money {
 
   abs(): Money {
     return new Money(this.amount.abs());
+  }
+
+  /**
+   * Redondea a 2 decimales (moneda) con la política ÚNICA de la casa:
+   * **half-up**. Es el método que hay que usar antes de PERSISTIR cualquier
+   * monto derivado de un cálculo — típicamente `cantidad × precioUnitario`.
+   *
+   * Por qué half-up y no half-even: es la política que ya aplican las otras
+   * dos capas donde el sistema redondea dinero — `div()` (`toDecimalPlaces`)
+   * y Postgres `numeric(18,2)` (verificado: `31.525 → 31.53`,
+   * `0.005 → 0.01`). Redondear half-even acá desalinearía TypeScript de la
+   * base: cualquier valor que llegara al INSERT sin pasar por este método
+   * quedaría redondeado distinto por Postgres.
+   *
+   * Por qué existe: `mul()` NO redondea y `toBob()` devuelve `string`
+   * (formato). Sin este método, el redondeo terminaba ocurriendo dentro de
+   * Postgres al insertar — invisible y fuera del dominio (Anti-04). Y un
+   * total derivado de valores crudos NO coincide con la suma de los
+   * subtotales persistidos: con 3 líneas de `10.005`, `10.01 × 3 = 30.03`
+   * pero `30.015 → 30.02`. Regla: sumar SIEMPRE subtotales ya redondeados.
+   */
+  redondearABob(): Money {
+    return new Money(this.amount.toDecimalPlaces(2));
   }
 
   // ------------------------------------------------------------

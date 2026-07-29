@@ -703,6 +703,14 @@ export class ComprobantesService {
           if (!cuenta.esDetalle) {
             throw new CuentaNoDetalleError(orden, cuenta.id, cuenta.codigoInterno);
           }
+          // §4.1 — mismo invariante que `contabilizar`: una cuenta que exige
+          // contacto no puede quedarse sin él. Faltaba en este camino, y como
+          // la edición reemplaza las líneas EN BLOQUE se podía dejar sin
+          // `contactoId` una línea contra CUENTAS POR COBRAR — el campo del
+          // que depende el aging de cartera.
+          if (cuenta.requiereContacto && !l.contactoId) {
+            throw new ContactoRequeridoError(orden, cuenta.id, cuenta.codigoInterno);
+          }
           validarCoherenciaLineaBorrador(orden, l);
           return {
             orden,

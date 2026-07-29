@@ -227,3 +227,62 @@ describe('Money.div', () => {
     expect(() => Money.of('100').div(0)).toThrow(/division por cero/);
   });
 });
+
+describe('Money.redondearABob (política única de redondeo a moneda)', () => {
+  // La política de la casa es HALF-UP, y no por preferencia: es la única que
+  // mantiene alineadas las tres capas donde hoy se redondea dinero —
+  // `Money.div`, `Money.toBob` (`toFixed`) y Postgres `numeric(18,2)`.
+  // Adoptar half-even en TS desalinearía la BD: todo valor persistido sin
+  // redondeo explícito quedaría redondeado distinto por Postgres.
+
+  // Estos dos casos son los que DISCRIMINAN half-up de half-even. Un caso
+  // como 31.515 da 31.52 con ambas políticas y por eso no prueba nada.
+  it('redondea half-up, no half-even (31.525 → 31.53)', () => {
+    expect(Money.of('31.525').redondearABob().toBob()).toBe('31.53');
+  });
+
+  it('redondea half-up en el borde de cero (0.005 → 0.01)', () => {
+    expect(Money.of('0.005').redondearABob().toBob()).toBe('0.01');
+  });
+
+  it('coincide con el redondeo de Postgres numeric(18,2)', () => {
+    // Verificado contra la BD: 31.525 → 31.53 y 0.005 → 0.01.
+    expect(Money.of('31.525').redondearABob().toBob()).toBe('31.53');
+    expect(Money.of('0.005').redondearABob().toBob()).toBe('0.01');
+  });
+
+  it('deja intacto un valor que ya tiene 2 decimales', () => {
+    expect(Money.of('1250.50').redondearABob().toBob()).toBe('1250.50');
+  });
+
+  it('redondea hacia abajo cuando corresponde', () => {
+    expect(Money.of('10.004').redondearABob().toBob()).toBe('10.00');
+  });
+
+  it('respeta el signo (half-up se aleja del cero)', () => {
+    expect(Money.of('-0.005').redondearABob().toBob()).toBe('-0.01');
+  });
+
+  it('devuelve una instancia nueva (inmutabilidad)', () => {
+    const original = Money.of('10.005');
+    const redondeado = original.redondearABob();
+    expect(original.toString()).toBe('10.005');
+    expect(redondeado).not.toBe(original);
+  });
+
+  it('sumar subtotales YA redondeados evita el descuadre del total', () => {
+    // El bug que este método existe para prevenir: con 3 líneas de 10.005,
+    // el total derivado de los valores crudos (30.015 → 30.02) NO coincide
+    // con la suma de los subtotales persistidos (10.01 × 3 = 30.03).
+    const crudo = Money.of('10.005');
+    const subtotal = crudo.redondearABob();
+
+    const totalDesdeSubtotales = subtotal.plus(subtotal).plus(subtotal);
+    const totalDesdeCrudos = crudo.plus(crudo).plus(crudo).redondearABob();
+
+    expect(totalDesdeSubtotales.toBob()).toBe('30.03');
+    expect(totalDesdeCrudos.toBob()).toBe('30.02');
+    // La regla: el total SIEMPRE se arma sumando subtotales ya redondeados.
+    expect(totalDesdeSubtotales.equals(totalDesdeCrudos)).toBe(false);
+  });
+});
