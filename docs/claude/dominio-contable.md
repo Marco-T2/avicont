@@ -1,6 +1,6 @@
 <!--
-Última edición: 2026-05-27
-Última revisión contra core: 2026-05-27
+Última edición: 2026-07-28
+Última revisión contra core: 2026-07-28
 Owner: backend-lead
 -->
 
@@ -53,7 +53,14 @@ Cada invariante listado acá se codifica como **test obligatorio**. Si un invari
 #### Períodos y cierre
 
 - Un período es único por `(tenantId, year, month)`.
-- No se permiten comprobantes con `fechaContable` en períodos **CERRADO** o **BLOQUEADO**.
+- No se permiten comprobantes con `fechaContable` en un período que no esté **ABIERTO**.
+- ⚠️ **`PeriodoFiscalStatus` es `ABIERTO | CERRADO` — no existe un período BLOQUEADO.**
+  `BLOQUEADO` pertenece a `EstadoComprobante` (otro enum) y es el estado al que
+  van los comprobantes cuando su período se cierra (ver la línea de más abajo).
+  Lo que se le parece del lado del período es el booleano
+  `PeriodoFiscal.esDefinitivo`, que **no** bloquea la escritura —eso ya lo hace
+  `status = CERRADO`— sino que impide **reabrir**: un período definitivo se
+  queda sin la salida de la reapertura.
 - Para cerrar el período N, todos los comprobantes de ese período deben estar en CONTABILIZADO (incluidos los que tienen `anulado=true`). **No se cierra con borradores pendientes.**
 - Para cerrar el período N, el período N-1 debe estar CERRADO. **No se saltean períodos.**
 - Al cerrar, todos los CONTABILIZADO del período pasan atómicamente a BLOQUEADO.
