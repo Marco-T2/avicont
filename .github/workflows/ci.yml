@@ -86,6 +86,12 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      # Necesario para test/shutdown.e2e-spec.ts, que corre contra dist/main.js
+      # (el bug de §11.7 vive en el arranque real del proceso). De paso valida
+      # que `nest build` compile: ts-jest no lo cubre.
+      - name: Build
+        run: pnpm run build
+
       - name: Unit + Integration tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saas
