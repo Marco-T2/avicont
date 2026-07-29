@@ -28,6 +28,7 @@ export const tipoDocumentoFisicoFormSchema = z.object({
         'AJUSTE',
         'TRASPASO',
         'CIERRE',
+        'VENTA',
       ]),
     )
     .default([]),

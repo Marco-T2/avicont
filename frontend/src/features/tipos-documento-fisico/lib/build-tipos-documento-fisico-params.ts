@@ -28,7 +28,7 @@ export function buildTiposDocumentoFisicoParams(
   };
 }
 
-// Mapa value ↔ label para los 7 valores de TipoComprobante.
+// Mapa value ↔ label para los 8 valores de TipoComprobante.
 // Usado en el checkbox group del form y en los badges de la tabla.
 export const TIPO_COMPROBANTE_OPTIONS: { value: TipoComprobante; label: string }[] = [
   { value: 'APERTURA', label: 'Apertura' },
@@ -38,4 +38,5 @@ export const TIPO_COMPROBANTE_OPTIONS: { value: TipoComprobante; label: string }
   { value: 'AJUSTE', label: 'Ajuste / reversión' },
   { value: 'TRASPASO', label: 'Traspaso' },
   { value: 'CIERRE', label: 'Cierre' },
+  { value: 'VENTA', label: 'Venta' },
 ];

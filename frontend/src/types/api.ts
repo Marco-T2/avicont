@@ -55,10 +55,15 @@ export interface JwtPayload {
 // openapi-typescript emite los enums como UNIONES de strings (tipos), no como
 // objetos runtime. El frontend los usa como VALOR (`ClaseCuenta.ACTIVO` en
 // selects/comparaciones), así que se conservan como objetos `as const` a mano.
-// El `satisfies Record<string, Schemas[...][campo]>` hace que `tsc` falle si el
-// objeto deriva del enum del backend (drift de valores). Donde el enum no tiene
-// un campo schema correspondiente (params de query, DTOs aún sin decorar), el
-// objeto queda sin `satisfies` (no hay contra qué chequear).
+// El `satisfies` ata el objeto al enum del backend, pero la DIRECCIÓN importa
+// y es fácil escribirla al revés:
+//   - `Record<Schemas[...][campo], string>` (unión como CLAVE) falla ante un
+//     valor equivocado Y ante uno FALTANTE. Es la forma correcta.
+//   - `Record<string, Schemas[...][campo]>` (unión como valor) sólo falla ante
+//     un valor equivocado: omitir uno compila en verde.
+// Donde el enum no tiene un campo schema correspondiente (params de query,
+// DTOs aún sin decorar), el objeto queda sin `satisfies` (no hay contra qué
+// chequear).
 // ============================================================
 
 export const ClaseCuenta = {
@@ -776,6 +781,11 @@ export type ReabrirPeriodoRequest = Schemas['ReabrirPeriodoDto'];
 // Comprobantes (asientos contables — Fase 1 slice 1)
 // ============================================================
 
+// La unión generada va como CLAVE del Record, no como valor: así olvidar un
+// valor deja de compilar. Con la unión del lado del valor —como estaba— el
+// `satisfies` sólo detectaba valores EQUIVOCADOS, y omitir uno pasaba en
+// verde. `PerfilExtracto` ya usa esta forma porque el repo se quemó con eso
+// al sumar Fortaleza y BMSC. Validado por mutación: sacar VENTA rompe `tsc`.
 export const TipoComprobante = {
   APERTURA: 'APERTURA',
   DIARIO: 'DIARIO',
@@ -784,7 +794,8 @@ export const TipoComprobante = {
   AJUSTE: 'AJUSTE',
   TRASPASO: 'TRASPASO',
   CIERRE: 'CIERRE',
-} as const satisfies Record<string, Schemas['ComprobanteListItemDto']['tipo']>;
+  VENTA: 'VENTA',
+} as const satisfies Record<Schemas['ComprobanteListItemDto']['tipo'], string>;
 export type TipoComprobante = (typeof TipoComprobante)[keyof typeof TipoComprobante];
 
 export const EstadoComprobante = {

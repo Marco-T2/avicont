@@ -129,6 +129,7 @@ export function ComprobantesFilters(): React.JSX.Element {
               <SelectItem value="AJUSTE">Ajuste</SelectItem>
               <SelectItem value="APERTURA">Apertura</SelectItem>
               <SelectItem value="CIERRE">Cierre</SelectItem>
+              <SelectItem value="VENTA">Venta</SelectItem>
             </SelectContent>
           </Select>
         </div>
