@@ -24,8 +24,15 @@ QuickBooks — posicionamiento §10.9). Módulo
   comparando contra `ClockPort.currentDateLaPaz()` (string ISO que se eleva
   con `FechaContable`). NUNCA columna, NUNCA cron que flipee filas a
   medianoche, NUNCA `new Date()` en dominio/servicio (§4.6, Anti-20).
-- Ninguno de los tres se persiste (Anti-05). Solo ventas CONTABILIZADAS y no
-  anuladas integran la cartera.
+- Ninguno de los tres se persiste (Anti-05).
+- **Integran la cartera** las ventas con
+  `estado IN (CONTABILIZADO, BLOQUEADO) AND anulado = false` y saldo > 0.
+  Los dos estados, NO sólo `CONTABILIZADO`: cerrar un período pasa todos sus
+  comprobantes a `BLOQUEADO` (`bloquearPorPeriodo`), así que filtrar por
+  `CONTABILIZADO` a secas **vaciaría el estado de cuenta de cada cliente el
+  día del cierre mensual**, con las deudas intactas. Es el mismo predicado de
+  `ESTADOS_CONCILIABLES` ("plata efectivamente movida"); se extrae a un lugar
+  único en vez de escribirlo por tercera vez.
 
 #### Escenario: el estado cambia solo al aplicar
 
@@ -233,7 +240,8 @@ mismo tratamiento que en ventas (SHOULD, resuelve `sdd-design`).
 
 ### REQ-CXC-07: Estado de cuenta por cliente
 
-Por contacto: ventas CONTABILIZADAS no anuladas con saldo > 0, cada una con
+Por contacto: ventas de la cartera (REQ-CXC-01 — `CONTABILIZADO` **o**
+`BLOQUEADO`, no anuladas) con saldo > 0, cada una con
 `montoTotal`, cobrado, `saldoPendiente`, `fechaVencimiento` y **días de
 atraso** (derivados vía `ClockPort`, dependen del `contactoId` de la línea CxC
 — B-1), más el saldo a favor (Σ saldos no aplicados de sus cobros). Las
@@ -263,10 +271,13 @@ ajeno → 404.
 
 ### REQ-CXC-09: Period lock sobre el cobro (§4.4)
 
-Crear, editar o anular un **cobro** con `fechaContable` en período
-CERRADO/BLOQUEADO DEBE rechazarse — es un hecho contable. Reapertura formal,
-sin bypass (matriz fila 14). Las **aplicaciones** quedan explícitamente fuera
-del lock (REQ-CXC-03: no son hechos contables).
+Crear, editar o anular un **cobro** con `fechaContable` en un período que no
+está `ABIERTO` DEBE rechazarse — es un hecho contable. Reapertura formal, sin
+bypass (matriz fila 14). Las **aplicaciones** quedan explícitamente fuera del
+lock (REQ-CXC-03: no son hechos contables).
+
+Vocabulario: `PeriodoFiscalStatus` es `ABIERTO | CERRADO`; **no hay período
+`BLOQUEADO`** (ver REQ-VTA-09).
 
 #### Escenario: cobro en mes cerrado
 
