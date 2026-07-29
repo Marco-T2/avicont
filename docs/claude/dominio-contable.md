@@ -160,35 +160,42 @@ model LineaComprobante {
 
 **Nunca `Float` ni `Double` para plata ni para porcentajes.** En Prisma es `Decimal`. En TypeScript se maneja con `decimal.js` encapsulado dentro del value object `Money`.
 
+`Money` es **currency-neutral**: envuelve un `Prisma.Decimal` y NO lleva la
+moneda adentro. La moneda vive en la columna `moneda` de la línea, y la
+conversión a BOB se hace multiplicando por el tipo de cambio y redondeando.
+
 ```typescript
-// common/domain/money.ts
-import Decimal from 'decimal.js';
-
+// common/domain/money.ts (superficie real — no lleva `currency`)
 export class Money {
-  private constructor(
-    private readonly amount: Decimal,
-    private readonly currency: Moneda,
-  ) {}
+  private constructor(readonly amount: Prisma.Decimal) {}
 
-  static of(amount: string | number, currency: Moneda): Money {
-    return new Money(new Decimal(amount), currency);
-  }
+  static of(value: DecimalInput): Money;        // string | number | Decimal | Money
 
-  add(other: Money): Money {
-    if (this.currency !== other.currency) {
-      throw new Error('No se pueden sumar montos de distinta moneda sin conversión');
-    }
-    return new Money(this.amount.plus(other.amount), this.currency);
-  }
+  // Aritmética — NINGUNA redondea, salvo div()
+  plus(other: DecimalInput): Money;
+  minus(other: DecimalInput): Money;
+  mul(factor: DecimalInput): Money;
+  div(divisor: number): Money;                  // redondea a 2 (half-up)
 
-  toBob(tipoCambio: Decimal): Money {
-    if (this.currency === Moneda.BOB) return this;
-    return new Money(this.amount.mul(tipoCambio).toDecimalPlaces(2), Moneda.BOB);
-  }
+  /** Redondeo a 2 decimales (half-up). Usar ANTES de persistir un calculado. */
+  redondearABob(): Money;
 
-  // equals, lessThan, isZero, toString, etc.
+  /** Tolerancia ±Bs 0.01 de partida doble (Código Tributario art. 47). */
+  balanceadoEnBobCon(other: DecimalInput): boolean;
+
+  toBob(): string;                              // FORMATO para DTOs, 2 decimales
+  toPrismaDecimal(): Prisma.Decimal;
 }
 ```
+
+**Conversión a BOB**: `Money.of(monto).mul(tipoCambio).redondearABob()`.
+
+**Redondeo**: la política única es **half-up**, y coincide con la de Postgres
+`numeric(18,2)`. Todo monto que salga de un cálculo (`mul`, `plus`) se cierra
+con `redondearABob()` antes de persistir — si no, el redondeo lo termina
+haciendo la base al insertar, fuera del dominio. Un total se arma sumando
+subtotales **ya redondeados**, nunca redondeando la suma de los crudos. Ver
+Anti-04 y Anti-07.
 
 - Los servicios reciben y devuelven `Money`, **no `number`**.
 - Los DTOs que cruzan HTTP usan **`string`** (ej: `"1250.50"`) para evitar pérdida de precisión en JSON.
