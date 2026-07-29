@@ -29,9 +29,9 @@ TDD estricto (RED → GREEN). 1 task = 1 commit; cierra con `tsc` + suite del su
 - [x] 2.4 RED/GREEN `CuentasEfectivoReaderPort.esElegibleComoDestino`: `activa ∧ esDetalle ∧ (actividadFlujo = 'EFECTIVO' **∪** prefijo 1.1.1)`. **El test tiene que DISCRIMINAR unión de fallback**: cuenta bajo `1.1.1` marcada `OPERACION` → **sigue elegible**; cuenta fuera del prefijo marcada `EFECTIVO` → elegible. Sin ese par, una implementación con "en su defecto" pasa en verde. Adapter + wiring en `cuentas`.
 - [x] 2.5 Extraer `validarLineasContraCuentas` a `comprobantes/domain/`; consumirla en sus 3 call sites (`contabilizar:454`, `editarContabilizado:703`, `resolverYValidarBorrador:1286`). Es **anti-duplicación**: `requiereContacto` ya está en dos de ellos desde #294 — el extract unifica, no tapa un agujero.
 - [x] 2.6 Extraer `ESTADOS_CONCILIABLES` a un lugar único; consumirlo en sus 2 call sites (`prisma-lineas-cuenta-reader.adapter.ts:17` y `match-conciliacion.service.ts:34`).
-- [ ] 2.7 RED/GREEN `ComprobanteSistemaWriterPort` + adapter (5 métodos del design). Preserva `id`/`numero`; **todos re-validan**.
-- [ ] 2.8 `comprobantes.service.anular` → 409 `COMPROBANTE_ANULACION_DESDE_ORIGEN` si el origen es comercial.
-- [ ] 2.9 Constantes `ORIGEN_TIPO_VENTA` / `ORIGEN_TIPO_COBRO` (molde ya existente: `CierreOrigenTipo`).
+- [x] 2.7 RED/GREEN `ComprobanteSistemaWriterPort` + implementación (5 métodos). Preserva `id`/`numero`; **todos re-validan**. La implementación quedó como **servicio** (`comprobante-sistema-writer.service.ts`), no como adapter: orquesta validación de dominio y delega la persistencia en el repo port, así que no toca Prisma. `contabilizarSistema`/`anularSistema` reusan los núcleos `contabilizarEnTx`/`anularEnTx` extraídos de `ComprobantesService` (refactor puro) en vez de repetir las secuencias. El port cambió tres cosas frente al design —`tx` requerido, sin `periodoFiscalId`, sin `tipo` en regenerar—, todas documentadas ahí.
+- [x] 2.8 `comprobantes.service.anular` → 409 `COMPROBANTE_ANULACION_DESDE_ORIGEN` si el origen es comercial. La guarda mira el ORIGEN y no `generadoPorSistema`, para no atrapar a los asientos de cierre (que tienen su propia regla); vive sólo en la operación de usuario, no en `anularEnTx`.
+- [x] 2.9 Constantes `ORIGEN_TIPO_VENTA` / `ORIGEN_TIPO_COBRO` en el archivo del port (molde: `CierreOrigenTipo`), junto con `esOrigenComercial` y `nombreDeOrigenComercial` — el consumidor real necesita los predicados, no los literales.
 
 ## Fase 3 — `items`
 

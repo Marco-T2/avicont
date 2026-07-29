@@ -156,10 +156,23 @@ Aplicación → **no toca este flujo**: cero comprobantes (D-03).
 
 | File | Action | Description |
 |---|---|---|
-| `comprobantes/ports/comprobante-sistema-writer.port.ts` | Create | writer que re-valida |
-| `comprobantes/adapters/prisma-comprobante-sistema-writer.adapter.ts` | Create | reusa `repo.reemplazarComprobante` |
+| `comprobantes/ports/comprobante-sistema-writer.port.ts` | Create | writer que re-valida + constantes `ORIGEN_TIPO_*` |
+| `comprobantes/comprobante-sistema-writer.service.ts` | Create | implementación; reusa `repo.reemplazarComprobante` y los núcleos compartidos |
+| `comprobantes/ports/comprobante.repository.port.ts` | Modify | `crearBorradorSistemaSiNoExiste` (alta idempotente por origen) + `eliminarBorradorSistema` |
 | `comprobantes/domain/validacion-cuentas.ts` | Create | extract de las 3 copias |
-| `comprobantes/comprobantes.service.ts` | Modify | consume el extract; `anular` rechaza origen comercial (REQ-CMP-VTA-04) |
+| `comprobantes/comprobantes.service.ts` | Modify | consume el extract; expone `contabilizarEnTx`/`anularEnTx` (núcleos compartidos con el camino de sistema); `anular` rechaza origen comercial (REQ-CMP-VTA-04) |
+
+> **La implementación es un SERVICIO, no un adapter** (ajustado 2026-07-29). El
+> design la ubicaba en `adapters/`. Un adapter traduce hacia infraestructura, y
+> esta pieza orquesta validación de dominio: resuelve el período, verifica las
+> cuentas y aplica los invariantes de §4.1. La persistencia la delega en
+> `ComprobanteRepositoryPort`, así que no tiene una línea de Prisma — que es
+> justamente lo que la separa de un adapter.
+>
+> **No duplica el camino de usuario.** `contabilizarSistema` y `anularSistema`
+> llaman a `ComprobantesService.contabilizarEnTx` / `.anularEnTx`, extraídos
+> como refactor puro: las mismas secuencias que corre el contador, no copias.
+> Ese fue el motivo de sumar los dos métodos a la tabla de arriba.
 | `common/domain/efectivo.ts` | Create | `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo` — la BASE compartida, no "el criterio" |
 | `common/audited-transaction.runner.ts` | **Move** | desde `comprobantes/infrastructure/`; movimiento puro (ver decisión) |
 | `comprobantes/infrastructure/` | **Delete** | el directorio queda vacío tras el movimiento; su barrel `index.ts` no lo importaba nadie |
@@ -191,14 +204,31 @@ Aplicación → **no toca este flujo**: cero comprobantes (D-03).
 
 ```ts
 export abstract class ComprobanteSistemaWriterPort {
-  abstract crearBorradorSistema(d: CrearSistemaData, tx?: Tx): Promise<{ id: string }>;
-  /** Reemplazo en bloque §4.3: preserva cabecera, `id` y `numero` (§4.9). */
-  abstract regenerarLineasSistema(d: RegenerarData, tx?: Tx): Promise<void>;
-  abstract contabilizarSistema(id: string, tenantId: string, tx?: Tx): Promise<{ numero: string }>;
-  abstract anularSistema(d: AnularSistemaData, tx?: Tx): Promise<void>;
-  abstract eliminarBorradorSistema(id: string, tenantId: string, tx?: Tx): Promise<void>;
+  abstract crearBorradorSistema(d: CrearSistemaData, tx: Tx): Promise<{ id: string }>;
+  /** Reemplazo en bloque §4.3: preserva cabecera, `id`, `numero` (§4.9) y `tipo`. */
+  abstract regenerarLineasSistema(d: RegenerarSistemaData, tx: Tx): Promise<void>;
+  abstract contabilizarSistema(id: string, tenantId: string, tx: Tx): Promise<{ numero: string }>;
+  abstract anularSistema(d: AnularSistemaData, tx: Tx): Promise<void>;
+  abstract eliminarBorradorSistema(id: string, tenantId: string, tx: Tx): Promise<void>;
 }
 ```
+
+> **Ajustado 2026-07-29 al implementar la task 2.7.** Tres cambios sobre la
+> firma que este design traía, los tres para quitarle al caller maneras de
+> quedar mal:
+>
+> 1. **`tx` pasa de opcional a REQUERIDO** en los cinco métodos. La venta y su
+>    comprobante tienen que mutar en una sola TX, y los triggers de
+>    `comprobantes_audit` leen el actor de `app.audit_user_id`, que inyecta
+>    `AuditedTransactionRunner` al abrirla (§4.3). Con `tx?`, escribir fuera de
+>    la transacción compila y graba la fila de auditoría **sin actor**: una
+>    pérdida silenciosa. Requerido, no se puede escribir por accidente.
+> 2. **`CrearSistemaData` y `RegenerarSistemaData` NO llevan `periodoFiscalId`**:
+>    el writer lo resuelve desde `fechaContable`. Recibir los dos permite que no
+>    coincidan, y un comprobante archivado en un período que no le corresponde
+>    descuadra los reportes de ese mes sin que nada falle en el momento.
+> 3. **`regenerarLineasSistema` no recibe `tipo`**: lo preserva del comprobante
+>    existente, igual que el `id` y el `numero`.
 
 `ItemsReaderPort.obtenerBatch(tenantId, ids, tx?) → Map<id,{id,activo}>` —
 espejo literal de `ContactosReaderPort` (REQ-ITM-04).
