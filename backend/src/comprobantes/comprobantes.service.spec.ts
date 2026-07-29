@@ -1336,6 +1336,66 @@ describe('ComprobantesService', () => {
       };
     }
 
+    // REQ-CMP-VTA-04 / Anti-14 — la anulación de un comprobante comercial se
+    // dispara desde el módulo que lo generó, que primero desvincula las
+    // aplicaciones de cobro. Anularlo "por abajo" deja la venta viva apuntando
+    // a un asiento anulado: la inconsistencia exacta que Anti-14 nombra.
+    describe('origen comercial (REQ-CMP-VTA-04)', () => {
+      function setupOrigen(origenTipo: string | null) {
+        const ctx = setupAnularHappyPath();
+        const comp = comprobanteFactory({
+          id: 'comp-c',
+          estado: EstadoComprobante.CONTABILIZADO,
+          numero: 'V2607-000042',
+          anulado: false,
+          periodoFiscalId: PERIODO_ID,
+          generadoPorSistema: true,
+          origenTipo,
+          origenId: 'venta-1',
+        });
+        ctx.repo.findById.mockResolvedValue(comp);
+        return ctx;
+      }
+
+      it.each([
+        ['VENTA', 'la venta'],
+        ['COBRO', 'el cobro'],
+      ])('rechaza con 409 el comprobante de origen %s', async (origenTipo, modulo) => {
+        const { service, repo } = setupOrigen(origenTipo);
+
+        await expect(
+          service.anular(TENANT_ID, USER_ID, 'comp-c', 'Cliente devolvió la mercadería'),
+        ).rejects.toMatchObject({
+          code: 'COMPROBANTE_ANULACION_DESDE_ORIGEN',
+          details: { origenTipo },
+        });
+        // Y no llega a tocar la base: falla antes de abrir la anulación.
+        expect(repo.anular).not.toHaveBeenCalled();
+
+        await expect(
+          service.anular(TENANT_ID, USER_ID, 'comp-c', 'Cliente devolvió la mercadería'),
+        ).rejects.toThrow(new RegExp(modulo));
+      });
+
+      // La guarda es por ORIGEN, no por `generadoPorSistema`: los asientos de
+      // cierre también son de sistema y tienen su propia regla (REQ-CMP-SYS-06).
+      it('no toca la anulación de un comprobante de cierre', async () => {
+        const { service } = setupOrigen('CIERRE_RESULTADO');
+
+        await expect(
+          service.anular(TENANT_ID, USER_ID, 'comp-c', 'Corrección del cierre anual'),
+        ).resolves.toBeDefined();
+      });
+
+      it('no toca la anulación de un comprobante manual', async () => {
+        const { service } = setupOrigen(null);
+
+        await expect(
+          service.anular(TENANT_ID, USER_ID, 'comp-c', 'Error en imputación al cliente'),
+        ).resolves.toBeDefined();
+      });
+    });
+
     it('happy path: marca anulado=true en el propio comprobante (REQ-COMP-ANULAR-01)', async () => {
       const { service, repo: _repo, anulado } = setupAnularHappyPath();
 

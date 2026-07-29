@@ -72,6 +72,24 @@ export function esOrigenComercial(origenTipo: string | null | undefined): boolea
   return (ORIGENES_COMERCIALES as readonly string[]).includes(origenTipo);
 }
 
+/**
+ * Cómo se nombra el documento origen en un mensaje al usuario.
+ *
+ * El contador no sabe qué es un `origenTipo`: lo que necesita leer es "esto
+ * lo generó la venta, andá a la venta". La unión va como CLAVE del `Record`
+ * —no como valor— para que sumar un origen comercial y olvidarlo acá NO
+ * compile; con la unión del lado del valor, la omisión pasa en verde. Este
+ * repo ya se quemó con esa dirección al sumar perfiles de extracto.
+ */
+const NOMBRE_POR_ORIGEN: Record<OrigenTipoComercial, string> = {
+  [ORIGEN_TIPO_VENTA]: 'la venta',
+  [ORIGEN_TIPO_COBRO]: 'el cobro',
+};
+
+export function nombreDeOrigenComercial(origenTipo: OrigenTipoComercial): string {
+  return NOMBRE_POR_ORIGEN[origenTipo];
+}
+
 // ============================================================
 // Datos de escritura
 // ============================================================

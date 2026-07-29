@@ -80,6 +80,7 @@ import {
 } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
+  ComprobanteAnulacionDesdeOrigenError,
   ComprobanteAnuladoNoAnulableError,
   ComprobanteAnuladoNoEditableError,
   ComprobanteAnularBorradorNoPermitidoError,
@@ -126,6 +127,11 @@ import {
   LineaPersistData,
   ListarFiltros,
 } from './ports/comprobante.repository.port';
+import {
+  esOrigenComercial,
+  nombreDeOrigenComercial,
+  type OrigenTipoComercial,
+} from './ports/comprobante-sistema-writer.port';
 import {
   SECUENCIA_COMPROBANTE_PORT,
   SecuenciaComprobantePort,
@@ -819,6 +825,25 @@ export class ComprobantesService {
       comprobantePreTx.estado,
       comprobantePreTx.anulado,
     );
+
+    // REQ-CMP-VTA-04 / Anti-14: un comprobante de venta o de cobro se anula
+    // DESDE su módulo, que orquesta la desvinculación de las aplicaciones antes
+    // de anular por el camino de sistema. Si se pudiera anular por acá, la venta
+    // quedaría viva apuntando a un asiento anulado.
+    //
+    // La guarda mira el ORIGEN y no `generadoPorSistema`: los asientos de cierre
+    // también son de sistema y tienen su propia regla, la de acá abajo.
+    // Va sólo en esta operación de usuario — `anularEnTx`, el núcleo que
+    // comparte con el camino de sistema, no la lleva, porque es justamente el
+    // camino por el que ventas SÍ debe poder anular.
+    if (esOrigenComercial(comprobantePreTx.origenTipo)) {
+      const origenTipo = comprobantePreTx.origenTipo as OrigenTipoComercial;
+      throw new ComprobanteAnulacionDesdeOrigenError(
+        comprobantePreTx.id,
+        origenTipo,
+        nombreDeOrigenComercial(origenTipo),
+      );
+    }
 
     // REQ-CMP-SYS-06: anular un comprobante de CIERRE generado por sistema solo
     // se permite mientras la gestión NO esté CERRADA. Con gestión cerrada, el

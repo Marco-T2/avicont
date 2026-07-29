@@ -249,6 +249,30 @@ export class CierreComprobanteNoEliminableError extends ConflictError {
 }
 
 /**
+ * Se intenta anular por la API de comprobantes un comprobante que generó un
+ * módulo comercial (venta, cobro). REQ-CMP-VTA-04, Anti-14.
+ *
+ * La anulación de esos comprobantes se dispara desde el módulo origen, que
+ * antes desvincula las aplicaciones de cobro. Permitirla "por abajo" dejaría la
+ * venta viva apuntando a un asiento anulado — y el saldo de cartera, que se
+ * deriva de las aplicaciones, quedaría contando una venta que ya no existe
+ * contablemente.
+ *
+ * No es una restricción de permisos: es que la operación está incompleta si
+ * entra por acá. Por eso 409 y no 403.
+ * Code: COMPROBANTE_ANULACION_DESDE_ORIGEN — 409.
+ */
+export class ComprobanteAnulacionDesdeOrigenError extends ConflictError {
+  constructor(id: string, origenTipo: string, nombreOrigen: string) {
+    super(
+      'COMPROBANTE_ANULACION_DESDE_ORIGEN',
+      `Este comprobante lo generó ${nombreOrigen}; anulalo desde ahí para que también se desvinculen los cobros aplicados`,
+      { id, origenTipo },
+    );
+  }
+}
+
+/**
  * El camino de sistema comercial (`ComprobanteSistemaWriterPort`) recibió el id
  * de un comprobante que NO es de sistema, o que no está en el estado que la
  * operación admite.
