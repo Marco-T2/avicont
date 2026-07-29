@@ -12,6 +12,7 @@ import {
   createTestUser,
   prisma,
 } from './helpers/test-factory';
+import { waitForRow } from './helpers/wait-for';
 
 const PACK_CONCILIACION_CLAVE = 'contabilidad.conciliacion';
 
@@ -185,15 +186,14 @@ describe('Platform Admin — acceso super-admin (REQ-SA-12, REQ-SA-13)', () => {
 
     expect(res.status).toBe(201);
 
-    // El PlatformAuditInterceptor escribe de forma asíncrona (fire-and-forget).
-    // Esperamos un momento para que la escritura complete antes de verificar.
-    await new Promise((r) => setTimeout(r, 100));
-
-    // El PlatformAuditInterceptor registra la mutación
-    const auditRow = await prisma.platformAudit.findFirst({
-      where: { action: { contains: 'POST' } },
-      orderBy: { createdAt: 'desc' },
-    });
+    // El PlatformAuditInterceptor escribe de forma asíncrona (fire-and-forget),
+    // así que la fila se espera con polling, no con un sleep fijo.
+    const auditRow = await waitForRow(() =>
+      prisma.platformAudit.findFirst({
+        where: { action: { contains: 'POST' } },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
     expect(auditRow).not.toBeNull();
   });
 
@@ -405,12 +405,12 @@ describe('Platform Admin — PATCH status/entitlement super-admin (REQ-SA-14/15)
 
     expect(res.status).toBe(200);
 
-    await new Promise((r) => setTimeout(r, 150));
-
-    const auditRow = await prisma.platformAudit.findFirst({
-      where: { targetOrganizationId: targetOrgId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const auditRow = await waitForRow(() =>
+      prisma.platformAudit.findFirst({
+        where: { targetOrganizationId: targetOrgId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
     expect(auditRow).not.toBeNull();
     expect(auditRow?.targetOrganizationId).toBe(targetOrgId);
   });
@@ -483,12 +483,12 @@ describe('Platform Admin — PATCH status/entitlement super-admin (REQ-SA-14/15)
 
     expect(res.status).toBe(200);
 
-    await new Promise((r) => setTimeout(r, 150));
-
-    const auditRow = await prisma.platformAudit.findFirst({
-      where: { targetOrganizationId: targetOrgId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const auditRow = await waitForRow(() =>
+      prisma.platformAudit.findFirst({
+        where: { targetOrganizationId: targetOrgId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
     expect(auditRow).not.toBeNull();
     expect(auditRow?.targetOrganizationId).toBe(targetOrgId);
   });
