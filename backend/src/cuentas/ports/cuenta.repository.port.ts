@@ -68,4 +68,21 @@ export interface CuentaRepositoryPort {
   // Lista los nombres de los campos de OrgConfiguracionContable que apuntan a esta cuenta.
   // Ej: ['ivaCreditoId', 'resultadoEjercicioId']. Vacío si no está configurada.
   conceptosQueUsanCuenta(tenantId: string, cuentaId: string): Promise<string[]>;
+
+  /**
+   * Ítems ACTIVOS que declaran esta cuenta como `cuentaIngresoId`. Sostiene el
+   * guard `CUENTA_REFERENCIADA_POR_ITEMS` (REQ-ITM-05, Anti-41): el admin no
+   * desactiva una cuenta sin saber que hay ítems enchufados a ella.
+   *
+   * Devuelve los ítems, no un conteo: `details` tiene que decir CUÁLES para
+   * que el usuario sepa qué ir a re-mapear.
+   *
+   * Lee la tabla de otro módulo, igual que `contactos.countLineasReferenciadoras`
+   * lee `lineas_comprobante`: responder "¿quién me referencia?" es propio del
+   * dueño del recurso que se está protegiendo.
+   */
+  itemsActivosQueUsanCuenta(
+    tenantId: string,
+    cuentaId: string,
+  ): Promise<{ id: string; nombre: string; codigo: string | null }[]>;
 }
