@@ -23,7 +23,7 @@ TDD estricto (RED → GREEN). 1 task = 1 commit; cierra con `tsc` + suite del su
 
 ## Fase 2 — Núcleo compartido
 
-- [ ] 2.1 Mover `AuditedTransactionRunner` a `common/audited-transaction.runner.ts`. Movimiento **puro** (su única dependencia es `PrismaService`); ajustar `comprobantes/infrastructure/index.ts` y `comprobantes.module.ts`. **Bloquea la Fase 4**: hoy el runner vive en `comprobantes/infrastructure/` y §3.3 impide que Ventas lo alcance.
+- [x] 2.1 Mover `AuditedTransactionRunner` a `common/audited-transaction.runner.ts`. Movimiento **puro** (su única dependencia es `PrismaService`); ajustar `comprobantes/infrastructure/index.ts` y `comprobantes.module.ts`. **Bloquea la Fase 4**: hoy el runner vive en `comprobantes/infrastructure/` y §3.3 impide que Ventas lo alcance.
 - [ ] 2.2 RED/GREEN `common/domain/efectivo.ts`: `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo(cuenta)`. Solo la BASE compartida — el criterio completo NO vive acá.
 - [ ] 2.3 `reportes/domain/estado-flujo-efectivo.ts` importa prefijo y predicado de `common/`. **Su interruptor org-wide se queda donde está**: correr la regresión de EEFF: cualquier cambio de conducta del EFE es un bug de este change, no una mejora.
 - [ ] 2.4 RED/GREEN `CuentasEfectivoReaderPort.esElegibleComoDestino`: `activa ∧ esDetalle ∧ (actividadFlujo = 'EFECTIVO' **∪** prefijo 1.1.1)`. **El test tiene que DISCRIMINAR unión de fallback**: cuenta bajo `1.1.1` marcada `OPERACION` → **sigue elegible**; cuenta fuera del prefijo marcada `EFECTIVO` → elegible. Sin ese par, una implementación con "en su defecto" pasa en verde. Adapter + wiring en `cuentas`.

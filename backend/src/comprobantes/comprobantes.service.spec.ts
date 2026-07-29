@@ -24,7 +24,7 @@ import type { GestionStatusReaderPort } from '@/periodos-fiscales/ports/gestion-
 import type { PeriodosReaderPort } from '@/periodos-fiscales/ports/periodos-reader.port';
 import type { RbacService } from '@/rbac/rbac.service';
 
-import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
+import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import { ComprobantesService } from './comprobantes.service';
 import { ComprobanteDocumentoAsociacionPeriodoCerradoError } from './domain/comprobante-errors';
 import {

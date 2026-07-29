@@ -17,7 +17,7 @@ import { PrismaComprobanteRepository } from './adapters/prisma-comprobante.repos
 import { PrismaSecuenciaComprobanteAdapter } from './adapters/prisma-secuencia-comprobante';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
-import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
+import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import { ADJUNTO_COMPROBANTE_REPOSITORY_PORT } from './ports/adjunto-comprobante.repository.port';
 import { CIERRE_COMPROBANTE_WRITER_PORT } from './ports/cierre-comprobante-writer.port';
 import { COMPROBANTE_REPOSITORY_PORT } from './ports/comprobante.repository.port';

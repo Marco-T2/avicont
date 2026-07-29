@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '@/common/prisma.service';
+import { PrismaService } from './prisma.service';
 
 export interface AuditedTxOpts {
   /** Usuario que ejecuta la operación. OBLIGATORIO — lanzar si vacío. */
@@ -13,6 +13,22 @@ export interface AuditedTxOpts {
 }
 
 /**
+ * ## Por qué vive en `common/` y no en `comprobantes/`
+ *
+ * Vivió en `comprobantes/infrastructure/` hasta que Ventas necesitó abrir su
+ * transacción auditada: `ComprobantesModule` no lo exporta, y §3.3 prohíbe
+ * importar directo desde otro módulo, así que el módulo nuevo no tenía forma
+ * legítima de alcanzarlo.
+ *
+ * Se descartó exportarlo cruzando frontera de módulo (expone infraestructura
+ * concreta, que es justo lo que §3.3 prohíbe, y el precedente contagia) y
+ * también que el writer port abriera la TX (dejaría a Ventas escribiendo sus
+ * propias tablas dentro de una transacción abierta por otro módulo).
+ *
+ * Acá es infraestructura transversal, que es lo que §3.1 define para `common/`:
+ * depende sólo de `PrismaService` y no sabe nada de comprobantes. Se provee
+ * por módulo, igual que `PrismaService` — no hay módulo global.
+ *
  * Envuelve prisma.$transaction para inyectar el contexto de auditoría via
  * SET LOCAL (set_config con is_local=true). Los triggers de Postgres leen
  * estas session vars en current_setting y populan comprobantes_audit con

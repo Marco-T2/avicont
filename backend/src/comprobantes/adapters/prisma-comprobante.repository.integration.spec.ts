@@ -12,7 +12,7 @@ import {
 import { PrismaPeriodosReaderAdapter } from '@/periodos-fiscales/adapters/prisma-periodos-reader.adapter';
 import { ComprobantesService } from '../comprobantes.service';
 import { ComprobanteEditarContabilizadoEnPeriodoCerradoError } from '../domain/comprobante-errors';
-import { AuditedTransactionRunner } from '../infrastructure/audited-transaction.runner';
+import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import { PrismaComprobanteRepository } from './prisma-comprobante.repository';
 
 /**

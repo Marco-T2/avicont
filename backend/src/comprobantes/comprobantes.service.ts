@@ -59,7 +59,7 @@ import {
   AdjuntoComprobanteRepositoryPort,
 } from './ports/adjunto-comprobante.repository.port';
 import { STORAGE_PORT, StoragePort } from './ports/storage.port';
-import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
+import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import {
   CreateComprobanteDto,
   CreateLineaDto,
