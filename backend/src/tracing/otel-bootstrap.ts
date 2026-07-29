@@ -38,19 +38,32 @@ if (enabled) {
 
   sdk.start();
   console.info(`[otel-bootstrap] tracing enabled → ${endpoint}/v1/traces`);
-
-  const shutdown = async () => {
-    try {
-      await sdk?.shutdown();
-    } catch (err) {
-      console.error('[otel-bootstrap] shutdown error:', err);
-    }
-  };
-
-  process.once('SIGTERM', shutdown);
-  process.once('SIGINT', shutdown);
 } else {
   console.info('[otel-bootstrap] tracing disabled (TRACING_ENABLED != true)');
+}
+
+const SHUTDOWN_TIMEOUT_MS = 2_000;
+
+/**
+ * Cierra el SDK flusheando los spans pendientes. No registra handlers de señal
+ * a propósito: el apagado lo ordena `main.ts`, que es el único que puede cerrar
+ * primero la aplicación Nest y recién después el tracing.
+ *
+ * La espera está acotada porque el collector puede no estar disponible — en dev
+ * el hostname `tempo` sólo resuelve dentro de la red de Docker Compose, así que
+ * desde el host el flush esperaría a un endpoint inalcanzable.
+ */
+export async function shutdownTracing(timeoutMs = SHUTDOWN_TIMEOUT_MS): Promise<void> {
+  if (!sdk) return;
+
+  try {
+    await Promise.race([
+      sdk.shutdown(),
+      new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  } catch (err) {
+    console.error('[otel-bootstrap] shutdown error:', err);
+  }
 }
 
 export { sdk };
