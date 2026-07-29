@@ -50,14 +50,50 @@ export const ORIGEN_TIPO_COBRO = 'COBRO';
 export type OrigenTipoComercial = typeof ORIGEN_TIPO_VENTA | typeof ORIGEN_TIPO_COBRO;
 
 /**
- * Los orígenes que pertenecen a un módulo comercial. Se declara con la unión
- * como tipo del array (no `string[]`) para que sumar un origen nuevo a
- * `OrigenTipoComercial` y olvidarlo acá NO compile.
+ * Cómo se nombra el documento origen en un mensaje al usuario.
+ *
+ * El contador no sabe qué es un `origenTipo`: lo que necesita leer es "esto
+ * lo generó la venta, andá a la venta". La unión va como CLAVE del `Record`
+ * —no como valor— para que sumar un origen comercial y olvidarlo acá NO
+ * compile; con la unión del lado del valor, la omisión pasa en verde. Este
+ * repo ya se quemó con esa dirección al sumar perfiles de extracto.
+ *
+ * **Es además la fuente única de la lista de orígenes comerciales**: ver
+ * `ORIGENES_COMERCIALES`.
  */
-export const ORIGENES_COMERCIALES: readonly OrigenTipoComercial[] = [
-  ORIGEN_TIPO_VENTA,
-  ORIGEN_TIPO_COBRO,
-];
+const NOMBRE_POR_ORIGEN: Record<OrigenTipoComercial, string> = {
+  [ORIGEN_TIPO_VENTA]: 'la venta',
+  [ORIGEN_TIPO_COBRO]: 'el cobro',
+};
+
+export function nombreDeOrigenComercial(origenTipo: OrigenTipoComercial): string {
+  return NOMBRE_POR_ORIGEN[origenTipo];
+}
+
+/**
+ * Los orígenes que pertenecen a un módulo comercial.
+ *
+ * **DERIVADO de `NOMBRE_POR_ORIGEN`, y no escrito a mano.**
+ *
+ * Este array era una lista literal cuyo comentario prometía que sumar un valor
+ * a `OrigenTipoComercial` y olvidarlo acá "NO compile". **Eso era falso** y se
+ * midió por mutación (auditoría 2026-07-29): un array NO exige exhaustividad —
+ * `readonly OrigenTipoComercial[]` acepta 2 de 3 valores y `tsc` sale en 0.
+ *
+ * Lo que sí atrapaba la omisión era el test «exhaustividad del catálogo» del
+ * spec de este archivo, que compara el array contra un
+ * `Record<OrigenTipoComercial, true>`. O sea: la protección existía, pero en una
+ * capa más débil que la anunciada — se rompía en CI, no en el editor, y el
+ * comentario mandaba a no revisarlo.
+ *
+ * Derivarlo del `Record` elimina la segunda lista: ya no hay nada que sincronizar
+ * y la omisión pasa a ser imposible por construcción, en vez de detectada después.
+ * Mismo movimiento que ató `CONCEPTO_FIELDS` al DMMF. El test se conserva: es lo
+ * que impide que alguien vuelva a escribir el array a mano.
+ */
+export const ORIGENES_COMERCIALES: readonly OrigenTipoComercial[] = Object.keys(
+  NOMBRE_POR_ORIGEN,
+) as OrigenTipoComercial[];
 
 /**
  * ¿El comprobante lo generó un módulo comercial?
@@ -70,24 +106,6 @@ export const ORIGENES_COMERCIALES: readonly OrigenTipoComercial[] = [
 export function esOrigenComercial(origenTipo: string | null | undefined): boolean {
   if (origenTipo === null || origenTipo === undefined) return false;
   return (ORIGENES_COMERCIALES as readonly string[]).includes(origenTipo);
-}
-
-/**
- * Cómo se nombra el documento origen en un mensaje al usuario.
- *
- * El contador no sabe qué es un `origenTipo`: lo que necesita leer es "esto
- * lo generó la venta, andá a la venta". La unión va como CLAVE del `Record`
- * —no como valor— para que sumar un origen comercial y olvidarlo acá NO
- * compile; con la unión del lado del valor, la omisión pasa en verde. Este
- * repo ya se quemó con esa dirección al sumar perfiles de extracto.
- */
-const NOMBRE_POR_ORIGEN: Record<OrigenTipoComercial, string> = {
-  [ORIGEN_TIPO_VENTA]: 'la venta',
-  [ORIGEN_TIPO_COBRO]: 'el cobro',
-};
-
-export function nombreDeOrigenComercial(origenTipo: OrigenTipoComercial): string {
-  return NOMBRE_POR_ORIGEN[origenTipo];
 }
 
 // ============================================================
