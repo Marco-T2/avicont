@@ -602,7 +602,9 @@ Estos 9 invariantes son las reglas duras que, **si se violan, corrompen datos o 
 
 ### 4.4 Period lock
 
-- Prohibido crear, editar o anular comprobante con `fechaContable` en período `CERRADO` o `BLOQUEADO`.
+- Prohibido crear, editar o anular comprobante con `fechaContable` en un período que no esté `ABIERTO`.
+- ⚠️ **No existe un período `BLOQUEADO`**: `PeriodoFiscalStatus` es `ABIERTO | CERRADO`. `BLOQUEADO` es de `EstadoComprobante` — el estado al que pasan los **comprobantes** cuando se cierra su período (`bloquearPorPeriodo`), y del que vuelven al reabrirlo. Del lado del período lo que se le parece es el booleano `esDefinitivo`, que no bloquea la escritura —eso ya lo hace `CERRADO`— sino que impide **reabrir**.
+- Corolario para cualquier lectura que pregunte "¿este comprobante cuenta?": el predicado es `estado IN (CONTABILIZADO, BLOQUEADO) AND anulado = false`, **nunca `CONTABILIZADO` a secas** — el cierre mensual haría desaparecer todo lo del período cerrado. Ya existe como `ESTADOS_CONCILIABLES`.
 - Cerrar período N requiere N-1 cerrado y cero borradores en N. No se saltean períodos.
 - Validación del cierre debe estar **dentro de la transacción** con `FOR UPDATE` sobre el período — no sólo pre-TX. Cicatriz F-03.
 - **Sin bypass de admin**: para tocar algo de un período cerrado, el admin pasa por el flujo de reapertura (`PeriodoFiscalReopening`) → el período vuelve a estado abierto → los usuarios con permisos editan/anulan → admin cierra de nuevo. El flag `fueDuranteReapertura` en `comprobantes_audit` distingue cambios normales de los hechos durante una reapertura excepcional.
