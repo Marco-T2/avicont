@@ -13,7 +13,7 @@ import {
 // suficientes para operar el día 1, con numeración estilo PUCT oficial
 // RND-101800000004 usada como código interno puro. El admin de la organización
 // puede crear/editar/desactivar libremente, salvo las marcadas
-// `esRequeridaSistema = true` (8 cuentas que mapea OrgConfiguracionContable).
+// `esRequeridaSistema = true` (10 cuentas que mapea OrgConfiguracionContable).
 //
 // La jerarquía completa (nivel 1, 2, 3) se siembra automáticamente como
 // agrupadores (esDetalle=false). Total resultante: 110 cuentas.
@@ -43,7 +43,12 @@ export const CUENTAS_HOJA_COMERCIAL: CuentaHoja[] = [
   // ===== ACTIVO (17) =====
   { codigo: '1.1.1.001', nombre: 'CAJA' },
   { codigo: '1.1.1.002', nombre: 'BANCOS' },
-  { codigo: '1.1.2.001', nombre: 'CUENTAS POR COBRAR', requiereContacto: true },
+  {
+    codigo: '1.1.2.001',
+    nombre: 'CUENTAS POR COBRAR',
+    requiereContacto: true,
+    esRequeridaSistema: true,
+  },
   {
     codigo: '1.1.2.005',
     nombre: 'CUENTAS POR COBRAR AL PERSONAL, SOCIOS Y DIRECTORES',
@@ -96,7 +101,7 @@ export const CUENTAS_HOJA_COMERCIAL: CuentaHoja[] = [
   { codigo: '3.1.4.001', nombre: 'RESULTADO DE LA GESTIÓN', esRequeridaSistema: true },
 
   // ===== INGRESO (5) =====
-  { codigo: '4.1.1.001', nombre: 'INGRESOS POR VENTAS DE MERCADERÍAS' },
+  { codigo: '4.1.1.001', nombre: 'INGRESOS POR VENTAS DE MERCADERÍAS', esRequeridaSistema: true },
   { codigo: '4.2.1.002', nombre: 'INTERESES FINANCIEROS GANADOS' },
   { codigo: '4.3.1.011', nombre: 'DESCUENTOS OBTENIDOS POR PRONTO PAGO' },
   { codigo: '4.3.1.012', nombre: 'OTROS INGRESOS' },
@@ -413,12 +418,14 @@ export async function sembrarPlanCuentasComercial(
 // acá, el test de coherencia falla. Si la plantilla omite una cuenta
 // requerida, `poblarConfiguracionContableRequerida` tira fail loud.
 export const MAPEO_CODIGO_A_CONCEPTO = {
+  '1.1.2.001': 'cuentasPorCobrarId',
   '1.1.6.001': 'ivaCreditoId',
   '2.1.4.001': 'ivaDebitoId',
   '2.1.4.002': 'rcIvaRetenidoId',
   '2.1.4.004': 'itPorPagarId',
   '3.1.3.001': 'resultadosAcumuladosId',
   '3.1.4.001': 'resultadoEjercicioId',
+  '4.1.1.001': 'ventasId',
   '4.4.1.003': 'difCambioGananciaId',
   '5.6.1.003': 'difCambioPerdidaId',
 } as const;

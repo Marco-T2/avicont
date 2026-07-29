@@ -26,8 +26,10 @@ import {
 } from './enum-mappers';
 
 // Nombres de campos en OrgConfiguracionContable que pueden apuntar a una Cuenta.
-// Si agregás un concepto nuevo al schema, añadilo acá.
-const CONCEPTO_FIELDS = [
+// Si agregás un concepto nuevo al schema, añadilo acá — y si te olvidás,
+// `concepto-fields.spec.ts` rompe el build: deriva la lista esperada del
+// schema en vez de repetirla.
+export const CONCEPTO_FIELDS = [
   'ivaCreditoId',
   'ivaDebitoId',
   'ivaCreditoImportacionesId',
@@ -38,6 +40,8 @@ const CONCEPTO_FIELDS = [
   'difCambioPerdidaId',
   'resultadoEjercicioId',
   'resultadosAcumuladosId',
+  'cuentasPorCobrarId',
+  'ventasId',
   'cajaChicaDefaultId',
   'ajustePorInflacionId',
 ] as const;
