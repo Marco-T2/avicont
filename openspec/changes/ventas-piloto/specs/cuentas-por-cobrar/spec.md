@@ -53,15 +53,50 @@ QuickBooks — posicionamiento §10.9). Módulo
 §4.5), **cuenta destino elegible** (D-05), `glosa`. DEBE existir por sí solo,
 sin depender de ninguna venta.
 
-**Criterio de elegibilidad de la cuenta destino — ÚNICO y definido acá**
-(lo comparte la venta CONTADO, REQ-VTA-04; PA-1 cerrada por Marco
-2026-07-28). Una cuenta es elegible ⇔ `activa = true` ∧ `esDetalle = true` ∧
-identificada como **efectivo/equivalentes** por la regla que YA existe en el
-EFE: marca explícita `actividadFlujo = 'EFECTIVO'`, o en su defecto código
-bajo el prefijo `1.1.1` ("EFECTIVO Y EQUIVALENTES DE EFECTIVO",
-`CODIGO_EFECTIVO_PREFIJO`). No se inventa una segunda definición de
-"efectivo" (Anti-01: la regla vive en un solo lugar). Cuenta no elegible →
-422 `COBRO_CUENTA_DESTINO_NO_ELEGIBLE`.
+**Criterio de elegibilidad de la cuenta destino — ÚNICO para el flujo comercial
+y definido acá** (lo comparte la venta CONTADO, REQ-VTA-04; PA-1 cerrada por
+Marco 2026-07-28). Una cuenta es elegible ⇔
+
+```
+activa = true  ∧  esDetalle = true  ∧  ( actividadFlujo = 'EFECTIVO'  ∨  codigoInterno LIKE '1.1.1%' )
+```
+
+Es una **UNIÓN evaluada POR CUENTA**, y las tres palabras importan:
+
+- **Unión, no fallback.** La marca explícita **agrega**; nunca quita. Una cuenta
+  bajo `1.1.1` marcada con otra actividad (`OPERACION`, `INVERSION`…) **sigue
+  siendo elegible**. PROHIBIDO implementar "explícito, y **en su defecto** el
+  prefijo": esa lectura excluiría esa cuenta y es la que traía esta spec antes
+  del 2026-07-29.
+- **Por cuenta, no por organización.** Se evalúa cuenta a cuenta. PROHIBIDO
+  replicar el interruptor org-wide del EFE (ver abajo).
+- El prefijo es `CODIGO_EFECTIVO_PREFIJO = '1.1.1'` ("EFECTIVO Y EQUIVALENTES DE
+  EFECTIVO"), que junto al predicado `esEfectivoPorCodigo(cuenta)` vive en
+  `common/domain/efectivo.ts` y **se comparte** con el EFE.
+
+Cuenta no elegible → 422 `COBRO_CUENTA_DESTINO_NO_ELEGIBLE`.
+
+> ⚠️ **Esta regla NO es la del Estado de Flujo de Efectivo, y la divergencia es
+> deliberada.** El EFE usa un **interruptor de organización**
+> (`estado-flujo-efectivo.ts:106-111`): si **alguna** cuenta de la org está
+> marcada `EFECTIVO`, la heurística del prefijo se apaga **para todas**.
+> Aplicar eso acá haría que marcar `1.1.1.002 BANCOS` para mejorar un reporte
+> **sacara `1.1.1.001 CAJA` del selector de cobros** — que es el default
+> operativo (D-05). Son dos preguntas distintas: *"¿es efectivo y equivalente
+> para el flujo de caja?"* (presentación) vs. *"¿puede entrar plata acá?"*
+> (operación). Decisión de Marco, 2026-07-28.
+>
+> **Anti-01 se respeta donde corresponde**: lo compartido es el hecho
+> —`CODIGO_EFECTIVO_PREFIJO` y `esEfectivoPorCodigo`, en `common/domain/`—, no
+> las dos reglas construidas sobre él, que tienen dueños distintos. **El EFE no
+> se toca**: cualquier cambio en su conducta es una regresión de este change.
+>
+> **Y esta diferencia es INVISIBLE en el piloto**: hoy las 110 cuentas tienen
+> `actividadFlujo = null`, así que ambas reglas dan el mismo resultado. Se
+> manifiesta recién cuando alguien marque una cuenta desde `/plan-cuentas` — o
+> sea en producción. Por eso el escenario de abajo tiene que ejercitar la
+> cuenta marcada con actividad distinta de `EFECTIVO`: sin él, un test escrito
+> contra la regla equivocada pasa igual.
 
 El **default Caja General** (`1.1.1.001`) es **precarga de UI**, no concepto
 de backend: el backend siempre recibe la cuenta destino explícita y valida
@@ -103,6 +138,28 @@ no por el tipo del comprobante (D-11).
   de detalle
 - CUANDO se registra
 - ENTONCES rechaza con 422 `COBRO_CUENTA_DESTINO_NO_ELEGIBLE`
+
+#### Escenario: la marca AGREGA, nunca quita (unión, no fallback)
+
+> Este escenario **discrimina** unión de fallback. Sin él, una implementación
+> con "explícito, o en su defecto el prefijo" pasa en verde.
+
+- DADO la cuenta `1.1.1.005` (bajo el prefijo, activa, de detalle) marcada con
+  `actividadFlujo = 'OPERACION'` — es decir, explícitamente NO `EFECTIVO`
+- Y la cuenta `1.2.3.001` (fuera del prefijo, activa, de detalle) marcada con
+  `actividadFlujo = 'EFECTIVO'`
+- CUANDO se registran dos cobros, uno contra cada una
+- ENTONCES **ambos se aceptan**: la primera entra por el prefijo (la marca no la
+  excluye) y la segunda por la marca explícita
+
+#### Escenario: marcar una cuenta NO saca a otra del selector
+
+- DADO una organización donde ninguna cuenta tiene `actividadFlujo`, con
+  `1.1.1.001 CAJA` y `1.1.1.002 BANCOS` elegibles
+- CUANDO un admin marca `1.1.1.002 BANCOS` como `EFECTIVO` desde `/plan-cuentas`
+- ENTONCES `1.1.1.001 CAJA` **sigue siendo elegible** como destino de cobro
+- Y el Estado de Flujo de Efectivo sí cambia su conducta (su interruptor
+  org-wide se activa) — las dos reglas divergen a propósito
 
 #### Escenario: los cobros son invisibles para la conciliación (D-05, D-13)
 
@@ -213,8 +270,16 @@ Reparto de responsabilidades (B-9, Anti-18/Anti-01):
 | Cobro ya depositado vía traspaso | **nada** (D-13): sin objeto depósito ni guard de saldo de Caja; el desfase lo destapa el arqueo — trabajo del contador, asumido |
 
 La anulación se dispara desde este módulo, nunca desde comprobantes (Anti-14),
-con la consecuencia concreta en pantalla (D-14) y el rastro de B-14 con el
-mismo tratamiento que en ventas (SHOULD, resuelve `sdd-design`).
+con la consecuencia concreta en pantalla (D-14).
+
+**Rastro de B-14 — resuelto por `sdd-design`, ya no es un SHOULD**: toda
+`AplicacionCobro` que se elimine por anulación del cobro DEBE registrarse en
+`AplicacionCobroDesvinculada` (tabla append-only: `cobroId`, `ventaId`,
+`montoAplicado`, `motivo`, `userId`, `createdAt`), **exactamente igual que en la
+anulación de la venta** (REQ-VTA-07). El borrado de `AplicacionCobro` sigue
+siendo físico (D-12): se descartó el soft-delete porque obligaría a filtrar en
+toda derivación de `Σ montoAplicado` y un `WHERE` olvidado en el `SUM()` de
+REQ-CXC-04 sobre-aplica plata.
 
 #### Escenario: anular un cobro reabre por derivación
 

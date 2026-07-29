@@ -50,14 +50,26 @@ Este change introduce `origenTipo = 'VENTA'` (comprobantes de venta, tipo
 `VENTA`) y `origenTipo = 'COBRO'` (comprobantes de cobro, tipo `INGRESO` —
 D-11: el tipo del comprobante NO identifica al cobro; el origen sí).
 
-- El comentario-contrato de `schema.prisma` (`// "VENTA" | "COMPRA" | "PAGO" |
-  NULL`) DEBE actualizarse en este mismo change para incluir `'COBRO'` y
-  reflejar los valores vivos — hoy `'COBRO'` no está en la lista y se pisa
-  semánticamente con `'PAGO'` (B-13).
+- El comentario-contrato de `origenTipo` en `schema.prisma` (líneas 714-721)
+  enumera los **valores VIVOS** y hoy dice
+  `"CIERRE_GASTOS" | "CIERRE_INGRESOS" | "CIERRE_RESULTADO" | NULL`. DEBE
+  sumarle `'VENTA'` y `'COBRO'` en este mismo change: es un contrato
+  enumerativo y quedaría mintiendo por omisión (B-13).
+
+  > **Corregido 2026-07-29.** Este punto afirmaba que el comentario decía
+  > `// "VENTA" | "COMPRA" | "PAGO" | NULL` y que `'COBRO'` "se pisa
+  > semánticamente con `'PAGO'`". **Ese texto ya no existe** — lo reemplazó el
+  > change del cierre de ejercicio, y `'PAGO'` no está declarado en ninguna
+  > parte. La obligación de actualizar el comentario sigue en pie; la
+  > justificación del choque con `'PAGO'`, no.
+
 - Los valores DEBEN usarse vía **constantes de dominio** (p. ej.
   `ORIGEN_TIPO_VENTA`), nunca literales sueltos en los call sites: son strings
   libres comparados en varios lugares y un typo es un `false` silencioso
-  (Anti-09).
+  (Anti-09). Esto **no es una regla nueva de este change**: el propio comentario
+  del schema ya la enuncia (*"usarlos SIEMPRE vía constante de dominio"*), y el
+  cierre de ejercicio ya la aplica con su `CierreOrigenTipo`. Acá solo se
+  cumple.
 - Ambos generadores escriben sobre el
   `@@unique([organizationId, origenTipo, origenId])` existente con `upsert`,
   nunca `create` ciego (Anti-17, §4.9).
