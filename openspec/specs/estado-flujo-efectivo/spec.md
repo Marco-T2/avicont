@@ -181,8 +181,16 @@ Resolución (Enfoque C):
 El sistema DEBE identificar las cuentas que representan efectivo y equivalentes:
 1. Cuentas con `actividadFlujo='EFECTIVO'` (explícito).
 2. Si ninguna cuenta tiene `actividadFlujo='EFECTIVO'`, las cuentas de detalle cuyo
-   `codigoInterno` empieza con el **prefijo de efectivo del plan de cuentas** (`1.1.1`,
+   `codigoInterno` cae bajo el **prefijo de efectivo del plan de cuentas** (`1.1.1`,
    "EFECTIVO Y EQUIVALENTES DE EFECTIVO") se identifican por heurística.
+
+   La comparación es **por SEGMENTO** —el código es el prefijo exacto, o continúa
+   con un punto—, **no `startsWith` a secas**. `'1.1.10.001'.startsWith('1.1.1')`
+   es `true`, y el plan de cuentas lo edita el usuario: en cuanto exista un
+   hermano `1.1.10`, un `startsWith` lo clasificaría como efectivo. Hoy no existe
+   ninguna cuenta `1.1.1X` (el plan comercial va de `1.1.1` a `1.1.6`), así que la
+   precisión es un no-op sobre los datos actuales y una trampa cerrada hacia
+   adelante. Corregido el 2026-07-29 junto con la extracción a `common/`.
 
 El efectivo NO va en ninguna sección de actividad: es el OBJETIVO de la conciliación.
 `efectivo_inicial` = Σ saldoNeto(inicial) de las cuentas de efectivo;
@@ -522,9 +530,23 @@ Namespace `REPORTES_FLUJO_EFECTIVO_*` propio (§6.3 CLAUDE.md).
   `CuentaEstructuraRow`; el adapter lo agrega al `select` y lo mapea en el boundary vía
   `enum-mappers.ts`. Firmas de los 4 métodos sin cambio.
 - **Builder de dominio puro** `domain/estado-flujo-efectivo.ts`: función
-  `construirEstadoFlujoEfectivo` + helper `resolverActividadFlujo` + constante
-  `CODIGO_EFECTIVO_PREFIJO='1.1.1'`. Sin NestJS/Prisma. Reusa `calcularSaldoNeto` y
-  `calcularResultadoEjercicioBob` (anti-drift con BG/EEPN).
+  `construirEstadoFlujoEfectivo` + helper `resolverActividadFlujo`. Sin NestJS/Prisma.
+  Reusa `calcularSaldoNeto` y `calcularResultadoEjercicioBob` (anti-drift con BG/EEPN).
+
+  **`CODIGO_EFECTIVO_PREFIJO` y el predicado `esEfectivoPorCodigo` ya NO se definen
+  acá**: desde el 2026-07-29 viven en `common/domain/efectivo.ts` y este builder los
+  importa (re-exporta el prefijo para no romper a quien lo tomaba de acá). El motivo
+  es que Ventas/Cobros los necesitan para decidir qué cuenta puede recibir un cobro y
+  §3.3 impide que `cuentas` importe de `reportes`.
+
+  ⚠️ **Lo que NO se compartió es la regla de este reporte.** El **interruptor de
+  organización** —si ALGUNA cuenta está marcada `actividadFlujo='EFECTIVO'`, la
+  heurística del prefijo se apaga para TODAS— sigue viviendo acá y es exclusivo del
+  EFE. El flujo comercial usa una **unión POR CUENTA** (`cuentas/domain/elegibilidad-efectivo.ts`),
+  y la divergencia es deliberada: son dos preguntas distintas, *"¿es efectivo y
+  equivalente para el flujo de caja?"* vs. *"¿puede entrar plata acá?"*. Con el
+  interruptor aplicado al cobro, marcar `1.1.1.002 BANCOS` para mejorar este reporte
+  sacaría `1.1.1.001 CAJA` del selector de cobros.
 - **Errores de dominio** `domain/estado-flujo-efectivo-errors.ts`: 4 subclases `DomainError`
   (namespace `REPORTES_FLUJO_EFECTIVO_*`, todas 422).
 - **Service** `estado-flujo-efectivo.service.ts` (clon de `EvolucionPatrimonioService`,
