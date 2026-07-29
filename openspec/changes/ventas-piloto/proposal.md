@@ -140,9 +140,10 @@ ingreso: **el recibo del dinero que entra**.
 
 El cobro se identifica por `origenTipo = 'COBRO'`, no por el tipo del
 comprobante. Esto es legítimo y tiene precedente: **`origenTipo` es un `String?`
-libre** (`schema.prisma:715`, comentario `// "VENTA" | "COMPRA" | "PAGO" | NULL`)
-y **no hay acople 1:1 con `TipoComprobante`** — el cierre de ejercicio ya mapea
-**tres** `origenTipo` distintos al **mismo** `tipo = CIERRE`
+libre** (`schema.prisma:714-721`) y **no hay acople 1:1 con `TipoComprobante`**
+— el comentario del schema lo dice con todas las letras (*"String LIBRE, no
+enum: no hay acople 1:1 con `TipoComprobante` (el cierre del ejercicio mapea sus
+TRES origenTipo al mismo `tipo = CIERRE`)"*), y el código lo confirma
 (`cierre-ejercicio.service.ts:140-142`).
 
 Costo: cero archivos extra. Un tipo `COBRO` propio habría exigido además elegir
@@ -848,13 +849,17 @@ en los DTOs (§4.5). Cantidades `@db.Decimal(18,6)`.
 el cálculo de vencido — cero `new Date()` en dominio y servicios.
 
 ⚠️ **El método se llama `currentDateLaPaz()` y devuelve un `string` ISO
-`YYYY-MM-DD`, no un `Date`.** `ClockPort.hoyEnLaPaz()` **NO EXISTE** — es un
-símbolo fantasma que `CLAUDE.md:621`, `docs/claude/antipatrones.md:91`,
-`.atl/skill-registry.md:25` y cuatro docs de diseño citan como si existiera. La
-superficie real del port (`common/clock/clock.port.ts`) es `now()`,
-`currentYearLaPaz()` y `currentDateLaPaz()`. **Drift del core doc, no de este
-change** — pero cualquiera que implemente citando el CLAUDE.md va a buscar un
-método inexistente. Corregirlo va en PR propio de docs.
+`YYYY-MM-DD`, no un `Date`.** La superficie real del port
+(`common/clock/clock.port.ts`) es `now()`, `currentYearLaPaz()` y
+`currentDateLaPaz()`.
+
+> **Actualizado 2026-07-29 — el drift YA está corregido.** Este párrafo
+> denunciaba a `ClockPort.hoyEnLaPaz()` como símbolo fantasma citado por
+> `CLAUDE.md`, `docs/claude/antipatrones.md` y `.atl/skill-registry.md`.
+> Verificado hoy: **cero ocurrencias** en `backend/src/`, `CLAUDE.md` y
+> `docs/claude/`. No queda nada que corregir acá. (Ojo con el falso positivo:
+> `hoyEnLaPazISO()` de `frontend/src/lib/fecha-actual.ts` **sí existe** y es
+> otro símbolo — helper del frontend, no del `ClockPort`.)
 
 ## Affected Areas
 
@@ -1022,8 +1027,10 @@ Fuera de este change quedan dos PRs propios, identificados en el camino:
   del template, y el test confrontando tres puntas (decoradores +
   `.hasPermission` + seed). Detalle y correcciones al relevamiento original en
   D-23, que quedó actualizado.
-- **Docs**: `ClockPort.hoyEnLaPaz()`, `nowUtc()` y `yearEnLaPaz()` son símbolos
-  **fantasma** citados en 23 líneas de docs y comentarios vivos.
+- ~~**Docs**: `ClockPort.hoyEnLaPaz()`, `nowUtc()` y `yearEnLaPaz()` son
+  símbolos **fantasma** citados en 23 líneas de docs y comentarios vivos.~~ →
+  **RESUELTO** (verificado 2026-07-29: cero ocurrencias en `backend/src/`,
+  `CLAUDE.md` y `docs/claude/`).
 
 ### Brechas de especificación — obligatorias para `sdd-spec`
 
@@ -1086,12 +1093,22 @@ spec **tiene que enunciar** o se pierden en la implementación.
   mapear, la primera contabilización de venta falla en runtime. Para la org de
   prueba alcanza, pero hace falta un error de dominio con nombre
   (`..._CONCEPTO_NO_CONFIGURADO`) en vez de un 500.
-- **B-13 — Contrato del comentario de `origenTipo`.** `schema.prisma:715`
-  documenta `// "VENTA" | "COMPRA" | "PAGO" | NULL`. Este change introduce
-  `'COBRO'`, que no está en la lista y se pisa semánticamente con `'PAGO'`.
-  Actualizar el comentario en el mismo change, y usar **constantes de dominio**
-  en vez de literales sueltos: son strings libres comparados en varios call
-  sites, y un typo es un `false` silencioso.
+- **B-13 — Contrato del comentario de `origenTipo`.** *(Corregida 2026-07-29
+  contra el código: el relevamiento original citaba un comentario que ya no
+  existe.)* `schema.prisma:714-721` **ya no** documenta
+  `// "VENTA" | "COMPRA" | "PAGO" | NULL` — ese texto fue reemplazado por el
+  change del cierre de ejercicio. Hoy dice *"Valores VIVOS hoy:
+  `"CIERRE_GASTOS" | "CIERRE_INGRESOS" | "CIERRE_RESULTADO" | NULL`"* y **ya
+  manda** usar constantes de dominio (*"Al ser strings comparados en varios call
+  sites, usarlos SIEMPRE vía constante de dominio — un typo es un `false`
+  silencioso (Anti-09)"*). Consecuencias:
+  - **Cae** la parte del hallazgo que decía que `'COBRO'` "se pisa
+    semánticamente con `'PAGO'`": `'PAGO'` no está declarado en ninguna parte.
+  - **Sigue en pie** la obligación de agregar `'VENTA'` y `'COBRO'` a esa lista
+    de valores vivos en este mismo change — es un contrato enumerativo y
+    quedaría mintiendo por omisión.
+  - **Sigue en pie** el uso de constantes de dominio, pero como *aplicación de
+    una regla que el schema ya enuncia*, no como regla nueva de este change.
 - **B-14 — Rastro de las aplicaciones borradas.** D-12 borra físicamente las
   `AplicacionCobro` al anular; los triggers de `comprobantes_audit` **no cubren**
   las tablas de Ventas. El único acto que §4.7 exige auditar para siempre

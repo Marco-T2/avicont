@@ -27,22 +27,60 @@ y **hardcodea `contactoId: null`**
 inalcanzable y REQ-CMP-VTA-03 pide lo contrario. Extenderlo obligaría a meterle
 validación a un camino que hoy deliberadamente no la tiene, tocando el cierre.
 
+### Decisión: `AuditedTransactionRunner` sube a `common/` — hoy Ventas no puede alcanzarlo
+
+**Choice**: mover `AuditedTransactionRunner` de
+`comprobantes/infrastructure/audited-transaction.runner.ts` a
+`common/audited-transaction.runner.ts` (al lado de `PrismaService`, su única
+dependencia), y registrarlo donde ya vive la infra transversal. Movimiento
+**puro**: cero cambios de comportamiento, cero cambios de firma.
+
+> **Hueco detectado 2026-07-29.** El Approach de este design dice que la venta y
+> su comprobante nacen "en una sola TX vía `auditedTx.run`" y lo da por
+> resuelto. **No lo estaba**: `ComprobantesModule` exporta únicamente
+> `ComprobantesService` y `CIERRE_COMPROBANTE_WRITER_PORT`
+> (`comprobantes.module.ts:93`), y el runner vive en `comprobantes/infrastructure/`,
+> que §3.3 prohíbe importar desde otro módulo. Tal como estaba escrito, la
+> primera task de Fase 4 chocaba contra la regla de imports sin tener a dónde ir.
+
+| Opción | Costo |
+|---|---|
+| Exportar el runner desde `ComprobantesModule` | expone una clase de infraestructura concreta cruzando frontera de módulo — es exactamente lo que §3.3 prohíbe, y el precedente contagia |
+| Que el writer port abra la TX (`enTransaccionAuditada(userId, fn)`) | respeta §3.3, pero deja a Ventas escribiendo **sus propias** tablas dentro de una TX que abre el port de otro módulo: inversión de control confusa y el port pasa a orquestar |
+| **Mover a `common/`** | el runner depende **solo** de `PrismaService` (`@/common/prisma.service`) y no sabe nada de comprobantes: es infra transversal, que es literalmente lo que §3.1 define para `common/` |
+
+**Rationale**: no es una dependencia entre dominios, es plomería de Prisma —
+`$transaction` + cuatro `set_config`. Su propio docstring ya generaliza el
+mandato (*"Toda operación que emita eventos de auditoría DEBE usar este
+wrapper"*), y Compras va a necesitarlo por el mismo motivo. Dejarlo escondido
+en un módulo de dominio obliga a inventar un port por cada consumidor nuevo.
+
+**Riesgo acotado**: el runner tiene un único consumidor hoy
+(`comprobantes.service.ts`), así que el movimiento es un cambio de import y
+nada más. La suite de comprobantes es la red: si el actor dejara de llegar a
+`comprobantes_audit`, revienta ahí.
+
 ### Decisión: extraer la validación de cuentas — hoy está copiada 3 veces
 
 **Choice**: `validarLineasContraCuentas(lineas, cuentasMap, contactosMap)` en
 `comprobantes/domain/`, consumida por el camino de usuario **y** el de sistema.
 
-**Rationale**: `activa`/`esDetalle` está copiado en `contabilizar:451`,
-`editarContabilizado:702` y `resolverYValidarBorrador:1277`. Ventas sería la
+**Rationale**: `activa`/`esDetalle` está copiado en `contabilizar:454`,
+`editarContabilizado:703` y `resolverYValidarBorrador:1286`. Ventas sería la
 4.ª copia (Anti-01). El validador estructural (`comprobante-validator.ts`) ya
 es dominio puro y se reusa tal cual; esto le suma lo que necesita I/O.
 
-> **Hueco preexistente que esto cierra**: `requiereContacto` se enforcea en
-> **un solo lugar** — `contabilizar:457`. `editarContabilizado` **no lo valida**
-> (verificado: único call site de `ContactoRequeridoError`). O sea que el
-> mecanismo de §4.3 que D-17 manda reusar permite hoy dejar una línea de CxC
-> sin `contactoId`. Es exactamente el invariante de B-1, del que depende el
-> aging. El extract lo cierra en los dos caminos.
+> **Corregido 2026-07-29 — el hueco de `requiereContacto` YA ESTÁ CERRADO.**
+> Este bloque decía que `requiereContacto` se enforzaba en un solo lugar
+> (`contabilizar`) y que `editarContabilizado` no lo validaba. **Era cierto al
+> escribir el design y dejó de serlo antes de mergearlo**: el preflight #294
+> (`950f644`, mergeado ANTES de este documento) agregó la validación en
+> `comprobantes.service.ts:711`, con su propio comentario de §4.1.
+>
+> Lo que cambia para este change: **el extract sigue siendo obligatorio, pero
+> por anti-duplicación (Anti-01), no por cerrar un agujero**. Hoy hay DOS copias
+> de la regla de contacto, no una y un hueco; Ventas sería la tercera. Que nadie
+> salga a buscar el bug: no está.
 
 ### Decisión: el rastro de B-14 es tabla append-only, no soft-delete
 
@@ -63,17 +101,39 @@ escrita es *los REPORTES se calculan, los ACTOS se guardan*. Los triggers de
 `comprobantes_audit` **no sirven**: la función está clavada a `comprobante_id`
 y ramifica por `TG_TABLE_NAME` — no es genérica.
 
-### Decisión: el criterio de efectivo se extrae a `common/domain/` — ⚠ ver Open Questions
+### Decisión: a `common/domain/` va el PREFIJO, no "el criterio"
 
-**Choice**: mover `CODIGO_EFECTIVO_PREFIJO` + el predicado a
-`common/domain/efectivo.ts`; `cuentas` expone
-`CuentasEfectivoReaderPort.esElegibleComoDestino(...)`; `reportes` lo importa
-de `common/`.
+**Choice**: mover **`CODIGO_EFECTIVO_PREFIJO`** y el predicado por-cuenta
+`esEfectivoPorCodigo(cuenta)` a `common/domain/efectivo.ts`. `reportes` los
+importa de ahí; `cuentas` expone
+`CuentasEfectivoReaderPort.esElegibleComoDestino(...)`, que construye **su
+propio** criterio sobre esa base.
 
-**Rationale**: la regla vive en `reportes/domain/` y Ventas no puede importarla
-(§3.3). `common/` la comparten los dos sin dueño en disputa, y evita el
-precedente de duplicar (los `enum-mappers` de `cuentas`) que acá violaría
-Anti-01 sobre plata.
+> **Reconciliado 2026-07-29.** Este bloque se escribió cuando se creía que
+> Ventas y el EFE iban a compartir UNA regla, y el título decía "el criterio de
+> efectivo se extrae". La decisión de Marco más abajo (unión POR CUENTA) eligió
+> a conciencia **dos criterios divergentes**, así que "el criterio" en singular
+> ya no existe y este bloque no podía quedar como estaba.
+
+Lo que se comparte y lo que no, explícito para que nadie lo reinvente:
+
+| Pieza | Dónde vive | Quién la usa |
+|---|---|---|
+| `CODIGO_EFECTIVO_PREFIJO = '1.1.1'` | `common/domain/efectivo.ts` | EFE **y** Ventas/Cobros |
+| `esEfectivoPorCodigo(cuenta)` (`esDetalle` ∧ prefijo) | `common/domain/efectivo.ts` | EFE **y** Ventas/Cobros |
+| **Interruptor de organización** (si ALGUNA cuenta está marcada `EFECTIVO`, la heurística se apaga para TODAS) | `reportes/domain/estado-flujo-efectivo.ts` — **se queda ahí** | solo el EFE |
+| **Elegibilidad como destino de cobro** (`activa` ∧ `esDetalle` ∧ (`EFECTIVO` ∪ prefijo)) | `cuentas` vía `CuentasEfectivoReaderPort` | solo Ventas/Cobros |
+
+**Rationale**: lo que Anti-01 prohíbe es que el mismo hecho se escriba dos
+veces, y el hecho compartido es **cuál es el prefijo del plan de cuentas** — ese
+sí queda en un solo lugar. Las dos reglas de arriba **no son el mismo hecho**
+(ver la decisión de elegibilidad más abajo): responden preguntas distintas y
+tienen dueños distintos. Fusionarlas para "no duplicar" sería el error que la
+decisión de Marco descartó.
+
+⚠️ **El EFE no se toca funcionalmente.** Cambia de dónde importa dos símbolos;
+su interruptor org-wide queda intacto. Cualquier cambio de conducta del EFE en
+este change es una regresión, no una mejora — la task de Fase 2 lo verifica.
 
 ## Data Flow
 
@@ -100,12 +160,31 @@ Aplicación → **no toca este flujo**: cero comprobantes (D-03).
 | `comprobantes/adapters/prisma-comprobante-sistema-writer.adapter.ts` | Create | reusa `repo.reemplazarComprobante` |
 | `comprobantes/domain/validacion-cuentas.ts` | Create | extract de las 3 copias |
 | `comprobantes/comprobantes.service.ts` | Modify | consume el extract; `anular` rechaza origen comercial (REQ-CMP-VTA-04) |
-| `common/domain/efectivo.ts` | Create | predicado único de efectivo |
-| `reportes/domain/estado-flujo-efectivo.ts` | Modify | importa de `common/` |
+| `common/domain/efectivo.ts` | Create | `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo` — la BASE compartida, no "el criterio" |
+| `common/audited-transaction.runner.ts` | **Move** | desde `comprobantes/infrastructure/`; movimiento puro (ver decisión) |
+| `comprobantes/infrastructure/index.ts` + `comprobantes.module.ts` | Modify | cola del movimiento del runner |
+| `reportes/domain/estado-flujo-efectivo.ts` | Modify | importa el prefijo de `common/`; **su interruptor org-wide NO se toca** |
 | `items/`, `ventas/`, `cuentas-por-cobrar/` | Create | módulos hexagonales completos |
+| `prisma/schema.prisma` | Modify | 6 modelos + `VENTA` en el enum + 2 campos en `OrgConfiguracionContable` + **`'VENTA'`/`'COBRO'` en el comentario-contrato de `origenTipo`** (B-13) |
 | `prisma/migrations/` ×3 | Create | enum-only → tablas (+UNIQUE PARCIAL raw) → backfill data-only |
 | `CLAUDE.md` §11.6 | Modify | sumar el UNIQUE PARCIAL de `Item.codigo` |
-| `docs/claude/dominio-contable.md` §4.2 | Modify | fila `precioUnitario (18,6)` (B-7, §12.3) |
+| `docs/claude/dominio-contable.md` §4.2 | Modify | fila `precioUnitario (18,6)` (B-7, §12.3) — **verificado 2026-07-29: la fila NO existe** |
+| `frontend/src/components/nav-items.ts` | Modify | `NavSection += leadingGroups?: NavGroup[]` + grupo `comercial` (REQ-SB-15) |
+| `frontend/src/components/nav-list.tsx` | Modify | renderizar `leadingGroups` ANTES de `items` — única línea de mecanismo nueva |
+| `frontend/src/types/api.ts` | Modify | `VENTA` en `TipoComprobante` **e invertir su `satisfies`** para que la omisión rompa el build (ver abajo) |
+
+> **`types/api.ts` no avisa hoy, y esa es la trampa.** `TipoComprobante` (línea
+> 787) declara `as const satisfies Record<string, Schemas[…]['tipo']>`: la unión
+> generada es el **VALOR**, así que el `satisfies` detecta un valor
+> *equivocado* pero **NO** uno *faltante*. Olvidar `VENTA` ahí compila en verde.
+> `PerfilExtracto` (línea 375) ya usa la forma correcta —la unión como
+> **CLAVE**— justamente porque este repo se quemó con esto al sumar
+> Fortaleza/BMSC. Este change invierte el de `TipoComprobante` y **valida por
+> mutación** (sacar `VENTA` debe romper `tsc`). Sin eso, las 9 listas del
+> frontend siguen siendo mecánicas y silenciosas; con eso, el compilador cubre
+> la única que puede cubrir. El comentario de la línea 58 —que afirma que el
+> `satisfies` "hace que `tsc` falle"— se corrige para decir *ante valores
+> equivocados*, no ante omisiones.
 
 ## Interfaces / Contracts
 
@@ -134,12 +213,11 @@ espejo literal de `ContactosReaderPort` (REQ-ITM-04).
 Regresión obligatoria: `catalogo-vs-controllers.spec.ts` (3 puntas) y
 `catalogo-vs-espejo-frontend.spec.ts`.
 
-## Migration / Rollout
+## Architecture Decisions (continuación)
 
-Tres migraciones (D-22). La de tablas **no puede contener el literal
-`'VENTA'`** (Postgres pre-COMMIT, R-6). Protocolo §11.6 **obligatorio**: grep
-`^DROP (INDEX|EXTENSION|TYPE)` y rescate a mano — los `contactos_*_trgm_idx`
-caen siempre. Aditivas salvo el backfill, que sí toca datos (idempotente).
+> Las tres decisiones que siguen estaban archivadas bajo *Migration / Rollout*,
+> donde nadie las busca — «el redondeo es HALF-UP» no es una decisión de
+> despliegue. Reagrupadas el 2026-07-29; el contenido no cambió.
 
 ### Decisión: el redondeo es HALF-UP y `Money` estrena `redondearABob()`
 
@@ -212,43 +290,61 @@ al cerrar el mes**. La conciliación ya resolvió exactamente esto con
 `ESTADOS_CONCILIABLES` ("plata efectivamente movida"): mismo criterio, mismo
 molde. La venta **no lleva estado propio espejado** — se lee del comprobante.
 
+## Migration / Rollout
+
+Tres migraciones (D-22). La de tablas **no puede contener el literal
+`'VENTA'`** (Postgres pre-COMMIT, R-6). Protocolo §11.6 **obligatorio**: grep
+`^DROP (INDEX|EXTENSION|TYPE)` y rescate a mano — los `contactos_*_trgm_idx`
+caen siempre. Aditivas salvo el backfill, que sí toca datos (idempotente).
+
+Además, la migración de tablas lleva **escrito a mano** el UNIQUE PARCIAL de
+`Item.codigo` (D-24), que entra a la tabla de objetos raw vivos de §11.6 desde
+el día uno: cada regeneración futura tiene un objeto más que rescatar.
+
 ## Open Questions
 
-- [ ] ~~`Money` sin API de redondeo~~ → **RESUELTO** arriba (half-up medido).
-- [ ] ~~`BLOQUEADO` ausente de las specs~~ → **RESUELTO** arriba (molde
-  `ESTADOS_CONCILIABLES`). Requiere corregir el texto de REQ-VTA-01 y REQ-CXC-01.
-- [ ] **`Money` no tiene la API de redondeo que la spec cita** (contexto):
-  REQ-VTA-03 fija `subtotal = redondear(cantidad × precioUnitario, 2)` "con la
-  política central de `Money` (Anti-04; Anti-07: `toDecimalPlaces(2)` half-even
-  como `Money.toBob`)". Verificado: **nada de eso existe**. `Money.toBob()` no
-  recibe parámetros, usa `toFixed(2)` y es **half-up** — lo dice su propio
-  comentario (`money.ts:6`); no hay `Decimal.set` global. `Money.redondear(...)`
-  que promete Anti-04 tampoco existe, y `mul()` no redondea. Sin un método
-  nuevo, el redondeo lo termina haciendo **Postgres al insertar en
-  `Decimal(18,2)`**, en silencio — Anti-04 en su peor forma. Hay que (1)
-  agregar `Money.redondearABob(): Money`, (2) decidir half-up (statu quo del
-  sistema) vs half-even (lo que dicen los docs), y (3) corregir Anti-04/Anti-07,
-  que documentan una API inexistente — mismo drift que `ClockPort.hoyEnLaPaz()`.
-  El escenario de la spec (31.515 → 31.52) da **el mismo resultado con ambas
-  políticas**: no discrimina, y pasaría con la equivocada.
+**Ninguna.** Las tres que este design levantó están cerradas, más una cuarta que
+apareció al auditarlo. El registro de checkboxes venía mintiendo —cuatro sin
+tildar, **dos rotuladas BLOQUEANTE**, sobre temas que el propio documento
+resolvía tres párrafos más arriba— y se saneó el 2026-07-29.
 
-- [ ] **BLOQUEANTE — el estado `BLOQUEADO` no aparece en ninguna de las 5 specs.**
-  REQ-VTA-01 declara los estados "pegados" enumerando sólo BORRADOR↔BORRADOR y
-  CONTABILIZADO↔CONTABILIZADO. Pero cerrar un período ejecuta
-  `bloquearPorPeriodo` (`prisma-comprobantes-lock.adapter.ts:23`), que pasa
-  **todos** los comprobantes del período de CONTABILIZADO a BLOQUEADO en masa —
-  operación mensual de rutina, no un caso de borde. Dos consecuencias sin
-  responder: qué estado toma la venta cuando su comprobante se bloquea, y sobre
-  todo si REQ-CXC-01 ("sólo ventas CONTABILIZADAS integran la cartera") deja
-  fuera del estado de cuenta a todas las ventas del mes recién cerrado. La
-  cartera debe derivarse de `anulado` + saldo, **no** del estado del
-  comprobante.
+| # | Pregunta | Estado | Dónde se resolvió |
+|---|---|---|---|
+| 1 | `Money` sin API de redondeo; ¿half-up o half-even? | ✅ **half-up**, medido en las 3 capas | Decisión «el redondeo es HALF-UP…». `Money.redondearABob()` **ya existe en `main`** (#294) |
+| 2 | El estado `BLOQUEADO` no aparece en ninguna spec | ✅ cartera = `estado IN (CONTABILIZADO, BLOQUEADO) AND anulado = false` | Decisión «la cartera se deriva de `anulado` + saldo». Texto de REQ-VTA-01 y REQ-CXC-01 **ya corregido** (#296) |
+| 3 | El criterio de efectivo de la spec no es el del EFE | ✅ **unión POR CUENTA** (Marco, 2026-07-28) | Decisiones «elegibilidad de efectivo…» y «a `common/` va el PREFIJO, no el criterio» |
+| 4 | *(detectada 2026-07-29)* Ventas no puede alcanzar `auditedTx.run` sin violar §3.3 | ✅ el runner sube a `common/` | Decisión «`AuditedTransactionRunner` sube a `common/`» |
 
-- [x] ~~**El criterio de efectivo de la spec NO es el del EFE**~~ → **RESUELTO
-  por Marco (2026-07-28): va la opción B, unión por cuenta.** Ver la decisión
-  abajo. Contexto original conservado:
+Cerrada por Marco el 2026-07-29, fuera de este documento: **REQ-SB-15 exigía
+renderizar un grupo ANTES de los ítems sueltos, y el contrato de `NavSection` no
+lo permite** (`items` va arriba de `groups`, por tipo y por `NavList`). Va campo
+`leadingGroups?: NavGroup[]` — ver el delta de `frontend-sidebar-nav`.
 
-- [ ] ~~**BLOQUEANTE — el criterio de efectivo de la spec NO es el del EFE.**~~
+### Contexto histórico (por qué cada una era un problema real)
+
+Se conserva porque explica decisiones que sin él se leen como arbitrarias.
+
+**(1) Redondeo.** REQ-VTA-03 citaba "la política central de `Money` (Anti-04;
+Anti-07: `toDecimalPlaces(2)` half-even como `Money.toBob`)" — **nada de eso
+existía**: una cadena de tres documentos describiendo una API inventada.
+`toBob()` usa `toFixed(2)` (half-up), `mul()` no redondea, y sin método propio
+el redondeo lo terminaba haciendo **Postgres al insertar**, fuera del dominio
+(Anti-04 en su peor forma). El escenario que traía la spec (`31.515 → 31.52`)
+daba lo mismo con ambas políticas: **habría pasado en verde con la equivocada**.
+
+**(2) `BLOQUEADO`.** Cerrar un período ejecuta `bloquearPorPeriodo`
+(`prisma-comprobantes-lock.adapter.ts:23`) y pasa **todos** los comprobantes del
+período de CONTABILIZADO a BLOQUEADO en masa — rutina mensual, no caso de borde.
+Leído literal, el "sólo ventas CONTABILIZADAS" de REQ-CXC-01 **vaciaba el estado
+de cuenta de cada cliente el día del cierre**, con las deudas intactas.
+
+**(3) Efectivo — el contexto completo, que sigue siendo la mejor defensa de la
+decisión.**
+
+<details>
+<summary>Texto original de la pregunta</summary>
+
+**BLOQUEANTE — el criterio de efectivo de la spec NO es el del EFE.**
   REQ-CXC-02 lo describe por cuenta ("explícito, o **en su defecto** el prefijo
   `1.1.1`"). El EFE real usa un **interruptor de organización**
   (`estado-flujo-efectivo.ts:106-111`): si **alguna** cuenta está marcada
@@ -263,7 +359,7 @@ molde. La venta **no lleva estado propio espejado** — se lee del comprobante.
   divergencia nace el día que alguien marque una cuenta desde `/plan-cuentas`
   (la UI ya lo permite, change `cuenta-actividad-flujo-ui`).
 
-  | | A — alinear al EFE (interruptor de org) | B — por cuenta (unión) |
+  | | A — alinear al EFE (interruptor de org) | **B — por cuenta (unión)** ← ELEGIDA |
   |---|---|---|
   | Definición de efectivo | una sola | dos, divergentes |
   | Marcar BANCOS como EFECTIVO | **CAJA deja de ser elegible** y era el default del cobro (D-05) | nada se rompe |
@@ -276,3 +372,13 @@ molde. La venta **no lleva estado propio espejado** — se lee del comprobante.
   org-wide las fuerza a ser la misma. Decisión de producto de Marco; **(C)**
   cambiar el EFE queda descartada (toca un reporte en producción). Cualquiera
   de las dos exige corregir el texto de REQ-CXC-02.
+
+</details>
+
+**Lo que hace peligrosa a (3), y por lo que la spec tiene que decir EXACTO lo
+que el código va a hacer**: con las 110 cuentas en `null`, A y B dan **hoy el
+mismo resultado**. La divergencia no se manifiesta en el piloto — nace el día
+que alguien marque una cuenta desde `/plan-cuentas`, o sea en producción y
+lejos de este change. Un test escrito contra el texto viejo ("**o en su
+defecto**") pasaría en verde igual, exactamente como el escenario de redondeo
+de (1).

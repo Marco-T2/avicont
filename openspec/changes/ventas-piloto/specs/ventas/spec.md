@@ -179,10 +179,13 @@ Reglas:
   extendiendo D-05 en vez de crear una excepción: dos formularios que hacen
   lo mismo (recibir plata) no piden datos distintos, y quien cobra por
   transferencia no necesita un asiento de traslado para reflejar lo que ya
-  sabe al vender. La elegibilidad es el criterio ÚNICO definido en
-  REQ-CXC-02 (efectivo/equivalentes: `actividadFlujo = 'EFECTIVO'` o prefijo
-  `1.1.1`, más `activa` ∧ `esDetalle` — Anti-01: no se define dos veces);
-  cuenta fuera del criterio → 422 `VENTA_CUENTA_DESTINO_NO_ELEGIBLE`. El
+  sabe al vender. La elegibilidad es **el criterio definido en REQ-CXC-02 y no
+  se re-enuncia acá** (Anti-01): `activa` ∧ `esDetalle` ∧
+  (`actividadFlujo = 'EFECTIVO'` **∪** prefijo `1.1.1`), unión **por cuenta** —
+  la marca agrega, nunca quita, y **no es la regla del EFE**, que usa un
+  interruptor de organización (la divergencia es deliberada; ver el bloque de
+  advertencia de REQ-CXC-02).
+  Cuenta fuera del criterio → 422 `VENTA_CUENTA_DESTINO_NO_ELEGIBLE`. El
   asiento debita **la cuenta elegida**, nunca una constante. El default es
   precarga de UI: si `1.1.1.001` no existe o no es elegible, el formulario
   no precarga — jamás un 500; una org sin ninguna cuenta elegible cae en el
@@ -346,11 +349,21 @@ Antes de anular, la UI DEBE mostrar la **consecuencia concreta** (D-14):
 cuántos cobros se desvinculan y por cuánto. Es la única confirmación del
 flujo.
 
-**B-14 — riesgo aceptado y nombrado**: el borrado físico de las aplicaciones
-destruye parte del contexto del acto que §4.7 audita. El sistema DEBERÍA
-preservar un rastro mínimo del estado previo (soft-delete barato o snapshot en
-el detalle de auditoría) — la forma exacta la decide `sdd-design`; lo que NO
-puede pasar es que se implemente el borrado sin haber evaluado el rastro.
+**B-14 — RESUELTO por `sdd-design`, ya no es un SHOULD**: toda `AplicacionCobro`
+que se elimine al anular la venta DEBE registrarse en
+`AplicacionCobroDesvinculada` (tabla **append-only**: `cobroId`, `ventaId`,
+`montoAplicado`, `motivo`, `userId`, `createdAt`). El borrado de
+`AplicacionCobro` sigue siendo **físico** (D-12 intacto).
+
+Por qué append-only y no soft-delete: con `deletedAt` en `AplicacionCobro`,
+**toda** derivación de `Σ montoAplicado` necesitaría un `WHERE`, y un filtro
+olvidado en el `SUM()` de REQ-CXC-04 **sobre-aplica plata**. El riesgo cae justo
+sobre el invariante de dinero. Precedente de la casa: `ArranqueConciliado`
+conserva el acto anulado; la convención escrita es *los REPORTES se calculan,
+los ACTOS se guardan*. Los triggers de `comprobantes_audit` NO sirven: la
+función está clavada a `comprobante_id` y ramifica por `TG_TABLE_NAME`.
+
+Mismo tratamiento en la anulación del **cobro** (REQ-CXC-06).
 
 #### Escenario: anular desvincula y preserva
 
