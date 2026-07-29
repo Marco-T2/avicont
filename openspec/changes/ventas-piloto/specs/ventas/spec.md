@@ -20,9 +20,22 @@ prueba, sin IVA/IT (D-09; la forma de v2 quedó fijada en D-29).
 
 Guardar un borrador de venta DEBE crear el `Comprobante` en BORRADOR en la
 misma transacción, con `generadoPorSistema = true`, `origenTipo = 'VENTA'`,
-`origenId = venta.id` y tipo `VENTA`. Los dos estados van pegados
-(BORRADOR ↔ BORRADOR; CONTABILIZADO ↔ CONTABILIZADO). Contabilizar NO crea el
-comprobante: le asigna el número correlativo (§4.9).
+`origenId = venta.id` y tipo `VENTA`. Contabilizar NO crea el comprobante: le
+asigna el número correlativo (§4.9).
+
+**La venta NO lleva estado propio espejado**: se lee del comprobante. Decir
+que "los estados van pegados" sería inexacto — `EstadoComprobante` tiene
+**tres** valores y el tercero lo produce una operación de rutina: cerrar un
+período ejecuta `bloquearPorPeriodo` y pasa TODOS sus comprobantes de
+`CONTABILIZADO` a `BLOQUEADO` (reabrir lo revierte). Un estado espejado en
+`Venta` se desincronizaría en ese mismo instante, en masa y en silencio.
+
+Para toda lectura que pregunte "¿esta venta cuenta?" el criterio es
+`estado IN (CONTABILIZADO, BLOQUEADO) AND anulado = false` — "plata
+efectivamente movida", el mismo predicado que ya usa `ESTADOS_CONCILIABLES`
+en `comprobantes/adapters/prisma-lineas-cuenta-reader.adapter.ts`. La
+constante se extrae a un lugar único (hoy está duplicada en dos archivos);
+PROHIBIDO comparar contra `CONTABILIZADO` a secas.
 
 Eliminar un borrador de venta DEBE eliminar su comprobante borrador por el
 camino de sistema (el flag bloquea la operación de usuario). Editar un
@@ -45,6 +58,15 @@ borrador ES un comprobante en borrador y el chequeo "cero borradores en N" de
 - DADO una venta en BORRADOR con su comprobante borrador
 - CUANDO el usuario elimina la venta
 - ENTONCES el comprobante borrador desaparece con ella, vía camino de sistema
+
+#### Escenario: cerrar el período NO saca la venta de la cartera
+
+- DADO una venta a crédito CONTABILIZADA con saldo pendiente, en el período N
+- CUANDO se cierra el período N y su comprobante pasa a `BLOQUEADO`
+- ENTONCES la venta sigue en el estado de cuenta del cliente, con el mismo
+  saldo y los mismos días de atraso
+- Y al reabrir el período tampoco cambia nada: el criterio no mira la
+  transición, mira `anulado` y el saldo
 
 ### REQ-VTA-02: Estructura del documento y snapshots (D-28)
 
@@ -93,9 +115,12 @@ improvisarse acá y quedar huérfana):
 
 Reglas:
 
-- `subtotal = redondear(cantidad × precioUnitario, 2)` con la política central
-  de `Money` (Anti-04: única fuente de redondeo; Anti-07: `toDecimalPlaces(2)`
-  half-even como `Money.toBob`). PROHIBIDO redondeo ad-hoc.
+- `subtotal = Money.of(cantidad).mul(precioUnitario).redondearABob()` — la
+  política única de la casa es **half-up**, no half-even (Anti-04). El método
+  `redondearABob()` es obligatorio y explícito: `mul()` NO redondea y `toBob()`
+  devuelve `string` (formato), así que sin él el valor llega crudo al `INSERT`
+  y lo redondea Postgres `numeric(18,2)` — fuera del dominio. PROHIBIDO
+  redondeo ad-hoc.
 - `subtotal` y `montoTotal` DEBEN **persistirse** (B-8) — son hechos del
   documento pactado, como `LineaComprobante.debitoBob` — y DEBEN recalcularse
   por el backend en cada write, en la misma transacción que reemplaza las
@@ -115,10 +140,23 @@ Reglas:
 
 #### Escenario: el cliente no dicta los totales
 
-- DADO un create con `cantidad = "3"`, `precioUnitario = "10.505"` y un
+- DADO un create con `cantidad = "5"`, `precioUnitario = "6.305"` y un
   `subtotal` malicioso de `"999.99"` en el payload
 - CUANDO el backend procesa
-- ENTONCES persiste `subtotal = "31.52"` (31.515 → half-even) calculado por él
+- ENTONCES persiste `subtotal = "31.53"` calculado por él
+
+> El caso está elegido para que **discrimine**: `31.525` da `31.53` con
+> half-up y `31.52` con half-even. El ejemplo anterior de esta spec
+> (`3 × 10.505 = 31.515`) daba `31.52` con **ambas** políticas, así que el
+> test habría pasado en verde con la política equivocada.
+
+#### Escenario: el total suma subtotales ya redondeados
+
+- DADO una venta con 3 líneas de `cantidad = "1"` y `precioUnitario = "10.005"`
+- CUANDO el backend calcula
+- ENTONCES cada `subtotal` persiste `"10.01"` y `montoTotal` persiste `"30.03"`
+- Y NO `"30.02"`, que es lo que daría redondear la suma de los valores crudos
+  (`30.015`) — de ahí la regla de sumar redondeados
 
 #### Escenario: editar recalcula en la misma transacción
 
@@ -345,10 +383,17 @@ guard + servicio + repositorio (§4.2). Venta ajena → 404. Los cruces
 
 ### REQ-VTA-09: Period lock sin bypass (§4.4; matriz 14)
 
-Crear, contabilizar, editar o anular una venta cuya `fechaContable` cae en
-período `CERRADO`/`BLOQUEADO` DEBE rechazarse. El único camino es la
+Crear, contabilizar, editar o anular una venta cuya `fechaContable` cae en un
+período que no está `ABIERTO` DEBE rechazarse. El único camino es la
 reapertura formal (`PeriodoFiscalReopening`) — sin contraseña de override ni
 excepción de admin (D-14: escalón "exigir reapertura formal").
+
+**Precisión de vocabulario**: `PeriodoFiscalStatus` tiene sólo `ABIERTO` y
+`CERRADO` — **no existe un período `BLOQUEADO`** (`BLOQUEADO` es valor de
+`EstadoComprobante`, otro enum; confundirlos es fácil y esta spec lo hacía).
+Lo que se le parece es el booleano `PeriodoFiscal.esDefinitivo`, que NO
+bloquea la escritura —eso ya lo hace `status = CERRADO`— sino que impide
+**reabrir**: un período definitivo se queda sin la salida de la reapertura.
 
 #### Escenario: editar venta de período cerrado
 
