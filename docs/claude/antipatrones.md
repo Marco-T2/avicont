@@ -60,7 +60,8 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 
 - **Qué**: `Math.round(x * 0.13 * 100) / 100` esparcido en el código.
 - **Por qué duele**: cada expresión redondea un poquito distinto. Auditor encuentra diferencia de Bs 0.01 entre columnas.
-- **Regla**: `common/domain/money.ts` expone `redondear(monto, modo)`. Única fuente de verdad.
+- **Regla**: `common/domain/money.ts` expone `redondearABob()` — redondeo a 2 decimales **half-up**, única fuente de verdad. Usarlo SIEMPRE antes de persistir un monto calculado (`mul()` no redondea; `toBob()` es formato y devuelve `string`). Sin él el redondeo termina ocurriendo dentro de Postgres al insertar en `numeric(18,2)`: invisible y fuera del dominio.
+- **Corolario**: un total se arma sumando **subtotales ya redondeados**, nunca redondeando la suma de los crudos. Con 3 líneas de `10.005`: `10.01 × 3 = 30.03`, pero `30.015 → 30.02`.
 - **Enforcement**: lint prohíbe `Math.round(` sobre montos + code review.
 
 #### Anti-05: Guardar estado derivable
@@ -81,8 +82,9 @@ Cada antipatrón lleva cuatro líneas: **Qué** (una línea), **Por qué duele**
 
 - **Qué**: `usd * tipoCambio` sin política de redondeo explícita.
 - **Por qué duele**: una diferencia de centavo por línea multiplicada por 1000 líneas es un descuadre reportable.
-- **Regla**: toda conversión pasa por `Money.toBob(tipoCambio)` que aplica `toDecimalPlaces(2)` con `ROUND_HALF_EVEN`.
-- **Enforcement**: test de propiedad (property-based) sobre `Money.toBob`.
+- **Regla**: toda conversión se hace con `Money` (`mul(tipoCambio)`) y se cierra con `redondearABob()`, que aplica `toDecimalPlaces(2)` con **half-up**. `toBob()` NO recibe parámetros: es formato a `string` para DTOs, con la misma política.
+- **Por qué half-up y no half-even**: es la política que ya aplican las otras dos capas donde el sistema redondea dinero — `Money.div()` y Postgres `numeric(18,2)` (verificado: `31.525 → 31.53`, `0.005 → 0.01`). Redondear half-even en TypeScript desalinearía la base: todo valor que llegara al INSERT sin pasar por `redondearABob()` quedaría redondeado distinto por Postgres.
+- **Enforcement**: `money.spec.ts` fija la política con los casos que DISCRIMINAN half-up de half-even (`31.525`, `0.005`). Un caso como `31.515` da `31.52` con ambas y no prueba nada.
 
 #### Anti-08: Cálculo de período fiscal por fecha del servidor
 
