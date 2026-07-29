@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { EstadoComprobante, MatchConciliacion, Prisma } from '@prisma/client';
+import type { MatchConciliacion, Prisma } from '@prisma/client';
+
+import { ESTADOS_CONCILIABLES } from '@/common/estados-comprobante';
 
 import {
   LineaCuentaRow,
@@ -30,8 +32,6 @@ import {
   MovimientoBancarioRepositoryPort,
   MOVIMIENTO_BANCARIO_REPOSITORY_PORT,
 } from './ports/movimiento-bancario.repository.port';
-
-const ESTADOS_CONCILIABLES: readonly EstadoComprobante[] = ['CONTABILIZADO', 'BLOQUEADO'];
 
 export interface CrearMatchInput {
   movimientoBancarioId: string;

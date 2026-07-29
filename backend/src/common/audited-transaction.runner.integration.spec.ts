@@ -15,7 +15,7 @@ import { AuditedTransactionRunner } from './audited-transaction.runner';
  * Requiere Postgres corriendo en DATABASE_URL.
  * Correr con:
  *   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/saas \
- *     pnpm exec jest src/comprobantes/infrastructure/audited-transaction.runner.integration.spec.ts
+ *     pnpm exec jest src/common/audited-transaction.runner.integration.spec.ts
  */
 describe('AuditedTransactionRunner — integration vs Postgres', () => {
   let prisma: PrismaClient;

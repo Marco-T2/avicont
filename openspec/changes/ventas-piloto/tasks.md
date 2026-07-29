@@ -23,12 +23,12 @@ TDD estricto (RED → GREEN). 1 task = 1 commit; cierra con `tsc` + suite del su
 
 ## Fase 2 — Núcleo compartido
 
-- [ ] 2.1 Mover `AuditedTransactionRunner` a `common/audited-transaction.runner.ts`. Movimiento **puro** (su única dependencia es `PrismaService`); ajustar `comprobantes/infrastructure/index.ts` y `comprobantes.module.ts`. **Bloquea la Fase 4**: hoy el runner vive en `comprobantes/infrastructure/` y §3.3 impide que Ventas lo alcance.
-- [ ] 2.2 RED/GREEN `common/domain/efectivo.ts`: `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo(cuenta)`. Solo la BASE compartida — el criterio completo NO vive acá.
-- [ ] 2.3 `reportes/domain/estado-flujo-efectivo.ts` importa prefijo y predicado de `common/`. **Su interruptor org-wide se queda donde está**: correr la regresión de EEFF: cualquier cambio de conducta del EFE es un bug de este change, no una mejora.
-- [ ] 2.4 RED/GREEN `CuentasEfectivoReaderPort.esElegibleComoDestino`: `activa ∧ esDetalle ∧ (actividadFlujo = 'EFECTIVO' **∪** prefijo 1.1.1)`. **El test tiene que DISCRIMINAR unión de fallback**: cuenta bajo `1.1.1` marcada `OPERACION` → **sigue elegible**; cuenta fuera del prefijo marcada `EFECTIVO` → elegible. Sin ese par, una implementación con "en su defecto" pasa en verde. Adapter + wiring en `cuentas`.
-- [ ] 2.5 Extraer `validarLineasContraCuentas` a `comprobantes/domain/`; consumirla en sus 3 call sites (`contabilizar:454`, `editarContabilizado:703`, `resolverYValidarBorrador:1286`). Es **anti-duplicación**: `requiereContacto` ya está en dos de ellos desde #294 — el extract unifica, no tapa un agujero.
-- [ ] 2.6 Extraer `ESTADOS_CONCILIABLES` a un lugar único; consumirlo en sus 2 call sites (`prisma-lineas-cuenta-reader.adapter.ts:17` y `match-conciliacion.service.ts:34`).
+- [x] 2.1 Mover `AuditedTransactionRunner` a `common/audited-transaction.runner.ts`. Movimiento **puro** (su única dependencia es `PrismaService`); ajustar `comprobantes/infrastructure/index.ts` y `comprobantes.module.ts`. **Bloquea la Fase 4**: hoy el runner vive en `comprobantes/infrastructure/` y §3.3 impide que Ventas lo alcance.
+- [x] 2.2 RED/GREEN `common/domain/efectivo.ts`: `CODIGO_EFECTIVO_PREFIJO` + `esEfectivoPorCodigo(cuenta)`. Solo la BASE compartida — el criterio completo NO vive acá.
+- [x] 2.3 `reportes/domain/estado-flujo-efectivo.ts` importa prefijo y predicado de `common/`. **Su interruptor org-wide se queda donde está**: correr la regresión de EEFF: cualquier cambio de conducta del EFE es un bug de este change, no una mejora.
+- [x] 2.4 RED/GREEN `CuentasEfectivoReaderPort.esElegibleComoDestino`: `activa ∧ esDetalle ∧ (actividadFlujo = 'EFECTIVO' **∪** prefijo 1.1.1)`. **El test tiene que DISCRIMINAR unión de fallback**: cuenta bajo `1.1.1` marcada `OPERACION` → **sigue elegible**; cuenta fuera del prefijo marcada `EFECTIVO` → elegible. Sin ese par, una implementación con "en su defecto" pasa en verde. Adapter + wiring en `cuentas`.
+- [x] 2.5 Extraer `validarLineasContraCuentas` a `comprobantes/domain/`; consumirla en sus 3 call sites (`contabilizar:454`, `editarContabilizado:703`, `resolverYValidarBorrador:1286`). Es **anti-duplicación**: `requiereContacto` ya está en dos de ellos desde #294 — el extract unifica, no tapa un agujero.
+- [x] 2.6 Extraer `ESTADOS_CONCILIABLES` a un lugar único; consumirlo en sus 2 call sites (`prisma-lineas-cuenta-reader.adapter.ts:17` y `match-conciliacion.service.ts:34`).
 - [ ] 2.7 RED/GREEN `ComprobanteSistemaWriterPort` + adapter (5 métodos del design). Preserva `id`/`numero`; **todos re-validan**.
 - [ ] 2.8 `comprobantes.service.anular` → 409 `COMPROBANTE_ANULACION_DESDE_ORIGEN` si el origen es comercial.
 - [ ] 2.9 Constantes `ORIGEN_TIPO_VENTA` / `ORIGEN_TIPO_COBRO` (molde ya existente: `CierreOrigenTipo`).

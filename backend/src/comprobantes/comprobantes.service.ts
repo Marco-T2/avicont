@@ -59,7 +59,7 @@ import {
   AdjuntoComprobanteRepositoryPort,
 } from './ports/adjunto-comprobante.repository.port';
 import { STORAGE_PORT, StoragePort } from './ports/storage.port';
-import { AuditedTransactionRunner } from './infrastructure/audited-transaction.runner';
+import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import {
   CreateComprobanteDto,
   CreateLineaDto,
@@ -98,10 +98,6 @@ import {
   CierreGestionCerradaError,
   ContactoInactivoError,
   ContactoReferenciadoNoExisteError,
-  ContactoRequeridoError,
-  CuentaInactivaError,
-  CuentaNoDetalleError,
-  CuentaNoEncontradaError,
   DocumentoFisicoReferenciadoNoExisteError,
   FechaFuturaNoPermitidaError,
   GestionNoAbiertaError,
@@ -121,6 +117,7 @@ import {
   validarComprobanteParaContabilizar,
 } from './domain/comprobante-validator';
 import { NumeroComprobante } from './domain/numero-comprobante';
+import { resolverCuentaDeLinea, validarContactoRequerido } from './domain/validacion-cuentas';
 import {
   COMPROBANTE_REPOSITORY_PORT,
   AnularData,
@@ -446,17 +443,8 @@ export class ComprobantesService {
       const contactosMap = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
 
       for (const linea of actual.lineas) {
-        const cuenta = cuentasMap.get(linea.cuentaId);
-        if (!cuenta) throw new CuentaNoEncontradaError(linea.cuentaId);
-        if (!cuenta.activa) {
-          throw new CuentaInactivaError(linea.orden, cuenta.id, cuenta.codigoInterno);
-        }
-        if (!cuenta.esDetalle) {
-          throw new CuentaNoDetalleError(linea.orden, cuenta.id, cuenta.codigoInterno);
-        }
-        if (cuenta.requiereContacto && !linea.contactoId) {
-          throw new ContactoRequeridoError(linea.orden, cuenta.id, cuenta.codigoInterno);
-        }
+        const cuenta = resolverCuentaDeLinea(linea.orden, linea.cuentaId, cuentasMap);
+        validarContactoRequerido(linea.orden, cuenta, linea.contactoId);
         if (linea.contactoId) {
           const contacto = contactosMap.get(linea.contactoId);
           if (!contacto) {
@@ -697,20 +685,13 @@ export class ComprobantesService {
 
         const lineasPersist = lineasInput.map((l, idx) => {
           const orden = idx + 1;
-          const cuenta = cuentasMap.get(l.cuentaId);
-          if (!cuenta) throw new CuentaNoEncontradaError(l.cuentaId);
-          if (!cuenta.activa) throw new CuentaInactivaError(orden, cuenta.id, cuenta.codigoInterno);
-          if (!cuenta.esDetalle) {
-            throw new CuentaNoDetalleError(orden, cuenta.id, cuenta.codigoInterno);
-          }
+          const cuenta = resolverCuentaDeLinea(orden, l.cuentaId, cuentasMap);
           // §4.1 — mismo invariante que `contabilizar`: una cuenta que exige
           // contacto no puede quedarse sin él. Faltaba en este camino, y como
           // la edición reemplaza las líneas EN BLOQUE se podía dejar sin
           // `contactoId` una línea contra CUENTAS POR COBRAR — el campo del
           // que depende el aging de cartera.
-          if (cuenta.requiereContacto && !l.contactoId) {
-            throw new ContactoRequeridoError(orden, cuenta.id, cuenta.codigoInterno);
-          }
+          validarContactoRequerido(orden, cuenta, l.contactoId);
           validarCoherenciaLineaBorrador(orden, l);
           return {
             orden,
@@ -1280,12 +1261,9 @@ export class ComprobantesService {
     // 3) Validar cada línea.
     const lineas: LineaPersistData[] = input.lineas.map((linea, index) => {
       const orden = index + 1;
-      const cuenta = cuentas.get(linea.cuentaId);
-      if (!cuenta) throw new CuentaNoEncontradaError(linea.cuentaId);
-      if (!cuenta.activa) throw new CuentaInactivaError(orden, cuenta.id, cuenta.codigoInterno);
-      if (!cuenta.esDetalle) {
-        throw new CuentaNoDetalleError(orden, cuenta.id, cuenta.codigoInterno);
-      }
+      // Sin `validarContactoRequerido` a propósito: un BORRADOR puede estar
+      // incompleto; §4.1 exige el contacto recién al contabilizar.
+      const cuenta = resolverCuentaDeLinea(orden, linea.cuentaId, cuentas);
       if (!cuenta.permiteMultiMoneda && linea.moneda !== cuenta.monedaFuncional) {
         throw new MonedaIncompatibleCuentaError(orden, {
           cuentaId: cuenta.id,

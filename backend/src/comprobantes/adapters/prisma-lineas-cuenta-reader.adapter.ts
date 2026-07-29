@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { EstadoComprobante, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+import { ESTADOS_CONCILIABLES } from '@/common/estados-comprobante';
 
 import { PrismaService } from '@/common/prisma.service';
 
@@ -11,10 +13,6 @@ import {
   SumaLineasCuentaFiltros,
   SumaLineasCuentaRow,
 } from '../ports/lineas-cuenta-reader.port';
-
-// Estados que representan plata efectivamente movida (design §3): un BORRADOR
-// todavía no movió nada y por eso no es conciliable.
-const ESTADOS_CONCILIABLES = [EstadoComprobante.CONTABILIZADO, EstadoComprobante.BLOQUEADO];
 
 // Shape del `findMany` con el include de cabecera — evita repetirlo en los 2 métodos.
 type FilaConComprobante = Prisma.LineaComprobanteGetPayload<{
@@ -68,7 +66,7 @@ export class PrismaLineasCuentaReaderAdapter extends LineasCuentaReaderPort {
         cuentaId: filtros.cuentaId,
         comprobante: {
           organizationId: tenantId, // defense in depth (Anti-31)
-          estado: { in: ESTADOS_CONCILIABLES },
+          estado: { in: [...ESTADOS_CONCILIABLES] },
           anulado: false,
           fechaContable: { gte: filtros.fechaDesde, lte: filtros.fechaHasta },
         },
@@ -121,7 +119,7 @@ export class PrismaLineasCuentaReaderAdapter extends LineasCuentaReaderPort {
         cuentaId: filtros.cuentaId,
         comprobante: {
           organizationId: tenantId, // defense in depth (Anti-31)
-          estado: { in: ESTADOS_CONCILIABLES },
+          estado: { in: [...ESTADOS_CONCILIABLES] },
           anulado: false,
           fechaContable: {
             lte: filtros.hasta,
