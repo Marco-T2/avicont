@@ -80,10 +80,10 @@ import {
 } from './dto/listar-comprobantes.dto';
 import { UpdateComprobanteDto } from './dto/update-comprobante.dto';
 import {
+  ComprobanteAnulacionDesdeOrigenError,
   ComprobanteAnuladoNoAnulableError,
   ComprobanteAnuladoNoEditableError,
   ComprobanteAnularBorradorNoPermitidoError,
-  ComprobanteAnularMotivoInvalidoError,
   ComprobanteExportRangoExcedidoError,
   ComprobanteAnularPeriodoCerradoError,
   ComprobanteCampoInvalidoError,
@@ -115,6 +115,7 @@ import {
   calcularTotalesBob,
   type LineaParaValidar,
   validarComprobanteParaContabilizar,
+  validarMotivoAnulacion,
 } from './domain/comprobante-validator';
 import { NumeroComprobante } from './domain/numero-comprobante';
 import { resolverCuentaDeLinea, validarContactoRequerido } from './domain/validacion-cuentas';
@@ -126,6 +127,11 @@ import {
   LineaPersistData,
   ListarFiltros,
 } from './ports/comprobante.repository.port';
+import {
+  esOrigenComercial,
+  nombreDeOrigenComercial,
+  type OrigenTipoComercial,
+} from './ports/comprobante-sistema-writer.port';
 import {
   SECUENCIA_COMPROBANTE_PORT,
   SecuenciaComprobantePort,
@@ -414,130 +420,153 @@ export class ComprobantesService {
     id: string,
   ): Promise<ComprobanteResponseDto> {
     return this.auditedTx.run({ userId }, async (tx) => {
-      const actual = await this.repo.findById(tenantId, id, tx);
-      if (!actual) throw new ComprobanteNoEncontradoError(id);
-      if (actual.estado !== EstadoComprobante.BORRADOR) {
-        throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'contabilizar');
-      }
-
-      const fechaContable = FechaContable.fromDbDate(actual.fechaContable);
-
-      // 1) Período fiscal de la fecha sigue ABIERTO.
-      const periodo = await this.periodos.obtenerPorFecha(tenantId, fechaContable, tx);
-      if (!periodo) throw new GestionNoAbiertaError(fechaContable.toIso());
-      if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
-        throw new PeriodoNoAbiertoError(periodo.id, periodo.status);
-      }
-
-      // 2) Cuentas: activas, esDetalle, y contacto presente si requerido.
-      const cuentaIds = actual.lineas.map((l) => l.cuentaId);
-      const cuentasMap = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
-
-      // 2.5) Contactos: existencia + activo. Lectura dentro de la misma TX
-      // para aislarse contra una desactivación concurrente. El contacto
-      // pudo haberse desactivado (pero no borrado, FK Restrict lo bloquea)
-      // entre crear/editar el borrador y este contabilizar.
-      const contactoIds = actual.lineas
-        .map((l) => l.contactoId)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0);
-      const contactosMap = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
-
-      for (const linea of actual.lineas) {
-        const cuenta = resolverCuentaDeLinea(linea.orden, linea.cuentaId, cuentasMap);
-        validarContactoRequerido(linea.orden, cuenta, linea.contactoId);
-        if (linea.contactoId) {
-          const contacto = contactosMap.get(linea.contactoId);
-          if (!contacto) {
-            throw new ContactoReferenciadoNoExisteError(linea.orden, linea.contactoId);
-          }
-          if (!contacto.activo) {
-            throw new ContactoInactivoError(linea.orden, linea.contactoId);
-          }
-        }
-      }
-
-      // 3) Invariantes estructurales completos (partida doble, mínimo líneas,
-      //    monto > 0, XOR, coherencia BOB, tipoCambio consistente, glosa,
-      //    fecha no futura).
-      const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
-      const lineasParaValidar: LineaParaValidar[] = actual.lineas.map((l) => ({
-        orden: l.orden,
-        moneda: toDominioMoneda(l.moneda),
-        debito: l.debito,
-        credito: l.credito,
-        tipoCambio: l.tipoCambio,
-        debitoBob: l.debitoBob,
-        creditoBob: l.creditoBob,
-      }));
-      validarComprobanteParaContabilizar({
-        glosa: actual.glosa,
-        fechaContable,
-        hoy,
-        lineas: lineasParaValidar,
-      });
-
-      // 3.5) Documentos físicos asociados (design §4.3). Solo si el comprobante
-      // tiene asociaciones. Antes del correlativo: si falla, no consumimos
-      // numeración. La pre-validación lanza con ids REALES (el adapter, al
-      // chocar el UNIQUE PARCIAL en el UPDATE, no tiene contexto del id —
-      // riesgo heredado de la asociación). El UNIQUE PARCIAL en BD sigue
-      // siendo la última línea de defensa contra races (CLAUDE.md §4.8).
-      const asociaciones = await this.asociacionRepo.listarPorComprobante(tenantId, id, tx);
-      if (asociaciones.length > 0) {
-        const documentoFisicoIds = asociaciones.map((a) => a.documentoFisicoId);
-        const yaContabilizados = await this.documentosFisicosReader.idsYaAsociadosAContabilizado(
-          tenantId,
-          documentoFisicoIds,
-          id,
-          tx,
-        );
-        const [primerYaContabilizado] = yaContabilizados;
-        if (primerYaContabilizado !== undefined) {
-          throw new DocumentoFisicoYaAsociadoAOtroContabilizadoError(primerYaContabilizado);
-        }
-        await this.asociacionRepo.refrescarEstadoComprobante(
-          tenantId,
-          id,
-          EstadoComprobante.CONTABILIZADO,
-          tx,
-        );
-      }
-
-      // 4) Correlativo atómico en la misma TX (si esta TX falla más abajo,
-      //    el correlativo se revierte y no queda "consumido").
-      const correlativo = await this.secuencia.siguienteCorrelativo(
-        tenantId,
-        actual.tipo,
-        fechaContable.year,
-        fechaContable.month,
-        tx,
-      );
-      const numero = NumeroComprobante.of(
-        toDominioTipoComprobante(actual.tipo),
-        fechaContable.year,
-        fechaContable.month,
-        correlativo,
-      ).toString();
-
-      // 5) Totales cache en BOB.
-      const totales = calcularTotalesBob(lineasParaValidar);
-
-      // 6) Update de estado + número + totales. Los triggers Postgres en
-      // comprobantes_audit capturan el UPDATE automáticamente con el actor
-      // inyectado por auditedTx (app.audit_user_id).
-      const persisted = await this.repo.contabilizar(
-        tenantId,
-        id,
-        {
-          numero,
-          totalDebitoBob: totales.debito.toPrismaDecimal(),
-          totalCreditoBob: totales.credito.toPrismaDecimal(),
-        },
-        tx,
-      );
-
+      const persisted = await this.contabilizarEnTx(tenantId, id, tx);
       return toComprobanteResponse(persisted);
     });
+  }
+
+  /**
+   * Núcleo de la contabilización, sin abrir transacción.
+   *
+   * Existe para que el camino de sistema (`ComprobanteSistemaWriterPort`, que
+   * usan ventas y cobros) contabilice DENTRO de la TX que abrió el módulo
+   * origen, sin tener que repetir la secuencia de validaciones. Es la misma
+   * secuencia, no una copia: si mañana se suma un invariante acá, los dos
+   * caminos lo heredan. Duplicarla era el riesgo real — el asiento automático
+   * es justamente el que nadie mira a mano.
+   *
+   * Quien llama abre la TX y es responsable de que sea una TX AUDITADA
+   * (`AuditedTransactionRunner`), o los triggers de `comprobantes_audit`
+   * graban la fila sin actor.
+   */
+  async contabilizarEnTx(
+    tenantId: string,
+    id: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas> {
+    const actual = await this.repo.findById(tenantId, id, tx);
+    if (!actual) throw new ComprobanteNoEncontradoError(id);
+    if (actual.estado !== EstadoComprobante.BORRADOR) {
+      throw new ComprobanteEstadoInvalidoError(id, actual.estado, 'contabilizar');
+    }
+
+    const fechaContable = FechaContable.fromDbDate(actual.fechaContable);
+
+    // 1) Período fiscal de la fecha sigue ABIERTO.
+    const periodo = await this.periodos.obtenerPorFecha(tenantId, fechaContable, tx);
+    if (!periodo) throw new GestionNoAbiertaError(fechaContable.toIso());
+    if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+      throw new PeriodoNoAbiertoError(periodo.id, periodo.status);
+    }
+
+    // 2) Cuentas: activas, esDetalle, y contacto presente si requerido.
+    const cuentaIds = actual.lineas.map((l) => l.cuentaId);
+    const cuentasMap = await this.cuentas.obtenerBatch(tenantId, cuentaIds, tx);
+
+    // 2.5) Contactos: existencia + activo. Lectura dentro de la misma TX
+    // para aislarse contra una desactivación concurrente. El contacto
+    // pudo haberse desactivado (pero no borrado, FK Restrict lo bloquea)
+    // entre crear/editar el borrador y este contabilizar.
+    const contactoIds = actual.lineas
+      .map((l) => l.contactoId)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    const contactosMap = await this.contactos.obtenerBatch(tenantId, contactoIds, tx);
+
+    for (const linea of actual.lineas) {
+      const cuenta = resolverCuentaDeLinea(linea.orden, linea.cuentaId, cuentasMap);
+      validarContactoRequerido(linea.orden, cuenta, linea.contactoId);
+      if (linea.contactoId) {
+        const contacto = contactosMap.get(linea.contactoId);
+        if (!contacto) {
+          throw new ContactoReferenciadoNoExisteError(linea.orden, linea.contactoId);
+        }
+        if (!contacto.activo) {
+          throw new ContactoInactivoError(linea.orden, linea.contactoId);
+        }
+      }
+    }
+
+    // 3) Invariantes estructurales completos (partida doble, mínimo líneas,
+    //    monto > 0, XOR, coherencia BOB, tipoCambio consistente, glosa,
+    //    fecha no futura).
+    const hoy = FechaContable.fromIso(this.clock.currentDateLaPaz());
+    const lineasParaValidar: LineaParaValidar[] = actual.lineas.map((l) => ({
+      orden: l.orden,
+      moneda: toDominioMoneda(l.moneda),
+      debito: l.debito,
+      credito: l.credito,
+      tipoCambio: l.tipoCambio,
+      debitoBob: l.debitoBob,
+      creditoBob: l.creditoBob,
+    }));
+    validarComprobanteParaContabilizar({
+      glosa: actual.glosa,
+      fechaContable,
+      hoy,
+      lineas: lineasParaValidar,
+    });
+
+    // 3.5) Documentos físicos asociados (design §4.3). Solo si el comprobante
+    // tiene asociaciones. Antes del correlativo: si falla, no consumimos
+    // numeración. La pre-validación lanza con ids REALES (el adapter, al
+    // chocar el UNIQUE PARCIAL en el UPDATE, no tiene contexto del id —
+    // riesgo heredado de la asociación). El UNIQUE PARCIAL en BD sigue
+    // siendo la última línea de defensa contra races (CLAUDE.md §4.8).
+    const asociaciones = await this.asociacionRepo.listarPorComprobante(tenantId, id, tx);
+    if (asociaciones.length > 0) {
+      const documentoFisicoIds = asociaciones.map((a) => a.documentoFisicoId);
+      const yaContabilizados = await this.documentosFisicosReader.idsYaAsociadosAContabilizado(
+        tenantId,
+        documentoFisicoIds,
+        id,
+        tx,
+      );
+      const [primerYaContabilizado] = yaContabilizados;
+      if (primerYaContabilizado !== undefined) {
+        throw new DocumentoFisicoYaAsociadoAOtroContabilizadoError(primerYaContabilizado);
+      }
+      await this.asociacionRepo.refrescarEstadoComprobante(
+        tenantId,
+        id,
+        EstadoComprobante.CONTABILIZADO,
+        tx,
+      );
+    }
+
+    // 4) Correlativo atómico en la misma TX (si esta TX falla más abajo,
+    //    el correlativo se revierte y no queda "consumido").
+    const correlativo = await this.secuencia.siguienteCorrelativo(
+      tenantId,
+      actual.tipo,
+      fechaContable.year,
+      fechaContable.month,
+      tx,
+    );
+    const numero = NumeroComprobante.of(
+      toDominioTipoComprobante(actual.tipo),
+      fechaContable.year,
+      fechaContable.month,
+      correlativo,
+    ).toString();
+
+    // 5) Totales cache en BOB.
+    const totales = calcularTotalesBob(lineasParaValidar);
+
+    // 6) Update de estado + número + totales. Los triggers Postgres en
+    // comprobantes_audit capturan el UPDATE automáticamente con el actor
+    // inyectado por auditedTx (app.audit_user_id).
+    const persisted = await this.repo.contabilizar(
+      tenantId,
+      id,
+      {
+        numero,
+        totalDebitoBob: totales.debito.toPrismaDecimal(),
+        totalCreditoBob: totales.credito.toPrismaDecimal(),
+      },
+      tx,
+    );
+
+    return persisted;
   }
 
   // ============================================================
@@ -777,10 +806,7 @@ export class ComprobantesService {
   ): Promise<ComprobanteResponseDto> {
     // 1) Validar motivo significativo (invariante de dominio, no protocolo).
     // REQ-COMP-ANULAR-02: 10 chars no-whitespace.
-    const motivoTrim = (motivo ?? '').trim();
-    if (motivoTrim.length < ComprobanteAnularMotivoInvalidoError.LONGITUD_MINIMA) {
-      throw new ComprobanteAnularMotivoInvalidoError(motivoTrim.length);
-    }
+    const motivoTrim = validarMotivoAnulacion(motivo);
 
     // 2) Resolver reapertura activa ANTES de abrir la TX del wrapper.
     // La reapertura se resuelve con una query simple (sin lock) para determinar
@@ -799,6 +825,25 @@ export class ComprobantesService {
       comprobantePreTx.estado,
       comprobantePreTx.anulado,
     );
+
+    // REQ-CMP-VTA-04 / Anti-14: un comprobante de venta o de cobro se anula
+    // DESDE su módulo, que orquesta la desvinculación de las aplicaciones antes
+    // de anular por el camino de sistema. Si se pudiera anular por acá, la venta
+    // quedaría viva apuntando a un asiento anulado.
+    //
+    // La guarda mira el ORIGEN y no `generadoPorSistema`: los asientos de cierre
+    // también son de sistema y tienen su propia regla, la de acá abajo.
+    // Va sólo en esta operación de usuario — `anularEnTx`, el núcleo que
+    // comparte con el camino de sistema, no la lleva, porque es justamente el
+    // camino por el que ventas SÍ debe poder anular.
+    if (esOrigenComercial(comprobantePreTx.origenTipo)) {
+      const origenTipo = comprobantePreTx.origenTipo as OrigenTipoComercial;
+      throw new ComprobanteAnulacionDesdeOrigenError(
+        comprobantePreTx.id,
+        origenTipo,
+        nombreDeOrigenComercial(origenTipo),
+      );
+    }
 
     // REQ-CMP-SYS-06: anular un comprobante de CIERRE generado por sistema solo
     // se permite mientras la gestión NO esté CERRADA. Con gestión cerrada, el
@@ -827,44 +872,79 @@ export class ComprobantesService {
         ...(reapertura ? { reaperturaId: reapertura.id } : {}),
       },
       async (tx) => {
-        // 3) Re-leer dentro de la TX (lock implícito — el UPDATE final lockea el row).
-        const original = await this.repo.findById(tenantId, id, tx);
-        if (!original) throw new ComprobanteNoEncontradoError(id);
-
-        // Re-validar estado dentro de TX (defensa contra race CONTABILIZADO→BLOQUEADO).
-        this.validarEstadoParaAnular(original.id, original.estado, original.anulado);
-
-        // 4) Validar período del comprobante (no "hoy").
-        // REQ-COMP-ANULAR-07/08: FOR UPDATE del período está implícito en el UPDATE
-        // del comprobante que Prisma emite al final. Si queremos explícito usamos
-        // obtenerPorFecha que ya hace la query en TX.
-        const fecha = FechaContable.fromDbDate(original.fechaContable);
-        const periodo = await this.periodos.obtenerPorFecha(tenantId, fecha, tx);
-        if (!periodo) throw new GestionNoAbiertaError(fecha.toIso());
-
-        if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
-          // Solo permitir si hay reapertura activa (ya la resolvimos pre-TX).
-          if (!reapertura) {
-            throw new ComprobanteAnularPeriodoCerradoError(periodo.id, periodo.status);
-          }
-          // Con reapertura activa: el período se considera ABIERTO (REQ-COMP-REAPERTURA-01).
-        }
-
-        // 5) CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
-        await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
-
-        // 6) Persistir el flag de anulación in-place (§4.7 CLAUDE.md).
-        // El trigger trg_comprobantes_audit captura el UPDATE en comprobantes_audit.
-        const anularData: AnularData = {
-          fechaAnulacion: this.clock.now(),
-          anuladoPorUserId: userId,
-          motivoAnulacion: motivoTrim,
-        };
-        const anulado = await this.repo.anular(tenantId, id, anularData, tx);
+        const anulado = await this.anularEnTx(
+          tenantId,
+          id,
+          {
+            motivoTrim,
+            anuladoPorUserId: userId,
+            hayReaperturaActiva: Boolean(reapertura),
+          },
+          tx,
+        );
 
         return toComprobanteResponse(anulado);
       },
     );
+  }
+
+  /**
+   * Núcleo de la anulación, sin abrir transacción.
+   *
+   * Lo comparten el `anular` de usuario y el `anularSistema` que usan ventas y
+   * cobros (`ComprobanteSistemaWriterPort`). Sin esto habría dos anulaciones
+   * distintas sobre la misma entidad, y la que se olvidara de desasociar los
+   * documentos físicos dejaría un documento respaldando un asiento anulado.
+   *
+   * El motivo entra YA validado y trimmeado (`validarMotivoAnulacion`): quien
+   * abre la TX lo necesita antes, porque el runner de auditoría lo graba como
+   * contexto de la transacción.
+   *
+   * `hayReaperturaActiva` es un parámetro y no una consulta interna a
+   * propósito: el camino de usuario la resuelve pre-TX para poder pasarle el
+   * `reaperturaId` al runner, y re-consultarla acá sería una segunda lectura
+   * que podría contradecir a la primera.
+   */
+  async anularEnTx(
+    tenantId: string,
+    id: string,
+    data: { motivoTrim: string; anuladoPorUserId: string; hayReaperturaActiva: boolean },
+    tx: Prisma.TransactionClient,
+  ): Promise<ComprobanteConLineas> {
+    // 3) Re-leer dentro de la TX (lock implícito — el UPDATE final lockea el row).
+    const original = await this.repo.findById(tenantId, id, tx);
+    if (!original) throw new ComprobanteNoEncontradoError(id);
+
+    // Re-validar estado dentro de TX (defensa contra race CONTABILIZADO→BLOQUEADO).
+    this.validarEstadoParaAnular(original.id, original.estado, original.anulado);
+
+    // 4) Validar período del comprobante (no "hoy").
+    // REQ-COMP-ANULAR-07/08: FOR UPDATE del período está implícito en el UPDATE
+    // del comprobante que Prisma emite al final. Si queremos explícito usamos
+    // obtenerPorFecha que ya hace la query en TX.
+    const fecha = FechaContable.fromDbDate(original.fechaContable);
+    const periodo = await this.periodos.obtenerPorFecha(tenantId, fecha, tx);
+    if (!periodo) throw new GestionNoAbiertaError(fecha.toIso());
+
+    if (periodo.status !== PeriodoFiscalStatus.ABIERTO) {
+      // Solo permitir si hay reapertura activa (ya la resolvimos pre-TX).
+      if (!data.hayReaperturaActiva) {
+        throw new ComprobanteAnularPeriodoCerradoError(periodo.id, periodo.status);
+      }
+      // Con reapertura activa: el período se considera ABIERTO (REQ-COMP-REAPERTURA-01).
+    }
+
+    // 5) CLAUDE.md §4.7: desasociar documentos físicos del comprobante anulado.
+    await this.asociacionRepo.desasociarTodasDelComprobante(tenantId, id, tx);
+
+    // 6) Persistir el flag de anulación in-place (§4.7 CLAUDE.md).
+    // El trigger trg_comprobantes_audit captura el UPDATE en comprobantes_audit.
+    const anularData: AnularData = {
+      fechaAnulacion: this.clock.now(),
+      anuladoPorUserId: data.anuladoPorUserId,
+      motivoAnulacion: data.motivoTrim,
+    };
+    return this.repo.anular(tenantId, id, anularData, tx);
   }
 
   /**

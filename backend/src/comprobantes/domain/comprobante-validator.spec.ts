@@ -4,6 +4,7 @@ import { Moneda } from '@/common/domain/enums';
 import { FechaContable } from '@/common/domain/fecha-contable';
 
 import {
+  ComprobanteAnularMotivoInvalidoError,
   ComprobanteDesbalanceadoError,
   ComprobanteMontoCeroError,
   ComprobanteSinLineasError,
@@ -18,6 +19,7 @@ import {
   calcularTotalesBob,
   validarComprobanteParaContabilizar,
   validarFechaNoFutura,
+  validarMotivoAnulacion,
   validarGlosa,
   validarLinea,
   validarMinimoLineas,
@@ -445,5 +447,44 @@ describe('validarComprobanteParaContabilizar', () => {
     expect(() => validarComprobanteParaContabilizar({ ...baseInput, lineas })).toThrow(
       ComprobanteDesbalanceadoError,
     );
+  });
+});
+
+describe('validarMotivoAnulacion', () => {
+  it('acepta un motivo con exactamente el mínimo de caracteres significativos', () => {
+    expect(validarMotivoAnulacion('1234567890')).toBe('1234567890');
+  });
+
+  it('devuelve el motivo trimmeado — se mide y se persiste el mismo string', () => {
+    expect(validarMotivoAnulacion('  error de digitacion  ')).toBe('error de digitacion');
+  });
+
+  // El whitespace no es contenido: un motivo de 40 espacios no explica nada.
+  it('rechaza un motivo que sólo alcanza el mínimo contando espacios', () => {
+    expect(() => validarMotivoAnulacion('  corto  ')).toThrow(ComprobanteAnularMotivoInvalidoError);
+  });
+
+  it.each([
+    ['vacío', ''],
+    ['sólo whitespace', '     '],
+    ['nueve caracteres', '123456789'],
+  ])('rechaza un motivo %s', (_caso, motivo) => {
+    expect(() => validarMotivoAnulacion(motivo)).toThrow(ComprobanteAnularMotivoInvalidoError);
+  });
+
+  it('rechaza null y undefined sin explotar por acceso a propiedad', () => {
+    expect(() => validarMotivoAnulacion(null)).toThrow(ComprobanteAnularMotivoInvalidoError);
+    expect(() => validarMotivoAnulacion(undefined)).toThrow(ComprobanteAnularMotivoInvalidoError);
+  });
+
+  it('reporta la longitud significativa, no la cruda', () => {
+    expect.assertions(1);
+    try {
+      validarMotivoAnulacion('   ab   ');
+    } catch (e) {
+      expect((e as ComprobanteAnularMotivoInvalidoError).details).toMatchObject({
+        longitudSignificativa: 2,
+      });
+    }
   });
 });

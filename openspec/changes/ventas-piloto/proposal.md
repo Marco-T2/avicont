@@ -348,7 +348,7 @@ falta acá.
 **Consecuencia que sí hay que resolver en el design**: el comprobante de la
 venta lleva `generadoPorSistema = true`, y ese flag **bloquea
 `editarContabilizado`** (`comprobantes.service.ts:594`). Ventas no puede usar el
-camino de usuario: el `ComprobanteWriterPort` necesita un **método de
+camino de usuario: el `ComprobanteSistemaWriterPort` necesita un **método de
 sistema** que reutilice la misma mecánica de reemplazo de líneas. El precedente
 del bypass ya existe — el writer del cierre borra con `generadoPorSistema: true`
 en el `where`.
@@ -771,9 +771,14 @@ partida es este — no el de ellos.
 con `domain/`, `ports/`, `adapters/`, `dto/`.
 
 **Cross-módulo por port** (§3.3). Ventas no importa nada concreto de
-comprobantes: declara `ComprobanteWriterPort` y el módulo comprobantes registra
-el adapter. Mismo criterio para `ContactosReaderPort` (ya existe) y
-`ConfiguracionContableReaderPort`.
+comprobantes: consume `ComprobanteSistemaWriterPort`, que **declara y registra
+el propio módulo comprobantes**. Mismo criterio para `ContactosReaderPort` (ya
+existe) y `ConfiguracionContableReaderPort`.
+
+> **Corregido 2026-07-29 (task 2.7).** Acá decía que Ventas *declara* el port.
+> Lo declara el módulo dueño del dominio (§3.7), igual que
+> `CierreComprobanteWriterPort`: si lo declarara cada consumidor, el núcleo
+> terminaría implementando un contrato de escritura por módulo comercial.
 
 **Idempotencia del auto-asiento** (§4.9, Anti-17). El comprobante de una venta
 lleva `origenTipo = 'VENTA'`, `origenId = venta.id`, sobre el
@@ -872,7 +877,7 @@ el cálculo de vencido — cero `new Date()` en dominio y servicios.
 | `prisma/migrations/` | **tres** migraciones: enum-only escrita a mano, tablas (ver R-6) **+ el UNIQUE PARCIAL de `Item.codigo` como raw SQL a mano dentro de la de tablas (D-24)**, y backfill data-only (D-22) |
 | `CLAUDE.md` §11.6 | sumar el UNIQUE PARCIAL de `Item.codigo` a la tabla de objetos raw SQL vivos (D-24) — sin eso, la próxima migración regenerada lo dropea y nadie lo rescata |
 | `tipos-documento-fisico/seed/tipos-universales.ts` | `VENTA` en los tipos que hoy llevan `INGRESO` (D-22) — si no, cada tenant nuevo reproduce el problema |
-| `comprobantes/` | `ComprobanteWriterPort` + adapter |
+| `comprobantes/` | `ComprobanteSistemaWriterPort` + implementación |
 | `cuentas/adapters/seed/comercial.ts` | `MAPEO_CODIGO_A_CONCEPTO` += CxC y Ventas |
 | `common/permisos/catalogo.ts` | submódulos `items` y `cobros` |
 | `catalogo-vs-controllers.spec.ts` | sacar 6 entradas `contabilidad.ventas.*` |

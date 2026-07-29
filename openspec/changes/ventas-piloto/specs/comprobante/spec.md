@@ -90,10 +90,20 @@ D-11: el tipo del comprobante NO identifica al cobro; el origen sí).
 
 ### REQ-CMP-VTA-03 — Escritura de sistema que RE-VALIDA (D-17, D-19, B-1)
 
-`ComprobanteWriterPort` (declarado por `ventas`/`cuentas-por-cobrar`,
-implementado por `comprobantes`) DEBE ofrecer el camino de sistema que el flag
-`generadoPorSistema = true` bloquea para el usuario (REQ-CMP-SYS-02/03/05
-quedan intactos):
+`ComprobanteSistemaWriterPort` (declarado, poseído e implementado por
+`comprobantes`; `ventas`/`cuentas-por-cobrar` lo consumen) DEBE ofrecer el
+camino de sistema que el flag `generadoPorSistema = true` bloquea para el
+usuario (REQ-CMP-SYS-02/03/05 quedan intactos):
+
+> **Corregido 2026-07-29 (implementación de la task 2.7).** Este párrafo decía
+> `ComprobanteWriterPort` "declarado por `ventas`/`cuentas-por-cobrar`". Las dos
+> cosas estaban mal. El nombre real es `ComprobanteSistemaWriterPort`, y el port
+> lo **posee `comprobantes`**: es el módulo dueño del dominio el que define qué
+> se le puede escribir (§3.7), igual que hace con `CierreComprobanteWriterPort`.
+> Si lo declarara Ventas, cada módulo comercial nuevo traería su propio contrato
+> de escritura sobre comprobantes y el núcleo terminaría implementando N
+> variantes de lo mismo. El design ya lo decía bien ("`comprobantes` **posee** el
+> writer port"); la contradicción venía del proposal, corregido también.
 
 - **Regenerar líneas** de un comprobante de sistema (BORRADOR o CONTABILIZADO
   con período abierto) por la mecánica de §4.3: reemplazo de líneas en bloque,

@@ -11,6 +11,7 @@ import {
 import {
   AnularData,
   ComprobanteConLineas,
+  ComprobanteCrearSistemaData,
   ComprobanteCreateBorradorData,
   ComprobanteListRow,
   ComprobanteReemplazarComprobanteData,
@@ -206,6 +207,74 @@ export class PrismaComprobanteRepository extends ComprobanteRepositoryPort {
         id,
         organizationId: tenantId,
         estado: EstadoComprobante.BORRADOR,
+      },
+    });
+    return res.count;
+  }
+
+  async crearBorradorSistemaSiNoExiste(
+    tenantId: string,
+    data: ComprobanteCrearSistemaData,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ id: string }> {
+    const existente = await tx.comprobante.findUnique({
+      where: {
+        organizationId_origenTipo_origenId: {
+          organizationId: tenantId,
+          origenTipo: data.origenTipo,
+          origenId: data.origenId,
+        },
+      },
+      select: { id: true },
+    });
+    if (existente) return { id: existente.id };
+
+    const creado = await tx.comprobante.create({
+      data: {
+        organizationId: tenantId,
+        tipo: data.tipo,
+        estado: EstadoComprobante.BORRADOR,
+        generadoPorSistema: true,
+        fechaContable: data.fechaContable,
+        periodoFiscalId: data.periodoFiscalId,
+        glosa: data.glosa,
+        monedaPrincipal: data.monedaPrincipal,
+        origenTipo: data.origenTipo,
+        origenId: data.origenId,
+        createdByUserId: data.createdByUserId,
+        lineas: {
+          create: data.lineas.map((l) => ({
+            organizationId: tenantId,
+            orden: l.orden,
+            cuentaId: l.cuentaId,
+            contactoId: l.contactoId,
+            moneda: l.moneda,
+            debito: l.debito,
+            credito: l.credito,
+            tipoCambio: l.tipoCambio,
+            debitoBob: l.debitoBob,
+            creditoBob: l.creditoBob,
+            glosaLinea: l.glosaLinea,
+          })),
+        },
+      },
+      select: { id: true },
+    });
+
+    return { id: creado.id };
+  }
+
+  async eliminarBorradorSistema(
+    tenantId: string,
+    id: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<number> {
+    const res = await tx.comprobante.deleteMany({
+      where: {
+        id,
+        organizationId: tenantId,
+        estado: EstadoComprobante.BORRADOR,
+        generadoPorSistema: true,
       },
     });
     return res.count;
