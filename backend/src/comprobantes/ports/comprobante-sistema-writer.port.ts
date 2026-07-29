@@ -101,9 +101,15 @@ export interface LineaSistemaData {
 export interface CrearSistemaData {
   tenantId: string;
   tipo: TipoComprobante;
-  /** @db.Date ya construido vía `FechaContable.toDbDate()` (§4.6). */
+  /**
+   * @db.Date ya construido vía `FechaContable.toDbDate()` (§4.6).
+   *
+   * El período fiscal NO se recibe: lo resuelve el writer a partir de esta
+   * fecha. Recibir los dos abre la puerta a que no coincidan, y un comprobante
+   * archivado en un período que no le corresponde descuadra los reportes de
+   * ese mes sin que nada falle en el momento.
+   */
   fechaContable: Date;
-  periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
   origenTipo: OrigenTipoComercial;
@@ -117,9 +123,11 @@ export interface CrearSistemaData {
 export interface RegenerarSistemaData {
   tenantId: string;
   comprobanteId: string;
-  /** @db.Date. Mover la fecha a otro mes NO cambia el número ya asignado (§4.3). */
+  /**
+   * @db.Date. Mover la fecha a otro mes NO cambia el número ya asignado (§4.3).
+   * El período se resuelve desde acá, igual que en el alta.
+   */
   fechaContable: Date;
-  periodoFiscalId: string;
   glosa: string;
   monedaPrincipal: Moneda;
   lineas: LineaSistemaData[];

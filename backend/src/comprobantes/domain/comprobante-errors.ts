@@ -249,6 +249,27 @@ export class CierreComprobanteNoEliminableError extends ConflictError {
 }
 
 /**
+ * El camino de sistema comercial (`ComprobanteSistemaWriterPort`) recibió el id
+ * de un comprobante que NO es de sistema, o que no está en el estado que la
+ * operación admite.
+ *
+ * No es un error que un usuario pueda provocar desde la UI: señala un bug del
+ * módulo llamador (ventas / cobros) pasando un id equivocado. Existe para que
+ * ese bug falle ruidosamente en vez de escribir sobre el asiento manual de un
+ * contador. §4.2, defense in depth.
+ * Code: COMPROBANTE_NO_ES_DE_SISTEMA — 409.
+ */
+export class ComprobanteNoEsDeSistemaError extends ConflictError {
+  constructor(id: string, motivo: string) {
+    super(
+      'COMPROBANTE_NO_ES_DE_SISTEMA',
+      'El comprobante no puede modificarse por el camino de sistema',
+      { id, motivo },
+    );
+  }
+}
+
+/**
  * Se intenta anular un comprobante de CIERRE (`generadoPorSistema=true`) cuya
  * gestión fiscal ya está `CERRADA`. Para tocarlo, el admin pasa por el flujo de
  * reapertura de período existente (`PeriodoFiscalReopening`, §4.4) — sin bypass.

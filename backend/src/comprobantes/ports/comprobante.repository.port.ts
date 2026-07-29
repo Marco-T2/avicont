@@ -44,6 +44,26 @@ export interface ComprobanteCreateBorradorData {
   lineas: LineaPersistData[];
 }
 
+/**
+ * Alta de un comprobante por el PATH-SISTEMA (ventas, cobros).
+ *
+ * Se separa de `ComprobanteCreateBorradorData` porque lleva los tres campos que
+ * el flujo de usuario NO expone y que no tendría sentido hacer opcionales ahí:
+ * `generadoPorSistema` (lo fija el repo en `true`) y el par `origenTipo`/`origenId`,
+ * que es lo que da la idempotencia del auto-asiento (§4.9, Anti-17).
+ */
+export interface ComprobanteCrearSistemaData {
+  tipo: TipoComprobante;
+  fechaContable: Date; // @db.Date ya construido vía FechaContable.toDbDate()
+  periodoFiscalId: string;
+  glosa: string;
+  monedaPrincipal: Moneda;
+  origenTipo: string;
+  origenId: string;
+  createdByUserId: string;
+  lineas: LineaPersistData[];
+}
+
 export interface ComprobanteReemplazarComprobanteData {
   tipo: TipoComprobante;
   fechaContable: Date;
@@ -175,6 +195,39 @@ export abstract class ComprobanteRepositoryPort {
     tenantId: string,
     id: string,
     tx?: Prisma.TransactionClient,
+  ): Promise<number>;
+
+  /**
+   * Alta idempotente de un comprobante de sistema, identificado por su origen.
+   *
+   * Si ya existe un comprobante para `(tenantId, origenTipo, origenId)` lo
+   * devuelve **sin tocarlo** — para cambiarle las líneas está
+   * `reemplazarComprobante`. Correr el generador dos veces sobre el mismo
+   * origen (retry, re-guardado) deja UN solo comprobante.
+   *
+   * La guarda es el `findUnique` previo; el `@@unique(organizationId,
+   * origenTipo, origenId)` de la BD es la línea dura (§4.8: constraint + guard,
+   * nunca uno solo). Una carrera genuina —dos altas simultáneas del MISMO
+   * origen— viola el UNIQUE y falla ruidosamente, que es la conducta correcta:
+   * jamás un duplicado silencioso. En la práctica no ocurre, porque `origenId`
+   * es el id de una fila recién creada en la misma transacción.
+   */
+  abstract crearBorradorSistemaSiNoExiste(
+    tenantId: string,
+    data: ComprobanteCrearSistemaData,
+    tx: Prisma.TransactionClient,
+  ): Promise<{ id: string }>;
+
+  /**
+   * Elimina físicamente un BORRADOR **de sistema**. Acotado a
+   * `generadoPorSistema = true` además del tenant y del estado: si un bug del
+   * módulo comercial pasara el id de un comprobante manual del contador, este
+   * where no lo alcanza. Devuelve las filas afectadas (0 o 1).
+   */
+  abstract eliminarBorradorSistema(
+    tenantId: string,
+    id: string,
+    tx: Prisma.TransactionClient,
   ): Promise<number>;
 
   /**

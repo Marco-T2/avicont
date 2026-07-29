@@ -75,6 +75,8 @@ function makeRepoMock(): MockRepo {
     contabilizar: jest.fn(),
     anular: jest.fn(),
     eliminarBorrador: jest.fn(),
+    crearBorradorSistemaSiNoExiste: jest.fn(),
+    eliminarBorradorSistema: jest.fn(),
     listar: jest.fn(),
     listarAuditoria: jest.fn(),
     contarParaExport: jest.fn(),

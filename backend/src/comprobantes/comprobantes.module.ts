@@ -15,11 +15,13 @@ import { PrismaAdjuntoComprobanteRepository } from './adapters/prisma-adjunto-co
 import { PrismaCierreComprobanteWriterAdapter } from './adapters/prisma-cierre-comprobante-writer.adapter';
 import { PrismaComprobanteRepository } from './adapters/prisma-comprobante.repository';
 import { PrismaSecuenciaComprobanteAdapter } from './adapters/prisma-secuencia-comprobante';
+import { ComprobanteSistemaWriterService } from './comprobante-sistema-writer.service';
 import { ComprobantesController } from './comprobantes.controller';
 import { ComprobantesService } from './comprobantes.service';
 import { AuditedTransactionRunner } from '@/common/audited-transaction.runner';
 import { ADJUNTO_COMPROBANTE_REPOSITORY_PORT } from './ports/adjunto-comprobante.repository.port';
 import { CIERRE_COMPROBANTE_WRITER_PORT } from './ports/cierre-comprobante-writer.port';
+import { COMPROBANTE_SISTEMA_WRITER_PORT } from './ports/comprobante-sistema-writer.port';
 import { COMPROBANTE_REPOSITORY_PORT } from './ports/comprobante.repository.port';
 import { SECUENCIA_COMPROBANTE_PORT } from './ports/secuencia-comprobante.port';
 import { STORAGE_PORT } from './ports/storage.port';
@@ -89,7 +91,16 @@ import { STORAGE_PORT } from './ports/storage.port';
       provide: CIERRE_COMPROBANTE_WRITER_PORT,
       useExisting: PrismaCierreComprobanteWriterAdapter,
     },
+
+    // Path-sistema COMERCIAL (REQ-CMP-VTA-03). Lo consumen `ventas` y
+    // `cuentas-por-cobrar` para generar y mantener sus comprobantes. A
+    // diferencia del writer del cierre, este RE-VALIDA antes de persistir.
+    ComprobanteSistemaWriterService,
+    {
+      provide: COMPROBANTE_SISTEMA_WRITER_PORT,
+      useExisting: ComprobanteSistemaWriterService,
+    },
   ],
-  exports: [ComprobantesService, CIERRE_COMPROBANTE_WRITER_PORT],
+  exports: [ComprobantesService, CIERRE_COMPROBANTE_WRITER_PORT, COMPROBANTE_SISTEMA_WRITER_PORT],
 })
 export class ComprobantesModule {}
