@@ -1,0 +1,14 @@
+-- AlterEnum
+-- Valor 'VENTA' de TipoComprobante (serie V). Aditivo puro.
+--
+-- Va SOLA en su propia migration a proposito: Postgres no permite usar un
+-- valor de enum recien agregado dentro de la misma transaccion que lo agrega
+-- (error 55P04, "unsafe use of new value of enum type"). Las tablas del
+-- modulo comercial y el backfill de tipos_documento_fisico viajan en las dos
+-- migrations siguientes, que ya lo ven committeado.
+--
+-- Migration ESCRITA A MANO (CLAUDE.md §11.6). `prisma migrate dev` detecta
+-- como drift los objetos raw SQL que no viven en schema.prisma y genera
+-- DROPs de comprobantes_audit, sus triggers y los indices GIN trigram de
+-- contactos. Precedente inmediato: 20260724230000_conciliacion_perfil_fie.
+ALTER TYPE "TipoComprobante" ADD VALUE 'VENTA';

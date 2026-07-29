@@ -672,6 +672,7 @@ enum TipoComprobante {
   AJUSTE // J — ajustes, reversiones, reclasificaciones
   TRASPASO // T — movimientos entre cuentas internas
   CIERRE // C — cierre de cuentas de resultado (Fase 1.5)
+  VENTA // V — venta a cliente (módulo comercial)
 }
 
 // Estado del comprobante.

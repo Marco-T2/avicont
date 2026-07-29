@@ -17,4 +17,5 @@ export const PREFIJO_POR_TIPO: Record<TipoComprobante, string> = {
   AJUSTE: 'J',
   TRASPASO: 'T',
   CIERRE: 'C',
+  VENTA: 'V',
 };
