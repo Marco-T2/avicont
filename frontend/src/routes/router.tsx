@@ -19,6 +19,7 @@ import { LotesPage } from '@/features/granja/pages/lotes-page';
 import { LoteDetailPage } from '@/features/granja/pages/lote-detail-page';
 import { TiposRegistroPage } from '@/features/granja/pages/tipos-registro-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
+import { ItemsPage } from '@/features/items/pages/items-page';
 import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { LibroMayorPage } from '@/features/libro-mayor/pages/libro-mayor-page';
 import { BalanceGeneralPage } from '@/features/balance-general/pages/balance-general-page';
@@ -184,6 +185,14 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.gestiones.read}>
                 <CierreEjercicioPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/items',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.items.read}>
+                <ItemsPage />
               </RequirePermission>
             ),
           },
