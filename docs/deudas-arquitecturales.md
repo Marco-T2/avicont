@@ -777,22 +777,60 @@ y el archivo sigue compilando, es type-only.
 
 ---
 
-## 7. Priorización recomendada (1 mes de trabajo estimado)
+## 7. Priorización recomendada
+
+### Cola VIGENTE (actualizada 2026-07-30)
+
+Lo de abajo son las deudas **abiertas**, en el orden en que conviene atacarlas.
+Ninguna es bloqueante y ninguna va antes de la Fase 5 de `ventas-piloto`.
 
 ```
-Sesión 1: §1.1 deudas puntuales Fase 1.x        [2h]
-Sesión 2: §1.2 RBAC cache invalidation port      [3h]
-Sesión 3: §2.1 users → hexagonal                 [2h]
-Sesión 4: §2.1 auth → hexagonal                  [2h]
-Sesión 5: §2.2 feature-flags → hexagonal         [2h]
-Sesión 6: §3.2 tenants / custom-roles (si se toca)
+§2.4  fechas validadas sólo con regex → 500        [1h]   ← primera
+§2.3  trigger de auditoría: ''::boolean sin NULLIF [2h]
+§3.3  modelo de super-admin global                 [—]
+§3.1  VOs oportunísticos (Email, Password, Nit)    [—]    ← al tocar cada archivo
+§3.6  documento físico (items con trigger)         [—]
+      migración L2 de enums Prisma, incremental    [—]    ← regla de oro §5.3
 ```
 
-Total aprox: **11h de trabajo puro**, distribuido según disponibilidad.
+**Por qué §2.4 primero**: es la única de las dos nuevas que **puede dispararse
+hoy**. Un usuario escribe una fecha que no existe (`"2026-02-31"` pasa el regex) y
+recibe un **500** en vez de un 422 con mensaje claro. No corrompe ni pierde nada
+—es un mensaje de error malo— pero es lo más barato de arreglar de toda la lista:
+reusar `EsFechaContableIso` (`backend/src/ventas/dto/es-fecha-contable-iso.ts`)
+en los 14 DTOs restantes. Un import y un decorador por archivo, sin migración y
+sin cambio de contrato.
+
+**Por qué §2.3 después**: verificado que **no es alcanzable hoy** (todos los call
+sites pasan `tx`). El fix es una línea, pero su costo real es la **migración**,
+que hay que escribir a mano con el protocolo §11.6 porque recrea la función del
+trigger — y `prisma migrate dev` está bloqueado en este repo. Decisión de Marco
+(2026-07-29): change propio, no mezclado con una feature.
+
+### Histórico — cola original (todas CERRADAS)
+
+```
+§1.1 deudas puntuales Fase 1.x        [2h]   ✅ 2026-04-25
+§1.2 RBAC cache invalidation port     [3h]   ✅ 2026-04-25
+§2.1 users → hexagonal                [2h]   ✅ 2026-04-24
+§2.1 auth → hexagonal                 [2h]   ✅ 2026-04-24
+§2.2 feature-flags → hexagonal        [2h]   ✅ 2026-04-24
+§3.2 tenants / custom-roles                  ✅ 2026-04-25 (a/b/c/d)
+```
 
 ---
 
-**Última revisión**: 2026-06-01 (§3.4 (A8) fix parcial aplicado PR #27 +
+**Última revisión**: 2026-07-30 — se suman **§2.3** (trigger de
+`comprobantes_audit` casteando `''::boolean` sin `NULLIF`, latente) y **§2.4**
+(14 DTOs con fechas validadas sólo por regex ⇒ `RangeError` crudo ⇒ 500
+alcanzable hoy), detectadas al construir la Fase 4 de `ventas-piloto`. La cola
+del §7 se rehizo: la original estaba entera cerrada y seguía figurando como
+pendiente, así que quien la leyera trabajaba sobre una lista falsa. **No es
+deuda pero se anota**: el umbral de RSS del health check pasó de 300 a 512 MB
+(`fix(health)`, PR #309) porque 300 ya lo excedía `main` — si el consumo sigue
+creciendo ~6 MB por módulo, revisarlo de nuevo alrededor de los 30 módulos.
+
+**Revisión previa**: 2026-06-01 (§3.4 (A8) fix parcial aplicado PR #27 +
 §3.5 (A9) cerrada PR #25 — reconciliado contra `schema.prisma` real durante
 el slice de frontend granja). Cierres previos (2026-04-25): §1.1 + §1.2 +
 §2.1 A/B + §2.1 remanente + §2.2 + §3.2.a + §3.2.b + §3.2.c + §3.2.d;
