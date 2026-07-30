@@ -69,16 +69,24 @@ export function NavList({
   const seccionesVisibles = useMemo(
     () =>
       NAV_SECTIONS.map((s) => {
+        // leadingGroups pasa por el MISMO pipeline que groups: un solo predicado
+        // y un solo colapso-a-cero, para que no existan dos mecanismos de grupo.
+        const filtrarGrupos = (grupos: NavGroup[] | undefined) =>
+          (grupos ?? [])
+            .map((g) => ({ group: g, visibleItems: g.items.filter(pasaFiltro) }))
+            .filter((g) => g.visibleItems.length > 0);
+        const leadingGroups = filtrarGrupos(s.leadingGroups);
         const looseItems = s.items.filter(pasaFiltro);
-        const groups = (s.groups ?? [])
-          .map((g) => ({ group: g, visibleItems: g.items.filter(pasaFiltro) }))
-          .filter((g) => g.visibleItems.length > 0);
+        const groups = filtrarGrupos(s.groups);
         const trailingItems = (s.trailingItems ?? []).filter(pasaFiltro);
+        // El total DEBE contar leadingGroups: sin eso, una sección cuyo único
+        // contenido visible fuera un grupo inicial desaparecería entera.
         const total =
+          leadingGroups.reduce((n, g) => n + g.visibleItems.length, 0) +
           looseItems.length +
           groups.reduce((n, g) => n + g.visibleItems.length, 0) +
           trailingItems.length;
-        return { section: s, looseItems, groups, trailingItems, total };
+        return { section: s, leadingGroups, looseItems, groups, trailingItems, total };
       }).filter((s) => s.total > 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [has, verticalActivo, packsActivos, userRoles],
@@ -109,7 +117,7 @@ export function NavList({
       {/* Ítem suelto Panel — siempre arriba, sin header (D-01). */}
       <NavItemSlot item={PANEL_ITEM} onItemClick={onItemClick} collapsed={collapsed} />
 
-      {seccionesVisibles.map(({ section, looseItems, groups, trailingItems }, idx) => (
+      {seccionesVisibles.map(({ section, leadingGroups, looseItems, groups, trailingItems }, idx) => (
         <div key={section.id} className="space-y-1">
           {debeMostrarHeader(section) && (
             <h2 className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -121,27 +129,30 @@ export function NavList({
             <div className="mx-2 my-1 border-t border-sidebar-border" aria-hidden="true" />
           )}
 
+          {/* Orden de render (REQ-SB-16): leadingGroups → items → groups → trailingItems. */}
+          {leadingGroups.map(({ group, visibleItems }) => (
+            <NavGroupSlot
+              key={group.id}
+              group={group}
+              visibleItems={visibleItems}
+              onItemClick={onItemClick}
+              collapsed={collapsed}
+            />
+          ))}
+
           {looseItems.map((item) => (
             <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={collapsed} />
           ))}
 
-          {groups.map(({ group, visibleItems }) =>
-            collapsed ? (
-              <NavGroupRail
-                key={group.id}
-                group={group}
-                visibleItems={visibleItems}
-                onItemClick={onItemClick}
-              />
-            ) : (
-              <NavGroupBlock
-                key={group.id}
-                group={group}
-                visibleItems={visibleItems}
-                onItemClick={onItemClick}
-              />
-            ),
-          )}
+          {groups.map(({ group, visibleItems }) => (
+            <NavGroupSlot
+              key={group.id}
+              group={group}
+              visibleItems={visibleItems}
+              onItemClick={onItemClick}
+              collapsed={collapsed}
+            />
+          ))}
 
           {trailingItems.map((item) => (
             <NavItemSlot key={item.to} item={item} onItemClick={onItemClick} collapsed={collapsed} />
@@ -156,6 +167,16 @@ interface GroupProps {
   group: NavGroup;
   visibleItems: NavItem[];
   onItemClick?: (() => void) | undefined;
+}
+
+// Selector único Rail/Block para leadingGroups Y groups: las dos colecciones
+// comparten los mismos componentes de grupo — un segundo mecanismo habría que
+// mantenerlo sincronizado con el primero.
+function NavGroupSlot({
+  collapsed,
+  ...props
+}: GroupProps & { collapsed: boolean }): React.JSX.Element {
+  return collapsed ? <NavGroupRail {...props} /> : <NavGroupBlock {...props} />;
 }
 
 // Prefijo, no igualdad: en /conciliacion/:id el grupo sigue contando como

@@ -17,15 +17,28 @@ import * as navItemsModule from './nav-items';
 import { NAV_ITEMS, NAV_SECTIONS, PANEL_ITEM, type NavItem } from './nav-items';
 import { NavList } from './nav-list';
 
-/** Ítems de una sección en orden de render: sueltos → grupos → sueltos finales. */
+/** Ítems de una sección en orden de render: grupos iniciales → sueltos → grupos → sueltos finales (REQ-SB-16). */
 function itemsDeSeccion(id: string): NavItem[] {
   const s = NAV_SECTIONS.find((x) => x.id === id);
   if (!s) return [];
-  return [...s.items, ...(s.groups ?? []).flatMap((g) => g.items), ...(s.trailingItems ?? [])];
+  return [
+    ...(s.leadingGroups ?? []).flatMap((g) => g.items),
+    ...s.items,
+    ...(s.groups ?? []).flatMap((g) => g.items),
+    ...(s.trailingItems ?? []),
+  ];
 }
 
+// Busca en las DOS colecciones de grupos: un guard que solo mira `groups`
+// deja a `leadingGroups` fuera de su vista y pierde la mitad del árbol.
 function grupo(seccionId: string, grupoId: string) {
-  return NAV_SECTIONS.find((s) => s.id === seccionId)?.groups?.find((g) => g.id === grupoId);
+  const s = NAV_SECTIONS.find((x) => x.id === seccionId);
+  return [...(s?.leadingGroups ?? []), ...(s?.groups ?? [])].find((g) => g.id === grupoId);
+}
+
+/** Todos los grupos de una sección, en orden de render (leadingGroups primero). */
+function gruposDeSeccion(s: (typeof NAV_SECTIONS)[number]) {
+  return [...(s.leadingGroups ?? []), ...(s.groups ?? [])];
 }
 
 /**
@@ -33,7 +46,7 @@ function grupo(seccionId: string, grupoId: string) {
  * deben depender del estado de plegado — expanden todo y miden solo el filtro.
  */
 function expandAllGroups(): void {
-  const ids = NAV_SECTIONS.flatMap((s) => (s.groups ?? []).map((g) => g.id));
+  const ids = NAV_SECTIONS.flatMap((s) => gruposDeSeccion(s).map((g) => g.id));
   act(() => {
     useSidebarStore.setState({ openGroups: Object.fromEntries(ids.map((id) => [id, true])) });
   });
@@ -142,10 +155,11 @@ describe('NAV_SECTIONS — estructura de datos', () => {
     expect(PANEL_ITEM.to).toBe('/');
   });
 
-  it('NAV_ITEMS derivado === [PANEL_ITEM, ...sueltos, ...grupos, ...sueltos finales]', () => {
+  it('NAV_ITEMS derivado === [PANEL_ITEM, ...grupos iniciales, ...sueltos, ...grupos, ...sueltos finales]', () => {
     const expected = [
       PANEL_ITEM,
       ...NAV_SECTIONS.flatMap((s) => [
+        ...(s.leadingGroups ?? []).flatMap((g) => g.items),
         ...s.items,
         ...(s.groups ?? []).flatMap((g) => g.items),
         ...(s.trailingItems ?? []),
@@ -154,9 +168,10 @@ describe('NAV_SECTIONS — estructura de datos', () => {
     expect(NAV_ITEMS).toEqual(expected);
   });
 
-  // T-02: orden interno de Contabilidad (sueltos → grupos → sueltos finales)
+  // T-02: orden interno de Contabilidad (grupos iniciales → sueltos → grupos → sueltos finales)
   it('sección contabilidad tiene los ítems en el orden correcto', () => {
     expect(itemsDeSeccion('contabilidad').map((i) => i.to)).toEqual([
+      '/items',
       '/comprobantes',
       '/libros/diario',
       '/libros/mayor',
@@ -1031,10 +1046,12 @@ describe('NAV_SECTIONS — subgrupos colapsables', () => {
   });
 
   it('cada grupo declara id, label e icono, y ningún id se repite', () => {
-    const ids = NAV_SECTIONS.flatMap((s) => (s.groups ?? []).map((g) => g.id));
+    // Recorre leadingGroups Y groups: el id es clave de plegado persistido,
+    // una colisión entre las dos colecciones pisaría preferencias del usuario.
+    const ids = NAV_SECTIONS.flatMap((s) => gruposDeSeccion(s).map((g) => g.id));
     expect(new Set(ids).size).toBe(ids.length);
     for (const s of NAV_SECTIONS) {
-      for (const g of s.groups ?? []) {
+      for (const g of gruposDeSeccion(s)) {
         expect(g.label.length).toBeGreaterThan(0);
         expect(g.items.length).toBeGreaterThan(0);
         // El icono es OBLIGATORIO: en modo riel es lo ÚNICO que representa al
@@ -1348,6 +1365,200 @@ describe('NavList — scroll propio', () => {
 // Existe igual porque nada cubría estas tres cadenas y por eso sobrevivieron
 // intactas a un PR que iba justo de esto.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// REQ-SB-16 (leadingGroups) + REQ-SB-15 (grupo comercial) — change ventas-piloto.
+//
+// PA-2 (decisión de producto firmada): el uso diario del piloto es comercial,
+// así que el grupo `comercial` abre la sección Contabilidad ANTES del ítem
+// suelto /comprobantes. Como `items` estaba documentado como "arriba de los
+// grupos", eso exige el campo nuevo `leadingGroups` — un NavGroup completo sin
+// semántica propia: mismo gating derivado, mismo plegado, mismo riel.
+//
+// ALCANCE PARCIAL deliberado: el grupo arranca solo con Ítems. Ventas y Cobros
+// entran cuando existan sus pantallas (main siempre deployable, §9.2).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('NAV_SECTIONS — leadingGroups y grupo comercial (estructura)', () => {
+  it('contabilidad declara el grupo comercial en leadingGroups, con icono', () => {
+    const c = NAV_SECTIONS.find((s) => s.id === 'contabilidad');
+    expect((c?.leadingGroups ?? []).map((g) => g.id)).toEqual(['comercial']);
+    const comercial = c?.leadingGroups?.[0];
+    expect(comercial?.label).toBe('Comercial');
+    // Obligatorio (REQ-SB-13): en el riel el icono es lo ÚNICO que representa al grupo.
+    expect(comercial?.icon).toBeDefined();
+  });
+
+  it('el grupo comercial contiene /items (versión parcial: Ventas y Cobros entran con sus pantallas)', () => {
+    expect(grupo('contabilidad', 'comercial')?.items.map((i) => i.to)).toEqual(['/items']);
+  });
+
+  it('el ítem Ítems declara permiso, vertical CONTABILIDAD y NINGÚN pack (FREE, D-01)', () => {
+    const item = NAV_ITEMS.find((i) => i.to === '/items');
+    expect(item).toBeDefined();
+    expect(item?.label).toBe('Ítems');
+    expect(item?.requiredPermission).toBe('contabilidad.items.read');
+    expect(item?.vertical).toBe('CONTABILIDAD');
+    expect(item?.pack).toBeUndefined();
+  });
+
+  // Guard anti-drift espejo del de Bancos: el grupo comercial es FREE — si
+  // alguien le mete un ítem con pack, la superficie del grupo dejaría de
+  // aparecer/desaparecer como la unidad que REQ-SB-15 firma.
+  it('ningún ítem del grupo comercial declara pack', () => {
+    for (const item of grupo('contabilidad', 'comercial')?.items ?? []) {
+      expect(
+        item.pack,
+        `"${item.label}" (${item.to}) vive en el grupo comercial (FREE) y NO debe declarar pack`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('ninguna otra sección declara leadingGroups (campo aditivo)', () => {
+    for (const s of NAV_SECTIONS) {
+      if (s.id === 'contabilidad') continue;
+      expect(
+        s.leadingGroups,
+        `la sección "${s.id}" no debe declarar leadingGroups`,
+      ).toBeUndefined();
+    }
+  });
+
+  it('NAV_ITEMS aplana /items ANTES de /comprobantes (mismo orden que el render)', () => {
+    const tos = NAV_ITEMS.map((i) => i.to);
+    expect(tos.indexOf('/items')).toBeGreaterThan(-1);
+    expect(tos.indexOf('/items')).toBeLessThan(tos.indexOf('/comprobantes'));
+  });
+});
+
+describe('NavList — leadingGroups (REQ-SB-16) y grupo comercial (REQ-SB-15, render)', () => {
+  beforeEach(() => {
+    collapseAllGroups();
+    mockPermissions({ isOwner: true });
+    mockVertical('CONTABILIDAD');
+    mockPacks(['contabilidad.conciliacion']);
+  });
+
+  /** Orden real de aparición en el DOM de links y headers de grupo del nav. */
+  function ordenDom(container: HTMLElement): string[] {
+    return [...container.querySelectorAll('nav a, nav button[aria-expanded]')].map(
+      (el) => el.getAttribute('aria-label') ?? el.textContent ?? '',
+    );
+  }
+
+  it('expandido: header Comercial ANTES que Comprobantes, y Comprobantes antes que header Libros', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    const orden = ordenDom(container);
+    const iComercial = orden.findIndex((t) => t.includes('Comercial'));
+    const iComprobantes = orden.findIndex((t) => t.includes('Comprobantes'));
+    const iLibros = orden.findIndex((t) => t.includes('Libros'));
+    expect(iComercial).toBeGreaterThan(-1);
+    expect(iComprobantes).toBeGreaterThan(-1);
+    expect(iLibros).toBeGreaterThan(-1);
+    expect(iComercial).toBeLessThan(iComprobantes);
+    expect(iComprobantes).toBeLessThan(iLibros);
+  });
+
+  it('sin contabilidad.items.read: el grupo desaparece ENTERO y Comprobantes vuelve a abrir la sección', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.asientos.read'] });
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    // Grupo entero ausente, header incluido (REQ-SB-11, sin predicado nuevo).
+    expect(screen.queryByRole('button', { name: /Comercial/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ítems')).not.toBeInTheDocument();
+    // Comprobantes es lo primero de la sección (después del Panel, que va suelto).
+    const orden = ordenDom(container).filter((t) => !t.includes('Panel'));
+    expect(orden[0]).toContain('Comprobantes');
+  });
+
+  it('vertical GRANJA con el permiso: el ítem Ítems NO está en el DOM (cascada AND)', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.items.read'] });
+    mockVertical('GRANJA');
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.queryByText('Ítems')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Comercial/ })).not.toBeInTheDocument();
+  });
+
+  it('plegado por defecto: header del grupo visible, Ítems fuera del DOM', () => {
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /Comercial/ })).toBeInTheDocument();
+    expect(screen.queryByText('Ítems')).not.toBeInTheDocument();
+  });
+
+  it('el grupo arranca abierto cuando contiene la ruta activa (match por prefijo)', () => {
+    render(
+      <Wrapper initialEntries={['/items']}>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /Comercial/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getAllByText('Ítems').length).toBeGreaterThan(0);
+  });
+
+  it('la preferencia guardada gana sobre la ruta activa (mismo plegado que groups)', () => {
+    act(() => {
+      useSidebarStore.setState({ openGroups: { comercial: false } });
+    });
+    render(
+      <Wrapper initialEntries={['/items']}>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /Comercial/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('riel de 64px: el icono de Comercial precede a los de libros, eeff, bancos y maestros', () => {
+    const { container } = render(
+      <Wrapper>
+        <NavList collapsed />
+      </Wrapper>,
+    );
+    const labels = [...container.querySelectorAll('nav button')].map(
+      (el) => el.getAttribute('aria-label') ?? '',
+    );
+    const iComercial = labels.indexOf('Comercial');
+    expect(iComercial).toBeGreaterThan(-1);
+    for (const label of ['Libros', 'Estados financieros', 'Bancos', 'Maestros']) {
+      const i = labels.indexOf(label);
+      expect(i, `el grupo "${label}" debe estar en el riel`).toBeGreaterThan(-1);
+      expect(iComercial, `Comercial debe preceder a "${label}"`).toBeLessThan(i);
+    }
+  });
+
+  it('secciones sin leadingGroups no cambian: Granja renderiza sus ítems planos y en orden', () => {
+    mockVertical('GRANJA');
+    const { container } = render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    const links = [...container.querySelectorAll('nav a')].map((el) => el.textContent ?? '');
+    // La sección Granja va justo después del Panel; Administración le sigue intacta.
+    expect(links.slice(0, 4)).toEqual(['Panel', 'Dashboard', 'Mis Lotes', 'Tipos de Registro']);
+    // Sin grupos: ningún header colapsable en todo el nav (Granja no declara ninguno).
+    expect(container.querySelectorAll('nav button[aria-expanded]').length).toBe(0);
+  });
+});
+
 describe('NavList — piso táctil de 44px (pointer: coarse)', () => {
   beforeEach(() => {
     mockPermissions({ isOwner: true });

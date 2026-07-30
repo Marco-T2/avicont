@@ -27,6 +27,8 @@ import {
   Scale,
   Settings,
   Shield,
+  ShoppingCart,
+  Tags,
   ToggleRight,
   TrendingUp,
   Users,
@@ -110,8 +112,17 @@ export interface NavSection {
    */
   kind: 'modulo' | 'transversal';
   /**
-   * Ítems sueltos que van ARRIBA de los grupos, sin plegado. Reservado para los
-   * accesos de uso diario: enterrarlos tras un click sería un retroceso.
+   * Subgrupos colapsables renderizados ANTES de `items` (REQ-SB-16). Un
+   * NavGroup completo, sin semántica propia: mismo gating derivado, mismo
+   * plegado persistido y mismo flyout de riel que `groups` — solo cambia la
+   * posición. Existe porque `items` está reservado para "arriba de los grupos"
+   * y PA-2 exige un grupo que abra la sección antes del suelto de uso diario.
+   */
+  leadingGroups?: NavGroup[];
+  /**
+   * Ítems sueltos que van ARRIBA de los grupos (`groups`), sin plegado.
+   * Reservado para los accesos de uso diario: enterrarlos tras un click sería
+   * un retroceso.
    */
   items: NavItem[];
   /** Subgrupos colapsables, renderizados DESPUÉS de `items`. */
@@ -137,7 +148,30 @@ export const NAV_SECTIONS: NavSection[] = [
     id: 'contabilidad',
     label: 'Contabilidad',
     kind: 'modulo',
-    // Suelto arriba: es la pantalla de uso diario del contador.
+    // ─── Comercial ANTES del suelto /comprobantes (PA-2, REQ-SB-15): el piloto
+    // apunta a que el uso diario sea comercial y el asiento manual la excepción.
+    // VERSIÓN PARCIAL deliberada: solo Ítems por ahora — un ítem de nav que
+    // apunta a una ruta inexistente es un link roto en producción (§9.2, main
+    // siempre deployable). El grupo se completa con Ventas y Cobros cuando
+    // existan sus pantallas; van ANTES de Ítems en el orden final.
+    // Ningún ítem declara `pack`: Ventas es FREE, núcleo del vertical (D-01).
+    leadingGroups: [
+      {
+        id: 'comercial',
+        label: 'Comercial',
+        icon: ShoppingCart,
+        items: [
+          {
+            to: '/items',
+            label: 'Ítems',
+            icon: Tags,
+            requiredPermission: PERMISSIONS.contabilidad.items.read,
+            vertical: 'CONTABILIDAD',
+          },
+        ],
+      },
+    ],
+    // Suelto arriba (de `groups`): es la pantalla de uso diario del contador.
     items: [
       {
         to: '/comprobantes',
@@ -420,11 +454,13 @@ export const NAV_SECTIONS: NavSection[] = [
 
 // Export derivado para retrocompat de tests (guards anti-drift) y para que
 // los consumidores que iteran el universo completo de ítems sigan funcionando.
-// Aplana en el MISMO orden en que NavList renderiza: sueltos → grupos → finales.
+// Aplana en el MISMO orden en que NavList renderiza:
+// grupos iniciales → sueltos → grupos → finales (REQ-SB-16).
 // NavList itera NAV_SECTIONS directo (no este derivado) — D-05.
 export const NAV_ITEMS: NavItem[] = [
   PANEL_ITEM,
   ...NAV_SECTIONS.flatMap((s) => [
+    ...(s.leadingGroups ?? []).flatMap((g) => g.items),
     ...s.items,
     ...(s.groups ?? []).flatMap((g) => g.items),
     ...(s.trailingItems ?? []),
