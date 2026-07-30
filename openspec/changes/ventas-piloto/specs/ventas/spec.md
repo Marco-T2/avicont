@@ -465,13 +465,44 @@ catalogado, #291).
 
 ## Códigos de error (nuevos, namespace `VENTA_*`)
 
+> **Reconciliado con el código el 2026-07-29, al cerrar la Fase 4.** Esta tabla
+> listaba 5 códigos y la implementación tiene **16**. Los 11 que faltaban no son
+> invención: son las condiciones que los requisitos ya exigen (period lock,
+> multi-tenant, ítem/contacto inválidos) y que la tabla nunca nombró. El HTTP sale
+> de la subclase de `DomainError` (`NotFoundError` 404, `InvalidStateError` 422,
+> `ConflictError` 409), no se elige suelto.
+>
+> Los dos `500` son deliberados: señalan **bugs de dominio**, no errores del
+> usuario. `montoTotal` y los subtotales los calcula el backend, así que un
+> descuadre o un subtotal negativo sólo pueden venir de un defecto del caller —
+> devolver 422 los disfrazaría de dato inválido del cliente.
+
 | Código | HTTP | Condición |
 |---|---|---|
 | `VENTA_VENCIMIENTO_REQUERIDO` | 422 | CREDITO sin `fechaVencimiento` (o CONTADO con ella) |
 | `VENTA_CONCEPTO_NO_CONFIGURADO` | 422 | `cuentasPorCobrarId`/`ventasId` sin mapear (B-12) |
-| `VENTA_CUENTA_DESTINO_NO_ELEGIBLE` | 422 | cuenta destino del CONTADO fuera del criterio de efectivo/equivalentes (PA-1, criterio en REQ-CXC-02) |
+| `VENTA_CUENTA_DESTINO_NO_ELEGIBLE` | 422 | cuenta destino del CONTADO fuera del criterio de efectivo/equivalentes (PA-1, criterio en REQ-CXC-02); incluye el CONTADO sin `cuentaDestinoId` |
 | `VENTA_CUENTA_SNAPSHOT_INACTIVA` | 422 | cuenta del snapshot inactiva o no-detalle al generar el asiento |
 | `VENTA_ANULADA_NO_EDITABLE` | 409 | editar/anular una venta ya anulada (§4.7) |
+| `VENTA_NO_ENCONTRADA` | 404 | venta inexistente **o de otro tenant** — 404 y no 403, para no confirmar que existe (§4.2, REQ-VTA-08) |
+| `VENTA_CONTACTO_NO_ENCONTRADO` | 404 | el `contactoId` no existe en el tenant |
+| `VENTA_ITEM_NO_ENCONTRADO` | 404 | un `itemId` de las líneas no existe en el tenant (REQ-VTA-08) |
+| `VENTA_CONTACTO_INACTIVO` | 422 | el contacto existe pero está inactivo |
+| `VENTA_ITEM_INACTIVO` | 422 | un ítem de las líneas está inactivo (`ItemsReaderPort` devuelve `{id, activo}`) |
+| `VENTA_GESTION_NO_ABIERTA` | 422 | no existe período fiscal para la `fechaContable` (sin gestión creada) — REQ-VTA-09 |
+| `VENTA_PERIODO_NO_ABIERTO` | 409 | el período de la `fechaContable` está `CERRADO`; el mensaje nombra el flujo de reapertura formal. **Sin bypass de admin** (REQ-VTA-09) |
+| `VENTA_NO_ES_BORRADOR` | 409 | eliminar o contabilizar una venta que ya no está en BORRADOR |
+| `VENTA_ASIENTO_SIN_MONTO` | 422 | la venta no mueve monto alguno; §4.1 exige suma total > 0 |
+| `VENTA_ASIENTO_DESCUADRADO` | 500 | `montoTotal` ≠ Σ subtotales — **bug de dominio**, los dos los calcula el backend |
+| `VENTA_LINEA_SUBTOTAL_NEGATIVO` | 500 | subtotal negativo — **bug de dominio**, §4.1 exige débitos y créditos ≥ 0 |
+
+Códigos de **otros namespaces** que salen por endpoints de ventas, porque la
+validación vive en el writer del núcleo y NO se duplicó (Anti-01):
+
+| Código | HTTP | Condición |
+|---|---|---|
+| `COMPROBANTE_ANULAR_MOTIVO_INVALIDO` | 422 | motivo de anulación con menos de 10 caracteres significativos (§4.7) |
+| `COMPROBANTE_ANULAR_BORRADOR_NO_PERMITIDO` | 409 | anular una venta en BORRADOR — se elimina, no se anula |
 
 ## Preguntas abiertas
 

@@ -232,6 +232,91 @@ Entregada en 5 commits verdes sobre `main` (`f60711b..27b463b`):
   existen y son tenant-scoped) o agregamos `settings.*` al catálogo.
 - Modelo de super-admin global (ver §3.3 nueva).
 
+### 2.3 El trigger de `comprobantes_audit` castea `''::boolean` sin proteger
+
+**Detectado** 2026-07-29, construyendo la Fase 4 de `ventas-piloto`. Preexistente
+desde la migración `20260527190718_comprobantes_anulacion_as_flag_and_audit_triggers`.
+**Latente: hoy NO es alcanzable.** Fix acordado con Marco: change propio, después
+de la Fase 4 — no se mezcla con una feature de ventas.
+
+`AuditedTransactionRunner` setea los GUC con `set_config(..., true)`, o sea
+`is_local = true`: transaction-scoped. Pero Postgres tiene una particularidad con
+los GUC **custom**: una vez que los tocás, al terminar la TX no vuelven a
+"no definidos" sino a **string vacío**, y quedan así en esa conexión del pool.
+
+Entonces, en `trg_comprobantes_audit`:
+
+```sql
+-- línea 152 — NO protegida: el cast revienta antes de que el COALESCE ayude
+COALESCE(current_setting('app.audit_during_reopening', true)::boolean, false),
+-- línea 153 — SÍ protegida, con el NULLIF que a la de arriba le falta
+NULLIF(current_setting('app.audit_reapertura_id', true), '')::uuid,
+```
+
+Un write a `comprobantes` / `lineas_comprobante` **fuera** del runner auditado,
+sobre una conexión del pool que antes corrió una TX auditada, encuentra `''` y
+falla con **22P02** (`invalid input syntax for type boolean`) → 500. El error no
+nombra la causa: apunta al trigger, no al GUC vacío.
+
+**Por qué no es alcanzable hoy** (verificado, no supuesto): todos los call sites
+de escritura de comprobantes pasan `tx`, y ese `tx` sale siempre del runner.
+`CierreComprobanteWriterPort` declara `tx?: Prisma.TransactionClient` **opcional**,
+así que el tipo lo PERMITE, pero ningún consumidor lo ejercita.
+
+**Por qué igual hay que arreglarlo**: la asimetría con la línea 153 se lee como
+olvido, no como decisión, y el día que alguien escriba a comprobantes sin el
+runner se come un 500 opaco. Fix de una línea — el mismo `NULLIF` de la 153:
+
+```sql
+COALESCE(NULLIF(current_setting('app.audit_during_reopening', true), '')::boolean, false),
+```
+
+**Cuidado al hacerlo**: exige migración que recree la función del trigger, y
+`prisma migrate dev` **no se puede usar en este repo** (pide resetear la base de
+desarrollo porque `20260726010000_arranque_anulacion` fue editada a mano y el
+checksum ya no coincide). Va escrita a mano con el protocolo §11.6, como las
+migraciones de los perfiles de extracto y la de `ventas.cuentaDestinoId`.
+
+**Corolario para tests, este SÍ vigente hoy**: todo cleanup que borre
+comprobantes debe correr **dentro** del runner auditado. Ya está resuelto así en
+`backend/src/ventas/ventas.service.integration.spec.ts`.
+
+### 2.4 Fechas validadas SÓLO con regex → `RangeError` crudo → 500
+
+**Detectado** 2026-07-29, construyendo la Fase 4 de `ventas-piloto`. Preexistente,
+**alcanzable hoy por cualquier usuario**.
+
+`"2026-02-31"` es un string bien formateado y una fecha que no existe. Un DTO que
+valida con `@Matches(/^\d{4}-\d{2}-\d{2}$/)` lo acepta, y después
+`FechaContable.fromIso` lanza un **`RangeError` crudo**:
+
+```
+RangeError: FechaContable: día inválido 31 para 2026-02 (máx 28)
+```
+
+Verificado ejecutándolo, no leyéndolo: **no es un `DomainError`** (no tiene
+`httpStatus`), así que el `GlobalExceptionFilter` no lo mapea al formato de §6.4
+y sale un **500**. El usuario recibe un error de servidor por un dato de entrada
+inválido, que es exactamente lo que §6.2 existe para evitar.
+
+**15 DTOs afectados** (al 2026-07-29):
+
+| Módulo | Archivos | Severidad |
+|---|---|---|
+| `comprobantes` | `create-comprobante.dto.ts`, `listar-comprobantes.dto.ts` | **alta** — camino de escritura |
+| `conciliacion-bancaria` | `declarar-arranque.dto.ts` + 4 query DTOs | **alta** en `declarar-arranque` (escritura), baja en los query |
+| `reportes` | 9 query DTOs | baja — 500 en un GET con parámetro malo |
+
+**Ya resuelto donde se tocó**: `ventas` valida con el decorador propio
+`EsFechaContableIso` (`backend/src/ventas/dto/es-fecha-contable-iso.ts`), que
+construye la `FechaContable` y rechaza con 422. `documentos-fisicos` y `granja`
+usan `IsDateString`, que también cubre el caso.
+
+**Fix**: reusar `EsFechaContableIso` en los 15. No requiere migración ni cambia
+contratos — sólo convierte un 500 en el 422 que corresponde. Aplicar por la
+**regla de oro** del CLAUDE.md (al tocar un módulo para agregar features, migrar
+primero sus errores), o de una sola vez: son 15 archivos y un import.
+
 ---
 
 ## 3. Baja prioridad — nice to have

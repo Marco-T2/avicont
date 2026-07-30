@@ -1830,6 +1830,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ventas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar ventas del tenant con paginación y filtros (contactoId, rango de fechaContable). El estado de cada venta es el de su comprobante. */
+        get: operations["VentasController_listar"];
+        put?: never;
+        /** Guardar borrador de venta. Crea el documento Y su comprobante BORRADOR en la misma transacción (REQ-VTA-01). Los totales los calcula el backend (REQ-VTA-03). */
+        post: operations["VentasController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ventas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle de la venta con sus líneas. Ajena → 404 (REQ-VTA-08). */
+        get: operations["VentasController_obtener"];
+        /** Edición full-state (D-17): reemplaza la venta en bloque y regenera el asiento preservando id y número. Aplica a BORRADOR y a CONTABILIZADO en período abierto (REQ-VTA-06). */
+        put: operations["VentasController_editar"];
+        post?: never;
+        /** Eliminar físicamente un BORRADOR junto con su comprobante (REQ-VTA-01). Un CONTABILIZADO no se borra: se anula con /anular (§4.7). */
+        delete: operations["VentasController_eliminarBorrador"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ventas/{id}/contabilizar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Contabilizar la venta: asigna número de la serie propia V{YY}{MM}-{correlativo} y re-valida snapshots y cuenta destino (REQ-VTA-05). */
+        post: operations["VentasController_contabilizar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ventas/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular la venta (§4.7): flag anulado con motivo, comprobante y número preservados para siempre; desvincula todas las aplicaciones de cobros (REQ-VTA-07). */
+        post: operations["VentasController_anular"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/libros/diario": {
         parameters: {
             query?: never;
@@ -3543,6 +3614,237 @@ export interface components {
             cantidadPorDefecto?: string;
             /** Format: uuid */
             cuentaIngresoId?: string | null;
+        };
+        CreateLineaVentaDto: {
+            /**
+             * Format: uuid
+             * @description FK viva al catálogo de ítems.
+             */
+            itemId: string;
+            /**
+             * @description Snapshot editable por línea: el texto al momento de vender (D-28).
+             * @example Pollo entero
+             */
+            descripcion: string;
+            /**
+             * @description Decimal(18,6) como string, > 0.
+             * @example 5
+             */
+            cantidad: string;
+            /**
+             * @description Decimal(18,6) como string, ≥ 0 (un ítem bonificado va con 0: queda en el documento sin emitir línea contable). Precio PACTADO, no el sugerido vigente (D-28).
+             * @example 6.305
+             */
+            precioUnitario: string;
+        };
+        CreateVentaDto: {
+            /**
+             * Format: uuid
+             * @description Cliente de la venta.
+             */
+            contactoId: string;
+            /**
+             * @description Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @example CONTADO
+             * @enum {string}
+             */
+            condicionPago: "CONTADO" | "CREDITO";
+            /**
+             * @description Obligatoria en CREDITO, prohibida en CONTADO (REQ-VTA-02) — esa regla cruzada la valida el service con VENTA_VENCIMIENTO_REQUERIDO.
+             * @example 2026-08-15
+             */
+            fechaVencimiento?: string;
+            /** @example Venta de pollo faenado */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino ELEGIDA de la venta CONTADO (PA-1), validada como efectivo/equivalente. En CREDITO se ignora: la contrapartida es CxC.
+             */
+            cuentaDestinoId?: string;
+            lineas: components["schemas"]["CreateLineaVentaDto"][];
+        };
+        LineaVentaResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * @description 1..N dentro de la venta.
+             * @example 1
+             */
+            orden: number;
+            /** Format: uuid */
+            itemId: string;
+            /** @example Pollo entero */
+            descripcion: string;
+            /** @example 5 */
+            cantidad: string;
+            /** @example 6.305 */
+            precioUnitario: string;
+            /**
+             * Format: uuid
+             * @description Snapshot: cuenta resuelta al crear la línea (D-28).
+             */
+            cuentaIngresoId: string;
+            /**
+             * @description Calculado por el backend (REQ-VTA-03).
+             * @example 31.53
+             */
+            subtotal: string;
+        };
+        VentaResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contactoId: string;
+            /**
+             * @description YYYY-MM-DD, calendario puro (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /** @enum {string} */
+            condicionPago: "CONTADO" | "CREDITO";
+            /** @example 2026-08-15 */
+            fechaVencimiento: string | null;
+            /** @example Venta de pollo faenado */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino elegida (solo CONTADO, PA-1).
+             */
+            cuentaDestinoId: string | null;
+            /**
+             * @description Σ de subtotales redondeados (§4.5).
+             * @example 31.53
+             */
+            montoTotal: string;
+            /**
+             * Format: uuid
+             * @description Comprobante que da su estado a la venta.
+             */
+            comprobanteId: string;
+            /** @enum {string} */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+            /**
+             * @description Número de la serie V, asignado al contabilizar (§4.9). null en borrador.
+             * @example V2607-000001
+             */
+            numero: string | null;
+            /**
+             * @description Flag §4.7 — ortogonal al estado.
+             * @example false
+             */
+            anulado: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            lineas: components["schemas"]["LineaVentaResponseDto"][];
+        };
+        VentaListItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contactoId: string;
+            /**
+             * @description YYYY-MM-DD, calendario puro (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /** @enum {string} */
+            condicionPago: "CONTADO" | "CREDITO";
+            /** @example 2026-08-15 */
+            fechaVencimiento: string | null;
+            /** @example Venta de pollo faenado */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino elegida (solo CONTADO, PA-1).
+             */
+            cuentaDestinoId: string | null;
+            /**
+             * @description Σ de subtotales redondeados (§4.5).
+             * @example 31.53
+             */
+            montoTotal: string;
+            /**
+             * Format: uuid
+             * @description Comprobante que da su estado a la venta.
+             */
+            comprobanteId: string;
+            /** @enum {string} */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+            /**
+             * @description Número de la serie V, asignado al contabilizar (§4.9). null en borrador.
+             * @example V2607-000001
+             */
+            numero: string | null;
+            /**
+             * @description Flag §4.7 — ortogonal al estado.
+             * @example false
+             */
+            anulado: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ListarVentasResponseDto: {
+            ventas: components["schemas"]["VentaListItemDto"][];
+            /** @example 42 */
+            total: number;
+            /** @example 1 */
+            page: number;
+            /** @example 50 */
+            pageSize: number;
+        };
+        UpdateVentaDto: {
+            /**
+             * Format: uuid
+             * @description Cliente de la venta.
+             */
+            contactoId: string;
+            /**
+             * @description Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @example CONTADO
+             * @enum {string}
+             */
+            condicionPago: "CONTADO" | "CREDITO";
+            /**
+             * @description Obligatoria en CREDITO, prohibida en CONTADO (REQ-VTA-02) — esa regla cruzada la valida el service con VENTA_VENCIMIENTO_REQUERIDO.
+             * @example 2026-08-15
+             */
+            fechaVencimiento?: string;
+            /** @example Venta de pollo faenado */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino ELEGIDA de la venta CONTADO (PA-1), validada como efectivo/equivalente. En CREDITO se ignora: la contrapartida es CxC.
+             */
+            cuentaDestinoId?: string;
+            lineas: components["schemas"]["CreateLineaVentaDto"][];
+        };
+        VentaContabilizadaResponseDto: {
+            /** Format: uuid */
+            comprobanteId: string;
+            /**
+             * @description Número de la serie propia del tipo VENTA.
+             * @example V2607-000001
+             */
+            numero: string;
+        };
+        AnularVentaDto: {
+            /**
+             * @description Motivo de la anulación, mínimo 10 caracteres (visible en auditoría).
+             * @example Venta duplicada por error de carga
+             */
+            motivo: string;
         };
         RangoFechasDto: {
             /** @example 2026-04-01 */
@@ -8252,6 +8554,166 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ItemResponseDto"];
                 };
+            };
+        };
+    };
+    VentasController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtra por cliente. */
+                contactoId?: string;
+                /** @description Límite inferior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6). */
+                fechaDesde?: string;
+                /** @description Límite superior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6). */
+                fechaHasta?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarVentasResponseDto"];
+                };
+            };
+        };
+    };
+    VentasController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVentaDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaResponseDto"];
+                };
+            };
+        };
+    };
+    VentasController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaResponseDto"];
+                };
+            };
+        };
+    };
+    VentasController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVentaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaResponseDto"];
+                };
+            };
+        };
+    };
+    VentasController_eliminarBorrador: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    VentasController_contabilizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VentaContabilizadaResponseDto"];
+                };
+            };
+        };
+    };
+    VentasController_anular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnularVentaDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

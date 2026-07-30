@@ -497,6 +497,7 @@ model Cuenta {
   // no se borra por arrastre.
   itemsCuentaIngreso       Item[]       @relation("ItemCuentaIngreso")
   lineasVentaCuentaIngreso LineaVenta[] @relation("LineaVentaCuentaIngreso")
+  ventasCuentaDestino      Venta[]      @relation("VentaCuentaDestino")
   cobrosCuentaDestino      Cobro[]      @relation("CobroCuentaDestino")
 
   @@unique([organizationId, codigoInterno])
@@ -1702,6 +1703,20 @@ model Venta {
   fechaVencimiento DateTime?     @db.Date
   glosa            String
 
+  // Cuenta donde entra la plata en una venta CONTADO (PA-1), elegida por el
+  // usuario con Caja General como precarga de UI. Nullable porque una venta
+  // CREDITO no cobra nada al vender: su contrapartida es CxC.
+  //
+  // Se PERSISTE acá y no se deriva de la línea de débito del comprobante:
+  // derivarla haría que el documento leyera un dato de cabecera desde su
+  // propio output generado, y dejaría la asimetría con `Cobro`, que sí la
+  // tiene. Además un listado que quiera mostrar "cobrado en Caja" no necesita
+  // joinear `lineas_comprobante`.
+  //
+  // La elegibilidad (REQ-CXC-02: activa ∧ esDetalle ∧ (EFECTIVO ∪ prefijo
+  // 1.1.1)) la valida el servicio; la FK sólo garantiza que la cuenta exista.
+  cuentaDestinoId String?
+
   // Σ de subtotales YA REDONDEADOS (§4.5, half-up). Persistido porque es un
   // hecho del documento pactado, como LineaComprobante.debitoBob; el backend
   // lo recalcula en cada write, en la misma TX que reemplaza las líneas.
@@ -1713,6 +1728,7 @@ model Venta {
 
   organization              Organization                  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contacto                  Contacto                      @relation(fields: [contactoId], references: [id], onDelete: Restrict)
+  cuentaDestino             Cuenta?                       @relation("VentaCuentaDestino", fields: [cuentaDestinoId], references: [id], onDelete: Restrict)
   lineas                    LineaVenta[]
   aplicaciones              AplicacionCobro[]
   aplicacionesDesvinculadas AplicacionCobroDesvinculada[]
