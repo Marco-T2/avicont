@@ -26,6 +26,7 @@ export const RUTAS_GATE = [
   '/eeff/flujo-efectivo',
   '/eeff/hoja-trabajo',
   '/eeff/resultados',
+  '/items',
   '/libros/diario',
   '/libros/mayor',
   '/movimientos-bancarios',

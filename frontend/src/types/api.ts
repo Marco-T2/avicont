@@ -551,6 +551,37 @@ export interface InformeConciliacionParams {
 }
 
 // ============================================================
+// Items (catálogo de ítems vendibles — módulo comercial FREE)
+// ============================================================
+
+// La unión generada va como CLAVE del Record (forma correcta del satisfies:
+// falla ante un valor equivocado Y ante uno faltante — ver PerfilExtracto).
+export const TipoItem = {
+  PRODUCTO: 'PRODUCTO',
+  SERVICIO: 'SERVICIO',
+} as const satisfies Record<Schemas['ItemResponseDto']['tipo'], string>;
+export type TipoItem = (typeof TipoItem)[keyof typeof TipoItem];
+
+export type Item = Schemas['ItemResponseDto'];
+
+export type ItemListResponse = Schemas['ListarItemsResponseDto'];
+
+export type CreateItemRequest = Schemas['CreateItemDto'];
+
+export type UpdateItemRequest = Schemas['UpdateItemDto'];
+
+// Query params para GET /api/items (client-only).
+// activo: boolean → filtra por estado; 'all' → sin filtro; undefined → backend
+// default (solo activos). q busca en nombre + código.
+export interface ListarItemsParams {
+  q?: string;
+  tipo?: TipoItem;
+  activo?: boolean | 'all';
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

@@ -573,6 +573,16 @@ es `OWNER | ADMIN` por membership, no a nivel de `User`.
 - **Las partidas abiertas del arranque no se pueden derivar solas.** Una línea contable anterior al arranque sin movimiento que la reclame es indistinguible entre un cheque en circulación —que SÍ es partida— y el asiento de apertura, cuyo saldo ya está dentro del extracto declarado. Si la organización importó extractos recién desde el arranque, TODA línea anterior parece en tránsito. Se resolvió poniéndolo a confirmación del contador, con la verificación aritmética `Σ partidas = saldoLibros − saldoExtracto + residual` como desambiguador. **Lo que queda**: cuando SÍ hay cobertura de extractos anterior al arranque, los candidatos podrían pre-marcarse solos y dejar la confirmación como revisión en vez de como carga. **Trigger**: si adoptar una cuenta con historia larga se vuelve tedioso.
 - **El anti-join "líneas sin match" no se puede expresar.** El ancla `(comprobanteId, orden)` de `MatchConciliacion` no tiene FK (deliberado, ver el modelo), así que Prisma no puede filtrar por relación; y el SQL crudo contra `lineas_comprobante` desde `conciliacion-bancaria` está vedado por `no-escribe-comprobantes.arch.spec.ts` (esquivaría el read port y su filtro de tenant). Por eso las partidas abiertas se CONGELAN al declarar en vez de derivarse en cada lectura. No es deuda a pagar — es una restricción del diseño que conviene tener escrita antes de que alguien intente el atajo.
 
+### 3.8 Frontend del piloto comercial (change `ventas-piloto`, Fase 6)
+
+**Menor, abierta:**
+- `mensaje-items.ts` vive en `features/items/lib/` en vez de `src/lib/error-messages.ts`, donde el resto de los módulos concentra los mapeos de códigos de error del backend. Sin consecuencia funcional; el día que un segundo consumidor necesite traducir un código de `items`, mover.
+
+**Clase de bug que apareció acá y conviene tener escrita — no es deuda, es una regla:**
+- **Un requisito que manda `details` para que el usuario los LEA no está cumplido hasta que el frontend los muestre.** REQ-ITM-05 exige rechazar la desactivación de una cuenta enchufada a ítems "devolviendo en `details` la lista de ítems afectados" (Anti-41: *el admin no desactiva una cuenta sin saber que está enchufada*). El backend cumplía al pie de la letra y el diálogo del frontend caía al fallback genérico, así que el admin leía "re-mapealos" sin saber cuáles: el requisito estaba verde en los tests del backend y **muerto en la pantalla**. Cerrado en el PR #313.
+  - **Por qué se escapa**: el error lo TIRA un módulo (`cuentas`) y lo CAUSA otro (`items`). Quien construye la feature nueva no mira el diálogo de la vieja, y quien revisa la vieja no sabe que apareció un código nuevo. Cuando un change agrega un error code a un módulo ajeno, revisar **quién lo renderiza**, no solo quién lo lanza.
+  - Ya existía el molde a copiar (`conceptosBloqueantes` para `CUENTA_CONFIGURADA_COMO_CONCEPTO`, el error hermano del mismo diálogo). El costo de la omisión no fue no saber cómo, fue no mirar.
+
 ---
 
 ## 4. Explícitamente fuera de scope

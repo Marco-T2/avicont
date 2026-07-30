@@ -408,7 +408,7 @@ export function CuentaForm({
         <Field
           label="Actividad de flujo de efectivo"
           error={errors.actividadFlujo?.message}
-          hint="Clasifica la cuenta para el Estado de Flujo de Efectivo (NIC 7). En blanco, el reporte deduce la actividad por la subclase de la cuenta. Atención con «Efectivo»: en cuanto marcás una cuenta como efectivo, el reporte deja de reconocer por código (1.1.1) y toma como efectivo SOLO las marcadas."
+          hint="Clasifica la cuenta para el Estado de Flujo de Efectivo (NIC 7). En blanco, el reporte deduce la actividad por la subclase de la cuenta. Marcarla como «Efectivo» tiene además un segundo efecto: la habilita como cuenta destino de cobros y de ventas al contado, donde la marca SUMA a las cuentas del código 1.1.1 y nunca quita ninguna. Atención, porque en el Estado de Flujo de Efectivo funciona al revés: en cuanto marcás una cuenta como efectivo, el reporte deja de reconocer por código (1.1.1) y toma como efectivo SOLO las marcadas."
         >
           <Select
             value={actividadFlujo ?? '__none__'}
