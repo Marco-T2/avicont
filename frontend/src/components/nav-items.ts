@@ -19,12 +19,15 @@ import {
   FileStack,
   FileText,
   FolderOpen,
+  HandCoins,
   Home,
   Landmark,
   LayoutDashboard,
   Library,
   ListChecks,
+  Receipt,
   Scale,
+  ScrollText,
   Settings,
   Shield,
   ShoppingCart,
@@ -150,10 +153,13 @@ export const NAV_SECTIONS: NavSection[] = [
     kind: 'modulo',
     // ─── Comercial ANTES del suelto /comprobantes (PA-2, REQ-SB-15): el piloto
     // apunta a que el uso diario sea comercial y el asiento manual la excepción.
-    // VERSIÓN PARCIAL deliberada: solo Ítems por ahora — un ítem de nav que
-    // apunta a una ruta inexistente es un link roto en producción (§9.2, main
-    // siempre deployable). El grupo se completa con Ventas y Cobros cuando
-    // existan sus pantallas; van ANTES de Ítems en el orden final.
+    // Orden: el flujo de trabajo (vendo → cobro → consulto la deuda), con el
+    // maestro al final. Ítems es catálogo: se toca al dar de alta un producto,
+    // no todos los días.
+    // "Estado de cuenta" es el 4º ítem por decisión de Marco (2026-07-30): sin
+    // él la pantalla quedaba sin puerta de entrada. Va bajo `cobros.read` a
+    // propósito — quien sólo lee no registra ni aplica, pero SÍ consulta la
+    // deuda del cliente (REQ-CXC-10).
     // Ningún ítem declara `pack`: Ventas es FREE, núcleo del vertical (D-01).
     leadingGroups: [
       {
@@ -161,6 +167,27 @@ export const NAV_SECTIONS: NavSection[] = [
         label: 'Comercial',
         icon: ShoppingCart,
         items: [
+          {
+            to: '/ventas',
+            label: 'Ventas',
+            icon: Receipt,
+            requiredPermission: PERMISSIONS.contabilidad.ventas.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/cobros',
+            label: 'Cobros',
+            icon: HandCoins,
+            requiredPermission: PERMISSIONS.contabilidad.cobros.read,
+            vertical: 'CONTABILIDAD',
+          },
+          {
+            to: '/estado-cuenta',
+            label: 'Estado de cuenta',
+            icon: ScrollText,
+            requiredPermission: PERMISSIONS.contabilidad.cobros.read,
+            vertical: 'CONTABILIDAD',
+          },
           {
             to: '/items',
             label: 'Ítems',

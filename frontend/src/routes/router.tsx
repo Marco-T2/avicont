@@ -19,7 +19,13 @@ import { LotesPage } from '@/features/granja/pages/lotes-page';
 import { LoteDetailPage } from '@/features/granja/pages/lote-detail-page';
 import { TiposRegistroPage } from '@/features/granja/pages/tipos-registro-page';
 import { AcceptInvitePage } from '@/features/invitations/pages/accept-invite-page';
+import { CobrosPage } from '@/features/cobros/pages/cobros-page';
+import { EditarCobroPage } from '@/features/cobros/pages/editar-cobro-page';
+import { NuevoCobroPage } from '@/features/cobros/pages/nuevo-cobro-page';
+import { EstadoCuentaPage } from '@/features/estado-cuenta/pages/estado-cuenta-page';
 import { ItemsPage } from '@/features/items/pages/items-page';
+import { VentaEditorPage } from '@/features/ventas/pages/venta-editor-page';
+import { VentasPage } from '@/features/ventas/pages/ventas-page';
 import { LibroDiarioPage } from '@/features/libro-diario/pages/libro-diario-page';
 import { LibroMayorPage } from '@/features/libro-mayor/pages/libro-mayor-page';
 import { BalanceGeneralPage } from '@/features/balance-general/pages/balance-general-page';
@@ -185,6 +191,68 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission={PERMISSIONS.contabilidad.gestiones.read}>
                 <CierreEjercicioPage />
+              </RequirePermission>
+            ),
+          },
+          // ─── Comercial ─────────────────────────────────────────────────────
+          // El alta va gateada con `create` y la edición con `read`: entrar a ver
+          // una venta no exige poder modificarla; las acciones de la pantalla
+          // llevan su propio gate fino (§14.7).
+          {
+            path: '/ventas',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.ventas.read}>
+                <VentasPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/ventas/nueva',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.ventas.create}>
+                <VentaEditorPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/ventas/:id/editar',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.ventas.read}>
+                <VentaEditorPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/cobros',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.cobros.read}>
+                <CobrosPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/cobros/nuevo',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.cobros.create}>
+                <NuevoCobroPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/cobros/:id/editar',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.cobros.read}>
+                <EditarCobroPage />
+              </RequirePermission>
+            ),
+          },
+          // El estado de cuenta va bajo `cobros.read` (REQ-CXC-10): quien sólo
+          // lee no registra ni aplica cobros, pero sí consulta la deuda.
+          {
+            path: '/estado-cuenta',
+            element: (
+              <RequirePermission permission={PERMISSIONS.contabilidad.cobros.read}>
+                <EstadoCuentaPage />
               </RequirePermission>
             ),
           },

@@ -532,6 +532,33 @@ features/cuentas/
 
 Hoy no usamos MSW porque los tests cubren validación de forms y stores. Cuando tengamos queries con orquestación (invalidations, optimistic updates), migrar a **MSW** (Mock Service Worker) — anotado como deuda.
 
+### Comandos de verificación
+
+Correr **desde `frontend/`**:
+
+```bash
+pnpm exec tsc -b                       # typecheck  ← NO `tsc --noEmit`
+pnpm exec vitest run                   # suite completa
+pnpm exec vitest run src/features/x    # una feature
+pnpm run lint                          # eslint .
+pnpm run gate:ui                       # capturas de las rutas de scripts/rutas-gate.mjs
+pnpm run gate:tap                      # tap targets ≥44×44 bajo dedo emulado
+```
+
+> ⚠️ **`pnpm exec tsc --noEmit` NO CHEQUEA NADA acá y sale 0.** El
+> `tsconfig.json` de `frontend/` es solution-style —`{"files": [], "references":
+> […]}`— así que sin archivos propios tsc no tiene nada que mirar y reporta
+> éxito sobre cero archivos analizados. Es un **falso verde**, la peor forma del
+> error: se lee igual que un typecheck limpio.
+>
+> El comando real es **`pnpm exec tsc -b`** (build mode, el mismo que usa
+> `pnpm run build`). Verificado el 2026-07-30 por mutación: con `--noEmit` un
+> `satisfies` roto a propósito pasa en verde; con `-b` muere con TS1360.
+>
+> El backend es al revés (`tsc --noEmit -p tsconfig.json`, raíz §11.4) porque su
+> `tsconfig.json` sí lista archivos. **No copies el comando de una carpeta a la
+> otra.**
+
 ## 10. Accesibilidad mínima
 
 - `<label htmlFor="id">` asociado a `<input id="id">` — siempre.

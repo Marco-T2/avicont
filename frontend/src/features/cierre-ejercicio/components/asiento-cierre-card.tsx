@@ -17,7 +17,7 @@ import type { EstadoComprobante } from '@/types/api';
 import { useComprobante } from '@/features/comprobantes/hooks/use-comprobante';
 import { EstadoComprobanteBadge } from '@/features/comprobantes/components/estado-comprobante-badge';
 import { MontoCell } from '@/features/comprobantes/components/monto-cell';
-import { formatearFechaContable } from '@/features/comprobantes/lib/formatear-fecha-contable';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 
 // Cross-feature: cuentas de detalle activas para resolver nombres en la tabla de líneas.
 // pageSize 100 = límite del backend (ListarCuentasQueryDto @Max(100)).

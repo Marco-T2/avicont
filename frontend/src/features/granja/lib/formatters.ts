@@ -1,14 +1,7 @@
 // Formateadores puros para el módulo granja.
 // Sin React, sin I/O, sin side effects — testables directamente.
 
-// Mismo patrón que features/comprobantes/lib/formatear-fecha-contable.ts
-// CLAUDE.md §4.6: FechaContable es YYYY-MM-DD; renderizar en America/La_Paz.
-const FECHA_FORMAT_GRANJA = new Intl.DateTimeFormat('es-BO', {
-  timeZone: 'America/La_Paz',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 
 /**
  * Formatea el costo por pollo vivo.
@@ -30,16 +23,18 @@ export function formatPorcentajeMortalidad(rate: number): string {
 }
 
 /**
- * Convierte una fecha granja en formato ISO YYYY-MM-DD
- * a la representación legible "dd/MM/yyyy" usando la zona horaria
- * de La Paz (America/La_Paz — CLAUDE.md §4.6).
+ * Convierte una fecha granja "YYYY-MM-DD" a "dd/MM/yyyy".
  *
- * Se agrega "T12:00:00" para forzar medianoche local antes de parsear,
- * evitando que el parser ISO lo interprete como UTC y desplace el día.
+ * Delega en el helper compartido: el criterio de presentación es IDÉNTICO al
+ * del resto del sistema. Acá vivía una copia con su propio `Intl.DateTimeFormat`
+ * y el comentario "no se reusa porque granja formatea con su propio criterio",
+ * que era falso — y arrastraba el mismo bug de zona horaria que el original
+ * (§4.6: una fecha de calendario no se convierte entre zonas).
+ *
+ * Se conserva el nombre porque es el vocabulario de la feature.
  *
  * Ejemplo: '2026-06-15' → '15/06/2026'.
  */
 export function formatFechaGranja(fechaIso: string): string {
-  const date = new Date(`${fechaIso}T12:00:00`);
-  return FECHA_FORMAT_GRANJA.format(date);
+  return formatearFechaContable(fechaIso);
 }

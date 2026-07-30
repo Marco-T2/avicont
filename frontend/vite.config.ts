@@ -43,5 +43,16 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Zona fija para que la suite sea determinística. Sin esto los tests
+    // corrían en la zona de la máquina y las aserciones sobre fechas pasaban
+    // o fallaban según DÓNDE se ejecutaran: un bug real de corrimiento de día
+    // (§4.6) quedó tapado meses porque en La Paz y en el CI daba el resultado
+    // correcto, y sólo aparecía desde UTC+9.
+    //
+    // Se elige La Paz —no UTC— a propósito: es la zona del usuario real, así
+    // que lo que verifica la suite es lo que ve el contador. Un test que
+    // dependa de la zona para pasar está mal escrito, y con esto se nota
+    // acá en vez de en la máquina de otro.
+    env: { TZ: 'America/La_Paz' },
   },
 });

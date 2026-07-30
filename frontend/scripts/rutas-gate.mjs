@@ -14,6 +14,8 @@ export const VIEWPORTS = [375, 768];
  * TSX. El test de drift es lo que mantiene esta lista honesta.
  */
 export const RUTAS_GATE = [
+  '/cobros',
+  '/cobros/nuevo',
   '/comprobantes',
   '/comprobantes/nuevo',
   '/conciliacion',
@@ -26,6 +28,7 @@ export const RUTAS_GATE = [
   '/eeff/flujo-efectivo',
   '/eeff/hoja-trabajo',
   '/eeff/resultados',
+  '/estado-cuenta',
   '/items',
   '/libros/diario',
   '/libros/mayor',
@@ -40,6 +43,8 @@ export const RUTAS_GATE = [
   '/settings/roles',
   '/settings/roles/nuevo',
   '/tipos-documento-fisico',
+  '/ventas',
+  '/ventas/nueva',
 ];
 
 /**

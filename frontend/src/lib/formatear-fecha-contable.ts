@@ -1,26 +1,37 @@
-// SOLO para display en la UI: convierte la fecha usando America/La_Paz porque la capa de
-// presentación debe mostrar la hora local del usuario (CLAUDE.md §4.6).
-// Para exportar a Excel, usar `formatearFechaCelda` de `@/lib/export-excel` en su lugar:
-// ese helper hace string-split puro (sin Date ni zona horaria) y garantiza que no hay
-// corrimiento de día por UTC — crítico para celdas numéricas de fecha en el archivo .xlsx.
-const FECHA_FORMAT = new Intl.DateTimeFormat('es-BO', {
-  timeZone: 'America/La_Paz',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
+// Display de una FECHA CONTABLE (§4.6): calendario puro, sin hora y sin zona.
+//
+// La conversión es manipulación de STRING, nunca `new Date`. Una fecha contable
+// no representa un instante, así que no hay nada que convertir entre zonas: el
+// 01/07/2026 es el mismo día para el contador en La Paz y para el auditor en
+// cualquier otro lado.
+//
+// La implementación anterior hacía `new Date(`${iso}T12:00:00`)` —que parsea en
+// la zona del NAVEGADOR— y después formateaba en America/La_Paz. Dos
+// conversiones sobre un dato que no las admite: desde UTC+9 el mediodía local
+// cae en el día anterior en La Paz y la fecha se renderizaba CORRIDA UN DÍA.
+// Mismo criterio que `formatearFechaCelda` de `@/lib/export-excel`, que ya
+// resolvía esto con split para las celdas del .xlsx.
+//
+// Para un TIMESTAMP (createdAt, auditoría) esto NO sirve: ahí sí hay un
+// instante que renderizar en America/La_Paz, y va con Intl.DateTimeFormat.
+
+const FECHA_CONTABLE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
- * Convierte una fecha contable "YYYY-MM-DD" a "dd/MM/yyyy"
- * en la zona horaria de La Paz (America/La_Paz — CLAUDE.md §4.6).
+ * Convierte una fecha contable "YYYY-MM-DD" a "dd/MM/yyyy".
  *
- * Helper compartido entre features de reportes (Libro Diario, Libro Mayor).
+ * Determinístico e independiente de la zona horaria del navegador.
  * Ejemplo: '2026-05-01' → '01/05/2026'.
  *
- * Se agrega "T12:00:00" para fijar medianoche local y evitar que el parser ISO
- * lo interprete como UTC y desplace el día.
+ * Si la entrada no es exactamente YYYY-MM-DD se devuelve TAL CUAL. Es
+ * deliberado: un timestamp mal pasado acá rendería su fecha UTC, que es
+ * plausible y puede estar equivocada por un día. Un string visiblemente raro
+ * en pantalla se reporta y se arregla; una fecha corrida en silencio, no.
  */
 export function formatearFechaContable(fechaIso: string): string {
-  const date = new Date(`${fechaIso}T12:00:00`);
-  return FECHA_FORMAT.format(date);
+  const partes = FECHA_CONTABLE_REGEX.exec(fechaIso);
+  if (partes === null) return fechaIso;
+
+  const [, yyyy, mm, dd] = partes;
+  return `${dd}/${mm}/${yyyy}`;
 }

@@ -121,7 +121,10 @@ export function toCobroListItem(cobro: Cobro, comprobante: ComprobanteDeCobro): 
     id: cobro.id,
     contactoId: cobro.contactoId,
     fechaContable: fechaDbAIso(cobro.fechaContable),
-    monto: cobro.monto.toString(),
+    // §4.5: 2 decimales SIEMPRE. `Decimal.toString()` descarta el cero final
+    // ("504.40" → "504.4") y la UI lo pinta crudo. Alineado con
+    // `comprobante-response.dto.ts` y con `estado-cuenta-response.dto.ts`.
+    monto: cobro.monto.toFixed(2),
     cuentaDestinoId: cobro.cuentaDestinoId,
     glosa: cobro.glosa,
     comprobanteId: comprobante.id,
@@ -143,7 +146,7 @@ export function toCobroResponse(
     aplicaciones: aplicaciones.map((a) => ({
       id: a.id,
       ventaId: a.ventaId,
-      montoAplicado: a.montoAplicado.toString(),
+      montoAplicado: a.montoAplicado.toFixed(2), // dinero (§4.5) — ver monto
       createdAt: a.createdAt.toISOString(),
     })),
   };
@@ -154,7 +157,7 @@ export function toAplicacionResponse(row: AplicacionCobroRow): AplicacionCobroRe
     id: row.id,
     cobroId: row.cobroId,
     ventaId: row.ventaId,
-    montoAplicado: row.montoAplicado.toString(),
+    montoAplicado: row.montoAplicado.toFixed(2), // dinero (§4.5) — ver monto
     createdAt: row.createdAt.toISOString(),
   };
 }
