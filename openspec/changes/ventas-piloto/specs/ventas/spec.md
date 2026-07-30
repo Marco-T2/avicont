@@ -305,6 +305,49 @@ Matriz de operaciones sobre el monto (el saldo es derivado — "resolver"):
 | Bajar el monto, ≥ lo cobrado | ídem |
 | Bajar el monto POR DEBAJO de lo cobrado | recorte **LIFO** de aplicaciones (D-21): de la más reciente hacia atrás, en cascada hasta absorber la diferencia; el excedente queda como saldo no aplicado del cobro recortado (saldo a favor) |
 
+**Fila 7 — pasar de CREDITO a CONTADO con aplicaciones vivas: RECHAZAR**
+(agregado 2026-07-30 por auditoría de la Fase 5; no estaba en la spec y era un
+agujero real, verificado por probe de integración).
+
+Una venta CONTADO **no integra la cartera** (REQ-VTA-04, D-04): se cobró en el
+acto. Sin esta regla, el flip produce por la puerta de atrás exactamente el
+estado que REQ-CXC-03 prohíbe crear —una `AplicacionCobro` contra una venta
+fuera de la cartera— con tres consecuencias:
+
+1. La venta desaparece del estado de cuenta, pero su aplicación **sigue
+   restando saldo a favor del cobro** (el saldo no aplicado suma *todas* las
+   aplicaciones): plata del cliente consumida sin deuda visible en ningún lado.
+2. El asiento regenerado pasa a debitar la cuenta destino, así que **Caja queda
+   debitada dos veces** —por la venta CONTADO y por el cobro— por un solo
+   movimiento real, y CxC queda con un haber sin contrapartida.
+3. No queda **rastro** en `AplicacionCobroDesvinculada` (B-14): el acto
+   desaparece.
+
+Se rechaza con 422 `VENTA_CONDICION_PAGO_CON_APLICACIONES` en vez de
+desvincular en silencio: misma postura que la fila 8 de REQ-CXC-06
+(`COBRO_MONTO_INFERIOR_APLICADO`) — cuando el reparto es entre cobros
+distinguibles el sistema NO elige, el usuario desaplica primero. Desvincular
+además **no arreglaría** el doble débito de Caja.
+
+El guard se evalúa **antes** que la rama del cambio de contacto (fila 6): al
+revés, un flip que además cambia el cliente desvincularía primero y pasaría.
+La dirección inversa (CONTADO → CREDITO) **no se bloquea** — devuelve la venta
+a la cartera, donde sus aplicaciones vuelven a tener sentido.
+
+#### Escenario (−): flip a CONTADO con un cobro aplicado
+
+- DADO una venta a crédito contabilizada con un cobro aplicado
+- CUANDO se la edita a CONTADO
+- ENTONCES rechaza con 422 `VENTA_CONDICION_PAGO_CON_APLICACIONES`
+- Y no se toca la venta, ni su asiento (sigue debitando CxC), ni la aplicación
+
+#### Escenario: sin aplicaciones el flip procede
+
+- DADO una venta a crédito contabilizada sin ningún cobro aplicado
+- CUANDO se la edita a CONTADO
+- ENTONCES la edición procede — la regla protege el vínculo, no la condición de
+  pago
+
 Cambiar el **contacto** DEBE permitirse (D-20: vive en la línea, el reemplazo
 en bloque ES el mecanismo — justificación escrita contra Anti-15, cuyos daños
 LCV/SIN están fuera de scope §10.9) y DEBE **desvincular TODAS las
@@ -495,6 +538,7 @@ catalogado, #291).
 | `VENTA_ASIENTO_SIN_MONTO` | 422 | la venta no mueve monto alguno; §4.1 exige suma total > 0 |
 | `VENTA_ASIENTO_DESCUADRADO` | 500 | `montoTotal` ≠ Σ subtotales — **bug de dominio**, los dos los calcula el backend |
 | `VENTA_LINEA_SUBTOTAL_NEGATIVO` | 500 | subtotal negativo — **bug de dominio**, §4.1 exige débitos y créditos ≥ 0 |
+| `VENTA_CONDICION_PAGO_CON_APLICACIONES` | 422 | pasar la venta de CREDITO a CONTADO teniendo aplicaciones vivas (fila 7; agregado 2026-07-30 por auditoría de la Fase 5) |
 
 Códigos de **otros namespaces** que salen por endpoints de ventas, porque la
 validación vive en el writer del núcleo y NO se duplicó (Anti-01):

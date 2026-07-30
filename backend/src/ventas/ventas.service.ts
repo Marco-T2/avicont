@@ -37,6 +37,7 @@ import { recortarAplicacionesLifo } from './domain/recorte-aplicaciones';
 import {
   VentaAnuladaNoEditableError,
   VentaConceptoNoConfiguradoError,
+  VentaCondicionPagoConAplicacionesError,
   VentaContactoInactivoError,
   VentaContactoNoEncontradoError,
   VentaCuentaDestinoNoElegibleError,
@@ -450,7 +451,15 @@ export class VentasService {
         tx,
       );
 
-      await this.ajustarAplicaciones(tenantId, venta, input.contactoId, montoTotal, userId, tx);
+      await this.ajustarAplicaciones(
+        tenantId,
+        venta,
+        input.contactoId,
+        input.condicionPago,
+        montoTotal,
+        userId,
+        tx,
+      );
 
       const ventaActualizada = await this.repo.reemplazar(
         tenantId,
@@ -707,20 +716,34 @@ export class VentasService {
 
   /**
    * Matriz de REQ-VTA-06 sobre las aplicaciones de la venta editada:
-   * cambio de contacto → desvincular TODAS (fila 6); baja del monto por
-   * debajo de lo cobrado → recorte LIFO (D-21). El caso "sube o baja sin
-   * perforar lo cobrado" no toca nada — el saldo pendiente es derivado.
+   * flip CREDITO → CONTADO → rechazar (fila 7); cambio de contacto →
+   * desvincular TODAS (fila 6); baja del monto por debajo de lo cobrado →
+   * recorte LIFO (D-21). El caso "sube o baja sin perforar lo cobrado" no toca
+   * nada — el saldo pendiente es derivado.
+   *
+   * Corre ANTES de toda escritura de la edición: un rechazo sale sin haber
+   * tocado la venta, su asiento ni ninguna aplicación.
    */
   private async ajustarAplicaciones(
     tenantId: string,
     venta: VentaConLineas,
     contactoNuevoId: string,
+    condicionPagoNueva: CondicionPago,
     montoTotalNuevo: Money,
     userId: string,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
     const aplicaciones = await this.repo.listarAplicaciones(tenantId, venta.id, tx);
     if (aplicaciones.length === 0) return;
+
+    // Fila 7 — se evalúa PRIMERO, incluso si el contacto también cambia: la
+    // rama del contacto desvincularía y dejaría pasar el flip, que es
+    // justamente lo que hay que impedir. La dirección inversa (CONTADO →
+    // CREDITO) NO se bloquea: devuelve la venta a la cartera, donde sus
+    // aplicaciones vuelven a tener sentido.
+    if (condicionPagoNueva === 'CONTADO' && venta.condicionPago !== 'CONTADO') {
+      throw new VentaCondicionPagoConAplicacionesError(venta.id, aplicaciones.length);
+    }
 
     if (contactoNuevoId !== venta.contactoId) {
       await this.desvincularAplicaciones(
