@@ -281,6 +281,42 @@ migraciones de los perfiles de extracto y la de `ventas.cuentaDestinoId`.
 comprobantes debe correr **dentro** del runner auditado. Ya está resuelto así en
 `backend/src/ventas/ventas.service.integration.spec.ts`.
 
+### 2.4 Fechas validadas SÓLO con regex → `RangeError` crudo → 500
+
+**Detectado** 2026-07-29, construyendo la Fase 4 de `ventas-piloto`. Preexistente,
+**alcanzable hoy por cualquier usuario**.
+
+`"2026-02-31"` es un string bien formateado y una fecha que no existe. Un DTO que
+valida con `@Matches(/^\d{4}-\d{2}-\d{2}$/)` lo acepta, y después
+`FechaContable.fromIso` lanza un **`RangeError` crudo**:
+
+```
+RangeError: FechaContable: día inválido 31 para 2026-02 (máx 28)
+```
+
+Verificado ejecutándolo, no leyéndolo: **no es un `DomainError`** (no tiene
+`httpStatus`), así que el `GlobalExceptionFilter` no lo mapea al formato de §6.4
+y sale un **500**. El usuario recibe un error de servidor por un dato de entrada
+inválido, que es exactamente lo que §6.2 existe para evitar.
+
+**15 DTOs afectados** (al 2026-07-29):
+
+| Módulo | Archivos | Severidad |
+|---|---|---|
+| `comprobantes` | `create-comprobante.dto.ts`, `listar-comprobantes.dto.ts` | **alta** — camino de escritura |
+| `conciliacion-bancaria` | `declarar-arranque.dto.ts` + 4 query DTOs | **alta** en `declarar-arranque` (escritura), baja en los query |
+| `reportes` | 9 query DTOs | baja — 500 en un GET con parámetro malo |
+
+**Ya resuelto donde se tocó**: `ventas` valida con el decorador propio
+`EsFechaContableIso` (`backend/src/ventas/dto/es-fecha-contable-iso.ts`), que
+construye la `FechaContable` y rechaza con 422. `documentos-fisicos` y `granja`
+usan `IsDateString`, que también cubre el caso.
+
+**Fix**: reusar `EsFechaContableIso` en los 15. No requiere migración ni cambia
+contratos — sólo convierte un 500 en el 422 que corresponde. Aplicar por la
+**regla de oro** del CLAUDE.md (al tocar un módulo para agregar features, migrar
+primero sus errores), o de una sola vez: son 15 archivos y un import.
+
 ---
 
 ## 3. Baja prioridad — nice to have

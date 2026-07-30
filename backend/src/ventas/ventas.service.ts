@@ -58,7 +58,9 @@ import {
   type AplicacionDeVenta,
   type ComprobanteDeVenta,
   type LineaVentaData,
+  type Venta,
   type VentaConLineas,
+  type VentaListarFiltros,
   VentaRepositoryPort,
 } from './ports/venta.repository.port';
 import {
@@ -108,6 +110,36 @@ export interface VentaContabilizada {
   /** Número de la serie propia del tipo VENTA: `V{YY}{MM}-{correlativo:6}`. */
   numero: string;
 }
+
+export interface ListarVentasInput {
+  contactoId?: string;
+  /** ISO `YYYY-MM-DD` inclusivo (§4.6) — el DTO ya validó el calendario. */
+  fechaDesde?: string;
+  fechaHasta?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** La venta con el estado que le da su comprobante (REQ-VTA-01). */
+export interface VentaListada {
+  venta: Venta;
+  comprobante: ComprobanteDeVenta;
+}
+
+export interface ListarVentasResult {
+  ventas: VentaListada[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface VentaDetalle {
+  venta: VentaConLineas;
+  comprobante: ComprobanteDeVenta;
+}
+
+const LIST_DEFAULT_LIMIT = 50;
+const LIST_MAX_LIMIT = 100;
 
 /**
  * Motivos user-facing del rastro `AplicacionCobroDesvinculada` (B-14). El de
@@ -522,6 +554,58 @@ export class VentasService {
   }
 
   // ============================================================
+  // Lecturas (task 4.9) — superficie read del controller. SIN transacción
+  // auditada a propósito: los triggers de `comprobantes_audit` solo miran
+  // escrituras, y una lectura no emite auditoría.
+  // ============================================================
+
+  /**
+   * Listado paginado (Anti-28: paginación obligatoria, limit capeado) con el
+   * estado de cada venta DERIVADO de su comprobante (REQ-VTA-01). Una venta
+   * sin comprobante es un dato roto y queda fuera de la lista — el mismo
+   * criterio que el 404 del detalle, sin tumbar el listado entero.
+   */
+  async listar(tenantId: string, input: ListarVentasInput): Promise<ListarVentasResult> {
+    const page = input.page ?? 1;
+    const limit = Math.min(input.limit ?? LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT);
+
+    const filtros: VentaListarFiltros = {
+      ...(input.contactoId !== undefined ? { contactoId: input.contactoId } : {}),
+      ...(input.fechaDesde !== undefined
+        ? { fechaDesde: FechaContable.fromIso(input.fechaDesde).toDbDate() }
+        : {}),
+      ...(input.fechaHasta !== undefined
+        ? { fechaHasta: FechaContable.fromIso(input.fechaHasta).toDbDate() }
+        : {}),
+    };
+
+    const { ventas, total } = await this.repo.listar(tenantId, filtros, { page, limit }, undefined);
+    const comprobantes = await this.repo.obtenerComprobantesDeVentas(
+      tenantId,
+      ventas.map((v) => v.id),
+      undefined,
+    );
+
+    return {
+      ventas: ventas.flatMap((venta) => {
+        const comprobante = comprobantes.get(venta.id);
+        return comprobante === undefined ? [] : [{ venta, comprobante }];
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * Detalle con líneas y comprobante.
+   * @throws VentaNoEncontradaError (404) inexistente o ajena (REQ-VTA-08).
+   */
+  async obtener(tenantId: string, ventaId: string): Promise<VentaDetalle> {
+    return this.obtenerVentaConComprobante(tenantId, ventaId, undefined);
+  }
+
+  // ============================================================
   // Period lock — pieza reutilizable (task 4.8)
   // ============================================================
 
@@ -562,7 +646,7 @@ export class VentasService {
   private async obtenerVentaConComprobante(
     tenantId: string,
     ventaId: string,
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | undefined,
   ): Promise<{ venta: VentaConLineas; comprobante: ComprobanteDeVenta }> {
     const venta = await this.repo.findById(tenantId, ventaId, tx);
     if (venta === null) throw new VentaNoEncontradaError(ventaId);

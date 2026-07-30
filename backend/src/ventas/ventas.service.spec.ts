@@ -1177,4 +1177,104 @@ describe('VentasService', () => {
       expect(repo.eliminarAplicaciones).not.toHaveBeenCalled();
     });
   });
+
+  // ============================================================
+  // Lecturas (task 4.9): superficie read para el controller
+  // ============================================================
+
+  describe('listar', () => {
+    beforeEach(() => {
+      repo.listar.mockResolvedValue({ ventas: [ventaRow()], total: 1 });
+    });
+
+    it('combina cada venta con su comprobante (estado/numero/anulado, REQ-VTA-01)', async () => {
+      const res = await service.listar(TENANT, {});
+
+      expect(res.total).toBe(1);
+      expect(res.ventas).toHaveLength(1);
+      expect(res.ventas[0]?.venta.id).toBe(VENTA_ID);
+      expect(res.ventas[0]?.comprobante).toMatchObject({
+        id: COMPROBANTE_ID,
+        estado: EstadoComprobante.BORRADOR,
+        anulado: false,
+      });
+      expect(repo.obtenerComprobantesDeVentas).toHaveBeenCalledWith(TENANT, [VENTA_ID], undefined);
+    });
+
+    it('convierte los filtros de fecha ISO a Date de calendario y delega al repo', async () => {
+      await service.listar(TENANT, {
+        contactoId: CONTACTO,
+        fechaDesde: '2026-07-01',
+        fechaHasta: '2026-07-31',
+        page: 2,
+        limit: 25,
+      });
+
+      expect(repo.listar).toHaveBeenCalledWith(
+        TENANT,
+        {
+          contactoId: CONTACTO,
+          fechaDesde: new Date(Date.UTC(2026, 6, 1)),
+          fechaHasta: new Date(Date.UTC(2026, 6, 31)),
+        },
+        { page: 2, limit: 25 },
+        undefined,
+      );
+    });
+
+    it('defaults: page 1, limit 50; y capea limit en 100 (Anti-28)', async () => {
+      await service.listar(TENANT, {});
+      expect(repo.listar).toHaveBeenCalledWith(TENANT, {}, { page: 1, limit: 50 }, undefined);
+
+      await service.listar(TENANT, { limit: 999 });
+      expect(repo.listar).toHaveBeenLastCalledWith(TENANT, {}, { page: 1, limit: 100 }, undefined);
+    });
+
+    it('una venta sin comprobante (dato roto) queda fuera de la lista, no revienta', async () => {
+      repo.obtenerComprobantesDeVentas.mockResolvedValue(new Map());
+
+      const res = await service.listar(TENANT, {});
+
+      expect(res.ventas).toHaveLength(0);
+      expect(res.total).toBe(1);
+    });
+
+    it('es una LECTURA: no pasa por la transacción auditada', async () => {
+      await service.listar(TENANT, {});
+      expect(auditedTx.run).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('obtener', () => {
+    it('devuelve la venta con líneas y su comprobante', async () => {
+      const res = await service.obtener(TENANT, VENTA_ID);
+
+      expect(res.venta.id).toBe(VENTA_ID);
+      expect(res.venta.lineas).toHaveLength(1);
+      expect(res.comprobante.id).toBe(COMPROBANTE_ID);
+    });
+
+    it('venta inexistente o ajena → VENTA_NO_ENCONTRADA (404, REQ-VTA-08)', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.obtener(TENANT, VENTA_ID)).rejects.toMatchObject({
+        code: 'VENTA_NO_ENCONTRADA',
+        httpStatus: 404,
+      });
+    });
+
+    it('venta sin comprobante (dato roto) → el mismo 404, no revela nada más (§4.2)', async () => {
+      repo.obtenerComprobantesDeVentas.mockResolvedValue(new Map());
+
+      await expect(service.obtener(TENANT, VENTA_ID)).rejects.toMatchObject({
+        code: 'VENTA_NO_ENCONTRADA',
+        httpStatus: 404,
+      });
+    });
+
+    it('es una LECTURA: no pasa por la transacción auditada', async () => {
+      await service.obtener(TENANT, VENTA_ID);
+      expect(auditedTx.run).not.toHaveBeenCalled();
+    });
+  });
 });

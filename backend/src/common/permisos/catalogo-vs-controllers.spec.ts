@@ -159,12 +159,6 @@ const DECLARADOS_SIN_ENDPOINT: readonly string[] = [
 
   // --- Módulos adelantados: el permiso existe, el módulo todavía no ---
   'contabilidad.dashboard.read',
-  'contabilidad.ventas.read',
-  'contabilidad.ventas.create',
-  'contabilidad.ventas.update',
-  'contabilidad.ventas.delete',
-  'contabilidad.ventas.post',
-  'contabilidad.ventas.void',
   'contabilidad.compras.read',
   'contabilidad.compras.create',
   'contabilidad.compras.update',
@@ -177,7 +171,8 @@ const DECLARADOS_SIN_ENDPOINT: readonly string[] = [
   // aterriza SU controller, no antes: la aserción es igualdad exacta en las
   // dos direcciones.
   //
-  // `contabilidad.items.*` ya salió: su controller aterrizó en la Fase 3.
+  // `contabilidad.items.*` salió en la Fase 3; `contabilidad.ventas.*` en la
+  // Fase 4 (VentasController). Quedan los 6 `cobros.*` hasta la Fase 5.
   'contabilidad.cobros.read',
   'contabilidad.cobros.create',
   'contabilidad.cobros.update',
