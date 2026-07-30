@@ -582,6 +582,95 @@ export interface ListarItemsParams {
 }
 
 // ============================================================
+// Ventas (documento comercial — módulo comercial FREE)
+// ============================================================
+
+// La unión generada va como CLAVE del Record (forma correcta del satisfies:
+// falla ante un valor equivocado Y ante uno faltante — ver TipoItem).
+export const CondicionPago = {
+  CONTADO: 'CONTADO',
+  CREDITO: 'CREDITO',
+} as const satisfies Record<Schemas['VentaListItemDto']['condicionPago'], string>;
+export type CondicionPago = (typeof CondicionPago)[keyof typeof CondicionPago];
+
+export type Venta = Schemas['VentaResponseDto'];
+
+export type VentaListItem = Schemas['VentaListItemDto'];
+
+export type LineaVenta = Schemas['LineaVentaResponseDto'];
+
+export type VentaListResponse = Schemas['ListarVentasResponseDto'];
+
+export type CreateVentaRequest = Schemas['CreateVentaDto'];
+
+export type UpdateVentaRequest = Schemas['UpdateVentaDto'];
+
+export type AnularVentaRequest = Schemas['AnularVentaDto'];
+
+export type VentaContabilizada = Schemas['VentaContabilizadaResponseDto'];
+
+// Query params para GET /api/ventas (client-only). Rango sobre fechaContable.
+export interface ListarVentasParams {
+  contactoId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
+// Cobros y aplicaciones (cuentas por cobrar)
+// ============================================================
+
+export type Cobro = Schemas['CobroResponseDto'];
+
+export type CobroListItem = Schemas['CobroListItemDto'];
+
+export type CobroListResponse = Schemas['ListarCobrosResponseDto'];
+
+export type CreateCobroRequest = Schemas['CreateCobroDto'];
+
+export type UpdateCobroRequest = Schemas['UpdateCobroDto'];
+
+export type AnularCobroRequest = Schemas['AnularCobroDto'];
+
+export type CobroContabilizado = Schemas['CobroContabilizadoResponseDto'];
+
+// Vínculo cobro↔venta. NO es un hecho contable: no genera asiento (D-03).
+export type AplicacionCobro = Schemas['AplicacionCobroItemDto'];
+
+export type CrearAplicacionRequest = Schemas['CrearAplicacionDto'];
+
+export type EditarAplicacionRequest = Schemas['EditarAplicacionDto'];
+
+// Query params para GET /api/cobros (client-only). Rango sobre fechaContable.
+export interface ListarCobrosParams {
+  contactoId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+// ============================================================
+// Estado de cuenta por cliente (REQ-CXC-07)
+// ============================================================
+
+export const EstadoComercialVenta = {
+  ABIERTA: 'ABIERTA',
+  PARCIAL: 'PARCIAL',
+  SALDADA: 'SALDADA',
+} as const satisfies Record<Schemas['VentaEstadoCuentaDto']['estadoComercial'], string>;
+export type EstadoComercialVenta =
+  (typeof EstadoComercialVenta)[keyof typeof EstadoComercialVenta];
+
+// Las ventas vienen en orden canónico FIFO desde el backend (REQ-CXC-05): la
+// pantalla de cobro auto-tilda sobre ESTE orden, no lo recalcula.
+export type EstadoCuenta = Schemas['EstadoCuentaResponseDto'];
+
+export type VentaEstadoCuenta = Schemas['VentaEstadoCuentaDto'];
+
+// ============================================================
 // Documentos físicos
 // ============================================================
 

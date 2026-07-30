@@ -171,6 +171,9 @@ describe('NAV_SECTIONS — estructura de datos', () => {
   // T-02: orden interno de Contabilidad (grupos iniciales → sueltos → grupos → sueltos finales)
   it('sección contabilidad tiene los ítems en el orden correcto', () => {
     expect(itemsDeSeccion('contabilidad').map((i) => i.to)).toEqual([
+      '/ventas',
+      '/cobros',
+      '/estado-cuenta',
       '/items',
       '/comprobantes',
       '/libros/diario',
@@ -1374,8 +1377,12 @@ describe('NavList — scroll propio', () => {
 // grupos", eso exige el campo nuevo `leadingGroups` — un NavGroup completo sin
 // semántica propia: mismo gating derivado, mismo plegado, mismo riel.
 //
-// ALCANCE PARCIAL deliberado: el grupo arranca solo con Ítems. Ventas y Cobros
-// entran cuando existan sus pantallas (main siempre deployable, §9.2).
+// El grupo entró PARCIAL (solo Ítems) en el PR #313 para no dejar links rotos
+// en main (§9.2); acá se completa con las tres pantallas restantes. El orden
+// sigue el flujo de trabajo —vendo → cobro → consulto la deuda— y deja el
+// maestro al final. "Estado de cuenta" es el 4º ítem por decisión de Marco
+// (2026-07-30): REQ-SB-15 declaraba tres y la pantalla habría quedado sin
+// puerta de entrada.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('NAV_SECTIONS — leadingGroups y grupo comercial (estructura)', () => {
   it('contabilidad declara el grupo comercial en leadingGroups, con icono', () => {
@@ -1387,15 +1394,32 @@ describe('NAV_SECTIONS — leadingGroups y grupo comercial (estructura)', () => 
     expect(comercial?.icon).toBeDefined();
   });
 
-  it('el grupo comercial contiene /items (versión parcial: Ventas y Cobros entran con sus pantallas)', () => {
-    expect(grupo('contabilidad', 'comercial')?.items.map((i) => i.to)).toEqual(['/items']);
+  it('el grupo comercial lleva las 4 pantallas en el orden del flujo de trabajo', () => {
+    expect(grupo('contabilidad', 'comercial')?.items.map((i) => i.to)).toEqual([
+      '/ventas',
+      '/cobros',
+      '/estado-cuenta',
+      '/items',
+    ]);
   });
 
-  it('el ítem Ítems declara permiso, vertical CONTABILIDAD y NINGÚN pack (FREE, D-01)', () => {
-    const item = NAV_ITEMS.find((i) => i.to === '/items');
+  // Cada ítem con su permiso: el estado de cuenta va bajo `cobros.read` a
+  // propósito (REQ-CXC-10) — quien sólo lee no registra ni aplica cobros, pero
+  // sí consulta la deuda del cliente. Ninguno declara pack: el grupo es FREE.
+  it.each([
+    ['/ventas', 'Ventas', 'contabilidad.ventas.read'],
+    ['/cobros', 'Cobros', 'contabilidad.cobros.read'],
+    ['/estado-cuenta', 'Estado de cuenta', 'contabilidad.cobros.read'],
+    ['/items', 'Ítems', 'contabilidad.items.read'],
+  ])('%s declara label, permiso, vertical CONTABILIDAD y NINGÚN pack (FREE, D-01)', (
+    to,
+    label,
+    permiso,
+  ) => {
+    const item = NAV_ITEMS.find((i) => i.to === to);
     expect(item).toBeDefined();
-    expect(item?.label).toBe('Ítems');
-    expect(item?.requiredPermission).toBe('contabilidad.items.read');
+    expect(item?.label).toBe(label);
+    expect(item?.requiredPermission).toBe(permiso);
     expect(item?.vertical).toBe('CONTABILIDAD');
     expect(item?.pack).toBeUndefined();
   });
@@ -1422,10 +1446,14 @@ describe('NAV_SECTIONS — leadingGroups y grupo comercial (estructura)', () => 
     }
   });
 
-  it('NAV_ITEMS aplana /items ANTES de /comprobantes (mismo orden que el render)', () => {
+  it('NAV_ITEMS aplana el grupo comercial ANTES de /comprobantes (mismo orden que el render)', () => {
     const tos = NAV_ITEMS.map((i) => i.to);
-    expect(tos.indexOf('/items')).toBeGreaterThan(-1);
-    expect(tos.indexOf('/items')).toBeLessThan(tos.indexOf('/comprobantes'));
+    for (const to of ['/ventas', '/cobros', '/estado-cuenta', '/items']) {
+      expect(tos.indexOf(to), `${to} debe estar en NAV_ITEMS`).toBeGreaterThan(-1);
+      expect(tos.indexOf(to), `${to} debe aplanarse antes de /comprobantes`).toBeLessThan(
+        tos.indexOf('/comprobantes'),
+      );
+    }
   });
 });
 
@@ -1461,7 +1489,7 @@ describe('NavList — leadingGroups (REQ-SB-16) y grupo comercial (REQ-SB-15, re
     expect(iComprobantes).toBeLessThan(iLibros);
   });
 
-  it('sin contabilidad.items.read: el grupo desaparece ENTERO y Comprobantes vuelve a abrir la sección', () => {
+  it('sin NINGÚN permiso comercial: el grupo desaparece ENTERO y Comprobantes vuelve a abrir la sección', () => {
     mockPermissions({ allowedPermissions: ['contabilidad.asientos.read'] });
     const { container } = render(
       <Wrapper>
@@ -1470,10 +1498,32 @@ describe('NavList — leadingGroups (REQ-SB-16) y grupo comercial (REQ-SB-15, re
     );
     // Grupo entero ausente, header incluido (REQ-SB-11, sin predicado nuevo).
     expect(screen.queryByRole('button', { name: /Comercial/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Ítems')).not.toBeInTheDocument();
+    for (const label of ['Ventas', 'Cobros', 'Estado de cuenta', 'Ítems']) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
     // Comprobantes es lo primero de la sección (después del Panel, que va suelto).
     const orden = ordenDom(container).filter((t) => !t.includes('Panel'));
     expect(orden[0]).toContain('Comprobantes');
+  });
+
+  // La cascada es POR ÍTEM (REQ-SB-05): con un solo permiso comercial el grupo
+  // sobrevive mostrando esa única pantalla. Es el complemento del test anterior
+  // —que sin ninguno desaparece entero— y lo que impide que alguien "optimice"
+  // el gating a nivel de grupo, donde perder un permiso escondería las otras
+  // tres pantallas que el usuario SÍ puede ver.
+  it('con solo contabilidad.ventas.read: el grupo sobrevive con Ventas únicamente', () => {
+    mockPermissions({ allowedPermissions: ['contabilidad.ventas.read'] });
+    expandAllGroups();
+    render(
+      <Wrapper>
+        <NavList />
+      </Wrapper>,
+    );
+    expect(screen.getByRole('button', { name: /Comercial/ })).toBeInTheDocument();
+    expect(screen.getByText('Ventas')).toBeInTheDocument();
+    for (const label of ['Cobros', 'Estado de cuenta', 'Ítems']) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
   });
 
   it('vertical GRANJA con el permiso: el ítem Ítems NO está en el DOM (cascada AND)', () => {
