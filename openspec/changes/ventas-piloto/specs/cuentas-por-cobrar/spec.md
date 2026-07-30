@@ -182,6 +182,55 @@ Consecuencia de period lock (D-03): aplicar y desaplicar NO tocan
 contabilidad, así que DEBEN permitirse aunque el cobro o la venta pertenezcan
 a un período cerrado — no hay hecho contable nuevo que fechar.
 
+**Ambas puntas DEBEN integrar la cartera** (agregado 2026-07-30 durante la
+implementación; no estaba en la spec y son dos agujeros reales, encontrados
+uno por el orquestador y el otro por un sub-agente):
+
+```
+punta cobro:  estado IN (CONTABILIZADO, BLOQUEADO) ∧ anulado = false
+punta venta:  lo anterior  ∧  condicionPago = CREDITO
+```
+
+Una aplicación **afirma que plata recibida canceló una venta**. De ahí las dos
+mitades:
+
+- Un comprobante en **BORRADOR no movió plata** (y uno anulado dejó de
+  moverla). Sin esta regla queda una asimetría sobre los dos lados de la misma
+  resta: un cobro en borrador aplicado a una venta le baja el `saldoPendiente`
+  —que suma *todas* las aplicaciones— pero **nunca** cuenta como saldo a favor,
+  que sí exige comprobante vigente. → 422 `APLICACION_PUNTA_NO_CONTABILIZADA`.
+- Una venta **CONTADO** está perfectamente contabilizada y aun así **no integra
+  la cartera** (D-04, REQ-VTA-04: se cobró en el acto y jamás aparece en el
+  estado de cuenta). Aplicarle un cobro consumía saldo a favor **sin cancelar
+  ninguna deuda visible en ningún lado**. → 422 `APLICACION_VENTA_CONTADO`,
+  código separado a propósito: reusar el anterior daría un mensaje mentiroso.
+
+La pantalla FIFO nunca ofrece ninguno de los dos casos, pero REQ-CXC-05 es
+explícita en que **el backend valida sobre lo recibido** — la sugerencia del
+frontend no es un control de seguridad.
+
+**Anti-01**: este predicado es el MISMO de REQ-CXC-01 y DEBE tener una sola
+definición en el código (`domain/cartera.ts`), consumida tanto por la lectura
+—qué aparece en el estado de cuenta— como por la escritura —a qué venta puede
+aplicarse un cobro. Expresarlo por segunda vez en un `where` declarativo es
+drift esperando a pasar.
+
+#### Escenario (−): aplicar a un cobro en BORRADOR
+
+- DADO un cobro dado de alta y todavía sin contabilizar
+- CUANDO se intenta aplicarlo a una venta abierta del mismo cliente
+- ENTONCES rechaza con 422 `APLICACION_PUNTA_NO_CONTABILIZADA`
+
+#### Escenario (−): aplicar a una venta CONTADO
+
+> Este escenario **discrimina**: la venta CONTADO pasa el predicado
+> "contabilizada y no anulada", así que sin este caso el guard incompleto pasa
+> en verde.
+
+- DADO un cliente con una venta CONTADO contabilizada y un cobro contabilizado
+- CUANDO se intenta aplicar el cobro a esa venta
+- ENTONCES rechaza con 422 `APLICACION_VENTA_CONTADO`
+
 #### Escenario: reaplicar es mover una fila
 
 - DADO un cobro de un período CERRADO con 400 de saldo a favor
@@ -376,3 +425,53 @@ manual `frontend/src/lib/permissions.ts` actualizado.
 | `APLICACION_EXCEDE_COBRO` | 422 | Σ aplicaciones superaría el monto del cobro (B-6) |
 | `APLICACION_EXCEDE_VENTA` | 422 | Σ aplicaciones superaría el total de la venta (B-6) |
 | `APLICACION_CONTACTO_DISTINTO` | 422 | cobro y venta de contactos distintos |
+
+### Códigos agregados durante la implementación (2026-07-30)
+
+La tabla original cubría las 6 condiciones que la spec nombraba; el ciclo de
+vida completo necesitó estos. Se registran acá para que la tabla sea exacta
+—mismo criterio que la Fase 4, cuyo builder de asiento sumó 3— y **ninguno
+inventa conducta nueva**: son las condiciones que ya exigían §4.2, §4.4 y §4.7.
+
+| Código | HTTP | Condición |
+|---|---|---|
+| `COBRO_NO_ENCONTRADO` | 404 | cobro ajeno o inexistente (§4.2: ajeno se comporta como inexistente) |
+| `COBRO_NO_ES_BORRADOR` | 409 | operación de borrador sobre un cobro ya contabilizado |
+| `COBRO_ANULADO_NO_EDITABLE` | 409 | editar un cobro anulado (§4.7) |
+| `COBRO_GESTION_NO_ABIERTA` | 422 | sin gestión fiscal para la fecha (REQ-CXC-09) |
+| `COBRO_PERIODO_NO_ABIERTO` | 409 | período no `ABIERTO` (REQ-CXC-09, sin bypass) |
+| `COBRO_CONTACTO_NO_ENCONTRADO` | 404 | contacto ajeno o inexistente |
+| `COBRO_CONTACTO_INACTIVO` | 422 | contacto dado de baja |
+| `COBRO_ASIENTO_SIN_MONTO` | 422 | monto no positivo: el asiento quedaría sin líneas (§4.1) |
+| `APLICACION_NO_ENCONTRADA` | 404 | aplicación ajena o inexistente |
+| `APLICACION_VENTA_NO_ENCONTRADA` | 404 | venta ajena o inexistente en el vínculo (REQ-CXC-08) |
+| `APLICACION_MONTO_NO_POSITIVO` | 422 | monto ≤ 0: un negativo "liberaría" cupo y sobre-aplicaría en silencio |
+| `APLICACION_PUNTA_NO_CONTABILIZADA` | 422 | alguna punta sin comprobante vigente (REQ-CXC-03) |
+| `APLICACION_VENTA_CONTADO` | 422 | la venta se cobró en el acto y no integra la cartera (REQ-CXC-03) |
+
+## Superficie HTTP (fijada en la implementación, 2026-07-30)
+
+REQ-CXC-10 fija los permisos pero ninguna spec fijaba las rutas. Quedan:
+
+| Endpoint | Método | Permiso |
+|---|---|---|
+| `/api/cobros` | POST / GET | `cobros.create` / `cobros.read` |
+| `/api/cobros/:id` | GET / PUT / DELETE | `cobros.read` / `cobros.update` / `cobros.delete` |
+| `/api/cobros/:id/contabilizar` | POST | `cobros.post` |
+| `/api/cobros/:id/anular` | POST | `cobros.void` |
+| `/api/cobros/:id/aplicaciones[/:aplicacionId]` | POST / PUT / DELETE | `cobros.update` (las tres) |
+| `/api/estado-cuenta/:contactoId` | GET | `cobros.read` |
+
+El estado de cuenta va en ruta propia y no como subrecurso de `/cobros`:
+`GET /cobros/:id` parsea `:id` como UUID, así que una subruta dependería del
+orden de registro. **Cambiar el `contactoId` de un cobro (matriz fila 12) viaja
+por el `PUT` full-state**, no por un endpoint propio — el reemplazo en bloque
+ES el mecanismo (espejo de D-17/D-20 en ventas).
+
+Aclaraciones de shape que REQ-CXC-07 no fijaba: el estado de cuenta expone
+`fechaCorte` (el "hoy" del `ClockPort` con el que se derivaron los días de
+atraso — sin él el frontend no puede explicar el número que muestra) y el saldo
+a favor **agregado**; los cobros individuales se consultan por
+`GET /cobros?contactoId=`. Una venta con `fechaVencimiento` nula —el tipo de la
+columna lo permite aunque el writer exija vencimiento en CREDITO— se informa
+**nunca vencida, 0 días de atraso**, nunca un 500.
