@@ -94,13 +94,22 @@ describe('ItemListTable — estados de carga y vacío', () => {
 });
 
 describe('ItemListTable — filas', () => {
-  it('muestra los datos del ítem; el precio se muestra como viene (§4.5)', () => {
+  it('muestra los datos del ítem; el precio conserva TODA su precisión (§4.5)', () => {
     renderTable();
     expect(screen.getByText('Pollo entero')).toBeInTheDocument();
     expect(screen.getByText('P-01')).toBeInTheDocument();
     expect(screen.getByText('Producto')).toBeInTheDocument();
     expect(screen.getByText('kg')).toBeInTheDocument();
-    expect(screen.getByText('6.305000')).toBeInTheDocument();
+    // Se agrupan los miles y se usa coma decimal, pero los 6 decimales quedan
+    // intactos: el campo es Decimal(18,6) y redondear a 2 sería inventar un
+    // valor que el sistema nunca calculó.
+    expect(screen.getByText('6,305000')).toBeInTheDocument();
+    expect(screen.queryByText('6,31')).not.toBeInTheDocument();
+  });
+
+  it('agrupa los miles del precio sin tocar los decimales', () => {
+    renderTable({ items: [{ ...base, precioUnitarioSugerido: '1234567.891234' }] });
+    expect(screen.getByText('1.234.567,891234')).toBeInTheDocument();
   });
 
   it('muestra guion cuando codigo, unidadMedida y precio son null — nunca "undefined"', () => {

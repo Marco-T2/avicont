@@ -37,6 +37,46 @@ export function conceptosBloqueantes(err: unknown): string[] {
     : [];
 }
 
+export interface ItemBloqueante {
+  id: string;
+  nombre: string;
+  codigo: string | null;
+}
+
+// Extrae los ítems activos que bloquean la desactivación de una cuenta usada
+// como `cuentaIngresoId` (payload del error CUENTA_REFERENCIADA_POR_ITEMS).
+// REQ-ITM-05 / Anti-41: el backend manda la lista PRECISAMENTE para que el
+// admin no tenga que salir a buscar cuáles son; descartarla acá vaciaría el
+// requisito. Mismo rol que `conceptosBloqueantes` para su error hermano.
+export function itemsBloqueantes(err: unknown): ItemBloqueante[] {
+  const p = extractBackendError(err);
+  const items = p.details?.items;
+  if (!Array.isArray(items)) return [];
+  return items.filter((i): i is ItemBloqueante => {
+    if (typeof i !== 'object' || i === null) return false;
+    const candidato = i as Partial<ItemBloqueante>;
+    return (
+      typeof candidato.id === 'string' &&
+      typeof candidato.nombre === 'string' &&
+      (candidato.codigo === null || typeof candidato.codigo === 'string')
+    );
+  });
+}
+
+/**
+ * Arma el texto de los ítems bloqueantes para un toast, acotado a `tope` para
+ * que 40 ítems no tapen la pantalla. El código va cuando existe — es lo que el
+ * usuario tiene a mano para buscarlos en el listado.
+ */
+export function describirItemsBloqueantes(items: ItemBloqueante[], tope = 5): string {
+  const visibles = items
+    .slice(0, tope)
+    .map((i) => (i.codigo !== null ? `${i.codigo} — ${i.nombre}` : i.nombre))
+    .join(', ');
+  const restantes = items.length - tope;
+  return restantes > 0 ? `${visibles} y ${restantes} más` : visibles;
+}
+
 // Extrae el id del contacto existente que bloquea la creación por duplicado
 // de documento (payload del error CONTACTO_DOCUMENTO_DUPLICADO).
 // Útil para que el caller pueda ofrecer "ver contacto existente".

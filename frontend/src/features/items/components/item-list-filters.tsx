@@ -61,37 +61,50 @@ export function ItemListFilters({
         ) : null}
       </div>
 
+      {/* Las dos tandas tienen una chip "Todos" cada una. Sin la etiqueta a la
+          vista quedan dos "Todos" pegados y no se distingue cuál filtra qué —
+          el `aria-label` lo resolvía para el lector de pantalla y no para el ojo. */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <div
-          className="flex flex-wrap gap-2"
-          role="group"
-          aria-label="Filtrar por tipo"
-        >
-          {TIPOS.map(({ value, label }) => (
-            <ChipButton
-              key={value}
-              active={tipo === value}
-              onClick={() => onTipoChange(value)}
-            >
-              {label}
-            </ChipButton>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <span id="filtro-tipo-label" className="text-xs text-muted-foreground">
+            Tipo
+          </span>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-labelledby="filtro-tipo-label"
+          >
+            {TIPOS.map(({ value, label }) => (
+              <ChipButton
+                key={value}
+                active={tipo === value}
+                onClick={() => onTipoChange(value)}
+              >
+                {label}
+              </ChipButton>
+            ))}
+          </div>
         </div>
 
-        <div
-          className="flex flex-wrap gap-2"
-          role="group"
-          aria-label="Filtrar por estado"
-        >
-          {ESTADOS.map(({ value, label }) => (
-            <ChipButton
-              key={value}
-              active={estado === value}
-              onClick={() => onEstadoChange(value)}
-            >
-              {label}
-            </ChipButton>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <span id="filtro-estado-label" className="text-xs text-muted-foreground">
+            Estado
+          </span>
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-labelledby="filtro-estado-label"
+          >
+            {ESTADOS.map(({ value, label }) => (
+              <ChipButton
+                key={value}
+                active={estado === value}
+                onClick={() => onEstadoChange(value)}
+              >
+                {label}
+              </ChipButton>
+            ))}
+          </div>
         </div>
       </div>
     </div>

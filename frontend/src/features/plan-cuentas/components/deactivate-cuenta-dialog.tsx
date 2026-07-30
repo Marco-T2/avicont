@@ -14,6 +14,8 @@ import {
 import {
   backendErrorMessage,
   conceptosBloqueantes,
+  describirItemsBloqueantes,
+  itemsBloqueantes,
   CONCEPTO_LABELS,
   extractBackendError,
 } from '@/lib/error-messages';
@@ -27,10 +29,12 @@ interface DeactivateCuentaDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// AlertDialog de confirmación de desactivación. Maneja dos errores especiales
+// AlertDialog de confirmación de desactivación. Maneja tres errores especiales
 // del backend con CTAs apropiados:
 //   - CUENTA_CONFIGURADA_COMO_CONCEPTO: muestra los conceptos que bloquean +
 //     aviso para remapear en "Configuración contable".
+//   - CUENTA_REFERENCIADA_POR_ITEMS: muestra los ítems que la usan como cuenta
+//     de ingreso (REQ-ITM-05 / Anti-41).
 //   - CUENTA_REQUERIDA_SISTEMA_INMUTABLE: el message del backend ya es claro.
 export function DeactivateCuentaDialog({
   cuenta,
@@ -58,6 +62,21 @@ export function DeactivateCuentaDialog({
               label: 'Configuración',
               onClick: () => toast.info('Pantalla "Configuración contable" — próximamente'),
             },
+          });
+          onOpenChange(false);
+          return;
+        }
+        // REQ-ITM-05 / Anti-41: el backend manda en `details.items` los ítems
+        // activos que usan la cuenta como cuenta de ingreso. Sin esta rama el
+        // admin leía "re-mapealos" sin saber CUÁLES, y tenía que salir a
+        // buscarlos a mano en el catálogo.
+        if (payload.code === 'CUENTA_REFERENCIADA_POR_ITEMS') {
+          const items = itemsBloqueantes(err);
+          toast.error('No se puede desactivar — cuenta de ingreso de ítems activos', {
+            description:
+              items.length > 0
+                ? `Ítems: ${describirItemsBloqueantes(items)}. Asignales otra cuenta de ingreso (o desactivalos) antes de desactivar esta cuenta.`
+                : backendErrorMessage(err, 'Re-mapeá los ítems antes de desactivar'),
           });
           onOpenChange(false);
           return;

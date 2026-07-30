@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import type { Item, TipoItem } from '@/types/api';
 
 import { TIPO_ITEM_OPTIONS } from '../lib/build-items-params';
+import { formatearDecimalDisplay } from '../lib/formatear-decimal';
 
 const TIPO_LABEL: Record<TipoItem, string> = Object.fromEntries(
   TIPO_ITEM_OPTIONS.map(({ value, label }) => [value, label]),
@@ -119,10 +120,12 @@ export function ItemListTable({
               <TableCell className="text-muted-foreground">
                 {item.unidadMedida ?? '—'}
               </TableCell>
-              {/* §4.5: el precio es un string decimal y se muestra como viene —
-                  sin Number(), sin recalcular. */}
+              {/* §4.5: el precio es un string decimal; el formateo agrupa miles
+                  y no toca la precisión — sin Number(), sin recalcular. */}
               <TableCell className="text-right font-mono text-xs tabular-nums">
-                {item.precioUnitarioSugerido ?? '—'}
+                {item.precioUnitarioSugerido !== null
+                  ? formatearDecimalDisplay(item.precioUnitarioSugerido)
+                  : '—'}
               </TableCell>
               <TableCell>
                 <span
