@@ -6,6 +6,7 @@ import { PrismaService } from '@/common/prisma.service';
 import { ORIGEN_TIPO_VENTA } from '@/comprobantes/ports/comprobante-sistema-writer.port';
 
 import {
+  AplicacionDesvinculadaData,
   AplicacionDeVenta,
   ComprobanteDeVenta,
   LineaVentaData,
@@ -41,6 +42,7 @@ export class PrismaVentaRepository extends VentaRepositoryPort {
         condicionPago: data.condicionPago,
         fechaVencimiento: data.fechaVencimiento,
         glosa: data.glosa,
+        cuentaDestinoId: data.cuentaDestinoId,
         montoTotal: data.montoTotal,
         createdByUserId: data.createdByUserId,
         lineas: { create: this.aLineasCreate(tenantId, data.lineas) },
@@ -69,6 +71,7 @@ export class PrismaVentaRepository extends VentaRepositoryPort {
         condicionPago: data.condicionPago,
         fechaVencimiento: data.fechaVencimiento,
         glosa: data.glosa,
+        cuentaDestinoId: data.cuentaDestinoId,
         montoTotal: data.montoTotal,
         lineas: { create: this.aLineasCreate(tenantId, data.lineas) },
       },
@@ -217,6 +220,52 @@ export class PrismaVentaRepository extends VentaRepositoryPort {
         numero: numeroPorVenta.get(venta.id) ?? null,
         totalAplicado: aplicadoPorVenta.get(venta.id) ?? new Prisma.Decimal(0),
       }));
+  }
+
+  async actualizarMontoAplicacion(
+    tenantId: string,
+    aplicacionId: string,
+    montoAplicado: Prisma.Decimal,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    // `update` (no updateMany) para que la aplicación ajena o inexistente
+    // lance P2025 en vez de terminar en silencio (mismo criterio que
+    // `eliminar`). El scope de tenant va en el where (§4.2).
+    await tx.aplicacionCobro.update({
+      where: { id: aplicacionId, organizationId: tenantId },
+      data: { montoAplicado },
+    });
+  }
+
+  async eliminarAplicaciones(
+    tenantId: string,
+    aplicacionIds: string[],
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (aplicacionIds.length === 0) return;
+    // deleteMany scopeado: los ids vienen de `listarAplicaciones` del MISMO
+    // tenant en la MISMA TX, así que un id ajeno acá simplemente no borra nada.
+    await tx.aplicacionCobro.deleteMany({
+      where: { organizationId: tenantId, id: { in: aplicacionIds } },
+    });
+  }
+
+  async registrarAplicacionesDesvinculadas(
+    tenantId: string,
+    aplicaciones: AplicacionDesvinculadaData[],
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (aplicaciones.length === 0) return;
+    await tx.aplicacionCobroDesvinculada.createMany({
+      data: aplicaciones.map((a) => ({
+        organizationId: tenantId,
+        cobroId: a.cobroId,
+        ventaId: a.ventaId,
+        montoAplicado: a.montoAplicado,
+        motivo: a.motivo,
+        userId: a.userId,
+      })),
+    });
   }
 
   private aLineasCreate(

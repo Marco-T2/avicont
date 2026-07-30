@@ -41,6 +41,13 @@ export interface VentaCreateData {
   /** Obligatoria en CREDITO, prohibida en CONTADO — lo valida el service. */
   fechaVencimiento: Date | null;
   glosa: string;
+  /**
+   * Cuenta destino ELEGIDA de la venta CONTADO (PA-1), ya validada como
+   * elegible por el service. `null` en CREDITO (su contrapartida es CxC). Se
+   * PERSISTE: regenerar el asiento la lee de acá, nunca de la línea de débito
+   * del comprobante (el documento no deriva cabecera desde su output).
+   */
+  cuentaDestinoId: string | null;
   /** Σ de subtotales YA redondeados, calculada por el service (REQ-VTA-03). */
   montoTotal: Prisma.Decimal;
   createdByUserId: string;
@@ -58,6 +65,8 @@ export interface VentaReemplazoData {
   condicionPago: CondicionPago;
   fechaVencimiento: Date | null;
   glosa: string;
+  /** Ver `VentaCreateData.cuentaDestinoId` — mismo contrato. */
+  cuentaDestinoId: string | null;
   montoTotal: Prisma.Decimal;
   lineas: LineaVentaData[];
 }
@@ -94,6 +103,19 @@ export interface VentaEnCartera {
   venta: Venta;
   numero: string | null;
   totalAplicado: Prisma.Decimal;
+}
+
+/**
+ * Fila del rastro append-only `AplicacionCobroDesvinculada` (B-14): lo que
+ * queda del acto cuando una `AplicacionCobro` se elimina físicamente al
+ * anular la venta, cambiarle el contacto o recortarla a cero (D-21).
+ */
+export interface AplicacionDesvinculadaData {
+  cobroId: string;
+  ventaId: string;
+  montoAplicado: Prisma.Decimal;
+  motivo: string;
+  userId: string;
 }
 
 export interface VentaListarFiltros {
@@ -198,4 +220,41 @@ export abstract class VentaRepositoryPort {
     contactoId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<VentaEnCartera[]>;
+
+  /**
+   * Recorte parcial (D-21): baja el `montoAplicado` de UNA aplicación. El
+   * monto viene ya calculado por el dominio (`recortarAplicacionesLifo`) y es
+   * siempre > 0 — una aplicación en 0 no se actualiza, se elimina. `tx`
+   * OBLIGATORIO: el recorte es parte de la edición de la venta y no existe
+   * suelto.
+   */
+  abstract actualizarMontoAplicacion(
+    tenantId: string,
+    aplicacionId: string,
+    montoAplicado: Prisma.Decimal,
+    tx: Prisma.TransactionClient,
+  ): Promise<void>;
+
+  /**
+   * Borrado FÍSICO de aplicaciones (D-12): no hay soft-delete a propósito —
+   * un `deletedAt` obligaría a TODA derivación de `Σ montoAplicado` a llevar
+   * `WHERE`, y un filtro olvidado sobre-aplica plata. El rastro va aparte
+   * (`registrarAplicacionesDesvinculadas`), en la MISMA TX.
+   */
+  abstract eliminarAplicaciones(
+    tenantId: string,
+    aplicacionIds: string[],
+    tx: Prisma.TransactionClient,
+  ): Promise<void>;
+
+  /**
+   * Registra el rastro append-only en `AplicacionCobroDesvinculada` (B-14).
+   * Una fila por aplicación eliminada, en la MISMA TX que el borrado físico:
+   * borrar sin rastro pierde el acto, rastrear sin borrar duplica plata.
+   */
+  abstract registrarAplicacionesDesvinculadas(
+    tenantId: string,
+    aplicaciones: AplicacionDesvinculadaData[],
+    tx: Prisma.TransactionClient,
+  ): Promise<void>;
 }

@@ -152,6 +152,7 @@ describe('PrismaVentaRepository (integration)', () => {
     condicionPago: CondicionPago.CONTADO,
     fechaVencimiento: null,
     glosa: 'Venta al contado a Avícola Sur',
+    cuentaDestinoId: null,
     montoTotal: new Prisma.Decimal('31.53'),
     createdByUserId: USER_ID,
     lineas: [linea()],
@@ -292,6 +293,7 @@ describe('PrismaVentaRepository (integration)', () => {
             condicionPago: CondicionPago.CONTADO,
             fechaVencimiento: null,
             glosa: 'Venta editada',
+            cuentaDestinoId: null,
             montoTotal: new Prisma.Decimal('800.00'),
             lineas: [
               linea({
@@ -330,6 +332,7 @@ describe('PrismaVentaRepository (integration)', () => {
             condicionPago: CondicionPago.CONTADO,
             fechaVencimiento: null,
             glosa: 'Venta al contado a Granja Norte',
+            cuentaDestinoId: null,
             montoTotal: new Prisma.Decimal('31.53'),
             lineas: [linea()],
           },
@@ -354,6 +357,7 @@ describe('PrismaVentaRepository (integration)', () => {
               condicionPago: CondicionPago.CONTADO,
               fechaVencimiento: null,
               glosa: 'Intento cross-tenant',
+              cuentaDestinoId: null,
               montoTotal: new Prisma.Decimal('1.00'),
               lineas: [
                 linea({
@@ -608,6 +612,126 @@ describe('PrismaVentaRepository (integration)', () => {
 
       await expect(repo.listarVentasEnCartera(tenantA, contactoA2)).resolves.toEqual([]);
       await expect(repo.listarVentasEnCartera(tenantB, contactoA)).resolves.toEqual([]);
+    });
+  });
+
+  describe('cuentaDestinoId (PA-1)', () => {
+    it('crear la persiste y reemplazar la actualiza', async () => {
+      const venta = await crearVenta(tenantA, { cuentaDestinoId: cuentaDestinoA });
+      expect(venta.cuentaDestinoId).toBe(cuentaDestinoA);
+
+      const editada = await prisma.$transaction((tx) =>
+        repo.reemplazar(tenantA, venta.id, { ...datosBase(), cuentaDestinoId: null }, tx),
+      );
+      expect(editada.cuentaDestinoId).toBeNull();
+    });
+  });
+
+  describe('actualizarMontoAplicacion (recorte parcial, D-21)', () => {
+    it('baja el monto de UNA aplicación sin tocar las demás', async () => {
+      const venta = await crearVenta(tenantA, { montoTotal: new Prisma.Decimal('1000.00') });
+      const app1 = await aplicarCobro(venta.id, '500.00', new Date('2026-07-21T10:00:00Z'));
+      const app2 = await aplicarCobro(venta.id, '500.00', new Date('2026-07-22T10:00:00Z'));
+
+      await prisma.$transaction((tx) =>
+        repo.actualizarMontoAplicacion(tenantA, app2.id, new Prisma.Decimal('300.00'), tx),
+      );
+
+      const filas = await prisma.aplicacionCobro.findMany({
+        where: { organizationId: tenantA, ventaId: venta.id },
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(filas.map((f) => f.montoAplicado.toString())).toEqual(['500', '300']);
+      expect(filas[0]?.id).toBe(app1.id);
+    });
+
+    it('no cruza tenants: la aplicación ajena rebota con P2025 exacto (§4.2)', async () => {
+      const venta = await crearVenta(tenantA, { montoTotal: new Prisma.Decimal('1000.00') });
+      const app = await aplicarCobro(venta.id, '500.00', new Date('2026-07-21T10:00:00Z'));
+
+      await expect(
+        prisma.$transaction((tx) =>
+          repo.actualizarMontoAplicacion(tenantB, app.id, new Prisma.Decimal('1.00'), tx),
+        ),
+      ).rejects.toMatchObject({ code: 'P2025' });
+
+      const intacta = await prisma.aplicacionCobro.findFirstOrThrow({
+        where: { organizationId: tenantA, id: app.id },
+      });
+      expect(intacta.montoAplicado.toString()).toBe('500');
+    });
+  });
+
+  describe('eliminarAplicaciones + registrarAplicacionesDesvinculadas (B-14)', () => {
+    it('borra físicamente SOLO las indicadas', async () => {
+      const venta = await crearVenta(tenantA, { montoTotal: new Prisma.Decimal('1000.00') });
+      const app1 = await aplicarCobro(venta.id, '500.00', new Date('2026-07-21T10:00:00Z'));
+      const app2 = await aplicarCobro(venta.id, '500.00', new Date('2026-07-22T10:00:00Z'));
+
+      await prisma.$transaction((tx) => repo.eliminarAplicaciones(tenantA, [app2.id], tx));
+
+      const filas = await prisma.aplicacionCobro.findMany({
+        where: { organizationId: tenantA, ventaId: venta.id },
+      });
+      expect(filas.map((f) => f.id)).toEqual([app1.id]);
+    });
+
+    it('no cruza tenants: los ids ajenos sobreviven (§4.2)', async () => {
+      const venta = await crearVenta(tenantA, { montoTotal: new Prisma.Decimal('1000.00') });
+      const app = await aplicarCobro(venta.id, '500.00', new Date('2026-07-21T10:00:00Z'));
+
+      await prisma.$transaction((tx) => repo.eliminarAplicaciones(tenantB, [app.id], tx));
+
+      await expect(
+        prisma.aplicacionCobro.count({ where: { organizationId: tenantA, id: app.id } }),
+      ).resolves.toBe(1);
+    });
+
+    it('registra el rastro append-only con organizationId, monto, motivo y userId', async () => {
+      const venta = await crearVenta(tenantA, { montoTotal: new Prisma.Decimal('1000.00') });
+      const app = await aplicarCobro(venta.id, '500.00', new Date('2026-07-21T10:00:00Z'));
+
+      await prisma.$transaction((tx) =>
+        repo.registrarAplicacionesDesvinculadas(
+          tenantA,
+          [
+            {
+              cobroId: app.cobroId,
+              ventaId: venta.id,
+              montoAplicado: app.montoAplicado,
+              motivo: 'Anulación de la venta: mercadería devuelta por el cliente',
+              userId: USER_ID,
+            },
+          ],
+          tx,
+        ),
+      );
+
+      const rastro = await prisma.aplicacionCobroDesvinculada.findMany({
+        where: { organizationId: tenantA, ventaId: venta.id },
+      });
+      expect(rastro).toHaveLength(1);
+      expect(rastro[0]).toMatchObject({
+        organizationId: tenantA,
+        cobroId: app.cobroId,
+        ventaId: venta.id,
+        motivo: 'Anulación de la venta: mercadería devuelta por el cliente',
+        userId: USER_ID,
+      });
+      expect(rastro[0]?.montoAplicado.toString()).toBe('500');
+    });
+
+    it('con lista vacía no escribe nada', async () => {
+      const venta = await crearVenta(tenantA);
+
+      await prisma.$transaction((tx) => repo.registrarAplicacionesDesvinculadas(tenantA, [], tx));
+      await prisma.$transaction((tx) => repo.eliminarAplicaciones(tenantA, [], tx));
+
+      await expect(
+        prisma.aplicacionCobroDesvinculada.count({
+          where: { organizationId: tenantA, ventaId: venta.id },
+        }),
+      ).resolves.toBe(0);
     });
   });
 });
