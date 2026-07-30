@@ -30,7 +30,18 @@ export class HealthController {
     return this.health.check([
       () => this.prisma.pingCheck('database', this.prismaService),
       () => this.memory.checkHeap('memory_heap', 150 * 1024 * 1024), // 150MB
-      () => this.memory.checkRSS('memory_rss', 300 * 1024 * 1024), // 300MB
+      // 512MB. Medido el 2026-07-29: el proceso compilado (`node dist/main.js`)
+      // arranca en ~307MB en `main` y ~313MB con el módulo de ventas — o sea que
+      // el umbral anterior de 300MB YA lo excedía `main`, y las corridas verdes
+      // de `ui-gate` venían saliendo por suerte, con el runner de CI cayendo
+      // apenas por debajo. El siguiente módulo que alguien agregara lo rompía.
+      //
+      // 307MB no es una fuga: es lo que pesa NestJS + Prisma + AWS SDK S3 + OTel
+      // con ~25 módulos. El RSS incluye memoria mapeada y compartida y no baja
+      // pronto tras un GC, así que como señal de salud es tosco — la accionable
+      // es `memory_heap`, que sigue en 150MB y verde. Este umbral queda como red
+      // de un leak GRUESO, que no se detiene en 320MB.
+      () => this.memory.checkRSS('memory_rss', 512 * 1024 * 1024), // 512MB
       () =>
         this.disk.checkStorage('disk', {
           path: '/',
