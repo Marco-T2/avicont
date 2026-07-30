@@ -1,5 +1,6 @@
 import {
   ClaseCuenta,
+  CondicionPago,
   EstadoComprobante,
   Moneda,
   NaturalezaCuenta,
@@ -719,6 +720,41 @@ describe('VentasService (integration)', () => {
       expect(comprobante.estado).toBe(EstadoComprobante.CONTABILIZADO);
       expect(comprobante.lineas[0]?.debitoBob.toString()).toBe('800');
       expect(comprobante.lineas[1]?.creditoBob.toString()).toBe('800');
+    });
+
+    it('flip CREDITO → CONTADO con un cobro aplicado → rechaza y nada se mueve (REQ-VTA-06 fila 7 / REQ-CXC-03)', async () => {
+      const creada = await service.crear(
+        tenantA,
+        USER_ID,
+        inputContado({ condicionPago: 'CREDITO', fechaVencimiento: '2026-08-15' }),
+      );
+      await service.contabilizar(tenantA, creada.venta.id, USER_ID);
+      const aplicacion = await aplicarCobro(creada.venta.id, '10.00', new Date('2026-07-21'));
+
+      await expect(
+        service.editar(tenantA, creada.venta.id, USER_ID, inputContado()),
+      ).rejects.toMatchObject({
+        code: 'VENTA_CONDICION_PAGO_CON_APLICACIONES',
+        httpStatus: 422,
+      });
+
+      // Antes del guard esto pasaba y dejaba el estado que REQ-CXC-03 prohíbe
+      // crear: la venta fuera de la cartera (CONTADO) con su aplicación viva,
+      // el asiento debitando Caja —dos veces la misma plata— y CERO rastro.
+      const venta = await prisma.venta.findUnique({ where: { id: creada.venta.id } });
+      expect(venta?.condicionPago).toBe(CondicionPago.CREDITO);
+
+      const comprobante = await comprobanteDb(creada.comprobanteId);
+      const debe = comprobante?.lineas.filter((l) => !l.debitoBob.isZero()) ?? [];
+      expect(debe).toHaveLength(1);
+      expect(debe[0]?.cuentaId).toBe(cuentaCxc);
+
+      const viva = await prisma.aplicacionCobro.findUnique({ where: { id: aplicacion.id } });
+      expect(viva).not.toBeNull();
+      const rastro = await prisma.aplicacionCobroDesvinculada.count({
+        where: { ventaId: creada.venta.id },
+      });
+      expect(rastro).toBe(0);
     });
 
     it('mover la fechaContable a otro mes abierto CONSERVA el número con su YYMM original (§4.3)', async () => {

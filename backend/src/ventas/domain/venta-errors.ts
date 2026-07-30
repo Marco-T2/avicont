@@ -86,6 +86,34 @@ export class VentaCuentaDestinoNoElegibleError extends InvalidStateError {
   }
 }
 
+/**
+ * Pasar una venta de CREDITO a CONTADO teniendo aplicaciones vivas
+ * (REQ-VTA-06 fila 7, agregado 2026-07-30 por auditoría de la Fase 5).
+ *
+ * Una venta CONTADO NO integra la cartera (D-04, REQ-VTA-04): se cobró en el
+ * acto. Dejar que el flip pase con aplicaciones vivas deja el estado que
+ * REQ-CXC-03 prohíbe crear —una `AplicacionCobro` contra una venta fuera de la
+ * cartera— por la puerta de atrás: la venta desaparece del estado de cuenta
+ * pero su aplicación sigue restando saldo a favor del cobro, y el asiento pasa
+ * a debitar Caja, que queda debitada DOS veces por un solo movimiento real.
+ *
+ * Rechazar y no desvincular en silencio es la misma postura que la fila 8 de
+ * REQ-CXC-06 (`COBRO_MONTO_INFERIOR_APLICADO`): cuando el reparto es entre
+ * cobros distinguibles, el sistema NO elige — el usuario desaplica primero.
+ * Desvincular tampoco arreglaría el doble débito de Caja.
+ *
+ * Code: VENTA_CONDICION_PAGO_CON_APLICACIONES — 422.
+ */
+export class VentaCondicionPagoConAplicacionesError extends InvalidStateError {
+  constructor(ventaId: string, aplicacionesVivas: number) {
+    super(
+      'VENTA_CONDICION_PAGO_CON_APLICACIONES',
+      'No se puede pasar la venta a CONTADO mientras tenga cobros aplicados. Desaplicá los cobros primero.',
+      { ventaId, aplicacionesVivas },
+    );
+  }
+}
+
 /** Code: VENTA_ITEM_INACTIVO — 422. El catálogo desactiva, no borra (REQ-ITM): no se vende un ítem inactivo. */
 export class VentaItemInactivoError extends InvalidStateError {
   constructor(itemId: string) {

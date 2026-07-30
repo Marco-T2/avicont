@@ -644,6 +644,7 @@ describe('VentasService', () => {
     return (repo.reemplazar.mock.calls[0] as unknown[])[2] as {
       contactoId: string;
       fechaContable: Date;
+      condicionPago: string;
       cuentaDestinoId: string | null;
       montoTotal: Prisma.Decimal;
       lineas: { cuentaIngresoId: string; subtotal: Prisma.Decimal }[];
@@ -1082,6 +1083,68 @@ describe('VentasService', () => {
           ],
         });
       }
+    });
+
+    describe('flip CREDITO → CONTADO (REQ-VTA-06 fila 7 / REQ-CXC-03)', () => {
+      const ventaCredito = () =>
+        ventaRow({
+          condicionPago: 'CREDITO',
+          fechaVencimiento: new Date(Date.UTC(2026, 7, 15)),
+          cuentaDestinoId: null,
+        });
+
+      it('con aplicaciones vivas → VENTA_CONDICION_PAGO_CON_APLICACIONES (422) y nada se escribe', async () => {
+        repo.findById.mockResolvedValue(ventaCredito());
+        repo.listarAplicaciones.mockResolvedValue([
+          aplicacion('app-1', 'cobro-1', '31.53', '2026-07-21T10:00:00Z'),
+        ]);
+
+        await expect(service.editar(TENANT, VENTA_ID, USER, inputContado())).rejects.toMatchObject({
+          code: 'VENTA_CONDICION_PAGO_CON_APLICACIONES',
+          httpStatus: 422,
+        });
+
+        // Ninguna escritura: ni la venta, ni el asiento, ni las aplicaciones.
+        expect(repo.reemplazar).not.toHaveBeenCalled();
+        expect(writer.regenerarLineasSistema).not.toHaveBeenCalled();
+        expect(repo.eliminarAplicaciones).not.toHaveBeenCalled();
+        expect(repo.registrarAplicacionesDesvinculadas).not.toHaveBeenCalled();
+      });
+
+      it('el rechazo NO depende de que el contacto también cambie: el flip manda', async () => {
+        repo.findById.mockResolvedValue(ventaCredito());
+        repo.listarAplicaciones.mockResolvedValue([
+          aplicacion('app-1', 'cobro-1', '31.53', '2026-07-21T10:00:00Z'),
+        ]);
+
+        await expect(
+          service.editar(TENANT, VENTA_ID, USER, inputContado({ contactoId: CONTACTO_2 })),
+        ).rejects.toMatchObject({ code: 'VENTA_CONDICION_PAGO_CON_APLICACIONES' });
+        // Si ganara la rama del contacto, desvincularía y el flip pasaría.
+        expect(repo.eliminarAplicaciones).not.toHaveBeenCalled();
+      });
+
+      it('SIN aplicaciones el flip procede: la regla protege el vínculo, no la condición de pago', async () => {
+        repo.findById.mockResolvedValue(ventaCredito());
+        repo.listarAplicaciones.mockResolvedValue([]);
+        repo.reemplazar.mockResolvedValue(ventaRow());
+
+        await service.editar(TENANT, VENTA_ID, USER, inputContado());
+
+        expect(datosReemplazo().condicionPago).toBe('CONTADO');
+      });
+
+      it('CONTADO → CREDITO con aplicaciones NO se bloquea: esa dirección devuelve la venta a la cartera', async () => {
+        repo.findById.mockResolvedValue(ventaRow());
+        repo.listarAplicaciones.mockResolvedValue([
+          aplicacion('app-1', 'cobro-1', '31.53', '2026-07-21T10:00:00Z'),
+        ]);
+        repo.reemplazar.mockResolvedValue(ventaRow({ condicionPago: 'CREDITO' }));
+
+        await service.editar(TENANT, VENTA_ID, USER, inputCredito());
+
+        expect(datosReemplazo().condicionPago).toBe('CREDITO');
+      });
     });
   });
 

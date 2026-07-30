@@ -209,6 +209,24 @@ La pantalla FIFO nunca ofrece ninguno de los dos casos, pero REQ-CXC-05 es
 explícita en que **el backend valida sobre lo recibido** — la sugerencia del
 frontend no es un control de seguridad.
 
+**Y el predicado DEBE sostenerse también contra las mutaciones de las puntas,
+no sólo contra la escritura del vínculo** (agregado 2026-07-30 por auditoría de
+la Fase 5). Este guard corre al crear y editar aplicaciones; una venta puede
+salir de la cartera DESPUÉS, y ahí el vínculo queda apuntando a lo que esta
+regla prohíbe:
+
+- Anular la venta o el cobro → ya resuelto: ambos flujos desvinculan con rastro
+  B-14 (REQ-VTA-07, REQ-CXC-06 fila 9).
+- Cambiar el contacto de cualquiera de las dos puntas → ya resuelto: desvincula
+  con rastro (REQ-VTA-06 fila 6, REQ-CXC-06 fila 12).
+- **Pasar la venta de CREDITO a CONTADO** → era el hueco: la venta salía de la
+  cartera y la aplicación sobrevivía. Se cierra en REQ-VTA-06 **fila 7** con
+  422 `VENTA_CONDICION_PAGO_CON_APLICACIONES`.
+
+Regla general para el próximo invariante sobre un vínculo: enforzarlo en la
+escritura del vínculo **y** revisar toda mutación de las entidades vinculadas
+que pueda llevar al mismo estado por otro camino.
+
 **Anti-01**: este predicado es el MISMO de REQ-CXC-01 y DEBE tener una sola
 definición en el código (`domain/cartera.ts`), consumida tanto por la lectura
 —qué aparece en el estado de cuenta— como por la escritura —a qué venta puede
