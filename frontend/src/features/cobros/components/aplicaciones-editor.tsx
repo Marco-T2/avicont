@@ -187,8 +187,13 @@ function AplicacionRow({
   // venta — el estado de cuenta no trae las SALDADAS ni el número correlativo.
   const { data: ventaDetalle, isLoading: cargandoVenta } = useVenta(aplicacion.ventaId);
 
-  const montoValido = (aCentavosSeguro(monto) ?? 0n) > 0n;
-  const cambio = monto !== aplicacion.montoAplicado;
+  const montoEnCentavos = aCentavosSeguro(monto);
+  const montoValido = (montoEnCentavos ?? 0n) > 0n;
+  // Comparación por VALOR, no por string: el backend canoniza a 2 decimales
+  // (`toFixed(2)`), así que tipear "100" contra un "100.00" guardado no es un
+  // cambio — comparando texto el botón quedaba encendido para siempre y
+  // reenviaba el mismo importe.
+  const cambio = montoEnCentavos !== aCentavosSeguro(aplicacion.montoAplicado);
   const pending = editarMutation.isPending || eliminarMutation.isPending;
 
   // Mientras el detalle llega, la venta del estado de cuenta (si tiene saldo)
@@ -247,7 +252,14 @@ function AplicacionRow({
             onClick={() =>
               editarMutation.mutate(
                 { aplicacionId: aplicacion.id, body: { montoAplicado: monto } },
-                { onSuccess: () => setMonto(monto) },
+                {
+                  // El PUT responde 204 sin body, así que el valor canónico se
+                  // deriva local con los mismos centavos del resto del feature:
+                  // el input queda en "100.00" como lo muestra toda la app.
+                  onSuccess: () => {
+                    if (montoEnCentavos !== null) setMonto(deCentavos(montoEnCentavos));
+                  },
+                },
               )
             }
           >

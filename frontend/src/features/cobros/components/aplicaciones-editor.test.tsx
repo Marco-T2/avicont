@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,9 +33,11 @@ vi.mock('../api/editar-aplicacion', () => ({ editarAplicacion: vi.fn() }));
 vi.mock('../api/eliminar-aplicacion', () => ({ eliminarAplicacion: vi.fn() }));
 
 import { crearAplicacion } from '../api/crear-aplicacion';
+import { editarAplicacion } from '../api/editar-aplicacion';
 import { AplicacionesEditor } from './aplicaciones-editor';
 
 const mockCrearAplicacion = vi.mocked(crearAplicacion);
+const mockEditarAplicacion = vi.mocked(editarAplicacion);
 
 function cobro(overrides: Partial<Cobro> = {}): Cobro {
   return {
@@ -83,6 +85,7 @@ beforeEach(() => {
   hasMock.mockReset();
   hasMock.mockReturnValue(true);
   mockCrearAplicacion.mockReset();
+  mockEditarAplicacion.mockReset();
   ventaDetalleMock.mockReset();
   ventaDetalleMock.mockReturnValue({ data: undefined, isLoading: false });
 });
@@ -205,5 +208,64 @@ describe('AplicacionesEditor — cobro CONTABILIZADO', () => {
       ventaId: 'v-1',
       montoAplicado: '300',
     });
+  });
+});
+
+// ============================================================
+// El botón "Guardar" de una aplicación tiene que APAGARSE tras guardar.
+//
+// El backend canoniza el monto a 2 decimales (`toFixed(2)` en
+// cobro-response.dto.ts), así que tipear "100" y guardar dejaba el input en
+// "100" contra un prop que pasaba a "100.00": la comparación por STRING seguía
+// dando "hay cambios" y el botón quedaba encendido para siempre, invitando a
+// reenviar lo mismo. El `onSuccess: () => setMonto(monto)` que había era una
+// auto-asignación: se leía como el resync que faltaba y no hacía nada.
+//
+// El PUT responde 204 sin body, así que el valor canónico no viene de la
+// respuesta: se deriva local con los mismos centavos que usa el resto.
+// ============================================================
+
+describe('AplicacionesEditor — el monto editado se asienta tras guardar', () => {
+  function cobroConAplicacionDe(montoAplicado: string): Cobro {
+    return cobro({
+      aplicaciones: [
+        { id: 'ap-1', ventaId: 'v-1', montoAplicado, createdAt: '2026-07-30T12:00:00Z' },
+      ],
+    });
+  }
+
+  it('tras guardar "250.5" el input queda canónico en "250.50" y el botón se apaga', async () => {
+    mockEditarAplicacion.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderEditor(cobroConAplicacionDe('100.00'));
+
+    const input = screen.getByRole('textbox', { name: /monto aplicado/i });
+    const guardar = screen.getByRole('button', { name: /^guardar$/i });
+    expect(guardar).toBeDisabled(); // sin cambios todavía
+
+    await user.clear(input);
+    await user.type(input, '250.5');
+    expect(guardar).toBeEnabled();
+
+    // Al backend va lo que el usuario escribió: el DTO acepta 1 o 2 decimales.
+    await user.click(guardar);
+    expect(mockEditarAplicacion).toHaveBeenCalledWith('cobro-1', 'ap-1', {
+      montoAplicado: '250.5',
+    });
+
+    // Y al asentarse, el input muestra la forma canónica de 2 decimales.
+    await waitFor(() => expect(input).toHaveValue('250.50'));
+  });
+
+  it('un monto equivalente pero escrito distinto NO cuenta como cambio', async () => {
+    const user = userEvent.setup();
+    renderEditor(cobroConAplicacionDe('250.50'));
+
+    const input = screen.getByRole('textbox', { name: /monto aplicado/i });
+    await user.clear(input);
+    await user.type(input, '250.5');
+
+    // Mismo importe, otra escritura: no hay nada que mandar al backend.
+    expect(screen.getByRole('button', { name: /^guardar$/i })).toBeDisabled();
   });
 });
