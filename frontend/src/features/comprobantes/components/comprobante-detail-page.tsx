@@ -16,7 +16,7 @@ import {
 import { useContactos } from '@/features/contactos/hooks/use-contactos';
 import { useCuentas } from '@/features/plan-cuentas/hooks/use-cuentas';
 
-import { formatearFechaContable } from '../lib/formatear-fecha-contable';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import {
   prefijoDe,
   secuenciaDe,

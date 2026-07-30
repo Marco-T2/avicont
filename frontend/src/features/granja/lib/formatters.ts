@@ -1,7 +1,8 @@
 // Formateadores puros para el módulo granja.
 // Sin React, sin I/O, sin side effects — testables directamente.
 
-// Mismo patrón que features/comprobantes/lib/formatear-fecha-contable.ts
+// Mismo patrón que src/lib/formatear-fecha-contable.ts (no se reusa porque
+// granja formatea con su propio criterio de presentación).
 // CLAUDE.md §4.6: FechaContable es YYYY-MM-DD; renderizar en America/La_Paz.
 const FECHA_FORMAT_GRANJA = new Intl.DateTimeFormat('es-BO', {
   timeZone: 'America/La_Paz',

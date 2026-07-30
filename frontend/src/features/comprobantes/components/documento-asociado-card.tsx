@@ -4,7 +4,7 @@ import { PermissionButton } from '@/components/shared/permission-button';
 import { PERMISSIONS } from '@/lib/permissions';
 import type { DocumentoFisico } from '@/types/api';
 
-import { formatearFechaContable } from '../lib/formatear-fecha-contable';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 
 // Desasociar exige AMBOS permisos (AND), igual que el backend:
 // comprobantes.controller.ts:200 → @RequirePermissions('documentos-fisicos.update','asientos.update').

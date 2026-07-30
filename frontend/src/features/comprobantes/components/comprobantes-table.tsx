@@ -16,7 +16,7 @@ import {
   etiquetaDocumentoNumero,
   etiquetaDocumentoTipo,
 } from '../lib/etiquetas-resumen';
-import { formatearFechaContable } from '../lib/formatear-fecha-contable';
+import { formatearFechaContable } from '@/lib/formatear-fecha-contable';
 import {
   formatearNumeroCorrelativo,
   prefijoDe,
