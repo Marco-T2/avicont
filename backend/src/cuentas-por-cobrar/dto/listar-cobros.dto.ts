@@ -7,7 +7,7 @@ import { EsFechaContableIso } from '@/common/validators/es-fecha-contable-iso';
 export const LIST_DEFAULT_PAGE_SIZE = 50;
 export const LIST_MAX_PAGE_SIZE = 100;
 
-export class ListarVentasQueryDto {
+export class ListarCobrosQueryDto {
   @ApiPropertyOptional({ format: 'uuid', description: 'Filtra por cliente.' })
   @IsOptional()
   @IsUUID()
