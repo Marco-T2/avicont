@@ -454,4 +454,20 @@ describe('PrismaCarteraReaderAdapter (integration)', () => {
       expect(cobros[0]?.totalAplicado.isZero()).toBe(true);
     });
   });
+
+  describe('obtenerRazonSocialContacto (snapshot para la glosa del cobro, Q-2)', () => {
+    it('devuelve la razón social del contacto del tenant', async () => {
+      await expect(reader.obtenerRazonSocialContacto(tenantA, clienteA)).resolves.toBe(
+        'Avícola Sur',
+      );
+    });
+
+    it('no cruza tenants: el contacto ajeno devuelve null (§4.2)', async () => {
+      await expect(reader.obtenerRazonSocialContacto(tenantB, clienteA)).resolves.toBeNull();
+    });
+
+    it('contacto inexistente devuelve null', async () => {
+      await expect(reader.obtenerRazonSocialContacto(tenantA, 'no-existe')).resolves.toBeNull();
+    });
+  });
 });

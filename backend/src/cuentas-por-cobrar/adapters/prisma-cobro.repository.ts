@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { type CondicionPago, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/common/prisma.service';
-import { ORIGEN_TIPO_COBRO } from '@/comprobantes/ports/comprobante-sistema-writer.port';
+import {
+  ORIGEN_TIPO_COBRO,
+  ORIGEN_TIPO_VENTA,
+} from '@/comprobantes/ports/comprobante-sistema-writer.port';
 
 import {
   AplicacionCobroRow,
@@ -64,6 +67,12 @@ export class PrismaCobroRepository extends CobroRepositoryPort {
         glosa: data.glosa,
       },
     });
+  }
+
+  async eliminar(tenantId: string, cobroId: string, tx: Prisma.TransactionClient): Promise<void> {
+    // `delete` (no deleteMany): el cobro ajeno o inexistente lanza P2025 exacto
+    // en vez de terminar en silencio (§4.2 — mismo criterio que `actualizar`).
+    await tx.cobro.delete({ where: { id: cobroId, organizationId: tenantId } });
   }
 
   async findById(
@@ -130,6 +139,30 @@ export class PrismaCobroRepository extends CobroRepositoryPort {
       comprobantes.map((c) => [
         // origenId nunca es null acá (filtrado por IN), pero el tipo Prisma
         // no lo sabe.
+        c.origenId ?? '',
+        { id: c.id, numero: c.numero, estado: c.estado, anulado: c.anulado },
+      ]),
+    );
+  }
+
+  async obtenerComprobantesDeVentas(
+    tenantId: string,
+    ventaIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Map<string, ComprobanteDeCobro>> {
+    if (ventaIds.length === 0) return new Map();
+    const client = tx ?? this.prisma;
+    const comprobantes = await client.comprobante.findMany({
+      where: {
+        organizationId: tenantId,
+        origenTipo: ORIGEN_TIPO_VENTA,
+        origenId: { in: ventaIds },
+      },
+      select: { id: true, numero: true, estado: true, anulado: true, origenId: true },
+    });
+
+    return new Map(
+      comprobantes.map((c) => [
         c.origenId ?? '',
         { id: c.id, numero: c.numero, estado: c.estado, anulado: c.anulado },
       ]),
@@ -255,9 +288,14 @@ export class PrismaCobroRepository extends CobroRepositoryPort {
     if (!cobro) return null;
 
     const ventas = await tx.$queryRaw<
-      Array<{ id: string; contactoId: string; montoTotal: Prisma.Decimal }>
+      Array<{
+        id: string;
+        contactoId: string;
+        montoTotal: Prisma.Decimal;
+        condicionPago: CondicionPago;
+      }>
     >`
-      SELECT id, "contactoId", "montoTotal"
+      SELECT id, "contactoId", "montoTotal", "condicionPago"
       FROM ventas
       WHERE id = ${params.ventaId} AND "organizationId" = ${tenantId}
       FOR UPDATE
@@ -287,7 +325,12 @@ export class PrismaCobroRepository extends CobroRepositoryPort {
 
     return {
       cobro: { id: cobro.id, contactoId: cobro.contactoId, monto: cobro.monto },
-      venta: { id: venta.id, contactoId: venta.contactoId, montoTotal: venta.montoTotal },
+      venta: {
+        id: venta.id,
+        contactoId: venta.contactoId,
+        montoTotal: venta.montoTotal,
+        condicionPago: venta.condicionPago,
+      },
       aplicadoAlCobro: fila?.aplicadoAlCobro ?? new Prisma.Decimal(0),
       aplicadoALaVenta: fila?.aplicadoALaVenta ?? new Prisma.Decimal(0),
     };

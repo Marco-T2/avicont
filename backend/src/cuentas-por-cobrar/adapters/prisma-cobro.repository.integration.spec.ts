@@ -379,6 +379,71 @@ describe('PrismaCobroRepository (integration)', () => {
     });
   });
 
+  describe('obtenerComprobantesDeVentas (punta venta de una aplicación)', () => {
+    it('indexa por ventaId el comprobante vinculado por (org, VENTA, origenId)', async () => {
+      const venta = await crearVenta(tenantA);
+      const comp = await crearComprobanteDeCobro(venta.id, {
+        origenTipo: 'VENTA',
+        estado: EstadoComprobante.CONTABILIZADO,
+        numero: 'V2607-000001',
+      });
+
+      const mapa = await repo.obtenerComprobantesDeVentas(tenantA, [venta.id]);
+
+      expect(mapa.get(venta.id)).toEqual({
+        id: comp.id,
+        numero: 'V2607-000001',
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+      });
+    });
+
+    it('ignora comprobantes de otro origenTipo con el mismo origenId', async () => {
+      const venta = await crearVenta(tenantA);
+      await crearComprobanteDeCobro(venta.id, { origenTipo: 'COBRO' });
+
+      const mapa = await repo.obtenerComprobantesDeVentas(tenantA, [venta.id]);
+
+      expect(mapa.size).toBe(0);
+    });
+
+    it('no cruza tenants (§4.2)', async () => {
+      const venta = await crearVenta(tenantA);
+      await crearComprobanteDeCobro(venta.id, {
+        origenTipo: 'VENTA',
+        estado: EstadoComprobante.CONTABILIZADO,
+      });
+
+      const mapa = await repo.obtenerComprobantesDeVentas(tenantB, [venta.id]);
+
+      expect(mapa.size).toBe(0);
+    });
+
+    it('con lista vacía no consulta y devuelve Map vacío', async () => {
+      await expect(repo.obtenerComprobantesDeVentas(tenantA, [])).resolves.toEqual(new Map());
+    });
+  });
+
+  describe('eliminar (borrador del cobro, REQ-CXC-02)', () => {
+    it('borra el cobro del tenant', async () => {
+      const cobro = await crearCobro(tenantA);
+
+      await prisma.$transaction((tx) => repo.eliminar(tenantA, cobro.id, tx));
+
+      await expect(repo.findById(tenantA, cobro.id)).resolves.toBeNull();
+    });
+
+    it('no cruza tenants: el cobro ajeno rebota con P2025 exacto y sobrevive (§4.2)', async () => {
+      const cobro = await crearCobro(tenantA);
+
+      await expect(
+        prisma.$transaction((tx) => repo.eliminar(tenantB, cobro.id, tx)),
+      ).rejects.toMatchObject({ code: 'P2025' });
+
+      await expect(repo.findById(tenantA, cobro.id)).resolves.not.toBeNull();
+    });
+  });
+
   describe('listarAplicacionesDeCobro', () => {
     it('devuelve las aplicaciones del cobro, la más reciente primero', async () => {
       const cobro = await crearCobro(tenantA, { monto: new Prisma.Decimal('1000.00') });
@@ -640,7 +705,14 @@ describe('PrismaCobroRepository (integration)', () => {
       expect(sumas).not.toBeNull();
       expect(sumas?.cobro).toMatchObject({ id: cobro.id, contactoId: contactoA });
       expect(sumas?.cobro.monto.toString()).toBe('500');
-      expect(sumas?.venta).toMatchObject({ id: venta.id, contactoId: contactoA });
+      // La condición de pago viaja EN el snapshot bajo lock: es el dato
+      // autoritativo con el que el service rechaza aplicar a una CONTADO
+      // (task 0) — una lectura aparte podría ver otra cosa.
+      expect(sumas?.venta).toMatchObject({
+        id: venta.id,
+        contactoId: contactoA,
+        condicionPago: CondicionPago.CREDITO,
+      });
       expect(sumas?.venta.montoTotal.toString()).toBe('1000');
       expect(sumas?.aplicadoAlCobro.toString()).toBe('250');
       expect(sumas?.aplicadoALaVenta.toString()).toBe('800');

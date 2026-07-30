@@ -21,6 +21,42 @@ export class CobroNoEncontradoError extends NotFoundError {
   }
 }
 
+/**
+ * Contacto inexistente o de otro tenant al registrar/editar un cobro — el
+ * mismo 404 en ambos casos (§4.2: no se revela la existencia de recursos
+ * ajenos). Espejo de `VENTA_CONTACTO_NO_ENCONTRADO`.
+ * Code: COBRO_CONTACTO_NO_ENCONTRADO — 404.
+ */
+export class CobroContactoNoEncontradoError extends NotFoundError {
+  constructor(contactoId: string) {
+    super('COBRO_CONTACTO_NO_ENCONTRADO', 'El contacto no existe', { contactoId });
+  }
+}
+
+/**
+ * La aplicación no existe en el tenant (o pertenece a otro): mismo 404
+ * (REQ-CXC-08 — devolver otra cosa le confirma al atacante que el recurso
+ * existe). Code: APLICACION_NO_ENCONTRADA — 404.
+ */
+export class AplicacionNoEncontradaError extends NotFoundError {
+  constructor(aplicacionId: string) {
+    super('APLICACION_NO_ENCONTRADA', 'La aplicación no existe', { aplicacionId });
+  }
+}
+
+/**
+ * La punta venta de una aplicación no existe en el tenant (REQ-CXC-08: el
+ * agujero clásico es aplicar un cobro del tenant A a una venta del tenant B —
+ * la venta ajena responde el MISMO 404 que la inexistente, nunca 403 ni 422).
+ * Vive acá y no en `ventas/` porque §3.3 prohíbe importar errores de otro
+ * módulo. Code: APLICACION_VENTA_NO_ENCONTRADA — 404.
+ */
+export class AplicacionVentaNoEncontradaError extends NotFoundError {
+  constructor(ventaId: string) {
+    super('APLICACION_VENTA_NO_ENCONTRADA', 'La venta no existe', { ventaId });
+  }
+}
+
 // ============================================================
 // 422 — estado inválido del documento o de la configuración
 // ============================================================
@@ -161,9 +197,91 @@ export class CobroGestionNoAbiertaError extends InvalidStateError {
   }
 }
 
+/**
+ * Contacto desactivado: no se le registran cobros nuevos (espejo de
+ * `VENTA_CONTACTO_INACTIVO`; la regla "existe y está activo" queda en el
+ * service según el reparto de `comprobantes/domain/validacion-cuentas.ts`).
+ * Code: COBRO_CONTACTO_INACTIVO — 422.
+ */
+export class CobroContactoInactivoError extends InvalidStateError {
+  constructor(contactoId: string) {
+    super('COBRO_CONTACTO_INACTIVO', 'El contacto está inactivo: no admite cobros nuevos', {
+      contactoId,
+    });
+  }
+}
+
+/**
+ * Una aplicación afirma que plata recibida canceló una venta, y un comprobante
+ * en BORRADOR no movió plata (ni uno anulado la sigue moviendo, §4.7). Ambas
+ * puntas de una `AplicacionCobro` DEBEN cumplir el predicado de cartera
+ * `estado IN (CONTABILIZADO, BLOQUEADO) AND anulado = false` — el MISMO de
+ * `ESTADOS_CONCILIABLES` (§4.4). Sin esta regla queda una asimetría real: la
+ * fila de cartera suma TODAS las aplicaciones, así que un cobro en BORRADOR
+ * aplicado a una venta le bajaría el saldo pendiente sin contar jamás como
+ * saldo a favor — los dos lados de la misma resta con predicados distintos.
+ *
+ * Decisión de orquestación 2026-07-30 (hueco no cubierto por la spec;
+ * pendiente de sumar a REQ-CXC-03 antes de archivar el change).
+ * Code: APLICACION_PUNTA_NO_CONTABILIZADA — 422.
+ */
+export class AplicacionPuntaNoContabilizadaError extends InvalidStateError {
+  constructor(punta: 'cobro' | 'venta', id: string, estado: string, anulado: boolean) {
+    const documento = punta === 'cobro' ? 'El cobro' : 'La venta';
+    const causa = anulado ? 'está anulado/a' : `está en estado ${estado}`;
+    super(
+      'APLICACION_PUNTA_NO_CONTABILIZADA',
+      `${documento} ${causa}: solo se aplican cobros y ventas contabilizados (plata efectivamente movida)`,
+      { punta, id, estado, anulado },
+    );
+  }
+}
+
+/**
+ * La punta venta de una aplicación DEBE integrar la cartera
+ * (`integraCartera`, Anti-01), y una venta CONTADO no la integra NUNCA
+ * (REQ-VTA-04 / D-04): se cobró en el acto, jamás aparece en el estado de
+ * cuenta. Aplicarle un cobro consumiría saldo a favor sin cancelar ninguna
+ * deuda visible en ningún lado — el espejo exacto de la asimetría del
+ * BORRADOR que motivó `APLICACION_PUNTA_NO_CONTABILIZADA`. No se reusa ese
+ * code porque su mensaje ("está en estado X") sería mentiroso acá: la
+ * CONTADO está perfectamente contabilizada.
+ *
+ * La pantalla FIFO nunca ofrece una CONTADO, pero REQ-CXC-05 es explícita:
+ * el backend valida sobre lo recibido — la sugerencia del frontend no es un
+ * control de seguridad.
+ *
+ * Decisión task 0 (2026-07-30); pendiente de sumar a REQ-CXC-03 antes de
+ * archivar el change. Code: APLICACION_VENTA_CONTADO — 422.
+ */
+export class AplicacionVentaContadoError extends InvalidStateError {
+  constructor(ventaId: string) {
+    super(
+      'APLICACION_VENTA_CONTADO',
+      'La venta es al contado: se cobró en el acto y no integra la cartera — no admite aplicaciones',
+      { ventaId },
+    );
+  }
+}
+
 // ============================================================
 // 409 — conflictos de estado
 // ============================================================
+
+/**
+ * El ciclo de vida del cobro espeja al de la venta: BORRADOR → contabilizar; un
+ * CONTABILIZADO/BLOQUEADO no se re-contabiliza ni se borra (se anula, §4.7).
+ * Espejo de `VENTA_NO_ES_BORRADOR`. Code: COBRO_NO_ES_BORRADOR — 409.
+ */
+export class CobroNoEsBorradorError extends ConflictError {
+  constructor(cobroId: string, estado: string) {
+    super(
+      'COBRO_NO_ES_BORRADOR',
+      `El cobro está en estado ${estado}: la operación solo aplica a borradores`,
+      { cobroId, estado },
+    );
+  }
+}
 
 /**
  * Period lock sin bypass (REQ-CXC-09, §4.4): el período de la `fechaContable`

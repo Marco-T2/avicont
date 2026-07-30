@@ -4,12 +4,19 @@ import {
   AplicacionContactoDistintoError,
   AplicacionExcedeCobroError,
   AplicacionExcedeVentaError,
+  AplicacionNoEncontradaError,
+  AplicacionPuntaNoContabilizadaError,
+  AplicacionVentaContadoError,
+  AplicacionVentaNoEncontradaError,
   CobroAnuladoNoEditableError,
   CobroConceptoNoConfiguradoError,
+  CobroContactoInactivoError,
+  CobroContactoNoEncontradoError,
   CobroCuentaDestinoNoElegibleError,
   CobroGestionNoAbiertaError,
   CobroMontoInferiorAplicadoError,
   CobroNoEncontradoError,
+  CobroNoEsBorradorError,
   CobroPeriodoNoAbiertoError,
 } from './cobro-errors';
 
@@ -127,5 +134,79 @@ describe('cobro-errors — codes y details estables', () => {
     expect(err.code).toBe('COBRO_ANULADO_NO_EDITABLE');
     expect(err.httpStatus).toBe(409);
     expect(err.details).toMatchObject({ cobroId: 'cobro-1' });
+  });
+
+  it('COBRO_NO_ES_BORRADOR es 409 y nombra el estado real del comprobante', () => {
+    const err = new CobroNoEsBorradorError('cobro-1', 'CONTABILIZADO');
+
+    expect(err.code).toBe('COBRO_NO_ES_BORRADOR');
+    expect(err.httpStatus).toBe(409);
+    expect(err.details).toMatchObject({ cobroId: 'cobro-1', estado: 'CONTABILIZADO' });
+  });
+
+  it('COBRO_CONTACTO_NO_ENCONTRADO es 404 (contacto ajeno = inexistente, §4.2)', () => {
+    const err = new CobroContactoNoEncontradoError('contacto-1');
+
+    expect(err.code).toBe('COBRO_CONTACTO_NO_ENCONTRADO');
+    expect(err.httpStatus).toBe(404);
+    expect(err.details).toMatchObject({ contactoId: 'contacto-1' });
+  });
+
+  it('COBRO_CONTACTO_INACTIVO es 422', () => {
+    const err = new CobroContactoInactivoError('contacto-1');
+
+    expect(err.code).toBe('COBRO_CONTACTO_INACTIVO');
+    expect(err.httpStatus).toBe(422);
+    expect(err.details).toMatchObject({ contactoId: 'contacto-1' });
+  });
+
+  it('APLICACION_NO_ENCONTRADA es 404 (aplicación ajena = inexistente, REQ-CXC-08)', () => {
+    const err = new AplicacionNoEncontradaError('app-1');
+
+    expect(err.code).toBe('APLICACION_NO_ENCONTRADA');
+    expect(err.httpStatus).toBe(404);
+    expect(err.details).toMatchObject({ aplicacionId: 'app-1' });
+  });
+
+  it('APLICACION_VENTA_NO_ENCONTRADA es 404 (venta ajena = inexistente, REQ-CXC-08)', () => {
+    const err = new AplicacionVentaNoEncontradaError('venta-1');
+
+    expect(err.code).toBe('APLICACION_VENTA_NO_ENCONTRADA');
+    expect(err.httpStatus).toBe(404);
+    expect(err.details).toMatchObject({ ventaId: 'venta-1' });
+  });
+
+  it('APLICACION_PUNTA_NO_CONTABILIZADA es 422 y nombra la punta, su estado y su flag anulado', () => {
+    const err = new AplicacionPuntaNoContabilizadaError('cobro', 'cobro-1', 'BORRADOR', false);
+
+    expect(err.code).toBe('APLICACION_PUNTA_NO_CONTABILIZADA');
+    expect(err.httpStatus).toBe(422);
+    expect(err.details).toMatchObject({
+      punta: 'cobro',
+      id: 'cobro-1',
+      estado: 'BORRADOR',
+      anulado: false,
+    });
+  });
+
+  it('APLICACION_PUNTA_NO_CONTABILIZADA distingue la punta venta anulada', () => {
+    const err = new AplicacionPuntaNoContabilizadaError('venta', 'venta-1', 'CONTABILIZADO', true);
+
+    expect(err.details).toMatchObject({
+      punta: 'venta',
+      id: 'venta-1',
+      estado: 'CONTABILIZADO',
+      anulado: true,
+    });
+  });
+
+  it('APLICACION_VENTA_CONTADO es 422, nombra la venta y NO habla de estados (la CONTADO está contabilizada)', () => {
+    const err = new AplicacionVentaContadoError('venta-1');
+
+    expect(err.code).toBe('APLICACION_VENTA_CONTADO');
+    expect(err.httpStatus).toBe(422);
+    expect(err.details).toMatchObject({ ventaId: 'venta-1' });
+    expect(err.message).toContain('contado');
+    expect(err.message).not.toContain('estado');
   });
 });

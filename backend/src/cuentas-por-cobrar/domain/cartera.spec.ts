@@ -1,10 +1,15 @@
+import { CondicionPago, EstadoComprobante } from '@prisma/client';
+
 import { FechaContable } from '@/common/domain/fecha-contable';
 import { Money } from '@/common/domain/money';
 
 import {
   diasAtraso,
+  esComprobanteConciliable,
   estadoComercial,
   estaVencida,
+  integraCartera,
+  motivoVentaFueraDeCartera,
   ordenarCarteraFifo,
   saldoPendiente,
   type VentaOrdenCartera,
@@ -185,6 +190,62 @@ describe('cartera (REQ-CXC-01) — todo derivado, nada persistido', () => {
       ordenarCarteraFifo(original);
 
       expect(original.map((v) => v.id)).toEqual(['v-jul01', 'v-jun01']);
+    });
+  });
+
+  describe('integraCartera — LA definición del predicado (Anti-01)', () => {
+    const credito = (estado: EstadoComprobante, anulado = false) => ({
+      condicionPago: CondicionPago.CREDITO,
+      estado,
+      anulado,
+    });
+
+    it('CREDITO + CONTABILIZADO + no anulada integra la cartera', () => {
+      expect(integraCartera(credito(EstadoComprobante.CONTABILIZADO))).toBe(true);
+      expect(motivoVentaFueraDeCartera(credito(EstadoComprobante.CONTABILIZADO))).toBeNull();
+    });
+
+    it('CREDITO + BLOQUEADO integra: el cierre mensual NO vacía la cartera (§4.4)', () => {
+      expect(integraCartera(credito(EstadoComprobante.BLOQUEADO))).toBe(true);
+    });
+
+    it('una venta CONTADO contabilizada NO integra: ya se cobró en el acto (D-04)', () => {
+      const contado = {
+        condicionPago: CondicionPago.CONTADO,
+        estado: EstadoComprobante.CONTABILIZADO,
+        anulado: false,
+      };
+      expect(integraCartera(contado)).toBe(false);
+      expect(motivoVentaFueraDeCartera(contado)).toBe('CONTADO');
+    });
+
+    it('un BORRADOR no integra: no movió plata todavía', () => {
+      expect(motivoVentaFueraDeCartera(credito(EstadoComprobante.BORRADOR))).toBe('NO_CONCILIABLE');
+    });
+
+    it('una anulada no integra aunque siga CONTABILIZADA (§4.7: el flag es ortogonal al estado)', () => {
+      expect(motivoVentaFueraDeCartera(credito(EstadoComprobante.CONTABILIZADO, true))).toBe(
+        'NO_CONCILIABLE',
+      );
+    });
+
+    it('CONTADO en BORRADOR reporta NO_CONCILIABLE: "no movió plata" es la condición más fundamental', () => {
+      expect(
+        motivoVentaFueraDeCartera({
+          condicionPago: CondicionPago.CONTADO,
+          estado: EstadoComprobante.BORRADOR,
+          anulado: false,
+        }),
+      ).toBe('NO_CONCILIABLE');
+    });
+  });
+
+  describe('esComprobanteConciliable — la mitad estado+anulado, compartida con la punta cobro', () => {
+    it('CONTABILIZADO y BLOQUEADO no anulados cuentan; BORRADOR y anulado no', () => {
+      expect(esComprobanteConciliable(EstadoComprobante.CONTABILIZADO, false)).toBe(true);
+      expect(esComprobanteConciliable(EstadoComprobante.BLOQUEADO, false)).toBe(true);
+      expect(esComprobanteConciliable(EstadoComprobante.BORRADOR, false)).toBe(false);
+      expect(esComprobanteConciliable(EstadoComprobante.CONTABILIZADO, true)).toBe(false);
     });
   });
 });

@@ -113,4 +113,21 @@ export abstract class CarteraReaderPort {
     contactoId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<CobroCarteraRow[]>;
+
+  /**
+   * Razón social del contacto — snapshot para la glosa de cabecera del
+   * comprobante del cobro (Q-2: autosuficiente en el Libro Diario, "Cobro a
+   * <cliente>", nunca "Cobro #id"). `null` si el contacto no existe o es de
+   * otro tenant (§4.2 — el service traduce a 404).
+   *
+   * Vive acá y no en `ContactosReaderPort` porque ese port deliberadamente NO
+   * expone la razón social (blast radius acotado); mismo motivo por el que
+   * `ventas` la lee vía su propio `VentaSnapshotsReaderPort` (§3.3/§3.7: cada
+   * módulo define su read-surface).
+   */
+  abstract obtenerRazonSocialContacto(
+    tenantId: string,
+    contactoId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string | null>;
 }

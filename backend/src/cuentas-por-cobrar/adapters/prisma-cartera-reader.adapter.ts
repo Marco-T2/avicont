@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CondicionPago, type Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 
 import { Money } from '@/common/domain/money';
 import { ESTADOS_CONCILIABLES } from '@/common/estados-comprobante';
@@ -9,6 +9,7 @@ import {
   ORIGEN_TIPO_VENTA,
 } from '@/comprobantes/ports/comprobante-sistema-writer.port';
 
+import { integraCartera } from '../domain/cartera';
 import { CarteraReaderPort, CobroCarteraRow, VentaCarteraRow } from '../ports/cartera-reader.port';
 
 /**
@@ -39,21 +40,21 @@ export class PrismaCarteraReaderAdapter extends CarteraReaderPort {
     tx?: Prisma.TransactionClient,
   ): Promise<VentaCarteraRow[]> {
     const client = tx ?? this.prisma;
+    // SIN filtro de condicionPago ni de estado en SQL a propósito (Anti-01):
+    // el predicado de cartera (CREDITO ∧ conciliable ∧ no anulada) tiene UNA
+    // sola definición — `integraCartera` en `domain/cartera.ts`, la misma que
+    // consume el guard de escritura del service — y se aplica acá EN MEMORIA
+    // sobre las ventas del contacto (conjunto acotado). Filtrarlo en el
+    // `where` duplicaría la regla y las dos copias divergirían en silencio.
     const ventas = await client.venta.findMany({
-      where: {
-        organizationId: tenantId,
-        contactoId,
-        // REQ-VTA-04 / D-04: una CONTADO no crea partida abierta. Filtrar por
-        // contacto a secas la colaría — su línea de débito también lleva
-        // contactoId (el Mayor de Caja documenta quién pagó).
-        condicionPago: CondicionPago.CREDITO,
-      },
+      where: { organizationId: tenantId, contactoId },
       select: {
         id: true,
         fechaContable: true,
         fechaVencimiento: true,
         createdAt: true,
         montoTotal: true,
+        condicionPago: true,
       },
       // Orden canónico FIFO (REQ-CXC-05) — mismo criterio y desempate que
       // `ordenarCarteraFifo` del dominio; el porqué de cada término vive en
@@ -63,26 +64,29 @@ export class PrismaCarteraReaderAdapter extends CarteraReaderPort {
     if (ventas.length === 0) return [];
 
     const ventaIds = ventas.map((v) => v.id);
-    const [conciliables, sumas] = await Promise.all([
-      // "¿Esta venta cuenta?" = plata efectivamente movida (§4.4): estado IN
-      // (CONTABILIZADO, BLOQUEADO) AND anulado = false. NUNCA `CONTABILIZADO`
-      // a secas — cerrar el período vaciaría la cartera del cliente.
+    const [comprobantes, sumas] = await Promise.all([
       client.comprobante.findMany({
         where: {
           organizationId: tenantId,
           origenTipo: ORIGEN_TIPO_VENTA,
           origenId: { in: ventaIds },
-          estado: { in: [...ESTADOS_CONCILIABLES] },
-          anulado: false,
         },
-        select: { origenId: true },
+        select: { origenId: true, estado: true, anulado: true },
       }),
       this.sumarAplicaciones(client, tenantId, 'ventaId', ventaIds),
     ]);
 
-    const enCartera = new Set(conciliables.map((c) => c.origenId));
+    const comprobantePorVenta = new Map(comprobantes.map((c) => [c.origenId, c]));
     return ventas
-      .filter((v) => enCartera.has(v.id))
+      .filter((v) => {
+        const comprobante = comprobantePorVenta.get(v.id);
+        if (comprobante === undefined) return false;
+        return integraCartera({
+          condicionPago: v.condicionPago,
+          estado: comprobante.estado,
+          anulado: comprobante.anulado,
+        });
+      })
       .map((v) => ({
         ventaId: v.id,
         fechaContable: v.fechaContable,
@@ -131,6 +135,21 @@ export class PrismaCarteraReaderAdapter extends CarteraReaderPort {
         monto: Money.of(c.monto),
         totalAplicado: sumas.get(c.id) ?? Money.ZERO,
       }));
+  }
+
+  async obtenerRazonSocialContacto(
+    tenantId: string,
+    contactoId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string | null> {
+    const client = tx ?? this.prisma;
+    // organizationId SIEMPRE primer predicado (§4.2 Anti-31): el contacto de
+    // otro tenant devuelve null, indistinguible del inexistente.
+    const contacto = await client.contacto.findFirst({
+      where: { organizationId: tenantId, id: contactoId },
+      select: { razonSocial: true },
+    });
+    return contacto?.razonSocial ?? null;
   }
 
   /** Σ `montoAplicado` por venta o por cobro, indexada por ese id. */

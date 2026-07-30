@@ -11,16 +11,80 @@
  * El estado comercial es ORTOGONAL al estado contable del comprobante y al
  * flag `anulado` (D-02): acá no existe ningún enum combinado. Qué ventas
  * INTEGRAN la cartera (`condicionPago = CREDITO` ∧ `estado IN (CONTABILIZADO,
- * BLOQUEADO)` ∧ `anulado = false`) lo filtra `CarteraReaderPort.listarVentasDeCartera`
- * — este archivo deriva sobre las que ya integran.
+ * BLOQUEADO)` ∧ `anulado = false`) lo define `integraCartera` en ESTE archivo
+ * (Anti-01: una sola definición) — la consumen la lectura
+ * (`PrismaCarteraReaderAdapter`) y la escritura (`CobrosService`).
  *
  * NO confundir con `listarVentasEnCartera` del repositorio de `ventas`: ese
  * método NO filtra `condicionPago`, así que consumirlo acá colaría las ventas
  * CONTADO al estado de cuenta, que es justo lo que REQ-VTA-04 prohíbe.
  */
 
+import { CondicionPago, type EstadoComprobante } from '@prisma/client';
+
 import { FechaContable } from '@/common/domain/fecha-contable';
 import { Money } from '@/common/domain/money';
+import { ESTADOS_CONCILIABLES } from '@/common/estados-comprobante';
+
+// ============================================================
+// Qué integra la cartera — LA definición del predicado (Anti-01)
+// ============================================================
+
+/**
+ * Proyección mínima de una venta candidata: su condición de pago y el
+ * estado/flag de su comprobante (el estado NO vive en la venta — REQ-VTA-01).
+ */
+export interface VentaCandidataACartera {
+  condicionPago: CondicionPago;
+  estado: EstadoComprobante;
+  anulado: boolean;
+}
+
+/**
+ * Por qué una venta queda FUERA de la cartera — o `null` si integra.
+ *
+ * - `NO_CONCILIABLE`: su comprobante no cumple `estado IN (CONTABILIZADO,
+ *   BLOQUEADO) AND anulado = false` — no movió plata (BORRADOR) o dejó de
+ *   moverla (anulada, §4.7). Se evalúa PRIMERO: es la condición más
+ *   fundamental y es la misma que rige la punta cobro.
+ * - `CONTADO`: la venta se cobró en el acto (REQ-VTA-04 / D-04) — jamás crea
+ *   partida abierta, aunque esté perfectamente contabilizada.
+ */
+export type MotivoVentaFueraDeCartera = 'NO_CONCILIABLE' | 'CONTADO';
+
+export function motivoVentaFueraDeCartera(
+  venta: VentaCandidataACartera,
+): MotivoVentaFueraDeCartera | null {
+  if (!esComprobanteConciliable(venta.estado, venta.anulado)) return 'NO_CONCILIABLE';
+  if (venta.condicionPago !== CondicionPago.CREDITO) return 'CONTADO';
+  return null;
+}
+
+/**
+ * Predicado completo de cartera (REQ-CXC-01):
+ * `condicionPago = CREDITO ∧ estado IN (CONTABILIZADO, BLOQUEADO) ∧ anulado = false`.
+ *
+ * ÚNICA definición (Anti-01): la consumen la LECTURA
+ * (`PrismaCarteraReaderAdapter.listarVentasDeCartera` — qué aparece en el
+ * estado de cuenta) y la ESCRITURA (`CobrosService` — a qué venta puede
+ * aplicarse un cobro). Sin esta unificación, una venta CONTADO contabilizada
+ * pasaba el guard de escritura y consumía saldo del cobro sin cancelar
+ * ninguna deuda visible.
+ */
+export function integraCartera(venta: VentaCandidataACartera): boolean {
+  return motivoVentaFueraDeCartera(venta) === null;
+}
+
+/**
+ * La mitad estado+anulado del predicado ("plata efectivamente movida", §4.4)
+ * — es lo que se exige de la punta COBRO de una aplicación, que no tiene
+ * condición de pago. `ESTADOS_CONCILIABLES` aporta la lista de estados; acá
+ * vive la composición con `anulado` para no repetir `... && !anulado` en cada
+ * consumidor.
+ */
+export function esComprobanteConciliable(estado: EstadoComprobante, anulado: boolean): boolean {
+  return ESTADOS_CONCILIABLES.includes(estado) && !anulado;
+}
 
 // ============================================================
 // Estado comercial

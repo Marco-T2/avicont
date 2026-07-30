@@ -15,7 +15,7 @@
 // solo la garantía de que lo leído no cambia hasta el commit (Anti-11/Anti-12,
 // cicatriz F-03).
 
-import type { EstadoComprobante, Prisma } from '@prisma/client';
+import type { CondicionPago, EstadoComprobante, Prisma } from '@prisma/client';
 
 export const COBRO_REPOSITORY_PORT = Symbol('COBRO_REPOSITORY_PORT');
 
@@ -128,7 +128,19 @@ export interface SumasAplicadasParams {
  */
 export interface SumasAplicadasConLock {
   cobro: { id: string; contactoId: string; monto: Prisma.Decimal };
-  venta: { id: string; contactoId: string; montoTotal: Prisma.Decimal };
+  /**
+   * `condicionPago` viaja EN el snapshot bajo lock a propósito: es el dato
+   * autoritativo con el que el service exige que la punta venta INTEGRE la
+   * cartera (`integraCartera`, Anti-01) — una CONTADO contabilizada no crea
+   * partida abierta y aplicarle un cobro consumiría saldo sin cancelar
+   * ninguna deuda visible. Leerlo en una query aparte podría ver otra cosa.
+   */
+  venta: {
+    id: string;
+    contactoId: string;
+    montoTotal: Prisma.Decimal;
+    condicionPago: CondicionPago;
+  };
   /** Σ montoAplicado de TODAS las aplicaciones del cobro (menos la excluida). */
   aplicadoAlCobro: Prisma.Decimal;
   /** Σ montoAplicado de TODAS las aplicaciones de la venta (menos la excluida). */
@@ -174,6 +186,15 @@ export abstract class CobroRepositoryPort {
     tx: Prisma.TransactionClient,
   ): Promise<Cobro>;
 
+  /**
+   * Borra físicamente un cobro en BORRADOR (el service ya verificó el estado
+   * del comprobante; el comprobante mismo se borra por
+   * `ComprobanteSistemaWriterPort.eliminarBorradorSistema`, en la MISMA TX).
+   * Lanza P2025 exacto si el cobro es ajeno o inexistente (§4.2). `tx`
+   * OBLIGATORIO: cobro y comprobante mueren juntos o no muere ninguno.
+   */
+  abstract eliminar(tenantId: string, cobroId: string, tx: Prisma.TransactionClient): Promise<void>;
+
   /** null si no existe o es de otro tenant (§4.2 — cobro ajeno → 404, REQ-CXC-08). */
   abstract findById(
     tenantId: string,
@@ -198,6 +219,21 @@ export abstract class CobroRepositoryPort {
   abstract obtenerComprobantesDeCobros(
     tenantId: string,
     cobroIds: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Map<string, ComprobanteDeCobro>>;
+
+  /**
+   * Comprobantes de un lote de VENTAS, indexados por `ventaId` (= `origenId`
+   * con `origenTipo = 'VENTA'`). Misma proyección que la de cobros: es la
+   * fuente del estado de la punta venta al escribir una aplicación — ambas
+   * puntas deben cumplir `estado IN (CONTABILIZADO, BLOQUEADO) AND anulado =
+   * false` (decisión 2026-07-30 sobre REQ-CXC-03; el porqué vive en
+   * `AplicacionPuntaNoContabilizadaError`). Lectura-proyección propia (§3.7):
+   * NO se importa nada de `ventas/` (§3.3).
+   */
+  abstract obtenerComprobantesDeVentas(
+    tenantId: string,
+    ventaIds: string[],
     tx?: Prisma.TransactionClient,
   ): Promise<Map<string, ComprobanteDeCobro>>;
 
