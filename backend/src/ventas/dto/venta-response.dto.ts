@@ -144,7 +144,13 @@ export function toVentaListItem(venta: Venta, comprobante: ComprobanteDeVenta): 
     fechaVencimiento: venta.fechaVencimiento === null ? null : fechaDbAIso(venta.fechaVencimiento),
     glosa: venta.glosa,
     cuentaDestinoId: venta.cuentaDestinoId,
-    montoTotal: venta.montoTotal.toString(),
+    // §4.5: el dinero cruza HTTP con sus 2 decimales SIEMPRE. `Decimal.toString()`
+    // descarta el cero final ("504.40" → "504.4") y la UI lo pinta crudo, así que
+    // un importe redondo se veía con un solo decimal en una columna de dinero.
+    // Peor: `estado-cuenta` publica ESA MISMA venta con `toBob()` ⇒ dos endpoints,
+    // el mismo número, dos strings distintos. `toFixed(2)` es lo que ya hace
+    // `comprobante-response.dto.ts` — acá se alinea la convención.
+    montoTotal: venta.montoTotal.toFixed(2),
     comprobanteId: comprobante.id,
     estado: comprobante.estado,
     numero: comprobante.numero,
@@ -165,10 +171,12 @@ export function toVentaResponse(
       orden: linea.orden,
       itemId: linea.itemId,
       descripcion: linea.descripcion,
+      // cantidad y precioUnitario son Decimal(18,6), NO dinero: van con
+      // `toString()` a propósito — `toFixed(2)` truncaría "6.305" a "6.31".
       cantidad: linea.cantidad.toString(),
       precioUnitario: linea.precioUnitario.toString(),
       cuentaIngresoId: linea.cuentaIngresoId,
-      subtotal: linea.subtotal.toString(),
+      subtotal: linea.subtotal.toFixed(2), // dinero (§4.5) — ver montoTotal
     })),
   };
 }

@@ -50,6 +50,47 @@ describe('venta-response.dto — mappers', () => {
     expect(res.lineas[0]?.subtotal).toBe('31.53');
   });
 
+  // Regresión: los montos salían con `Decimal.toString()`, que DESCARTA el cero
+  // final — "504.40" viajaba como "504.4". Ningún test lo cazaba porque todos
+  // usaban 31.53, que no tiene ceros a la derecha. Se veía en pantalla ("Bs 504.4"
+  // en una columna de dinero, porque la UI muestra el string crudo) y además
+  // contradecía a `estado-cuenta`, que publica ESA MISMA venta con `toBob()`:
+  // dos endpoints, el mismo importe, dos strings distintos.
+  it('un monto redondo conserva sus 2 decimales: "504.40", nunca "504.4" (§4.5)', () => {
+    const redondo = {
+      ...venta,
+      montoTotal: new Prisma.Decimal('504.40'),
+      lineas: [
+        { ...linea, cantidad: new Prisma.Decimal('80'), subtotal: new Prisma.Decimal('504.40') },
+      ],
+    };
+    const res = toVentaResponse(redondo, comprobante);
+
+    expect(res.montoTotal).toBe('504.40');
+    expect(res.lineas[0]?.subtotal).toBe('504.40');
+    expect(toVentaListItem(redondo, comprobante).montoTotal).toBe('504.40');
+  });
+
+  // El gemelo del anterior: cantidad y precioUnitario son Decimal(18,6) y NO son
+  // dinero. Sin este test, "arreglar" el de arriba aplicando toFixed(2) a todo
+  // truncaría un precio de 6.305 a 6.31 y el test seguiría verde.
+  it('cantidad y precioUnitario conservan sus decimales de escala 6, sin recortar a 2', () => {
+    const preciso = {
+      ...venta,
+      lineas: [
+        {
+          ...linea,
+          cantidad: new Prisma.Decimal('2.5'),
+          precioUnitario: new Prisma.Decimal('6.305'),
+        },
+      ],
+    };
+    const res = toVentaResponse(preciso, comprobante);
+
+    expect(res.lineas[0]?.precioUnitario).toBe('6.305');
+    expect(res.lineas[0]?.cantidad).toBe('2.5');
+  });
+
   it('fechaContable sale como YYYY-MM-DD sin hora ni corrimiento UTC (§4.6)', () => {
     const res = toVentaResponse(venta, comprobante);
     expect(res.fechaContable).toBe('2026-07-15');
