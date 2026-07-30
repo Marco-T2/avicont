@@ -1246,4 +1246,94 @@ describe('CobrosService', () => {
       expect(cartera.listarVentasDeCartera).not.toHaveBeenCalled();
     });
   });
+
+  describe('lecturas (task 5.10) — superficie read del controller', () => {
+    beforeEach(() => {
+      repo.listar.mockResolvedValue({ cobros: [cobroRow()], total: 1 });
+    });
+
+    describe('listar', () => {
+      it('devuelve cada cobro con el comprobante que le da su estado (REQ-CXC-02)', async () => {
+        const res = await service.listar(TENANT, {});
+
+        expect(res.total).toBe(1);
+        expect(res.page).toBe(1);
+        expect(res.limit).toBe(50);
+        expect(res.cobros).toHaveLength(1);
+        expect(res.cobros[0]?.comprobante.estado).toBe(EstadoComprobante.BORRADOR);
+      });
+
+      it('convierte los filtros de fecha ISO a @db.Date sin pasar por UTC (§4.6)', async () => {
+        await service.listar(TENANT, { fechaDesde: '2026-07-01', fechaHasta: '2026-07-31' });
+
+        const [tenant, filtros, pagination] = repo.listar.mock.calls[0] as [
+          string,
+          { fechaDesde?: Date; fechaHasta?: Date },
+          { page: number; limit: number },
+        ];
+        expect(tenant).toBe(TENANT);
+        expect(filtros.fechaDesde?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+        expect(filtros.fechaHasta?.toISOString()).toBe('2026-07-31T00:00:00.000Z');
+        expect(pagination).toEqual({ page: 1, limit: 50 });
+      });
+
+      it('capea el limit al máximo (Anti-28: paginación obligatoria)', async () => {
+        await service.listar(TENANT, { page: 3, limit: 9999 });
+
+        const [, , pagination] = repo.listar.mock.calls[0] as [unknown, unknown, unknown];
+        expect(pagination).toEqual({ page: 3, limit: 100 });
+      });
+
+      it('el cobro sin comprobante es dato roto y queda fuera sin tumbar el listado', async () => {
+        repo.obtenerComprobantesDeCobros.mockResolvedValue(new Map());
+
+        const res = await service.listar(TENANT, {});
+
+        expect(res.cobros).toEqual([]);
+        expect(res.total).toBe(1);
+      });
+
+      it('las lecturas NO abren transacción auditada: no emiten auditoría', async () => {
+        await service.listar(TENANT, {});
+
+        expect(auditedTx.run).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('obtener', () => {
+      it('devuelve cobro, comprobante y aplicaciones', async () => {
+        const aplicacion = {
+          id: APLICACION_ID,
+          ventaId: VENTA_ID,
+          montoAplicado: new Prisma.Decimal('300.00'),
+          createdAt: new Date(),
+        };
+        repo.listarAplicacionesDeCobro.mockResolvedValue([aplicacion]);
+
+        const res = await service.obtener(TENANT, COBRO_ID);
+
+        expect(res.cobro.id).toBe(COBRO_ID);
+        expect(res.comprobante.id).toBe(COMPROBANTE_ID);
+        expect(res.aplicaciones).toEqual([aplicacion]);
+        expect(auditedTx.run).not.toHaveBeenCalled();
+      });
+
+      it('el cobro ajeno o inexistente responde el mismo 404 (§4.2, REQ-CXC-08)', async () => {
+        repo.findById.mockResolvedValue(null);
+
+        await expect(service.obtener(TENANT, COBRO_ID)).rejects.toMatchObject({
+          code: 'COBRO_NO_ENCONTRADO',
+          httpStatus: 404,
+        });
+      });
+
+      it('el cobro sin comprobante es dato roto: el mismo 404', async () => {
+        repo.obtenerComprobantesDeCobros.mockResolvedValue(new Map());
+
+        await expect(service.obtener(TENANT, COBRO_ID)).rejects.toMatchObject({
+          code: 'COBRO_NO_ENCONTRADO',
+        });
+      });
+    });
+  });
 });

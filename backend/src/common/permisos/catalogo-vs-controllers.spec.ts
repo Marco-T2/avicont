@@ -166,19 +166,11 @@ const DECLARADOS_SIN_ENDPOINT: readonly string[] = [
   'contabilidad.compras.post',
   'contabilidad.compras.void',
   // Módulo comercial (change `ventas-piloto`): el catálogo se declaró entero
-  // en la Fase 1 —schema y RBAC juntos— y los controllers llegan en las
-  // fases 4 (ventas) y 5 (cobros). Cada grupo sale de esta lista cuando
-  // aterriza SU controller, no antes: la aserción es igualdad exacta en las
-  // dos direcciones.
-  //
-  // `contabilidad.items.*` salió en la Fase 3; `contabilidad.ventas.*` en la
-  // Fase 4 (VentasController). Quedan los 6 `cobros.*` hasta la Fase 5.
-  'contabilidad.cobros.read',
-  'contabilidad.cobros.create',
-  'contabilidad.cobros.update',
-  'contabilidad.cobros.delete',
-  'contabilidad.cobros.post',
-  'contabilidad.cobros.void',
+  // en la Fase 1 —schema y RBAC juntos— y los controllers llegaron en las
+  // fases 4 (ventas), 3 (`items.*`) y 5 (`cobros.*`, CobrosController +
+  // EstadoCuentaController). Cada grupo salió de esta lista cuando aterrizó
+  // SU controller, no antes: la aserción es igualdad exacta en las dos
+  // direcciones.
   // El cierre mensual se ejecuta hoy vía `contabilidad.periodos.cerrar`; estos
   // dos quedaron de un diseño anterior y no los exige ningún endpoint.
   'contabilidad.cierre-mensual.read',

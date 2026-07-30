@@ -1901,6 +1901,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cobros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar cobros del tenant con paginación y filtros (contactoId, rango de fechaContable). El estado de cada cobro es el de su comprobante. */
+        get: operations["CobrosController_listar"];
+        put?: never;
+        /** Guardar borrador de cobro. Crea el documento Y su comprobante INGRESO BORRADOR en la misma transacción (REQ-CXC-02): Debe cuenta destino / Haber CxC con el contacto en la línea. */
+        post: operations["CobrosController_crear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cobros/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle del cobro con sus aplicaciones vigentes. Ajeno → 404 (REQ-CXC-08). */
+        get: operations["CobrosController_obtener"];
+        /** Edición full-state: reemplaza el cobro en bloque y regenera su asiento preservando id y número. Bajar el monto por debajo de lo aplicado rechaza; cambiar el contacto desvincula TODAS las aplicaciones (REQ-CXC-06). */
+        put: operations["CobrosController_editar"];
+        post?: never;
+        /** Eliminar físicamente un BORRADOR junto con su comprobante. Un CONTABILIZADO no se borra: se anula con /anular (§4.7). */
+        delete: operations["CobrosController_eliminarBorrador"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cobros/{id}/contabilizar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Contabilizar el cobro: asigna número de la serie I{YY}{MM}-{correlativo} (D-11) y re-valida la elegibilidad de la cuenta destino. */
+        post: operations["CobrosController_contabilizar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cobros/{id}/anular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Anular el cobro (§4.7): flag anulado con motivo, comprobante y número preservados para siempre; elimina sus aplicaciones con rastro — las ventas vuelven a quedar pendientes por derivación (REQ-CXC-06). */
+        post: operations["CobrosController_anular"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cobros/{id}/aplicaciones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aplicar el cobro a una venta abierta del mismo contacto. NO genera asiento ni toca comprobantes (D-03) y queda exenta del period lock (REQ-CXC-03). Invariantes de sobre-aplicación bajo lock (REQ-CXC-04). */
+        post: operations["CobrosController_crearAplicacion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cobros/{id}/aplicaciones/{aplicacionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Editar el monto de una aplicación (> 0; en 0 se elimina, no se edita). El invariante de sobre-aplicación se re-evalúa excluyendo la fila editada (REQ-CXC-04). */
+        put: operations["CobrosController_editarAplicacion"];
+        post?: never;
+        /** Desaplicar: borra físicamente el vínculo (D-12) sin rastro — es el "reaplicar" normal de D-03, no una desvinculación forzada. La venta vuelve a mostrar saldo por derivación. */
+        delete: operations["CobrosController_eliminarAplicacion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/estado-cuenta/{contactoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Estado de cuenta del cliente (REQ-CXC-07): ventas de la cartera con saldo > 0 en orden canónico FIFO (el frontend auto-tilda sobre este orden), días de atraso derivados vía ClockPort y saldo a favor. Todo derivado, nada persistido. */
+        get: operations["EstadoCuentaController_obtener"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/libros/diario": {
         parameters: {
             query?: never;
@@ -3845,6 +3968,267 @@ export interface components {
              * @example Venta duplicada por error de carga
              */
             motivo: string;
+        };
+        CreateCobroDto: {
+            /**
+             * Format: uuid
+             * @description Cliente que paga.
+             */
+            contactoId: string;
+            /**
+             * @description Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @description Decimal(18,2) como string, > 0 (§4.5).
+             * @example 1250.50
+             */
+            monto: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino ELEGIDA (D-05): efectivo/equivalente según el criterio de REQ-CXC-02. El default Caja General es precarga de UI, no concepto de backend.
+             */
+            cuentaDestinoId: string;
+            /** @example Pago parcial de la factura 12 */
+            glosa: string;
+        };
+        AplicacionCobroItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ventaId: string;
+            /** @example 300.00 */
+            montoAplicado: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CobroResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contactoId: string;
+            /**
+             * @description YYYY-MM-DD, calendario puro (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @description Decimal(18,2) como string (§4.5).
+             * @example 1250.50
+             */
+            monto: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino elegida (D-05).
+             */
+            cuentaDestinoId: string;
+            /** @example Pago parcial de la factura 12 */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Comprobante INGRESO que da su estado al cobro.
+             */
+            comprobanteId: string;
+            /** @enum {string} */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+            /**
+             * @description Número de la serie I, asignado al contabilizar (§4.9, D-11). null en borrador.
+             * @example I2607-000001
+             */
+            numero: string | null;
+            /**
+             * @description Flag §4.7 — ortogonal al estado.
+             * @example false
+             */
+            anulado: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            aplicaciones: components["schemas"]["AplicacionCobroItemDto"][];
+        };
+        CobroListItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            contactoId: string;
+            /**
+             * @description YYYY-MM-DD, calendario puro (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @description Decimal(18,2) como string (§4.5).
+             * @example 1250.50
+             */
+            monto: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino elegida (D-05).
+             */
+            cuentaDestinoId: string;
+            /** @example Pago parcial de la factura 12 */
+            glosa: string;
+            /**
+             * Format: uuid
+             * @description Comprobante INGRESO que da su estado al cobro.
+             */
+            comprobanteId: string;
+            /** @enum {string} */
+            estado: "BORRADOR" | "CONTABILIZADO" | "BLOQUEADO";
+            /**
+             * @description Número de la serie I, asignado al contabilizar (§4.9, D-11). null en borrador.
+             * @example I2607-000001
+             */
+            numero: string | null;
+            /**
+             * @description Flag §4.7 — ortogonal al estado.
+             * @example false
+             */
+            anulado: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ListarCobrosResponseDto: {
+            cobros: components["schemas"]["CobroListItemDto"][];
+            /** @example 42 */
+            total: number;
+            /** @example 1 */
+            page: number;
+            /** @example 50 */
+            pageSize: number;
+        };
+        UpdateCobroDto: {
+            /**
+             * Format: uuid
+             * @description Cliente que paga.
+             */
+            contactoId: string;
+            /**
+             * @description Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6).
+             * @example 2026-07-15
+             */
+            fechaContable: string;
+            /**
+             * @description Decimal(18,2) como string, > 0 (§4.5).
+             * @example 1250.50
+             */
+            monto: string;
+            /**
+             * Format: uuid
+             * @description Cuenta destino ELEGIDA (D-05): efectivo/equivalente según el criterio de REQ-CXC-02. El default Caja General es precarga de UI, no concepto de backend.
+             */
+            cuentaDestinoId: string;
+            /** @example Pago parcial de la factura 12 */
+            glosa: string;
+        };
+        CobroContabilizadoResponseDto: {
+            /** Format: uuid */
+            comprobanteId: string;
+            /**
+             * @description Número de la serie I del tipo INGRESO (D-11).
+             * @example I2607-000001
+             */
+            numero: string;
+        };
+        AnularCobroDto: {
+            /**
+             * @description Motivo de la anulación, mínimo 10 caracteres (visible en auditoría).
+             * @example Cobro registrado dos veces por error
+             */
+            motivo: string;
+        };
+        CrearAplicacionDto: {
+            /**
+             * Format: uuid
+             * @description Venta abierta del MISMO contacto (REQ-CXC-03).
+             */
+            ventaId: string;
+            /**
+             * @description Decimal(18,2) como string, > 0 (§4.5).
+             * @example 300.00
+             */
+            montoAplicado: string;
+        };
+        AplicacionCobroResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ventaId: string;
+            /** @example 300.00 */
+            montoAplicado: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            cobroId: string;
+        };
+        EditarAplicacionDto: {
+            /**
+             * @description Decimal(18,2) como string, > 0 (§4.5).
+             * @example 150.50
+             */
+            montoAplicado: string;
+        };
+        VentaEstadoCuentaDto: {
+            /** Format: uuid */
+            ventaId: string;
+            /**
+             * @description YYYY-MM-DD, calendario puro (§4.6).
+             * @example 2026-07-10
+             */
+            fechaContable: string;
+            /** @example 2026-08-10 */
+            fechaVencimiento: string | null;
+            /** @example 1000.00 */
+            montoTotal: string;
+            /**
+             * @description Σ aplicado de sus cobros.
+             * @example 400.00
+             */
+            cobrado: string;
+            /**
+             * @description montoTotal − cobrado, derivado.
+             * @example 600.00
+             */
+            saldoPendiente: string;
+            /**
+             * @example PARCIAL
+             * @enum {string}
+             */
+            estadoComercial: "ABIERTA" | "PARCIAL" | "SALDADA";
+            /**
+             * @description fechaVencimiento < hoy (ClockPort) y saldo > 0.
+             * @example true
+             */
+            vencida: boolean;
+            /**
+             * @description Días de calendario desde el vencimiento; 0 si no venció.
+             * @example 3
+             */
+            diasAtraso: number;
+        };
+        EstadoCuentaResponseDto: {
+            /** Format: uuid */
+            contactoId: string;
+            /** @example Avícola Sur S.R.L. */
+            razonSocial: string;
+            /**
+             * @description El "hoy" (America/La_Paz) con el que se derivaron vencimiento y atraso.
+             * @example 2026-07-28
+             */
+            fechaCorte: string;
+            /** @description Ventas de la cartera con saldo > 0 en orden canónico FIFO (REQ-CXC-05): el frontend auto-tilda sobre ESTE orden, no lo recalcula. */
+            ventas: components["schemas"]["VentaEstadoCuentaDto"][];
+            /** @example 900.00 */
+            totalSaldoPendiente: string;
+            /**
+             * @description Σ saldos no aplicados de los cobros del contacto (anticipos).
+             * @example 300.00
+             */
+            saldoAFavor: string;
         };
         RangoFechasDto: {
             /** @example 2026-04-01 */
@@ -8714,6 +9098,256 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    CobrosController_listar: {
+        parameters: {
+            query?: {
+                /** @description Filtra por cliente. */
+                contactoId?: string;
+                /** @description Límite inferior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6). */
+                fechaDesde?: string;
+                /** @description Límite superior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6). */
+                fechaHasta?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListarCobrosResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_crear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCobroDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CobroResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CobroResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_editar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCobroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CobroResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_eliminarBorrador: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CobrosController_contabilizar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CobroContabilizadoResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_anular: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnularCobroDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CobrosController_crearAplicacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CrearAplicacionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AplicacionCobroResponseDto"];
+                };
+            };
+        };
+    };
+    CobrosController_editarAplicacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aplicacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditarAplicacionDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CobrosController_eliminarAplicacion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aplicacionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EstadoCuentaController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstadoCuentaResponseDto"];
+                };
             };
         };
     };

@@ -98,6 +98,31 @@ export interface CrearAplicacionInput {
  */
 export type EditarCobroInput = CrearCobroInput;
 
+export interface ListarCobrosInput {
+  contactoId?: string;
+  /** ISO `YYYY-MM-DD` (§4.6), límites inclusivos sobre `fechaContable`. */
+  fechaDesde?: string;
+  fechaHasta?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ListarCobrosResult {
+  cobros: { cobro: Cobro; comprobante: ComprobanteDeCobro }[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CobroDetalle {
+  cobro: Cobro;
+  comprobante: ComprobanteDeCobro;
+  aplicaciones: AplicacionDeCobro[];
+}
+
+const LIST_DEFAULT_LIMIT = 50;
+const LIST_MAX_LIMIT = 100;
+
 /**
  * Motivo user-facing del rastro `AplicacionCobroDesvinculada` (B-14) al
  * cambiar el cliente del cobro. El de anulación se compone con el motivo que
@@ -629,6 +654,64 @@ export class CobrosService {
 
       await this.repo.eliminarAplicaciones(tenantId, [aplicacionId], tx);
     });
+  }
+
+  // ============================================================
+  // 5.10 — Lecturas: superficie read del controller. SIN transacción
+  // auditada a propósito: los triggers de `comprobantes_audit` solo miran
+  // escrituras, y una lectura no emite auditoría (espejo de ventas 4.9).
+  // ============================================================
+
+  /**
+   * Listado paginado (Anti-28: paginación obligatoria, limit capeado) con el
+   * estado de cada cobro DERIVADO de su comprobante (REQ-CXC-02). Un cobro
+   * sin comprobante es un dato roto y queda fuera de la lista — el mismo
+   * criterio que el 404 del detalle, sin tumbar el listado entero.
+   */
+  async listar(tenantId: string, input: ListarCobrosInput): Promise<ListarCobrosResult> {
+    const page = input.page ?? 1;
+    const limit = Math.min(input.limit ?? LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT);
+
+    const filtros = {
+      ...(input.contactoId !== undefined ? { contactoId: input.contactoId } : {}),
+      ...(input.fechaDesde !== undefined
+        ? { fechaDesde: FechaContable.fromIso(input.fechaDesde).toDbDate() }
+        : {}),
+      ...(input.fechaHasta !== undefined
+        ? { fechaHasta: FechaContable.fromIso(input.fechaHasta).toDbDate() }
+        : {}),
+    };
+
+    const { cobros, total } = await this.repo.listar(tenantId, filtros, { page, limit }, undefined);
+    const comprobantes = await this.repo.obtenerComprobantesDeCobros(
+      tenantId,
+      cobros.map((c) => c.id),
+      undefined,
+    );
+
+    return {
+      cobros: cobros.flatMap((cobro) => {
+        const comprobante = comprobantes.get(cobro.id);
+        return comprobante === undefined ? [] : [{ cobro, comprobante }];
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * Detalle con comprobante y aplicaciones vigentes.
+   * @throws CobroNoEncontradoError (404) inexistente o ajeno (REQ-CXC-08).
+   */
+  async obtener(tenantId: string, cobroId: string): Promise<CobroDetalle> {
+    const { cobro, comprobante } = await this.obtenerCobroConComprobante(
+      tenantId,
+      cobroId,
+      undefined,
+    );
+    const aplicaciones = await this.repo.listarAplicacionesDeCobro(tenantId, cobroId, undefined);
+    return { cobro, comprobante, aplicaciones };
   }
 
   // ============================================================

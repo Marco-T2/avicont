@@ -5963,6 +5963,477 @@
         ]
       }
     },
+    "/api/cobros": {
+      "post": {
+        "operationId": "CobrosController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCobroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CobroResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Guardar borrador de cobro. Crea el documento Y su comprobante INGRESO BORRADOR en la misma transacción (REQ-CXC-02): Debe cuenta destino / Haber CxC con el contacto en la línea.",
+        "tags": [
+          "Cobros"
+        ]
+      },
+      "get": {
+        "operationId": "CobrosController_listar",
+        "parameters": [
+          {
+            "name": "contactoId",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por cliente.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "description": "Límite inferior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6).",
+            "schema": {
+              "example": "2026-07-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "description": "Límite superior inclusivo sobre fechaContable (YYYY-MM-DD, §4.6).",
+            "schema": {
+              "example": "2026-07-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListarCobrosResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Listar cobros del tenant con paginación y filtros (contactoId, rango de fechaContable). El estado de cada cobro es el de su comprobante.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/cobros/{id}": {
+      "get": {
+        "operationId": "CobrosController_obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CobroResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Detalle del cobro con sus aplicaciones vigentes. Ajeno → 404 (REQ-CXC-08).",
+        "tags": [
+          "Cobros"
+        ]
+      },
+      "put": {
+        "operationId": "CobrosController_editar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCobroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CobroResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Edición full-state: reemplaza el cobro en bloque y regenera su asiento preservando id y número. Bajar el monto por debajo de lo aplicado rechaza; cambiar el contacto desvincula TODAS las aplicaciones (REQ-CXC-06).",
+        "tags": [
+          "Cobros"
+        ]
+      },
+      "delete": {
+        "operationId": "CobrosController_eliminarBorrador",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Eliminar físicamente un BORRADOR junto con su comprobante. Un CONTABILIZADO no se borra: se anula con /anular (§4.7).",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/cobros/{id}/contabilizar": {
+      "post": {
+        "operationId": "CobrosController_contabilizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CobroContabilizadoResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Contabilizar el cobro: asigna número de la serie I{YY}{MM}-{correlativo} (D-11) y re-valida la elegibilidad de la cuenta destino.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/cobros/{id}/anular": {
+      "post": {
+        "operationId": "CobrosController_anular",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularCobroDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Anular el cobro (§4.7): flag anulado con motivo, comprobante y número preservados para siempre; elimina sus aplicaciones con rastro — las ventas vuelven a quedar pendientes por derivación (REQ-CXC-06).",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/cobros/{id}/aplicaciones": {
+      "post": {
+        "operationId": "CobrosController_crearAplicacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearAplicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AplicacionCobroResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Aplicar el cobro a una venta abierta del mismo contacto. NO genera asiento ni toca comprobantes (D-03) y queda exenta del period lock (REQ-CXC-03). Invariantes de sobre-aplicación bajo lock (REQ-CXC-04).",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/cobros/{id}/aplicaciones/{aplicacionId}": {
+      "put": {
+        "operationId": "CobrosController_editarAplicacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "aplicacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditarAplicacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Editar el monto de una aplicación (> 0; en 0 se elimina, no se edita). El invariante de sobre-aplicación se re-evalúa excluyendo la fila editada (REQ-CXC-04).",
+        "tags": [
+          "Cobros"
+        ]
+      },
+      "delete": {
+        "operationId": "CobrosController_eliminarAplicacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "aplicacionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Desaplicar: borra físicamente el vínculo (D-12) sin rastro — es el \"reaplicar\" normal de D-03, no una desvinculación forzada. La venta vuelve a mostrar saldo por derivación.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/estado-cuenta/{contactoId}": {
+      "get": {
+        "operationId": "EstadoCuentaController_obtener",
+        "parameters": [
+          {
+            "name": "contactoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoCuentaResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ],
+        "summary": "Estado de cuenta del cliente (REQ-CXC-07): ventas de la cartera con saldo > 0 en orden canónico FIFO (el frontend auto-tilda sobre este orden), días de atraso derivados vía ClockPort y saldo a favor. Todo derivado, nada persistido.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
     "/api/libros/diario": {
       "get": {
         "operationId": "ReportesController_obtenerLibroDiario",
@@ -10971,6 +11442,503 @@
         },
         "required": [
           "motivo"
+        ]
+      },
+      "CreateCobroDto": {
+        "type": "object",
+        "properties": {
+          "contactoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cliente que paga."
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-07-15",
+            "description": "Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6)."
+          },
+          "monto": {
+            "type": "string",
+            "example": "1250.50",
+            "description": "Decimal(18,2) como string, > 0 (§4.5)."
+          },
+          "cuentaDestinoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta destino ELEGIDA (D-05): efectivo/equivalente según el criterio de REQ-CXC-02. El default Caja General es precarga de UI, no concepto de backend."
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Pago parcial de la factura 12",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "contactoId",
+          "fechaContable",
+          "monto",
+          "cuentaDestinoId",
+          "glosa"
+        ]
+      },
+      "AplicacionCobroItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ventaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "montoAplicado": {
+            "type": "string",
+            "example": "300.00"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "ventaId",
+          "montoAplicado",
+          "createdAt"
+        ]
+      },
+      "CobroResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contactoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-07-15",
+            "description": "YYYY-MM-DD, calendario puro (§4.6)."
+          },
+          "monto": {
+            "type": "string",
+            "example": "1250.50",
+            "description": "Decimal(18,2) como string (§4.5)."
+          },
+          "cuentaDestinoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta destino elegida (D-05)."
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Pago parcial de la factura 12"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Comprobante INGRESO que da su estado al cobro."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "BORRADOR",
+              "CONTABILIZADO",
+              "BLOQUEADO"
+            ]
+          },
+          "numero": {
+            "type": "string",
+            "nullable": true,
+            "example": "I2607-000001",
+            "description": "Número de la serie I, asignado al contabilizar (§4.9, D-11). null en borrador."
+          },
+          "anulado": {
+            "type": "boolean",
+            "example": false,
+            "description": "Flag §4.7 — ortogonal al estado."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "aplicaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AplicacionCobroItemDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "contactoId",
+          "fechaContable",
+          "monto",
+          "cuentaDestinoId",
+          "glosa",
+          "comprobanteId",
+          "estado",
+          "numero",
+          "anulado",
+          "createdAt",
+          "updatedAt",
+          "aplicaciones"
+        ]
+      },
+      "CobroListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "contactoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-07-15",
+            "description": "YYYY-MM-DD, calendario puro (§4.6)."
+          },
+          "monto": {
+            "type": "string",
+            "example": "1250.50",
+            "description": "Decimal(18,2) como string (§4.5)."
+          },
+          "cuentaDestinoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta destino elegida (D-05)."
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Pago parcial de la factura 12"
+          },
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Comprobante INGRESO que da su estado al cobro."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "BORRADOR",
+              "CONTABILIZADO",
+              "BLOQUEADO"
+            ]
+          },
+          "numero": {
+            "type": "string",
+            "nullable": true,
+            "example": "I2607-000001",
+            "description": "Número de la serie I, asignado al contabilizar (§4.9, D-11). null en borrador."
+          },
+          "anulado": {
+            "type": "boolean",
+            "example": false,
+            "description": "Flag §4.7 — ortogonal al estado."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "contactoId",
+          "fechaContable",
+          "monto",
+          "cuentaDestinoId",
+          "glosa",
+          "comprobanteId",
+          "estado",
+          "numero",
+          "anulado",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ListarCobrosResponseDto": {
+        "type": "object",
+        "properties": {
+          "cobros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CobroListItemDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "example": 42
+          },
+          "page": {
+            "type": "number",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "number",
+            "example": 50
+          }
+        },
+        "required": [
+          "cobros",
+          "total",
+          "page",
+          "pageSize"
+        ]
+      },
+      "UpdateCobroDto": {
+        "type": "object",
+        "properties": {
+          "contactoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cliente que paga."
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-07-15",
+            "description": "Fecha contable de calendario, YYYY-MM-DD sin hora ni zona (§4.6)."
+          },
+          "monto": {
+            "type": "string",
+            "example": "1250.50",
+            "description": "Decimal(18,2) como string, > 0 (§4.5)."
+          },
+          "cuentaDestinoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Cuenta destino ELEGIDA (D-05): efectivo/equivalente según el criterio de REQ-CXC-02. El default Caja General es precarga de UI, no concepto de backend."
+          },
+          "glosa": {
+            "type": "string",
+            "example": "Pago parcial de la factura 12",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "contactoId",
+          "fechaContable",
+          "monto",
+          "cuentaDestinoId",
+          "glosa"
+        ]
+      },
+      "CobroContabilizadoResponseDto": {
+        "type": "object",
+        "properties": {
+          "comprobanteId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "numero": {
+            "type": "string",
+            "example": "I2607-000001",
+            "description": "Número de la serie I del tipo INGRESO (D-11)."
+          }
+        },
+        "required": [
+          "comprobanteId",
+          "numero"
+        ]
+      },
+      "AnularCobroDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "example": "Cobro registrado dos veces por error",
+            "description": "Motivo de la anulación, mínimo 10 caracteres (visible en auditoría).",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "CrearAplicacionDto": {
+        "type": "object",
+        "properties": {
+          "ventaId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Venta abierta del MISMO contacto (REQ-CXC-03)."
+          },
+          "montoAplicado": {
+            "type": "string",
+            "example": "300.00",
+            "description": "Decimal(18,2) como string, > 0 (§4.5)."
+          }
+        },
+        "required": [
+          "ventaId",
+          "montoAplicado"
+        ]
+      },
+      "AplicacionCobroResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ventaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "montoAplicado": {
+            "type": "string",
+            "example": "300.00"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cobroId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "ventaId",
+          "montoAplicado",
+          "createdAt",
+          "cobroId"
+        ]
+      },
+      "EditarAplicacionDto": {
+        "type": "object",
+        "properties": {
+          "montoAplicado": {
+            "type": "string",
+            "example": "150.50",
+            "description": "Decimal(18,2) como string, > 0 (§4.5)."
+          }
+        },
+        "required": [
+          "montoAplicado"
+        ]
+      },
+      "VentaEstadoCuentaDto": {
+        "type": "object",
+        "properties": {
+          "ventaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fechaContable": {
+            "type": "string",
+            "example": "2026-07-10",
+            "description": "YYYY-MM-DD, calendario puro (§4.6)."
+          },
+          "fechaVencimiento": {
+            "type": "string",
+            "nullable": true,
+            "example": "2026-08-10"
+          },
+          "montoTotal": {
+            "type": "string",
+            "example": "1000.00"
+          },
+          "cobrado": {
+            "type": "string",
+            "example": "400.00",
+            "description": "Σ aplicado de sus cobros."
+          },
+          "saldoPendiente": {
+            "type": "string",
+            "example": "600.00",
+            "description": "montoTotal − cobrado, derivado."
+          },
+          "estadoComercial": {
+            "type": "string",
+            "enum": [
+              "ABIERTA",
+              "PARCIAL",
+              "SALDADA"
+            ],
+            "example": "PARCIAL"
+          },
+          "vencida": {
+            "type": "boolean",
+            "example": true,
+            "description": "fechaVencimiento < hoy (ClockPort) y saldo > 0."
+          },
+          "diasAtraso": {
+            "type": "number",
+            "example": 3,
+            "description": "Días de calendario desde el vencimiento; 0 si no venció."
+          }
+        },
+        "required": [
+          "ventaId",
+          "fechaContable",
+          "fechaVencimiento",
+          "montoTotal",
+          "cobrado",
+          "saldoPendiente",
+          "estadoComercial",
+          "vencida",
+          "diasAtraso"
+        ]
+      },
+      "EstadoCuentaResponseDto": {
+        "type": "object",
+        "properties": {
+          "contactoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "razonSocial": {
+            "type": "string",
+            "example": "Avícola Sur S.R.L."
+          },
+          "fechaCorte": {
+            "type": "string",
+            "example": "2026-07-28",
+            "description": "El \"hoy\" (America/La_Paz) con el que se derivaron vencimiento y atraso."
+          },
+          "ventas": {
+            "description": "Ventas de la cartera con saldo > 0 en orden canónico FIFO (REQ-CXC-05): el frontend auto-tilda sobre ESTE orden, no lo recalcula.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VentaEstadoCuentaDto"
+            }
+          },
+          "totalSaldoPendiente": {
+            "type": "string",
+            "example": "900.00"
+          },
+          "saldoAFavor": {
+            "type": "string",
+            "example": "300.00",
+            "description": "Σ saldos no aplicados de los cobros del contacto (anticipos)."
+          }
+        },
+        "required": [
+          "contactoId",
+          "razonSocial",
+          "fechaCorte",
+          "ventas",
+          "totalSaldoPendiente",
+          "saldoAFavor"
         ]
       },
       "RangoFechasDto": {

@@ -13,7 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { EsFechaContableIso } from './es-fecha-contable-iso';
+import { EsFechaContableIso } from '@/common/validators/es-fecha-contable-iso';
 
 // Los montos y cantidades cruzan HTTP como STRING (§4.5): un float en JSON
 // pierde precisión antes de llegar a la columna Decimal(18,6).

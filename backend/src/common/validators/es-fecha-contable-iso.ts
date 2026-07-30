@@ -9,6 +9,11 @@ import { FechaContable } from '@/common/domain/fecha-contable';
  * Un `@Matches(/^\d{4}-\d{2}-\d{2}$/)` a secas no alcanza: "2026-02-31" pasa
  * el regex y `FechaContable.fromIso` lanza `RangeError` — que el filtro global
  * no mapea y saldría como 500. El DTO es la capa que lo convierte en 400.
+ *
+ * Vive en `common/validators/` (nació en `ventas/dto/`, Fase 4 del change
+ * `ventas-piloto`): lo consumen los DTOs de ventas Y de cuentas-por-cobrar, y
+ * §3.3 prohíbe el import cross-módulo mientras que duplicar la validación
+ * sería Anti-01. Mismo criterio que `FechaContable`, sobre la que se apoya.
  */
 export function EsFechaContableIso(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string): void {

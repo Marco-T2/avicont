@@ -20,6 +20,7 @@ import { ComprobantesModule } from './comprobantes/comprobantes.module';
 import { ContactosModule } from './contactos/contactos.module';
 import { ItemsModule } from './items/items.module';
 import { VentasModule } from './ventas/ventas.module';
+import { CuentasPorCobrarModule } from './cuentas-por-cobrar/cuentas-por-cobrar.module';
 import { TiposDocumentoFisicoModule } from './tipos-documento-fisico/tipos-documento-fisico.module';
 import { DocumentosFisicosModule } from './documentos-fisicos/documentos-fisicos.module';
 import { ReportesModule } from './reportes/reportes.module';
@@ -96,6 +97,7 @@ import { OrgStatusGuard } from './common/guards/org-status.guard';
     ContactosModule,
     ItemsModule,
     VentasModule,
+    CuentasPorCobrarModule,
     TiposDocumentoFisicoModule,
     DocumentosFisicosModule,
     ReportesModule,
