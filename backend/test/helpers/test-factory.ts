@@ -88,6 +88,22 @@ export async function cleanupTestData() {
   // aparte si los tests la inspeccionan.
   await prisma.comprobante.deleteMany({});
   await prisma.secuenciaComprobante.deleteMany({});
+  // Módulo comercial (ventas-piloto, fases 3-5). Van ANTES de `contacto` y de
+  // `cuenta`: `Venta` y `Cobro` tienen FK Restrict hacia las dos, y
+  // `LineaVenta`/`Item` la tienen hacia `Cuenta` e `Item`. El orden interno
+  // respeta esas mismas Restrict — las aplicaciones antes que sus puntas, las
+  // líneas antes que su venta y que el ítem que referencian.
+  //
+  // Hoy ningún e2e crea estas filas, así que la omisión estaba LATENTE; las
+  // tasks 7.1-7.6 sí las crean y el síntoma habría sido una violación de FK al
+  // borrar `contacto`/`cuenta`, que no nombra al módulo comercial por ningún
+  // lado. Se suma también `venta`, que la Fase 4 no había agregado.
+  await prisma.aplicacionCobroDesvinculada.deleteMany({});
+  await prisma.aplicacionCobro.deleteMany({});
+  await prisma.cobro.deleteMany({});
+  await prisma.lineaVenta.deleteMany({});
+  await prisma.venta.deleteMany({});
+  await prisma.item.deleteMany({});
   // Documento físico (Fase 1.4 slice 2): la tabla de asociación cascadea al
   // borrar Comprobante, pero la limpiamos explícita por idempotencia. Luego los
   // documentos (FK Restrict hacia TipoDocumentoFisico y Contacto) y por último
