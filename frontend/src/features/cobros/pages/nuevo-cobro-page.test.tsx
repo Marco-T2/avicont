@@ -386,4 +386,53 @@ describe('NuevoCobroPage — gating §14.7', () => {
     expect(screen.getByRole('button', { name: /guardar borrador/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /guardar y contabilizar/i })).toBeDisabled();
   });
+
+  // El flujo son TRES llamadas con TRES permisos: POST /cobros (create),
+  // /contabilizar (post) y /aplicaciones × N (**update** —
+  // cobros.controller.ts). Gatear sólo [create, post] prometía un botón que
+  // se rompe a mitad de camino: el cobro queda creado Y CONTABILIZADO y las
+  // aplicaciones dan 403, así que el importe entero se va a saldo a favor y
+  // la deuda del cliente no baja. Un rol "cajero" (registra y contabiliza,
+  // no re-imputa) es exactamente eso, y `CustomRole.permissions` es una lista
+  // libre — es construible, no hipotético.
+  const SIN_UPDATE = (p: string) => p !== 'contabilidad.cobros.update';
+
+  it('con create+post pero SIN update: contabilizar deshabilitado si hay filas tildadas', async () => {
+    hasMock.mockImplementation(SIN_UPDATE);
+    const user = userEvent.setup();
+    renderPage();
+
+    await elegirClienteYMonto(user, '600');
+    expect(screen.getByRole('button', { name: /guardar y contabilizar/i })).toBeDisabled();
+    // El borrador NO aplica nada, así que no necesita `update`: sigue abierto.
+    expect(screen.getByRole('button', { name: /guardar borrador/i })).toBeEnabled();
+  });
+
+  it('con create+post pero SIN update: contabilizar HABILITADO si no hay nada que aplicar', async () => {
+    // Sin ventas abiertas el cobro es un anticipo puro: cero aplicaciones,
+    // cero llamadas que exijan `update`. Gatear el botón acá le bloquearía al
+    // cajero una operación que el backend sí le acepta.
+    estadoCuentaMock.mockImplementation((contactoId: string | undefined) =>
+      contactoId === undefined
+        ? { data: undefined, isLoading: false, isError: false }
+        : {
+            data: {
+              contactoId,
+              razonSocial: 'Cliente Uno',
+              fechaCorte: '2026-07-30',
+              ventas: [],
+              totalSaldoPendiente: '0.00',
+              saldoAFavor: '0.00',
+            },
+            isLoading: false,
+            isError: false,
+          },
+    );
+    hasMock.mockImplementation(SIN_UPDATE);
+    const user = userEvent.setup();
+    renderPage();
+
+    await elegirClienteYMonto(user, '600');
+    expect(screen.getByRole('button', { name: /guardar y contabilizar/i })).toBeEnabled();
+  });
 });

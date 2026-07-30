@@ -133,6 +133,23 @@ function NuevoCobroForm({ cajaGeneralId }: { cajaGeneralId: string }): React.JSX
     (f) => f.tildada && (aCentavosSeguro(f.montoAplicado) ?? 0n) > 0n,
   );
 
+  // "Guardar y contabilizar" son TRES llamadas con TRES permisos distintos:
+  // POST /cobros (`create`) → /contabilizar (`post`) → /aplicaciones × N
+  // (`update`, igual que en la pantalla de edición). El gate los pide todos,
+  // porque un botón que se rompe en el paso 3 deja el peor estado posible: el
+  // cobro YA contabilizado y sin aplicaciones, o sea el importe entero como
+  // saldo a favor y la deuda del cliente intacta.
+  //
+  // `update` entra SOLO si hay algo que aplicar: sin filas tildadas el cobro
+  // es un anticipo puro y no dispara ninguna llamada que lo exija — pedirlo
+  // igual le bloquearía al usuario una operación que el backend le acepta.
+  const requiereUpdate = filasTildadas.length > 0;
+  const permisosContabilizar = [
+    PERMISSIONS.contabilidad.cobros.create,
+    PERMISSIONS.contabilidad.cobros.post,
+    ...(requiereUpdate ? [PERMISSIONS.contabilidad.cobros.update] : []),
+  ];
+
   async function doGuardar(values: CobroFormValues, modo: ModoGuardar): Promise<void> {
     const ventaPorId = new Map(ventas.map((v) => [v.ventaId, v]));
     // Las aplicaciones viajan EXPLÍCITAS: una por fila tildada con monto > 0.
@@ -314,11 +331,12 @@ function NuevoCobroForm({ cajaGeneralId }: { cajaGeneralId: string }): React.JSX
               Guardar borrador
             </PermissionButton>
             <PermissionButton
-              permission={[
-                PERMISSIONS.contabilidad.cobros.create,
-                PERMISSIONS.contabilidad.cobros.post,
-              ]}
-              deniedReason="No tenés permiso para registrar y contabilizar cobros"
+              permission={permisosContabilizar}
+              deniedReason={
+                requiereUpdate
+                  ? 'No tenés permiso para registrar, contabilizar y aplicar cobros a ventas'
+                  : 'No tenés permiso para registrar y contabilizar cobros'
+              }
               type="submit"
               disabled={isPending || resumen.excedeMonto}
               className="w-full sm:w-auto"
