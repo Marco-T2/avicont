@@ -24,7 +24,23 @@ en este orden:
 |---|---|---|---|---|
 | Ventas | `/ventas` | `contabilidad.ventas.read` | `'CONTABILIDAD'` | — |
 | Cobros | `/cobros` | `contabilidad.cobros.read` | `'CONTABILIDAD'` | — |
+| Estado de cuenta | `/estado-cuenta` | `contabilidad.cobros.read` | `'CONTABILIDAD'` | — |
 | Ítems | `/items` | `contabilidad.items.read` | `'CONTABILIDAD'` | — |
+
+**El 4º ítem entró el 2026-07-30 por decisión de Marco.** Esta tabla se escribió
+antes de que existieran las pantallas y declaraba tres; la task 6.7 agrega el
+estado de cuenta por cliente, que sin entrada de nav quedaba **construido e
+inalcanzable**. Se descartó la alternativa de llegar sólo desde el drawer de
+contacto: "¿cuánto me debe X?" es una tarea propia del contador, no un desvío
+de la ficha del cliente, y la pantalla ya trae su propio selector.
+
+El orden sigue el flujo de trabajo —vendo → cobro → consulto la deuda— y deja
+el maestro al final: Ítems es catálogo, se toca al dar de alta un producto y no
+todos los días.
+
+Que el estado de cuenta vaya bajo **`cobros.read`** y no bajo un permiso propio
+es deliberado y lo fija REQ-CXC-10: quien sólo lee no registra ni aplica cobros,
+pero SÍ consulta la deuda del cliente. **No se crea permiso nuevo.**
 
 **Posición (PA-2, cerrada por Marco 2026-07-28 — decisión de producto
 deliberada)**: el grupo va **PRIMERO en la sección, ANTES del ítem suelto
@@ -33,7 +49,7 @@ introduce REQ-SB-16. El piloto apunta a que el uso diario sea comercial y el
 asiento manual quede como excepción. Orden final de la sección:
 
 ```
-▸ Comercial   (Ventas · Cobros · Ítems)   ← primero
+▸ Comercial   (Ventas · Cobros · Estado de cuenta · Ítems)   ← primero
   Comprobantes                            ← sigue suelto; solo cambia de posición
 ▸ Libros
 ▸ Estados financieros

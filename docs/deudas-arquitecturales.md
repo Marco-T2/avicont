@@ -575,8 +575,15 @@ es `OWNER | ADMIN` por membership, no a nivel de `User`.
 
 ### 3.8 Frontend del piloto comercial (change `ventas-piloto`, Fase 6)
 
-**Menor, abierta:**
-- `mensaje-items.ts` vive en `features/items/lib/` en vez de `src/lib/error-messages.ts`, donde el resto de los módulos concentra los mapeos de códigos de error del backend. Sin consecuencia funcional; el día que un segundo consumidor necesite traducir un código de `items`, mover.
+**Menor, abierta — ya son TRES instancias (2026-07-30):**
+- `mensaje-items.ts`, `mensaje-ventas.ts` y `mensaje-cobros.ts` viven en `features/<x>/lib/` en vez de `src/lib/error-messages.ts`, donde el resto de los módulos concentra los mapeos de códigos de error del backend (`mensajePeriodosFiscales`, `mensajeComprobantes`, `mensajeDocumentosFisicos`, `mensajeCierreEjercicio`, `mensajeConciliacion`).
+  - Nació como una excepción en el PR #313 y el PR del piloto comercial la **replicó dos veces**, a sabiendas: los agentes tenían prohibido tocar `error-messages.ts` para no colisionar entre sí. Es el mecanismo típico por el que una excepción se vuelve el patrón — cada instancia nueva es más barata de agregar que de consolidar.
+  - **Por qué NO se consolidó en ese mismo PR**: son 371 líneas en 6 archivos y 10 sitios de import, con cero cambio de conducta. Meter un refactor mecánico de ese tamaño en un PR que ya trae 3 features, el nav y un arreglo de contrato del backend ensucia el diff y le quita valor al `git bisect` (§9.3). Va como change propio.
+  - Al consolidar: mover las tres funciones a `src/lib/error-messages.ts` con sus tests, respetando el orden alfabético de las secciones existentes, y borrar los `features/<x>/lib/mensaje-*.ts`.
+
+**Menor, abierta — resolución de nombres en los listados comerciales:**
+- Los listados de ventas y cobros resuelven `contactoId`/`cuentaDestinoId` con `useContactos`/`useCuentas` a `pageSize: 100`, que es el tope del backend (`LIST_MAX_PAGE_SIZE`). Con más de 100 contactos activos, las filas de arriba muestran el **UUID crudo** en vez de la razón social. Mismo patrón —y misma deuda— que `CuentaAutocomplete`. La salida real es que el listado proyecte el nombre desde el backend (como ya hace `ComprobanteListItemDto` con sus contactos embebidos), no subir el tope.
+- En la pantalla de edición de un cobro, una venta ya **SALDADA** aparece con su UUID: el estado de cuenta solo publica ventas con saldo > 0, así que la aplicación existente no encuentra su fila. Se resuelve leyendo `useVentas({ contactoId })` en esa pantalla.
 
 **Clase de bug que apareció acá y conviene tener escrita — no es deuda, es una regla:**
 - **Un requisito que manda `details` para que el usuario los LEA no está cumplido hasta que el frontend los muestre.** REQ-ITM-05 exige rechazar la desactivación de una cuenta enchufada a ítems "devolviendo en `details` la lista de ítems afectados" (Anti-41: *el admin no desactiva una cuenta sin saber que está enchufada*). El backend cumplía al pie de la letra y el diálogo del frontend caía al fallback genérico, así que el admin leía "re-mapealos" sin saber cuáles: el requisito estaba verde en los tests del backend y **muerto en la pantalla**. Cerrado en el PR #313.
