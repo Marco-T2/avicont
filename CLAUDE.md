@@ -1227,6 +1227,24 @@ chequeo decisivo no es ninguno de los síntomas, sino el del recuadro de abajo:
 | 1 | A | vivo pero trabado | recompilaba | 27 × `EADDRINUSE` | una jornada de cambios que nunca llegaron a la app |
 | 2 | B | **no existía** | **borrado** | **nada** | app sirviendo un binario de 1h35m atrás, sin un solo rastro |
 | 3 | A | vivo y compilando OK | recompilaba | 18 × `EADDRINUSE` | un fix recién mergeado que "no funcionaba" (daba el MISMO número de error que antes del fix) |
+| 4 | B ×2 | **DOS vivos a la vez** | recompilado por ambos | 15 y 9 × `EADDRINUSE`, uno en cada log | app sirviendo un binario sin los últimos 2 archivos, sin error visible |
+
+**La variante 4 (2026-07-30) es la que el PR #293 no podía cubrir.** Dos sesiones de
+Claude Code lanzaron cada una su propio `start:dev` en background (15:25 y 16:19). Los
+dos watchers quedaron vivos, ambos compilando al MISMO `dist/` y ambos reaccionando a
+cada cambio de archivo: a las 16:35:24 los dos logueaban `successfully started` en el
+mismo segundo, y a las 18:29 nacieron tres apps en ocho segundos. Un watcher solo le
+manda señales a SU propio hijo, así que **nada mata a un watcher rival** — y el fix
+#293, que hace que la app muera ante SIGTERM, no toca ese problema. Por la misma razón,
+liberar el `:3000` tampoco alcanza: el watcher rival relanza la app a los segundos.
+
+**Mitigación (`backend/scripts/liberar-dev.ts`)**: `start:dev` ahora desaloja primero el
+ÁRBOL de cualquier dev server previo de este repo (watcher + wrappers + app). Reconoce
+al watcher por el binario real del CLI de Nest bajo la raíz del backend — no por el
+texto `nest start --watch`, que aparece en el `sh -c` que lanza el propio script — y
+excluye la cadena de ancestros del proceso actual. Sin esas dos defensas se suicida:
+verificado en vivo, un `pkill -f 'avicont/backend/dist/main'` mató su propio shell
+porque el patrón estaba en su línea de comando.
 
 > **Si ves `EADDRINUSE` después del PR #293, no asumas la causa A.** Estaba
 > cubierta por un test, así que lo más probable es que alguien haya registrado un
@@ -1290,7 +1308,12 @@ antes de relanzar.
 viva** (la del dev, o `! pnpm run start:dev` en el prompt de Claude Code). Un
 `start:dev` disparado en background por una herramienta que después termina deja
 el proceso desacoplado: cuando ese padre muere, el PPID se reasigna a `/init` y
-ya está huérfano. Así nació la variante 2.
+ya está huérfano. Así nacieron las variantes 2 y 4.
+
+El desalojo de `start:dev` es una red, no un permiso: convierte "dos watchers
+compitiendo en silencio" en "el último gana", que es ruidoso y correcto. Pero un
+dev server lanzado en background sigue quedando huérfano igual, y sigue sirviendo
+un binario viejo hasta que alguien lo desaloje.
 
 Sigue siendo la práctica correcta, pero **no era la explicación de las variantes
 1 y 3**: esas venían de la causa A, y pasaban igual lanzando el dev server desde
