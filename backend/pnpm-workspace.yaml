@@ -53,16 +53,32 @@ minimumReleaseAgeStrict: true
 #   todo el stack OTel; como 2.9.0 pinea @opentelemetry/core a 2.9.0 exacto, convive una
 #   segunda copia de core en el árbol (aislada, sin estado global compartido: el estado
 #   global vive en @opentelemetry/api, que sigue en una sola copia).
+#
+# Tanda 2026-08-08 (advisories NUEVOS sobre paquetes que YA estaban acá: no se suma
+# ninguna entrada, se suben los pines. Las 6 versiones están fuera del cooldown de
+# 72h — verificado contra la fecha de publicación en el registry, no supuesto):
+# - brace-expansion GHSA-3jxr-9vmj-r5cp amplía su rango: 1.1.16→1.1.18 (pub. 2026-07-30),
+#   2.1.2→2.1.4 (2026-07-30), 5.0.7→5.0.9 (2026-07-30). Se mantiene el pin POR MAJOR
+#   por la misma razón de siempre (la v5 exporta nombrado y la v2 por default).
+# - js-yaml GHSA-5p4m-2wfm-xmqj (consumo cuadrático de CPU al resolver `!!omap`; el fix
+#   NO se backporteó): 3.15.0→3.15.1 y 4.3.0→4.3.1, ambas del 2026-07-31.
+# - fast-uri: 3.1.4→3.1.5 (2026-07-31).
+#
+# NOTA sobre el lockfile: `multer` y `@opentelemetry/propagator-jaeger` ya apuntaban a
+# la versión parcheada en ESTE archivo, pero el lock seguía resolviendo 2.1.x y 2.7.1
+# — la config se había editado sin regenerarlo. Como el CI instala con
+# `--frozen-lockfile`, el override no se aplicaba y el audit los reportaba igual. El
+# lock de este commit se regeneró, así que ahora config y lock coinciden.
 overrides:
   form-data: '>=4.0.6'
   protobufjs: '>=7.6.1'
   multer: '>=2.2.0'
-  'brace-expansion@1': '^1.1.16'
-  'brace-expansion@2': '^2.1.2'
-  'brace-expansion@5': '^5.0.7'
-  'js-yaml@3': '^3.15.0'
-  'js-yaml@4': '^4.3.0'
-  'fast-uri': '^3.1.4'
+  'brace-expansion@1': '^1.1.18'
+  'brace-expansion@2': '^2.1.4'
+  'brace-expansion@5': '^5.0.9'
+  'js-yaml@3': '^3.15.1'
+  'js-yaml@4': '^4.3.1'
+  'fast-uri': '^3.1.5'
   '@opentelemetry/propagator-jaeger': '^2.9.0'
 
 # Excepciones del audit gate (pnpm audit --audit-level high). Cada entrada declara
