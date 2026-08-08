@@ -41,13 +41,27 @@ minimumReleaseAgeStrict: true
 #   @tailwindcss/vite, @vitejs/plugin-react, @vitest/ui>vitest>@vitest/mocker). Toolchain
 #   de build, no llega al bundle de runtime. Parche 8.5.18 publicado 2026-07-12 — maduro,
 #   fuera del cooldown.
+#
+# Tanda 2026-08-08. Las 5 versiones están fuera del cooldown de 72h — verificado contra
+# la fecha de publicación en el registry, no supuesto:
+# - brace-expansion GHSA-3jxr-9vmj-r5cp amplía su rango: 2.1.2→2.1.4 y 5.0.7→5.0.9
+#   (ambas 2026-07-30). Se mantiene el pin POR MAJOR.
+# - js-yaml GHSA-5p4m-2wfm-xmqj (consumo cuadrático de CPU al resolver `!!omap`; el fix
+#   NO se backporteó): 4.3.0→4.3.1 (2026-07-31). Vía openapi-typescript>@redocly.
+# - undici: el advisory se extendió hasta <7.29.0, así que 7.28.0 dejó de alcanzar
+#   (parche 7.29.0, 2026-07-24). **Se conserva el tope en la major 7**: `^7.29.0` sigue
+#   sin cruzar a 8.x, que es lo que rompería jsdom@29 (ver arriba).
+# - nanoid GHSA-2v37-7h3g-55p8 (ENTRADA NUEVA): un generador custom con size 0 hace
+#   loop infinito. Entra por vite>postcss (7 paths). Parche 3.3.17 (2026-08-03). Se
+#   acota a `@3` para no arrastrar a 5.x a nadie que lo pida.
 overrides:
   form-data: '>=4.0.6'
   vite: '>=8.0.16'
-  undici: '^7.28.0'
-  'brace-expansion@2': '^2.1.2'
-  'brace-expansion@5': '^5.0.7'
-  'js-yaml@4': '^4.3.0'
+  undici: '^7.29.0'
+  'brace-expansion@2': '^2.1.4'
+  'brace-expansion@5': '^5.0.9'
+  'js-yaml@4': '^4.3.1'
+  'nanoid@3': '^3.3.17'
   postcss: '>=8.5.18'
 
 # Excepciones del audit gate (pnpm audit --audit-level high). Time-boxed: solo para
