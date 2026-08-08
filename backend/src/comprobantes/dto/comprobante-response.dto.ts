@@ -178,11 +178,19 @@ export function toComprobanteResponse(c: ComprobanteConLineas): ComprobanteRespo
       cuentaId: l.cuentaId,
       contactoId: l.contactoId,
       moneda: l.moneda,
-      debito: l.debito.toString(),
-      credito: l.credito.toString(),
+      // Dinero (§4.5): `Decimal(18,2)` con `toFixed(2)`, igual que los totales de
+      // la cabecera acá arriba y que los DTOs de venta y cobro. `toString()`
+      // DESCARTA el cero final —"1000.00" viajaba como "1000"— y la UI muestra
+      // el string crudo, así que se leía "Bs 1000" en una columna de dinero.
+      debito: l.debito.toFixed(2),
+      credito: l.credito.toFixed(2),
+      // `tipoCambio` NO es dinero: es `Decimal(14,8)` y `toFixed(2)` truncaría
+      // un 6.96000000 a 6.96 —inofensivo— pero un 0.14285714 a 0.14, que ya es
+      // otro número. Va con `toString()` a propósito, igual que
+      // `tipoCambioReexpresion` de la cabecera.
       tipoCambio: l.tipoCambio.toString(),
-      debitoBob: l.debitoBob.toString(),
-      creditoBob: l.creditoBob.toString(),
+      debitoBob: l.debitoBob.toFixed(2),
+      creditoBob: l.creditoBob.toFixed(2),
       glosaLinea: l.glosaLinea,
     })),
   };
