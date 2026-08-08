@@ -114,15 +114,24 @@ TDD estricto (RED → GREEN). 1 task = 1 commit; cierra con `tsc` + suite del su
 
 ## Fase 7 — Verificación
 
-- [ ] 7.1 E2E: venta CONTADO y CREDITO → asiento con número propio de la serie `V`.
-- [ ] 7.2 E2E: re-imputar un cobro deja su comprobante **byte-idéntico** (criterio 4).
-- [ ] 7.3 E2E: anular desde comprobantes → 409; desde ventas → procede (criterio 5).
-- [ ] 7.4 E2E: cerrar el período NO saca la venta del estado de cuenta (el comprobante pasa a `BLOQUEADO` y la cartera no se mueve).
-- [ ] 7.5 E2E: los cobros a Caja General **NO** aparecen entre los movimientos conciliables de la cuenta banco; el `TRASPASO` manual sí (criterio 7 — es el que prueba que Ventas no contaminó el pack de conciliación).
-- [ ] 7.6 E2E: dos ítems sin código conviven; dos con el mismo código chocan por el guard de servicio **y** por el constraint parcial (criterio 10).
-- [ ] 7.7 Regresión obligatoria: `catalogo-vs-controllers.spec.ts` (3 puntas), `catalogo-vs-espejo-frontend.spec.ts`, y la suite de EEFF sin cambios de conducta (por 2.3).
-- [ ] 7.8 Suite completa + `tsc` + `lint` + `gate:ui` + `gate:tap`.
-- [ ] 7.9 Checklist §7 de `frontend/CLAUDE.md`; lo que no se verificó va **sin tildar** y nombrado en el PR.
+Las cuatro suites nuevas comparten `test/helpers/comercial-fixture.ts` (org con
+gestión abierta + las 4 cuentas del circuito + config contable mapeada + cliente
++ ítem). Existe para no duplicar el escenario cuatro veces: Anti-01.
+
+**Método**: cada afirmación NEGATIVA va con su gemela positiva, o pasaría por la
+razón equivocada. "El cobro no aparece en la conciliación" es verde también con
+un panel que devuelva siempre cero; "el comprobante quedó byte-idéntico" es verde
+también con un snapshot que no mire nada.
+
+- [x] 7.1 E2E: venta CONTADO y CREDITO → asiento con número propio de la serie `V`. `test/ventas.e2e-spec.ts`. CONTADO debita la cuenta destino ELEGIDA, CREDITO debita CxC; `V2607-000001` y `V2607-000002` consecutivos. Va con el caso que prueba que la serie es **propia**: un `DIARIO` del mismo mes saca `D2607-000001` y no corre el correlativo de ventas. **El importe se compara NUMÉRICO, no por string** — ver el hallazgo del §Registro más abajo.
+- [x] 7.2 E2E: re-imputar un cobro deja su comprobante **byte-idéntico** (criterio 4). `test/cobros.e2e-spec.ts`. Aplicar → bajar el monto → desaplicar → re-aplicar a OTRA venta, comparando contra el snapshot de la FILA (cabecera + líneas, `updatedAt` incluido) y no contra el DTO: una reescritura con los mismos valores no la delata el DTO y sí `updatedAt`. Gemelo: anular el cobro SÍ mueve el comprobante.
+- [x] 7.3 E2E: anular desde comprobantes → 409; desde ventas → procede (criterio 5). 409 `COMPROBANTE_ANULACION_DESDE_ORIGEN` + se verifica que el rechazo no dejó nada a medias; por ventas → 204, `anulado=true`, número preservado (§4.7) y la venta sale de la cartera.
+- [x] 7.4 E2E: cerrar el período NO saca la venta del estado de cuenta (el comprobante pasa a `BLOQUEADO` y la cartera no se mueve). Sobre enero, que es el único período que se puede cerrar sin cerrar antes los anteriores (§4.4). **Validado por mutación**: sacando `BLOQUEADO` de `ESTADOS_CONCILIABLES` muere este test y sólo este.
+- [x] 7.5 E2E: los cobros a Caja General **NO** aparecen entre los movimientos conciliables de la cuenta banco; el `TRASPASO` manual sí (criterio 7 — es el que prueba que Ventas no contaminó el pack de conciliación). `test/comercial-conciliacion.e2e-spec.ts`. El traspaso entra por UNA sola línea, la del banco: el panel es de la CUENTA, no del comprobante. Tres casos: cobro a Caja (no entra), venta CONTADO a Caja (no entra), venta CONTADO cobrada DIRECTO al banco (**sí** entra — el criterio es la cuenta, no el módulo, y es lo que impide que un panel siempre-vacío pase). **Validado por mutación**: quitando el filtro `cuentaId` del adapter mueren los tres.
+- [x] 7.6 E2E: dos ítems sin código conviven; dos con el mismo código chocan por el guard de servicio **y** por el constraint parcial (criterio 10). `test/items.e2e-spec.ts`. El constraint se ejercita **salteando el servicio** (escritura Prisma → `P2002`), porque probar sólo el 409 deja pasar el día en que alguien borra el índice. Se suma un caso que lee `pg_indexes` y exige el `WHERE (codigo IS NOT NULL)`: los NULL no se agrupan ni en un UNIQUE común, así que sin esa aserción nada distingue el índice parcial del corriente — y es justo lo que se lleva puesto una migration regenerada (§11.6).
+- [x] 7.7 Regresión obligatoria: `catalogo-vs-controllers.spec.ts` (3 puntas), `catalogo-vs-espejo-frontend.spec.ts`, y la suite de EEFF sin cambios de conducta (por 2.3). Verde.
+- [x] 7.8 Suite completa + `tsc` + `lint` + `gate:ui` + `gate:tap`. Backend **262 suites / 3762 tests**; **E2E 55 suites / 650 tests** (51→55 suites); frontend **288 archivos / 2325 tests**; `tsc` backend y `tsc -b` frontend limpios (`--noEmit` en `frontend/` NO chequea nada); lint backend limpio, frontend 0 errores + 1 warning PREEXISTENTE (`react-hooks/incompatible-library` en `informe-conciliacion`, archivo no tocado); `gate:ui` y `gate:tap` **62 mediciones cada uno, verdes**, y las 6 rutas comerciales están en `rutas-gate.mjs`.
+- [x] 7.9 Checklist §7 de `frontend/CLAUDE.md`; lo que no se verificó va **sin tildar** y nombrado en el PR. **Este PR no toca un solo archivo de `frontend/`**, así que el checklist no aplica a su diff — el de la Fase 6 se cubrió en los PRs #313/#314. Lo que igual se corrió y quedó verde: 375 px y 768 px (los dos viewports de los gates) y tap targets con dedo emulado. **Sin verificar, a propósito**: 1440 px (los gates no lo miden), modo oscuro, drawer `< md`, auto-zoom de iOS, estrategia de tablas y modales — todos ítems de UI sobre código que este PR no modifica.
 
 ---
 
@@ -147,3 +156,32 @@ Qué cambió respecto del desglose mergeado en el #298, y por qué.
 | **2.5 reescrita** | El hueco de `requiereContacto` ya lo cerró #294; el extract queda por anti-duplicación |
 | Números de línea | `contabilizar` 451→454, `editarContabilizado` 702→703, `resolverYValidarBorrador` 1277→1286 (drift de #294) |
 | 6.3 | Se conserva el "9 listas" —**verificado exacto**— con los archivos enumerados para que no se busque en el lugar equivocado |
+
+---
+
+## Hallazgo de la Fase 7 (2026-08-08) — NO se arregla en este change
+
+Escribiendo la 7.1 apareció un defecto **preexistente y ajeno al piloto**, en
+`comprobantes/dto/comprobante-response.dto.ts`: la cabecera serializa los montos
+con `toFixed(2)` y las **líneas** con `toString()`. Como `Prisma.Decimal.toString()`
+descarta el cero final, `1000.00` sale `"1000"` y `MontoCell` lo pinta crudo:
+**"Bs 1000"** en el detalle del comprobante, contra **"Bs 1000.00"** en el detalle
+de la venta, para el mismo importe.
+
+Es exactamente el defecto que este change ya arregló **dos veces** —en
+`venta-response.dto.ts` y en `cobro-response.dto.ts`— una capa más adentro. Y el
+propio DTO se contradice: su `@ApiProperty` documenta `example: '1000.00'`.
+
+Dos tests de `comprobantes.service.spec.ts` (líneas 2804 y 2915) **assertean el
+valor sin ceros** (`toBe('1000')`, `toBe('500')`): la conducta buggeada está
+congelada, así que el arreglo los toca.
+
+**Por qué no entra acá**: es del módulo `comprobantes`, no del comercial, y §9.1
+pide un scope por commit. Va como change propio (`fix(comprobante)`), donde se
+pueda decidir de una sola vez qué campos son dinero —`debito`/`credito`/`*Bob`
+son `Decimal(18,2)`— y cuáles no: `tipoCambio` es `Decimal(14,8)` y `toFixed(2)`
+lo destruiría. Ese matiz es justo el que convierte un "arreglo obvio" en una
+regresión, y el mismo que ya mordió al normalizar los montos de ventas.
+
+**Los tests de la Fase 7 no dependen del formato**: comparan el importe numérico,
+así que quedan verdes con el defecto y con el arreglo.
