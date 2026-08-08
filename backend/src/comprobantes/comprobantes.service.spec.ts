@@ -2800,8 +2800,12 @@ describe('ComprobantesService', () => {
       );
       // El response expone el valor formateado
       expect(result.tipoCambioReexpresion).toBe('6.96');
-      // Los montoBob de líneas NO se alteran
-      expect(result.lineas[0]?.debitoBob).toBe('1000');
+      // Los montoBob de líneas NO se alteran. El "1000.00" es FORMATO del DTO
+      // (dinero va con 2 decimales, §4.5) — lo que este caso fija es que
+      // `tipoCambioReexpresion` no reexpresa los importes ya calculados, no
+      // cómo se serializan. Antes decía '1000' porque el mapper usaba
+      // `Decimal.toString()`, que descartaba el cero final.
+      expect(result.lineas[0]?.debitoBob).toBe('1000.00');
     });
 
     it('usa default 1.00000000 cuando tipoCambioReexpresion se omite', async () => {
